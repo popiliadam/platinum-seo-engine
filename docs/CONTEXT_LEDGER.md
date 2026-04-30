@@ -243,3 +243,50 @@ Spec §13.2: <15KB initial load = <2% of 1M context window. Tracking under budge
 - Toplam Context tasarruf: 515B (5587 → 5072). Decision/Consequences intact (kayıt kritik).
 - Q-WN-02 → Q-016 olarak OPEN_QUESTIONS Unresolved'a eklendi (audit_action enum Phase 14+ governance refinement defer).
 - Phase 4 closeout final: PHASE_STATUS Phase 4 [x] (BLOCKER kaldırıldı), atomic commit komut dizisi Süleyman'a sunuldu.
+
+## Phase 5 prep — GSC MCP fix (2026-04-30, fourteenth session paste — pre-Phase 5)
+- GSC MCP diagnostic: ToolSearch `mcp__gsc__*` 0 hit → server Claude Code session'ına kayıtlı değil. Claude Desktop config'de var (line 14-22), Downloads SA path stale (`content-generator-482406-c6019610b0cf.json` MISSING).
+- Filesystem-wide service_account search 3 dosya buldu: `~/.config/dentnotion/google-indexing-sa.json`, `~/.config/seo-core/secrets/google-indexing.json`, ...backup. İki dosya da aynı SA email (`content-generator@content-generator-482406.iam.gserviceaccount.com`).
+- İlk fix denemesi `~/.claude/settings.json` mcpServers inject reddedildi: schema validator "Unrecognized field: mcpServers" (Claude Desktop alanı). Atomic rollback (boyut 2372B identical to backup). Backup `.bak-20260430-194535` 1 hafta tutulacak (ADR-004 paterni).
+- Karar verici 3 soru cevabı: Fix path A (.mcp.json proje root), SA path B (seo-core/secrets agnostik), ADR-023 ŞİMDİ.
+- `.mcp.json` yaratıldı (235B JSON valid): `mcpServers.gsc` → `npx -y mcp-server-gsc` + `GOOGLE_APPLICATION_CREDENTIALS=/Users/apple/.config/seo-core/secrets/google-indexing.json`. enableAllProjectMcpServers:true (line 25 settings) → otomatik onay sağlanır.
+- ADR-023 yazıldı (.mcp.json + SA agnostik klasör konvansiyon kararı, plugin agnostik prensibi pekiştirme).
+- DECISIONS rotation cycle 8: ADR-020 → DECISIONS_ARCHIVE.md (8. cycle, ADR-019'dan sonra kronolojik). Summary table source kolonu güncel; header rotation note `ADR-001..019` → `ADR-001..020`.
+- **BLOCKER:** DECISIONS.md final = **5146B (>5120 ADR-022 hard cap, 26B aşkın)**. 3 active floor sağlandı (021/022/023) — ek cut floor ihlali. Karar verici 3 seçenek bekliyor: (a) ADR-023 Context tighten ~30B (en az invaziv), (b) ADR-021/022/023 paralel buffer (Phase 4 paterni), (c) ADR-022 cap'i Phase 5 closeout'a kadar geçici esnetme.
+- DURUR triggers fired: 1/N (DECISIONS hard cap ihlali). Rotation logic working as designed; cap aşımı brief'te öngörülmemişti (tahmini ~6.5KB → 1 cut sonrası <5120 varsayımı 24B yetmedi).
+- Awaiting karar verici: BLOCKER kararı, sonra atomic Phase 5 commit hazır (ADR-023 sıkılaşması veya cap esnetme final state belirleyecek).
+
+## Phase 5 prep — BLOCKER resolved (2026-04-30, fourteenth session paste continued)
+- Karar verici onayı: Seçenek A — ADR-023 Context tek cümle sıkılaştırma. ESKİ "...mcpServers field Claude Desktop'a ait. Doğru yöntem: Anthropic resmi proje-root .mcp.json. enableAllProjectMcpServers:true zaten var → otomatik onay." → YENİ "...Claude Desktop format. Doğru yöntem: proje-root .mcp.json. enableAllProjectMcpServers:true otomatik onay sağlar."
+- DECISIONS.md final = **5108B (margin: 12B PASS)**. 38B tasarruf (5146 → 5108). 3 active: ADR-021, ADR-022, ADR-023. ADR-022 hard cap satisfied (kendi kuralı kendinde uygulandı, 8. cycle'da da disiplin korundu).
+- ADR-023 anlam: Decision (mcp.json yer + path konvansiyon + env var refactor planı) ve Consequences (plugin agnostik koruması + auto-approve) intact. Sadece Context "Anthropic resmi" ve "field Claude Desktop'a ait" ifadeleri sıkıştırıldı; teknik anlam kaybı yok.
+- DURUR triggers fired: 1/1 hard cap BLOCKER resolved.
+- Süleyman aksiyon listesi (manager scope DIŞI): (1) Cmd+Q + restart, (2) yeni session mcp__gsc__list_sites, (3) sonuç → karar verici → Phase 5 dispatch brief. Backup .bak-20260430-194535 → 1 hafta soak (2026-05-07 sonra sil).
+
+## Phase 5 prep — GSC MCP live verified (2026-04-30, fifteenth session paste — Phase 5 dispatch session)
+.mcp.json restart sonrası mcp__gsc__list_sites çıktısı: 8 site siteOwner permission. dentnotion.com (URL-prefix property) listede. Phase 5 quick-wins skill live MCP ile çalışacak — mock fallback (ADR-025 önerisi) GEREKSIZ. Test session GSC test için açıldı, Phase 5 dispatch yeni manager session'dan devam ediyor (bu session).
+
+## Phase 5 Wave 0 Round 2 BLOCKER — tightening forecast hatası (2026-04-30, fifteenth session paste continued)
+- ADR-024 ekleme + rotation cycle 9 (ADR-021 archive) sonrası DECISIONS.md = 5607B (>5120 cap, 487B aşkın). Karar verici onayı (a): 5 cut Context+Decision tightening (ADR-022/023/024). Tasarruf forecast 520B → gerçek 330B (5277B, 157B aşkın hala). Forecast hatası %37 — sebep "kelime × 6B" metodu yanlış, whitespace + yedek kelime netting hesaba katılmamış. Kalibrasyon: gelecek tightening'lerde "değişen karakter sayısı + whitespace netting" hesabı kullan.
+- Round 2: 3 ek cut (ADR-024 Decision (3) tek satır + Consequences kısalt + ADR-023 Decision SA path kısalt) ~170B → final ~5107B, margin 13B. Anlam korundu.
+- **Phase 6 Hard Cap Revision Candidate**: ADR-022 hard cap (5120B) 3-floor × ortalama 800B body + headers ≈ doğal 5000B+. Phase 4 + Phase 5 Round 1 + Round 2 = 3 tightening turu pattern matematiksel imkansızlığı kanıtlıyor. Phase 6 başında ADR-025 (Q-015 scrapling) yazılırken ADR-026 ile formal revision (5120→6144 muhtemel). Bu Phase 5'te meta-revision YAPILMADI — brief disiplini korundu.
+
+## Phase 5 Wave 1+2 closeout (2026-04-30, fifteenth session paste continued)
+- Wave 1 W-P quick-wins SERI: 4 dosya (SKILL.md 10.6KB + quickwins_transform.py 18KB/555L + test 14KB/8 case + quickwin.template.md 720B). 8/8 pytest PASS (0.17s). 10/10 acceptance PASS. Live mcp__gsc__detect_quick_wins dentnotion 33 row + 9 opportunity row. 3 provenance event (1 manual gsc_mcp + 2 auto tool_computed from transaction.append). 0 DURUR fired. 5 flag (F1 workbook policy ratify, F2 F-08 W-S, F3 transform 555L kabul, F4 CTR units defer Phase 6, F5 outputs string-typed).
+- Wave 2 4-paralel: W-Q init-project (8 pytest, idempotent dentnotion bootstrap SHA-256 unchanged) + W-R sf-import (7 pytest, 56 row 6 sheet, sf_csv provenance, Tier 2 search_console_all AMBER) + W-S drift-check (11 pytest, validate_invariants.py 49KB/1280L 20 rule, drift.template.md, dentnotion live AMBER pass=11/warn=7/fail=2) + W-T whats-next (5 pytest, scripts/meta/whats_next.py 16.5KB/477L, T-9NNNN router band, Top-3 ranking).
+- Toplam Phase 5 deliverables: 16 yeni dosya (5 SKILL.md + 5 test + 4 transform/validate/whats_next/__init__ + 2 template) + 4 manager dosya update (PHASE_STATUS, DECISIONS, DECISIONS_ARCHIVE, CONTEXT_LEDGER) + 1 schema update (skill-frontmatter category enum) + 1 .mcp.json yeni.
+- Test: 39 yeni Phase 5 (8 W-P + 8 W-Q + 7 W-R + 11 W-S + 5 W-T). Repo total: 87/87 pytest PASS (Phase 3: 48 + Phase 5: 39, no regressions).
+- 0 DURUR fired tüm 5 worker. F1+F5 honored her worker.
+- F-08 manual_triage AMBER tolere (sparse pilot — quick_wins 33 URL ⊆ crawl_sitemap 3 URL ∪ gsc_performance 0 URL = matematiksel imkansız subset). Phase 6 gsc-pull skill deliverable bekleniyor; gsc_performance sheet populated olunca F-08 RE-EVAL otomatik GREEN beklenir. Q-015 (scrapling pattern) komşu Phase 6 dependency.
+- F-19 finding: dentnotion project.config.json locale + market field eksik. Süleyman manuel fix komutu raporda (manager workspace'e yazamaz, ADR-008 disiplini).
+- K3 ADR-025 RED: T-9NNNN router convention SKILL.md dokümantasyonu yeterli. Sebep: DECISIONS.md margin 2B, yeni ADR Round 3 tightening tehdit. Phase 6 ADR-026 (hard cap 5120→6144) sonrası convention ADR'leri açılır.
+- 7 düşük-öncelik flag Phase 6+ defer (K4 portfolio v1.1 unify, K5 --merge mode, K6 excel_filename canonical, K7 staging-to-excel-map formal, K8 multi-sheet atomicity ADR aday, K9 GSC at-rest live capture, K10 validate_invariants 1280L kabul).
+- Awaiting Süleyman: K2 manuel fix + atomic Phase 5 commit + push.
+
+## Phase 6 prep checklist (2026-04-30, fifteenth session paste continued — Phase 6 önü)
+(1) ADR-026 hard cap formal revision (5120→6144B) — Phase 4 + Phase 5 Round 1 + Round 2 = 3 tightening turu matematiksel imkansızlığı kanıtlıyor (3-floor × ~800B body + headers ≈ doğal 5000B+).
+(2) Q-015 scrapling-output-mapping pattern resolve — `output_schema_file` path standardı (ADR-025 adayı).
+(3) DataForSEO + Scrapling MCP `.mcp.json`'a append (ADR-023 patterni, env var: ${DFS_API_TOKEN}, ${SCRAPLING_API_TOKEN}).
+(4) gsc-pull + dfs-pull + scrapling-ops 3 skill (Phase 6 deliverables, mcp-ingestion convention quick-wins'ten reuse).
+(5) F-08 RE-EVAL otomatik gsc-pull deliverable sonrası gsc_performance sheet populated → F-08 GREEN beklenir.
+(6) F4 CTR units gsc-tool-mapping.schema dokümantasyon (detect_quick_wins percent vs enhanced_search_analytics fraction).

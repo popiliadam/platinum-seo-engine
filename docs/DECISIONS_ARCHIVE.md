@@ -11,6 +11,8 @@ ADR-011 rotation kararıyla `DECISIONS.md`'den taşınmış eski kararlar. Appen
 - ADR-013 (Phase 3.1 closeout cycle 5+, 2026-04-30 — ADR-014 <5KB hard cap enforced; ADR-012 cut yetmediği için ek rotation)
 - ADR-014/016/017/018 (Phase 3.2 PRE-FIX closeout, 2026-04-30 — altıncı rotation cycle, ADR-018..021 ekleme ile DECISIONS.md ~9.9KB tetiklenmesi sonrası agresif cut; gap-015 protected)
 - ADR-019 (Phase 4 ADIM 3, 2026-04-30 — yedinci rotation cycle, ADR-022 numerik clarification ekleme ile DECISIONS.md 6368B tetiklenmesi sonrası en eski active cut)
+- ADR-020 (Phase 5 önü, 2026-04-30 — sekizinci rotation cycle, ADR-023 .mcp.json kararı ekleme ile DECISIONS.md 6330B tetiklenmesi sonrası en eski active cut)
+- ADR-021 (Phase 5 Wave 0, 2026-04-30 — dokuzuncu rotation cycle, ADR-024 hibrit dispatch + schema fix ekleme ile DECISIONS.md 6350B tetiklenmesi sonrası en eski active cut)
 
 **Active ADR'ler için:** [DECISIONS.md](DECISIONS.md)
 
@@ -178,3 +180,21 @@ ADR-011 rotation kararıyla `DECISIONS.md`'den taşınmış eski kararlar. Appen
 **Context:** Phase 1.4 W-G workflow-run.schema yazımında `retry_count` (retry mechanism field) ve `schema_version` (version drift detection) atlandı. Subagent #3 W-L research'ünde tespit etti; `retry()` API method'u şu an retry_count'a refer ediyor ama schema'da yer yoktu.
 **Decision:** Additive bump — required'a EKLENMEDİ (default 0/missing kabul, backward compat). `retry_count`: integer >=0, default 0. `schema_version`: const "1.0".
 **Consequences:** workflow_runner.py retry() method retry_count'u inkremente eder (failed → running transition). schema_version Phase 14+ migrasyonlarda version skew detection için. Mevcut workflow-run.json yok (yeni özellik), backward compat sorunsuz.
+
+---
+
+## ADR-020 — events.schema event_kind="workflow" + workflow_action Enum
+**Date:** 2026-04-30
+**Status:** accepted
+**Context:** event_kind enum 3 değer (provenance/work/audit) workflow lifecycle event'leri için yetersiz. Workaround (audit routing) drift kabul; detay CONTEXT_LEDGER. Schema integrity sürprizi: events.run_id integer/PROVENANCE-only vs workflow-run.run_id string pattern → type collision riski (workflow_run_id ayrı field çözümü).
+**Decision:** event_kind enum genişletildi 4 değer ("provenance", "work", "audit", "workflow"). workflow_action enum 8 değer eklendi. **workflow_run_id (string, workflow-run.run_id pattern aynası)** eklendi — events.run_id integer/provenance-only kalır, type-correct ayrım. step_index optional. allOf conditional: event_kind="workflow" iken workflow_action + workflow_run_id zorunlu.
+**Consequences:** workflow_runner.py state transition'ları semantik-doğru `event_kind="workflow"` ile log'lanır. events.jsonl reader'lar (check_budget.py vb.) workflow event'lerini doğal filter ile ayırır. Type discipline (rules/schema-first.md) korundu — events.run_id integer kalmaya devam eder, workflow_run_id ayrı string field.
+
+---
+
+## ADR-021 — events.jsonl Path: _state/ (spec §4 SSoT)
+**Date:** 2026-04-30
+**Status:** accepted
+**Context:** Phase 3.1 W-M `check_budget.py` events.jsonl path `state/` (underscore'suz) kullandı. Spec §4 line 254 dir tree `_state/` (underscore'lu) — path konvansiyonu spec §4 SSoT.
+**Decision:** Spec §4 authoritative. `_state/` standartı uygulanır. `check_budget.py` line 14 docstring + line 119 default arg fix (`state/events.jsonl` → `_state/events.jsonl`). Tüm runtime state path'leri `_state/` prefix.
+**Consequences:** check_budget.py path drift kapatıldı (replace_all 2 hit). Phase 3.3 W-L (events_writer.py + workflow_runner.py) yazımında `_state/` standartına uyacak. Phase 5 smoke test'te path mismatch hatası önlendi.

@@ -1,7 +1,7 @@
 # Phase Status
 
 **Last Updated:** 2026-04-30T13:00:00Z
-**Active Phase:** Phase 4 — Hooks + Commands ACTIVE
+**Active Phase:** Phase 6 — Ingestion NEXT (Phase 5 atomic commit pending — Süleyman push)
 
 ## Previous Phase
 **Phase 3 — Scripts ✅ DONE 2026-04-30 (commit 3a0e8f5)**
@@ -25,7 +25,8 @@
 | Phase 1 | done | 2026-04-30 | 2026-04-30 | 4417e3c |
 | Phase 2 | done | 2026-04-30 | 2026-04-30 | 95e605d |
 | Phase 3 | done | 2026-04-30 | 2026-04-30 | 3a0e8f5 |
-| Phase 4 | done | 2026-04-30 | 2026-04-30 | (commit pending) |
+| Phase 4 | done | 2026-04-30 | 2026-04-30 | 91248ed |
+| Phase 5 | done | 2026-04-30 | 2026-04-30 | (commit pending) |
 
 ## Next Phase Preview
 **Phase 2 — Rules & Disciplines:** 10 normatif disiplin (naming.md, single-source-of-truth.md, schema-first.md, append-only-state.md, excel-discipline.md, secrets-management.md, glossary-discipline.md, skill-description-discipline.md, schema-versioning-discipline.md, time-discipline.md) — eski rules/universal-rules.json'dan ilham, yeniden yazım.
@@ -45,8 +46,22 @@
 - [x] commands/.gitkeep silindi (6 .md placeholder rolünü devraldı, rules/.gitkeep precedent)
 - [x] BLOCKER kaldırıldı: ADR-022 + ADR-020/021 Context tightening (515B tasarruf), DECISIONS.md = 5072B (margin 48B), 3 active korundu
 
+## Phase 5 Tasks
+- [x] D1+D2+D3 pre-dispatch fix (PHASE_STATUS Active Phase + Phase 4 hash 91248ed + CONTEXT_LEDGER GSC MCP live verified)
+- [x] Wave 0 PRE-FIX (skill-frontmatter category enum 8-value + Draft7 validate PASS, ADR-024 yazıldı, rotation cycle 9 ADR-021→archive, Round 1+2 tightening final DECISIONS.md 5118B margin 2B)
+- [x] Wave 1 — W-P quick-wins SERI (4 dosya, 8/8 pytest, 10/10 acceptance, live GSC MCP 33 row, 0 DURUR, 5 flag)
+- [x] Wave 2 — 4 paralel: W-Q init-project (8 pytest) ∥ W-R sf-import (7 pytest) ∥ W-S drift-check (11 pytest, validate_invariants.py 1280L 20 rule) ∥ W-T whats-next (5 pytest)
+- [x] Wave 3 — closeout (CONTEXT_LEDGER Phase 5 + F-08 + Phase 6 prep + PHASE_STATUS [x] + atomic commit dizisi)
+
+## Phase 6 NEXT — Ingestion (3 skill: gsc-pull, dfs-pull, scrapling-ops)
+- ADR-026 hard cap formal revision (5120→6144B) — Phase 4+5 R1+R2 3 tightening turu matematiksel kanıtlıyor
+- Q-015 scrapling-output-mapping pattern resolve (ADR-025 adayı)
+- DataForSEO + Scrapling MCP .mcp.json append (env var: ${DFS_API_TOKEN}, ${SCRAPLING_API_TOKEN})
+- F-08 RE-EVAL otomatik gsc-pull deliverable sonrası
+- F4 CTR units gsc-tool-mapping.schema dokümantasyon
+
 ## Outstanding Open Questions
-- **Q-015** — scrapling-output-mapping pattern dependency (Phase 6 öncesi, non-blocking)
+- **Q-015** — scrapling-output-mapping pattern dependency (Phase 6 öncesi, non-blocking; Phase 6 başında ADR-025 + ADR-026 hard cap revision birlikte gündem)
 - **Q-WN-01** — Plugin hook loader directory-merge belirsizliği (plugin.json explicit array ile geçici çözüldü, resmi doc clarification beklenebilir)
 - **Q-016** — audit_action enum mapping (Edit/Write/Bash → modified/accessed) — Phase 14+ governance refinement, non-blocking
 - **Q-WO-02** — shared/active.json mutability semantics (append-only-state.md kapsam dışı, future ADR aday)
