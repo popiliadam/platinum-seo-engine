@@ -1,0 +1,149 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://platinum-seo-engine/schemas/scrapling-output-mapping.schema.json",
+  "title": "Scrapling Output Mapping Contract v1.0",
+  "description": "Meta-schema for the Scrapling integration contract (§14). Covers both execution modes (§14.1): MCP tool call (interactive ad-hoc) and local script (cron/batch/monitoring). Registers the 4 canonical S1-S4 scenarios (§14.2): weekly competitor snapshot, monthly external mentions, weekly price monitor, and post-publish self audit. Every scenario MUST declare tier_escalation as the fixed sequence ['get','fetch','stealthy_fetch'] (§14.5) and MUST point at an output_schema_file under templates/scrapling/. URL normalization is inherited from the global pipeline — staging rows written from Scrapling output carry both url_original and url_normalized.",
+  "type": "object",
+  "required": ["schema_version", "scenarios"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "contract_for":   { "const": "Scrapling MCP + local script integration" },
+    "mcp_server_name": {
+      "type": "string",
+      "default": "ScraplingServer",
+      "description": "MCP server short name for interactive mode (§14.1). Local script mode does not use the MCP server."
+    },
+    "url_normalization": {
+      "type": "object",
+      "description": "Output_schema_file sub-schemas all carry url + url_normalized fields; join keys use url_normalized.",
+      "required": ["mandatory", "policy_source", "staging_fields"],
+      "properties": {
+        "mandatory":      { "const": true },
+        "policy_source":  { "const": "project.config.url_policy" },
+        "staging_fields": {
+          "type": "array",
+          "items": { "enum": ["url_original", "url_normalized"] },
+          "minItems": 2,
+          "uniqueItems": true
+        }
+      }
+    },
+    "scenarios": {
+      "type": "object",
+      "description": "The 4 canonical scenarios (§14.2). Keys are the fixed vocabulary S1_..S4_..",
+      "propertyNames": { "$ref": "#/definitions/scenarioKey" },
+      "additionalProperties": { "$ref": "#/definitions/scenario" },
+      "minProperties": 1,
+      "maxProperties": 4
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "scenarioKey": {
+      "type": "string",
+      "enum": [
+        "S1_competitor_snapshot",
+        "S2_external_mentions",
+        "S3_price_monitor",
+        "S4_self_audit"
+      ]
+    },
+    "executionMode": {
+      "type": "string",
+      "enum": ["mcp_tool_call", "local_script"]
+    },
+    "fetchMethod": {
+      "type": "string",
+      "description": "One rung of the Scrapling tier_escalation ladder (§14.5).",
+      "enum": ["get", "fetch", "stealthy_fetch"]
+    },
+    "tierEscalation": {
+      "type": "array",
+      "description": "Fixed canonical order per §14.5: get → fetch → stealthy_fetch. Local scripts and MCP mode both walk this ladder. Non-canonical orderings are a schema violation.",
+      "items": { "$ref": "#/definitions/fetchMethod" },
+      "minItems": 3,
+      "maxItems": 3,
+      "uniqueItems": true,
+      "const": ["get", "fetch", "stealthy_fetch"]
+    },
+    "logicalSheet": {
+      "type": "string",
+      "enum": [
+        "dashboard", "topical_map", "cluster_keywords", "cannibalization",
+        "quick_wins", "new_content_plan", "content_improve", "gsc_performance",
+        "content_decay", "on_page_audit", "opportunity", "tech_seo",
+        "crawl_sitemap", "robots_txt", "schema", "redirect_404",
+        "completed_work", "master_task"
+      ]
+    },
+    "autonomousRule": {
+      "type": "object",
+      "description": "Declarative trigger → master_task appender (S3/S4). Either threshold (numeric delta) or value (boolean/exact) must be set.",
+      "required": ["trigger_field", "action", "task_type"],
+      "properties": {
+        "trigger_field": { "type": "string", "minLength": 1 },
+        "threshold":     { "type": "number" },
+        "value":         { "type": ["boolean", "string", "number", "null"] },
+        "action":        { "enum": ["append_task_to_master_task", "create_master_task"] },
+        "task_type":     { "type": "string", "enum": ["price_review", "content_review", "audit_review", "mention_review"] }
+      },
+      "oneOf": [
+        { "required": ["threshold"] },
+        { "required": ["value"] }
+      ]
+    },
+    "scenario": {
+      "type": "object",
+      "required": [
+        "description",
+        "execution_modes",
+        "output_schema_file",
+        "local_script_reference",
+        "staging_table",
+        "cadence",
+        "tier_escalation"
+      ],
+      "properties": {
+        "description":    { "type": "string", "minLength": 1 },
+        "execution_modes": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/executionMode" },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "output_schema_file": {
+          "type": "string",
+          "description": "Relative path under templates/scrapling/ to the per-scenario output sub-schema (§14.3).",
+          "pattern": "^templates/scrapling/[a-z_]+\\.schema\\.json$"
+        },
+        "local_script_reference": {
+          "type": "string",
+          "description": "Template path with {slug} placeholder — resolved per-project at runtime.",
+          "pattern": "^projects/\\{slug\\}/scripts/scrapling_[a-z_]+\\.py$"
+        },
+        "staging_table": {
+          "type": "string",
+          "description": "SQLite staging table (§6.2). Convention: scrapling_*.",
+          "pattern": "^scrapling_[a-z][a-z0-9_]*$"
+        },
+        "excel_target_sheet": {
+          "oneOf": [
+            { "$ref": "#/definitions/logicalSheet" },
+            { "type": "null", "description": "Staging-only; no Excel projection (S3 price_monitor)." }
+          ]
+        },
+        "cadence": {
+          "type": "string",
+          "description": "Free-form cadence tag (e.g. 'weekly_monday_09h', 'monthly', 'weekly_friday_18h OR post_publish_48h'). Used by Cowork reminder scheduler."
+        },
+        "selector_source": {
+          "type": "string",
+          "description": "Dot-path into project config for per-domain CSS selectors (S1).",
+          "pattern": "^project\\.scrapling(\\.[a-z][a-z0-9_]*)+$"
+        },
+        "tier_escalation":  { "$ref": "#/definitions/tierEscalation" },
+        "autonomous_rule":  { "$ref": "#/definitions/autonomousRule" }
+      }
+    }
+  }
+}

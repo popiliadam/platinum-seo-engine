@@ -1,0 +1,344 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "http://platinum-seo-engine/schemas/events",
+  "title": "Events Log Entry v1.0",
+  "description": "Unified events log schema — replaces provenance-log + work-log. One row/file = one event. Three kinds: 'provenance' (pipeline ingest/normalize/project/validate/cascade — every MCP response or SF file produces one entry, append-only, run_id monotonic per project), 'work' (DONE protocol §21.4 step 4 emits these into logs/work-done/{YYYY-MM}/{task_id}.json — 10 closed event_type subtypes, monthly-report aggregates last-28-day events), 'audit' (governance placeholder — Phase 14+ for permission/access changes). Discriminator field is event_kind. Common envelope: schema_version, event_kind, event_id, timestamp, project_id. Sub-kind specific fields are defined alongside; conditional requireds enforced via allOf if/then. Cross-kind invariants: agent_run_id on a work event must reference an existing provenance event run_id. Retention: provenance append-only forever; work 12 months active then archive zip (§20.3); audit policy TBD. Both url + url_normalized required on URL-bearing work events (D-S3-5). All hash fields use sha256:hex64 pattern.",
+  "type": "object",
+  "required": ["schema_version", "event_kind", "event_id", "timestamp", "project_id"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "event_kind": {
+      "type": "string",
+      "description": "Top-level discriminator. Determines which sub-kind required fields apply.",
+      "enum": ["provenance", "work", "audit"]
+    },
+    "event_id": {
+      "type": "string",
+      "description": "Unique per project. For work events convention {event_type}_{task_id}_{timestamp_compact} (e.g. content_new_T-0042_20260420T1030); for provenance events run_id is the aggregator and event_id is per-row; for audit events governance assigns.",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+      "minLength": 3,
+      "maxLength": 128
+    },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "project_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Matches project-config.schema.json.project_id. Required across all kinds for portfolio cross-project aggregation (docs/ARCHITECTURE.md §26.2)."
+    },
+
+    "run_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "PROVENANCE-only. Monotonically increasing per project. A single run_id groups all entries produced by one pipeline invocation (e.g. one weekly SF import writes N entries sharing the same run_id)."
+    },
+    "source": {
+      "type": "object",
+      "description": "PROVENANCE-only. Origin of the data. source.kind determines which nested fields populate.",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "sf_csv → filename_original + filename_normalized + file_hash + row_count; *_mcp → response_bytes + row_count; manual/tool_computed → neither.",
+          "enum": ["sf_csv", "gsc_mcp", "dataforseo_mcp", "scrapling_local", "scrapling_mcp", "manual", "tool_computed"]
+        },
+        "source_folder":       { "type": "string", "description": "For sf_csv: the ingest folder relative path (e.g. sf_exports/2026-04/)." },
+        "filename_original":   { "type": "string", "description": "Pre-normalization SF filename, Turkish chars preserved." },
+        "filename_normalized": { "type": "string", "description": "Post filename_alias normalization (docs/ARCHITECTURE.md §6.4) — ascii + v_/p_ prefix stripped." },
+        "file_hash":           { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "row_count":           { "type": "integer", "minimum": 0 },
+        "response_bytes":      { "type": "integer", "minimum": 0, "description": "MCP raw response size; used for storage budget." },
+        "mcp_server":          { "type": "string", "description": "Short server name (gsc / dataforseo / scrapling) — matches mcp-tool-registry.json." },
+        "mcp_tool":            { "type": "string", "description": "Fully-qualified tool name (gsc__search_analytics, dataforseo__serp_organic_live_advanced, ...)." }
+      }
+    },
+    "operation": {
+      "type": "string",
+      "description": "PROVENANCE-only. Pipeline stage (docs/ARCHITECTURE.md §6.1 Stage 1-4 + DONE cascade §21.4). One entry per (file|response, operation) pair.",
+      "enum": ["ingest", "normalize", "project_excel", "validate", "cascade_done"]
+    },
+    "target_table": {
+      "type": "string",
+      "description": "PROVENANCE-only. Staging SQLite table written to. Convention: {provider}_{subject} (sf_urls, gsc_search_analytics, dfs_keyword_overview, scrapling_competitor_snapshot)."
+    },
+    "target_excel_sheet": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "dashboard", "topical_map", "cluster_keywords", "cannibalization",
+            "quick_wins", "new_content_plan", "content_improve", "gsc_performance",
+            "content_decay", "on_page_audit", "opportunity", "tech_seo",
+            "crawl_sitemap", "robots_txt", "schema", "redirect_404",
+            "completed_work", "master_task"
+          ]
+        },
+        { "type": "null" }
+      ],
+      "description": "PROVENANCE-only. Null when operation=ingest|normalize|validate (no Excel write). Required to be a logicalSheet when operation=project_excel."
+    },
+    "rows_written":      { "type": "integer", "minimum": 0, "description": "PROVENANCE-only." },
+    "cells_written":     { "type": "integer", "minimum": 0, "description": "PROVENANCE-only. Projection-mode=kpi_cells writes cells, not rows." },
+    "validation_status": { "enum": ["pending", "pass", "fail"], "description": "PROVENANCE-only." },
+    "validation_errors": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "PROVENANCE-only. Human-readable error strings; for machine-readable checks use consistency-report.checks[]."
+    },
+    "duration_ms": { "type": "integer", "minimum": 0, "description": "PROVENANCE-only." },
+    "cache_hit":   { "type": "boolean", "description": "PROVENANCE-only." },
+    "cost": {
+      "type": "object",
+      "description": "PROVENANCE-only. Cost accounting for paid sources (DFS credits, etc.). Absent when source.kind is free.",
+      "additionalProperties": false,
+      "properties": {
+        "provider":   { "enum": ["dataforseo", "scrapling_mcp_paid", "indexing_api", "other"] },
+        "credits":    { "type": "number", "minimum": 0 },
+        "currency":   { "type": "string", "description": "ISO 4217, only when billed in money not credits" },
+        "amount":     { "type": "number", "minimum": 0 },
+        "budget_key": { "type": "string", "description": "Dot-path into project.config (e.g. project.config.dataforseo.budget_credits_per_day)" }
+      }
+    },
+    "params_hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "description": "PROVENANCE-only. SHA-256 of the exact input params (MCP args, SF filename set). Used as cache key and for re-run determinism check."
+    },
+    "file_hash_chain": {
+      "type": "object",
+      "description": "PROVENANCE-only. docs/ARCHITECTURE.md §9.4 L2 Hash Chain — hash at each hand-off must match.",
+      "additionalProperties": false,
+      "properties": {
+        "intake_hash":  { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "staging_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "match":        { "type": "boolean", "description": "Derived: intake_hash == staging_hash (after deterministic re-serialization)." }
+      }
+    },
+    "row_count_chain": {
+      "type": "object",
+      "description": "PROVENANCE-only. docs/ARCHITECTURE.md §9.4 L3 Row Count Chain — raw_lines − 1 (header) == staging_rows.",
+      "additionalProperties": false,
+      "properties": {
+        "raw_lines":    { "type": "integer", "minimum": 0 },
+        "staging_rows": { "type": "integer", "minimum": 0 },
+        "delta":        { "type": "integer", "description": "Expected delta is 1 (header row)." }
+      }
+    },
+    "excel_diff_hash": {
+      "type": "object",
+      "description": "PROVENANCE-only. docs/ARCHITECTURE.md §9.4 L7 Diff Verification — pre/post snapshot of target sheet. Only populated when operation=project_excel.",
+      "additionalProperties": false,
+      "properties": {
+        "pre_hash":  { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "post_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "backup_path": {
+      "type": "string",
+      "description": "PROVENANCE-only. docs/ARCHITECTURE.md §9.4 L5 Atomic Write — relative path to the pre-op Excel backup. Restored on consistency-RED rollback."
+    },
+    "consistency_report_ref": {
+      "type": "string",
+      "description": "PROVENANCE-only. Relative path to the consistency-report.json snapshot written at L6 checkpoint. Links provenance ↔ consistency for audit."
+    },
+    "notes": { "type": "string", "description": "PROVENANCE-only. Free text. Distinct from work.note." },
+
+    "event_type": {
+      "type": "string",
+      "description": "WORK-only. docs/ARCHITECTURE.md §20.2 — closed 10-value enum. Stored value; display decoration (emoji in reports) applied at render time.",
+      "enum": [
+        "content_new",
+        "content_revise",
+        "content_remove",
+        "tech_fix",
+        "quickwin_applied",
+        "pillar_launch",
+        "schema_fix",
+        "redirect_deployed",
+        "backlink_outreach",
+        "manual"
+      ]
+    },
+    "task_id": {
+      "type": "string",
+      "description": "WORK-only. References master_task.task_id. Convention: T-NNNN (zero-padded 4 digits).",
+      "pattern": "^T-[0-9]{4,}$"
+    },
+    "url":            { "type": "string", "format": "uri", "description": "WORK-only." },
+    "url_normalized": {
+      "type": "string",
+      "description": "WORK-only. url after project.config.url_policy normalization (docs/ARCHITECTURE.md §6.6 + §12.2). Used for cross-sheet joins. Both url + url_normalized are required on URL-bearing work events (D-S3-5)."
+    },
+    "pillar": {
+      "type": "string",
+      "pattern": "^P[0-9]+_[a-z_]+$",
+      "description": "WORK-only. Matches project-config.pillars[].key (e.g. P01_sofa_sets). Required on pillar_launch and content_new with pillar context."
+    },
+    "cluster":     { "type": "string", "description": "WORK-only. Cluster slug matching data/cluster defs. Required on content_new + quickwin_applied." },
+    "before":      { "$ref": "#/definitions/pageSnapshot", "description": "WORK-only." },
+    "after":       { "$ref": "#/definitions/pageSnapshot", "description": "WORK-only." },
+    "metric_impact": {
+      "type": "object",
+      "description": "WORK-only. Measured outcome after the change (optional at event time; back-filled by monthly-report generator §22 from GSC 28-day delta).",
+      "additionalProperties": false,
+      "properties": {
+        "clicks_delta_28d":      { "type": "number" },
+        "impressions_delta_28d": { "type": "number" },
+        "position_delta_28d":    { "type": "number", "description": "Negative = improved (pos went from 7 → 3 is -4)." },
+        "ctr_delta_28d":         { "type": "number" },
+        "measured_at":           { "type": "string", "format": "date-time" }
+      }
+    },
+    "author": {
+      "type": "string",
+      "description": "WORK-only. Human name or agent id. For agent runs also populate agent_run_id."
+    },
+    "agent_run_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "WORK-only. Cross-kind link: references a provenance event's run_id that produced this work event (when automated). Cross-kind invariant — link work ↔ provenance."
+    },
+    "work_log_ref": {
+      "type": "string",
+      "description": "WORK-only. Relative path back to this file, duplicated in master_task.work_log_ref (col S §21.1) — kept in-file for self-describing archival."
+    },
+    "indexing_ping": {
+      "type": "object",
+      "description": "WORK-only. Optional docs/ARCHITECTURE.md §24 Indexing API ping record. Populated only when user accepted the prompt in DONE cascade step 6.",
+      "additionalProperties": false,
+      "properties": {
+        "attempted":         { "type": "boolean" },
+        "call_type":         { "enum": ["URL_UPDATED", "URL_DELETED"] },
+        "response_code":     { "type": "integer" },
+        "called_at":         { "type": "string", "format": "date-time" },
+        "verified_at":       { "type": "string", "format": "date-time", "description": "GSC urlInspection result timestamp (§24.4, 24h later)." },
+        "verified_coverage": { "type": "string" }
+      }
+    },
+    "primary_source": {
+      "type": "string",
+      "description": "WORK-only. Matches master_task.primary_source (§21.1 col C). Copied here so each work event is self-contained for archival replay.",
+      "enum": ["content_decay", "quickwin", "tech_fix", "schema", "pillar", "sxo", "cannibalization", "redirect_404", "manual"]
+    },
+    "related_sources": {
+      "type": "array",
+      "description": "WORK-only. Matches master_task.related_sources (§21.1 col D) — merged-task union.",
+      "items": {
+        "enum": ["content_decay", "quickwin", "tech_fix", "schema", "pillar", "sxo", "cannibalization", "redirect_404", "manual"]
+      },
+      "uniqueItems": true
+    },
+    "note":        { "type": "string", "description": "WORK-only. Free text; required on event_type=manual and event_type=content_remove (to record redirect_from_to target). Distinct from provenance.notes." },
+    "attachments": {
+      "type": "array",
+      "description": "WORK-only. Relative paths to supporting files (screenshots, outreach emails, redirect_from_to.txt). Relative to project workspace_root.",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
+
+    "audit_action": {
+      "type": "string",
+      "description": "AUDIT-only (placeholder, finalized Phase 14+ governance). What governance action was performed.",
+      "enum": ["created", "modified", "deleted", "accessed", "permission_changed", "config_changed"]
+    },
+    "audit_target": {
+      "type": "string",
+      "description": "AUDIT-only. Resource path or identifier of the object affected (e.g. schemas/project-config.schema.json, project:dentnotion, role:editor)."
+    },
+    "actor": {
+      "type": "string",
+      "description": "AUDIT-only. Identity that performed the action (user email, agent id, system process)."
+    }
+  },
+
+  "allOf": [
+    {
+      "description": "PROVENANCE kind required fields.",
+      "if":   { "properties": { "event_kind": { "const": "provenance" } } },
+      "then": { "required": ["run_id", "source", "operation"] }
+    },
+    {
+      "description": "WORK kind required fields.",
+      "if":   { "properties": { "event_kind": { "const": "work" } } },
+      "then": { "required": ["event_type", "task_id"] }
+    },
+    {
+      "description": "AUDIT kind required fields.",
+      "if":   { "properties": { "event_kind": { "const": "audit" } } },
+      "then": { "required": ["audit_action", "audit_target", "actor"] }
+    },
+    {
+      "description": "Per docs/ARCHITECTURE.md §20.2: URL-bearing work event types require url + url_normalized together.",
+      "if":   { "allOf": [
+                 { "properties": { "event_kind": { "const": "work" } } },
+                 { "properties": { "event_type": { "enum": ["content_new", "content_revise", "content_remove", "tech_fix", "quickwin_applied", "pillar_launch", "schema_fix", "redirect_deployed"] } } }
+               ] },
+      "then": { "required": ["url", "url_normalized"] }
+    },
+    {
+      "description": "content_revise MUST carry both before + after snapshots (§20.2).",
+      "if":   { "allOf": [
+                 { "properties": { "event_kind": { "const": "work" } } },
+                 { "properties": { "event_type": { "const": "content_revise" } } }
+               ] },
+      "then": { "required": ["before", "after"] }
+    },
+    {
+      "description": "content_new + pillar_launch require after snapshot + pillar (§20.2).",
+      "if":   { "allOf": [
+                 { "properties": { "event_kind": { "const": "work" } } },
+                 { "properties": { "event_type": { "enum": ["content_new", "pillar_launch"] } } }
+               ] },
+      "then": { "required": ["after", "pillar"] }
+    },
+    {
+      "description": "schema_fix requires before + after schema_types (§20.2).",
+      "if":   { "allOf": [
+                 { "properties": { "event_kind": { "const": "work" } } },
+                 { "properties": { "event_type": { "const": "schema_fix" } } }
+               ] },
+      "then": { "required": ["before", "after"] }
+    },
+    {
+      "description": "redirect_deployed + content_remove + backlink_outreach + manual require note.",
+      "if":   { "allOf": [
+                 { "properties": { "event_kind": { "const": "work" } } },
+                 { "properties": { "event_type": { "enum": ["redirect_deployed", "content_remove", "backlink_outreach", "manual"] } } }
+               ] },
+      "then": { "required": ["note"] }
+    },
+    {
+      "description": "quickwin_applied requires cluster + before + after (title/meta change diff).",
+      "if":   { "allOf": [
+                 { "properties": { "event_kind": { "const": "work" } } },
+                 { "properties": { "event_type": { "const": "quickwin_applied" } } }
+               ] },
+      "then": { "required": ["cluster", "before", "after"] }
+    }
+  ],
+
+  "definitions": {
+    "pageSnapshot": {
+      "type": "object",
+      "description": "Minimal page state snapshot. Both before/after share this shape so diffs are trivial. Used by work events; preserved verbatim from prior work-log.schema.json v1.0.",
+      "additionalProperties": false,
+      "properties": {
+        "title":        { "type": "string" },
+        "meta_description": { "type": "string" },
+        "h1":           { "type": "string" },
+        "word_count":   { "type": "integer", "minimum": 0 },
+        "schema_types": {
+          "type": "array",
+          "description": "Schema.org @type values present on the page at snapshot time (e.g. Article, Product, FAQPage).",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "status_code":  { "type": "integer", "minimum": 100, "maximum": 599 },
+        "canonical":    { "type": "string", "format": "uri" },
+        "faq_count":    { "type": "integer", "minimum": 0 },
+        "internal_links_out": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

@@ -1,0 +1,180 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://platinum-seo-engine/templates/portfolio-config.schema.json",
+  "title": "Portfolio Configuration Schema v1.1",
+  "description": "Portfolio workspace registry (projects/_portfolio/portfolio.config.json). Lists active vs pending-onboard projects, per-project SLAs, reminder cadence, and optional editorial overrides per project. See docs/ARCHITECTURE.md §4.2 / §26.2. Policy key: editorial_override_allowed = true (requires override_rationale).",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "portfolio_id",
+    "display_name",
+    "active_projects",
+    "slas",
+    "cadence"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^1\\.[0-9]+$",
+      "description": "Semver major.minor — 1.0 legacy skeleton; 1.1 adds active_projects / editorial_overrides."
+    },
+    "portfolio_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Lowercase slug for the portfolio workspace."
+    },
+    "display_name": { "type": "string" },
+    "plugin_version": {
+      "type": "string",
+      "description": "Plugin version this portfolio config was authored against (advisory; not enforced)."
+    },
+    "active_projects": {
+      "type": "array",
+      "description": "Projects currently in operational rotation — weekly briefs + monthly roundups + portfolio aggregation queries read from these. Minimum 1; portfolio scale ceiling 8.",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": { "$ref": "#/definitions/ActiveProjectEntry" }
+    },
+    "pending_onboard": {
+      "type": "array",
+      "description": "Projects registered in the portfolio but not yet onboarded (no staging data, no operational rotation). Skeleton entries only; do NOT participate in cross_query aggregation.",
+      "items": { "$ref": "#/definitions/PendingProjectEntry" }
+    },
+    "slas": {
+      "type": "object",
+      "description": "Portfolio-wide SLA defaults. Individual projects can override via editorial_overrides.sla_days with documented rationale.",
+      "required": ["weekly_sync_max_days", "monthly_roundup_target_dom"],
+      "properties": {
+        "weekly_sync_max_days": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30,
+          "description": "Maximum days between staging syncs before a project is considered stale."
+        },
+        "monthly_roundup_target_dom": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 31,
+          "description": "Target day-of-month to publish portfolio monthly roundup."
+        }
+      }
+    },
+    "cadence": {
+      "type": "object",
+      "description": "Portfolio reminder schedule — consumed by scheduled-task-registry + SessionStart hook.",
+      "required": ["weekly_brief", "monthly_roundup"],
+      "properties": {
+        "weekly_brief": {
+          "type": "object",
+          "required": ["day", "hour"],
+          "properties": {
+            "day": { "enum": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] },
+            "hour": { "type": "integer", "minimum": 0, "maximum": 23 }
+          }
+        },
+        "monthly_roundup": {
+          "type": "object",
+          "required": ["day_of_month", "hour"],
+          "properties": {
+            "day_of_month": { "type": "integer", "minimum": 1, "maximum": 31 },
+            "hour": { "type": "integer", "minimum": 0, "maximum": 23 }
+          }
+        }
+      }
+    },
+    "cross_query": {
+      "type": "object",
+      "description": "Defaults applied by the portfolio_cross_query tool.",
+      "properties": {
+        "default_timeout_sec": { "type": "integer", "minimum": 1, "maximum": 600, "default": 60 },
+        "default_row_limit": { "type": "integer", "minimum": 1, "maximum": 100000, "default": 1000 },
+        "read_only": { "const": true, "description": "Portfolio is a read-only aggregator. Cannot be disabled." }
+      }
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "ActiveProjectEntry": {
+      "type": "object",
+      "required": ["slug", "workspace_path", "profile", "priority"],
+      "properties": {
+        "slug": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "display_name": { "type": "string" },
+        "domain": { "type": "string", "format": "uri" },
+        "market": { "type": "string" },
+        "workspace_path": {
+          "type": "string",
+          "description": "Path to project workspace root, relative to portfolio workspace parent (platinum-premium-seo/), or absolute. Tool expands ~ and relative."
+        },
+        "profile": {
+          "type": "array",
+          "items": { "enum": ["e-commerce", "ymyl", "local-service", "b2b-saas", "portfolio"] },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "platform": {
+          "enum": ["wordpress", "wordpress+woocommerce", "ticimax", "ideasoft", "imagaza", "custom"]
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "description": "Portfolio-level priority. 1 = highest. Drives surfacing order in portfolio-overview + weekly-brief."
+        },
+        "last_sync_at": {
+          "type": ["string", "null"],
+          "description": "ISO-8601 timestamp of last successful staging sync. null → never synced (fresh project)."
+        },
+        "editorial_overrides": { "$ref": "#/definitions/EditorialOverrides" }
+      },
+      "additionalProperties": false
+    },
+    "PendingProjectEntry": {
+      "type": "object",
+      "required": ["slug"],
+      "properties": {
+        "slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "display_name": { "type": "string" },
+        "domain": { "type": "string", "format": "uri" },
+        "note": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "EditorialOverrides": {
+      "type": "object",
+      "description": "Project-specific deviations from portfolio SLAs/cadence. Every override MUST carry override_rationale documenting why. Pattern from S19 quality_gate 80→75 decision.",
+      "required": ["override_rationale"],
+      "properties": {
+        "sla_days": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30,
+          "description": "Override weekly_sync_max_days for this project only."
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "description": "Override portfolio priority for this project only (e.g., temporary demotion during maintenance window)."
+        },
+        "cadence": {
+          "enum": ["weekly", "biweekly", "monthly"],
+          "description": "Override reporting cadence for this project only."
+        },
+        "override_rationale": {
+          "type": "string",
+          "minLength": 10,
+          "description": "Free-form documentation of why this override exists. MANDATORY. Reference a decision (D-S##-#) if applicable."
+        },
+        "ramp_plan": {
+          "type": "string",
+          "description": "Optional path/plan for retiring this override (e.g., 'revisit after Q2 launch')."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

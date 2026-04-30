@@ -1,0 +1,183 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://platinum-seo-engine/templates/mcp-tool-registry.schema.json",
+  "title": "MCP Tool Registry v1.0",
+  "description": "Schema for the per-project MCP tool registry — a single inventory of every MCP server declared in .mcp.json and every tool that server exposes. Acceptance criterion §34 row 10: `claude mcp list` output MUST match this registry (exit 1 on drift). Distinct from the mapping files: gsc-tool-mapping.json / dataforseo-endpoint-mapping.json / scrapling-output-mapping.json describe HOW a tool feeds Excel sheets; this registry describes WHICH tools are declared to exist and their version locks + capabilities + auth method. Keeps the runtime surface (what Claude can actually call) auditable against the configured surface (what the project said it runs). Version locks here use the same const pattern as S3-D-1 (dataforseo-mcp-server const '2.8.9').",
+  "type": "object",
+  "required": ["schema_version", "servers"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last time the registry was reconciled against `claude mcp list`. Older-than-SLA → AMBER in consistency-report.schema_validation."
+    },
+    "reconcile_sla_hours": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 168,
+      "description": "Acceptable staleness before consistency check warns. Weekly is the default operational cadence."
+    },
+    "servers": {
+      "type": "object",
+      "description": "Keys are MCP server short names — the same keys used in .mcp.json mcpServers. Closed to the known 4 + project-local servers for audit clarity.",
+      "propertyNames": { "$ref": "#/definitions/serverName" },
+      "additionalProperties": { "$ref": "#/definitions/server" },
+      "minProperties": 1
+    },
+    "unmapped_tools_policy": {
+      "type": "string",
+      "description": "What to do when `claude mcp list` returns a tool not listed in servers[].tools — strict fails audit, permissive records it with a warning.",
+      "enum": ["strict", "permissive"],
+      "default": "strict"
+    }
+  },
+  "definitions": {
+    "serverName": {
+      "type": "string",
+      "description": "Canonical short server name. gsc + dataforseo + scrapling are the three external feeds; platinum_seo_core is the plugin's own server; project_local is the escape hatch for per-project-only servers.",
+      "enum": ["gsc", "dataforseo", "scrapling", "platinum_seo_core", "project_local"]
+    },
+    "authMethod": {
+      "type": "string",
+      "description": "How credentials are sourced. keychain = macOS keychain via keychain_helpers.py (preferred, §30); env_var = process env (CI/CD); user_config = ~/.config/seo-core/secrets (fallback); none = tool exposes no sensitive endpoints.",
+      "enum": ["keychain", "env_var", "user_config", "none"]
+    },
+    "runtime": {
+      "type": "string",
+      "description": "How the server is launched. npx spawns a Node package; python spawns a Python package; stdio is the built-in plugin server (no spawn); http is a remote-hosted MCP endpoint.",
+      "enum": ["npx", "python", "stdio", "http"]
+    },
+    "server": {
+      "type": "object",
+      "required": ["display_name", "runtime", "version_lock", "auth_method", "tools"],
+      "additionalProperties": false,
+      "properties": {
+        "display_name": { "type": "string", "minLength": 1 },
+        "runtime": { "$ref": "#/definitions/runtime" },
+        "package": {
+          "type": "string",
+          "description": "npm package or pypi package id. Required for runtime=npx or runtime=python.",
+          "pattern": "^[a-z0-9][a-z0-9@/_.-]*$"
+        },
+        "version_lock": {
+          "type": "string",
+          "description": "Exact version string the project locks to (no semver ranges for MCP servers — drift is a silent failure surface per §13.1). Use 'none' for runtime=stdio (built-in, versioned by the plugin).",
+          "pattern": "^(\\d+\\.\\d+\\.\\d+([+-][A-Za-z0-9.-]+)?|none)$"
+        },
+        "endpoint_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Only for runtime=http. Captured so rotation/drift audits know where to look."
+        },
+        "auth_method":  { "$ref": "#/definitions/authMethod" },
+        "auth_config": {
+          "type": "object",
+          "description": "Non-secret auth config — key names only, never values.",
+          "additionalProperties": false,
+          "properties": {
+            "keychain_service": { "type": "string", "description": "macOS keychain service name (seo-core-gsc, seo-core-dfs, etc.)." },
+            "env_vars": {
+              "type": "array",
+              "description": "Env var NAMES expected at runtime (e.g. DATAFORSEO_USERNAME). Values never stored.",
+              "items": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" }
+            },
+            "user_config_keys": {
+              "type": "array",
+              "description": "user_config keys referenced via ${user_config.X} interpolation in .mcp.json.",
+              "items": { "type": "string" }
+            }
+          }
+        },
+        "capabilities": {
+          "type": "array",
+          "description": "High-level capability tags, for budget/policy routing. e.g. 'paid' → governed by budget_policy; 'write' → needs PreToolUse confirmation; 'read' → no side effects.",
+          "items": { "enum": ["read", "write", "paid", "rate_limited", "cached", "destructive"] },
+          "uniqueItems": true
+        },
+        "rate_limit": { "type": "string", "description": "Free text; e.g. '200 queries per 100 seconds' (GSC), '30 qps account' (DFS SERP)." },
+        "docs_url": { "type": "string", "format": "uri" },
+        "tools": {
+          "type": "array",
+          "description": "Every callable tool this server exposes (subset of `claude mcp list` output for this server). Registry MUST be complete for servers with unmapped_tools_policy=strict.",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/tool" }
+        }
+      },
+      "allOf": [
+        {
+          "description": "npx runtime requires package.",
+          "if":   { "properties": { "runtime": { "const": "npx" } } },
+          "then": { "required": ["package"] }
+        },
+        {
+          "description": "python runtime requires package.",
+          "if":   { "properties": { "runtime": { "const": "python" } } },
+          "then": { "required": ["package"] }
+        },
+        {
+          "description": "http runtime requires endpoint_url.",
+          "if":   { "properties": { "runtime": { "const": "http" } } },
+          "then": { "required": ["endpoint_url"] }
+        }
+      ]
+    },
+    "tool": {
+      "type": "object",
+      "required": ["tool_name", "description"],
+      "additionalProperties": false,
+      "properties": {
+        "tool_name": {
+          "type": "string",
+          "description": "Fully qualified short name (gsc__search_analytics, dataforseo__serp_organic_live_advanced, scrapling__stealthy_fetch). Claude Code runtime surfaces this as mcp__{server}__{tool}; this registry stores the unprefixed form used in mapping files.",
+          "pattern": "^[a-z][a-z0-9_]*__[a-z][a-z0-9_]*$"
+        },
+        "description": { "type": "string", "minLength": 1 },
+        "category": {
+          "type": "string",
+          "description": "Coarse bucket for routing + budget. Mirrors the dataforseo endpoint_groups + gsc use-case families.",
+          "enum": [
+            "search_analytics", "keyword_research", "serp_scrape", "backlinks", "ai_optimization",
+            "index_inspect", "sitemap", "content_analysis", "domain_analytics", "page_audit",
+            "scrapling_fetch", "platform_detection", "plugin_internal", "other"
+          ]
+        },
+        "used_by_mappings": {
+          "type": "array",
+          "description": "Which mapping files reference this tool. Lint: union of these refs must cover every tool listed here (zero-orphan tool contract).",
+          "items": {
+            "enum": [
+              "gsc-tool-mapping.json",
+              "dataforseo-endpoint-mapping.json",
+              "scrapling-output-mapping.json",
+              "scrapling/competitor_snapshot.schema.json",
+              "scrapling/external_mentions.schema.json",
+              "scrapling/price_monitor.schema.json",
+              "scrapling/self_audit.schema.json",
+              "internal"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "cost_credits_per_call": {
+          "type": "number",
+          "minimum": 0,
+          "description": "DFS-style credit cost. 0 for free/GSC. Absent for scrapling_local (no per-call cost metric — measured in runtime cost instead)."
+        },
+        "cache_ttl_hours": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8760,
+          "description": "Default cache TTL. Per-use-case overrides live in the mapping files."
+        },
+        "deprecated": {
+          "type": "boolean",
+          "default": false,
+          "description": "True when the upstream MCP server has deprecated this tool but our version_lock still supports it. Emits AMBER until we bump the version lock."
+        },
+        "notes": { "type": "string" }
+      }
+    }
+  }
+}

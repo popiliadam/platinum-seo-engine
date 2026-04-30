@@ -1,0 +1,177 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://platinum-seo-engine/schemas/cross-sheet-invariants.json",
+  "additionalProperties": false,
+  "title": "Cross-Sheet Invariants — 20 CSR Registry v1.0",
+  "description": "Populated INSTANCE document (not a meta-schema) carrying the 20 Cross-Sheet Rules per §9.1. Top-level `rules` array is the source of truth consumed by the consistency_check tool. Per S3.5 pivot: instance documents live at `NAME.json`; if a paired meta-schema is ever needed it would go to `NAME.schema.json`. Verdict aggregation (§9.2/§17.2): any RED → RED; else any AMBER/WARN → AMBER; all PASS → GREEN. Severity-to-verdict: CRITICAL/HIGH → RED on FAIL, MEDIUM/LOW → AMBER on FAIL.",
+  "schema_version": "1.0",
+  "verdict_aggregation": "any RED → RED; else any AMBER/WARN → AMBER; all PASS → GREEN",
+  "severity_to_verdict_map": {
+    "CRITICAL": "RED",
+    "HIGH": "RED",
+    "MEDIUM": "AMBER",
+    "LOW": "AMBER"
+  },
+  "rules": [
+    {
+      "id": "F-01",
+      "rule": "master_task.url ⊆ (crawl_sitemap.url ∪ external_urls)",
+      "severity": "CRITICAL",
+      "category": "csr_foundation",
+      "rationale": "A task targeting an unknown URL is either a typo or a dangling reference; both produce unactionable entries that corrupt the DONE cascade and pollute completed_work.",
+      "computed_by": "consistency_check"
+    },
+    {
+      "id": "F-02",
+      "rule": "count(master_task WHERE status=DONE) == dashboard.R48",
+      "severity": "CRITICAL",
+      "category": "csr_foundation",
+      "rationale": "Dashboard R48 is the headline DONE-count KPI; drift means stakeholders see wrong numbers. Also mirrored as CI-06 for the 8-invariant view.",
+      "computed_by": "dashboard_refresh"
+    },
+    {
+      "id": "F-03",
+      "rule": "count(master_task WHERE status=TODO) == dashboard.R49",
+      "severity": "CRITICAL",
+      "category": "csr_foundation",
+      "rationale": "TODO count feeds the whats-next priority queue sizing; drift desynchronizes reminder thresholds.",
+      "computed_by": "dashboard_refresh"
+    },
+    {
+      "id": "F-04",
+      "rule": "count(master_task WHERE status=ONGOING) == dashboard.R50",
+      "severity": "HIGH",
+      "category": "csr_foundation",
+      "rationale": "ONGOING count gates parallelization limits; auto-repair via dashboard_refresh (§9.3).",
+      "computed_by": "dashboard_refresh"
+    },
+    {
+      "id": "F-05",
+      "rule": "completed_work.task_id ⊆ master_task WHERE status=DONE",
+      "severity": "HIGH",
+      "category": "csr_foundation",
+      "rationale": "A completed_work row referencing a non-DONE task means the DONE cascade §21.4 was partial — either master_task was reverted or the cascade aborted before step 5.",
+      "computed_by": "consistency_check"
+    },
+    {
+      "id": "F-06",
+      "rule": "new_content_plan.url_slug ⊆ topical_map.assigned_url",
+      "severity": "CRITICAL",
+      "category": "csr_foundation",
+      "rationale": "Content planned outside the topical map creates orphan pages with no pillar home — kills topical authority signal. Mirrored as CI-07.",
+      "computed_by": "consistency_check"
+    },
+    {
+      "id": "F-07",
+      "rule": "content_improve.url ⊆ (crawl_sitemap ∩ topical_map)",
+      "severity": "HIGH",
+      "category": "csr_foundation",
+      "rationale": "Improvement tasks must target pages that both exist (crawl_sitemap) AND have a pillar assignment (topical_map); otherwise the edit has no strategic context.",
+      "computed_by": "consistency_check"
+    },
+    {
+      "id": "F-08",
+      "rule": "quick_wins.target_url ⊆ (crawl_sitemap ∪ gsc_performance)",
+      "severity": "HIGH",
+      "category": "csr_foundation",
+      "rationale": "Quick wins must be either reachable (in sitemap) or already getting impressions (GSC). A URL in neither set is fictitious.",
+      "computed_by": "consistency_check"
+    },
+    {
+      "id": "F-09",
+      "rule": "cluster_keywords.assigned_url ⊆ topical_map.assigned_url",
+      "severity": "HIGH",
+      "category": "csr_foundation",
+      "rationale": "Every cluster keyword target must have a pillar home; otherwise the cluster is orphan and cluster→pillar reporting breaks.",
+      "computed_by": "consistency_check"
+    },
+    {
+      "id": "F-10",
+      "rule": "cannibalization.pages ⊆ crawl_sitemap.url",
+      "severity": "HIGH",
+      "category": "csr_foundation",
+      "rationale": "Cannibalization rows referencing non-crawled pages are stale; SF re-import needed before acting.",
+      "computed_by": "consistency_check"
+    },
+    {
+      "id": "F-11",
+      "rule": "schema.url ⊆ crawl_sitemap.url",
+      "severity": "HIGH",
+      "category": "csr_foundation",
+      "rationale": "Schema audit rows for unknown URLs indicate a sitemap/crawl drift that must be resolved before schema fixes are applied.",
+      "computed_by": "consistency_check"
+    },
+    {
+      "id": "F-12",
+      "rule": "redirect_404.from_url ⊆ sf_response_codes WHERE status IN (301,302,404)",
+      "severity": "HIGH",
+      "category": "csr_foundation",
+      "rationale": "Redirect/404 entries must be backed by actual SF response codes; fabricated rows cause redirect_chain and 404 sweep reports to double-count.",
+      "computed_by": "consistency_check"
+    },
+    {
+      "id": "F-13",
+      "rule": "robots_txt.disallowed == crawl_sitemap WHERE indexability='Non-indexable (robots)'",
+      "severity": "MEDIUM",
+      "category": "csr_foundation",
+      "rationale": "robots.txt declarations and SF-detected indexability must agree; a delta means one of the two is stale (cached robots or stale crawl).",
+      "computed_by": "consistency_check"
+    },
+    {
+      "id": "F-14",
+      "rule": "gsc_performance.page ⊆ (crawl_sitemap ∪ redirect_targets)",
+      "severity": "MEDIUM",
+      "category": "csr_foundation",
+      "rationale": "GSC may report impressions for redirected URLs for up to 6 months; accepting sitemap-OR-redirect-target union avoids false-positive orphan flags.",
+      "computed_by": "consistency_check"
+    },
+    {
+      "id": "F-15",
+      "rule": "cannibalization intent çakışması intent-matrix.json ile tutarlı",
+      "severity": "HIGH",
+      "category": "csr_foundation",
+      "rationale": "Two pages ranking for the same query are only 'cannibalizing' when their intents overlap per intent-matrix.json — a product page + a blog post for the same query may be intentional. Requires manual triage per §9.3.",
+      "computed_by": "consistency_check"
+    },
+    {
+      "id": "D-01",
+      "rule": "topical_map.pillar ⊆ data/pillars.json",
+      "severity": "CRITICAL",
+      "category": "csr_data",
+      "rationale": "Pillar key drift breaks every pillar-scoped report and the pillar_launch event (§20.2). Auto-repair available (JSON re-key + user confirm §9.3).",
+      "computed_by": "consistency_check"
+    },
+    {
+      "id": "D-02",
+      "rule": "cluster_keywords.cluster ⊆ data/cluster defs",
+      "severity": "HIGH",
+      "category": "csr_data",
+      "rationale": "Cluster label drift detaches keywords from their cluster definitions — downstream keyword_difficulty/priority scoring becomes meaningless.",
+      "computed_by": "consistency_check"
+    },
+    {
+      "id": "D-03",
+      "rule": "url_normalizer(x) == x for every URL in every sheet",
+      "severity": "HIGH",
+      "category": "csr_data",
+      "rationale": "Non-idempotent URLs break cross-sheet JOINs; mirrored as CI-05. Any failure means the url_normalizer was bypassed at write time (boundary violation §6.6).",
+      "computed_by": "consistency_check"
+    },
+    {
+      "id": "M-01",
+      "rule": "gsc_performance URL set is consistent with dashboard KPI URL set",
+      "severity": "MEDIUM",
+      "category": "csr_mcp",
+      "rationale": "Dashboard KPIs derived from gsc_performance must stay in sync after every mcp_feed run; drift means dashboard_refresh missed a sheet.",
+      "computed_by": "dashboard_refresh"
+    },
+    {
+      "id": "M-02",
+      "rule": "SF import run_id == Excel crawl_date (freshness)",
+      "severity": "MEDIUM",
+      "category": "csr_mcp",
+      "rationale": "Stale SF data + fresh Excel date is a lying report. Freshness SLA is per-sheet in excel-source-manifest.json; staler-than-SLA triggers AMBER.",
+      "computed_by": "consistency_check"
+    }
+  ]
+}

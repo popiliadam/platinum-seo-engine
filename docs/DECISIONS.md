@@ -3,77 +3,26 @@
 Platinum SEO Engine plugin için mimari kararların kaydı.
 Append-only — superseded entry'ler işaretlenir, silinmez.
 
----
+> **Rotation (ADR-011):** Phase 1 closeout'ta toplu rotation uygulandı. ADR-001..ADR-008 archive'da. Eski ADR'ler için: [DECISIONS_ARCHIVE.md](DECISIONS_ARCHIVE.md).
+> Bu dosya sadece son 5 ADR'i tutar; >5KB sınırına yaklaşırsa rotation tekrar tetiklenir.
 
-## ADR-001 — Plugin Repo Yeri: platinum-seo-engine olarak Rename
-**Date:** 2026-04-30
-**Status:** accepted
-**Context:** Q-001 — Plugin repo'su mevcut `~/Documents/platinum-seo-workflow-os/` dizininde mi açılsın yoksa yeni bir dizin mi yaratılsın? "workflow-os" geçici bir isim; final plugin adı `platinum-seo-engine` (spec §1, §2).
-**Decision:** Mevcut `~/Documents/platinum-seo-workflow-os/` dizini `~/Documents/platinum-seo-engine/` olarak rename edildi (`mv` ile). Mevcut `docs/superpowers/specs/*.md` ve diğer tüm dosyalar otomatik olarak yeni repo'ya taşındı; ek kopyalama yapılmadı.
-**Consequences:** GitHub repo adı `platinum-seo-engine` olacak (ADR-002). Tüm sonraki worker dispatch'leri ve commit'ler yeni path'i kullanır. VS Code workspace yeniden açılması gerekebilir.
+## Summary Table
 
----
-
-## ADR-002 — GitHub Repo Timing: Phase 0 Sonu, User-Created
-**Date:** 2026-04-30
-**Status:** accepted
-**Context:** Q-002 — GitHub repo açma timing'i ve kim açacak? Manager session'ın GitHub erişimi yok ve kullanıcı zaten "ben açacağım" dedi.
-**Decision:** Phase 0 sonunda local `git init` + initial commit yapılır (manager hazırlar). Kullanıcı GitHub üzerinde repo'yu `platinum-seo-engine` adıyla manuel olarak açar; manager session sonrasında `git remote add` + `git push` komutlarını sunar, kullanıcı uygular. Phase 1+ her phase sonu **atomic phase commit** (her phase tek commit veya küçük bir grup commit).
-**Consequences:** Phase 0 deliverable'larına `git init` + initial commit dahil. `.gitignore` (Worker C çıktısı) initial commit'te olur. Worker'lar git komutlarına dokunmaz; sadece manager git operasyonlarını koordine eder.
-
----
-
-## ADR-003 — Pilot Proje: dentnotion
-**Date:** 2026-04-30
-**Status:** accepted
-**Context:** Q-003 — Phase 5 GO/NO-GO gateway smoke test'i ve v1 acceptance (Phase 14) hangi pilot proje üzerinden doğrulanacak?
-**Decision:** Pilot proje **dentnotion**. Sebep: Eski `~/Documents/platinum-premium-seo/` repo'sunda en olgun klasör; SF, GSC, içerik dataları en kapsamlı.
-**Consequences:** Phase 5+ smoke test'leri dentnotion datasıyla çalışır. Discovery / Planning / Reporting / Production / Publishing skill'lerinin her biri dentnotion verisi üzerinde happy-path test edilir. Diğer projeler (vento, eykom, bigcattr) v1 sonrası onboard edilir.
-
----
-
-## ADR-004 — Eski Repo Silme: v1 Acceptance + 1 Hafta Soak
-**Date:** 2026-04-30
-**Status:** accepted
-**Context:** Q-004 — `~/Documents/platinum-seo-core/` (Python paketi + MCP server) ve `~/Documents/platinum-premium-seo/` (4. tasarım iterasyonu) ne zaman silinecek? Drift kaynakları ama referans değeri var.
-**Decision:** v1 acceptance (Phase 14 tamamlanması) sonrası **1 hafta soak süresi** beklenir. Bu süre içinde production bug surface ederse referans için eski repo'lara dönülebilir. Soak sonu eski repo'lar silinir. Soak boyunca ve öncesinde READ-ONLY referans (spec §13 + bootstrap §kritik kurallar). Worker'lar eski dosyaları sadece `cp` ile kopyalar; orijinal dosyaları mutate etmez.
-**Consequences:** Tahmini silme tarihi ≈ Phase 14 bitiş + 7 gün. Phase 5–13 boyunca eski dosyalar safe referans olarak elimizde. Migration phase'lerinde (Phase 1, 2, 3) worker'lar SADECE kopyalama operasyonu yapar.
-
----
-
-## ADR-005 — Workspace Repo Timing: Phase 14, User-Created
-**Date:** 2026-04-30
-**Status:** accepted
-**Context:** Q-005 — `platinum-seo-workspace` repo'su ne zaman ve nerede açılacak? Plugin'le aynı timing'de olmalı mı?
-**Decision:** Workspace repo (`~/Documents/platinum-seo-workspace/`) **Phase 14**'te yaratılır. Kullanıcı GitHub repo'sunu `platinum-seo-workspace` adıyla manuel açar. Phase 5–13 boyunca pilot test için mevcut `~/Documents/platinum-premium-seo/` workspace olarak READ-ONLY kullanılır (path detection eski premium klasörünü gösterir).
-**Consequences:** Plugin Phase 14'e kadar workspace repo'su olmadan test edilir. Phase 14 deliverable'larına workspace bootstrap + ilk proje (dentnotion) onboard dahil. `.env`'deki `PSE_WORKSPACE_PATH` Phase 5'ten itibaren `~/Documents/platinum-premium-seo/` (veya alt klasörü) gösterir; Phase 14'te yeni workspace path'ine taşınır.
-
----
-
-## ADR-006 — LICENSE: MIT
-**Date:** 2026-04-30
-**Status:** accepted
-**Context:** Q-006 — Worker C `LICENSE` dosyasını MIT olarak yarattı (alpha plugin için yaygın default). Final lisans seçimi user onayı bekliyordu.
-**Decision:** MIT lisansı onaylandı; mevcut `LICENSE` dosyası korundu. Permissive lisans — türev/ticari kullanım serbest. Patent grant yok (Apache 2'nin tersine), ama bu v1 alpha için kabul edilebilir tradeoff.
-**Consequences:** Plugin'i fork eden/kullanan herkes MIT şartlarına tabi. `plugin.json` `"license": "MIT"` field'i ve README badge'i tutarlı kalır. v1 sonrası lisans değişimi mümkün ama mevcut commit history MIT olarak donar.
-
----
-
-## ADR-007 — plugin.json Baseline Schema, Optional Alanlar Phase 4'te Validate
-**Date:** 2026-04-30
-**Status:** accepted
-**Context:** Q-007 — Worker C `plugin.json`'ı baseline schema ile yarattı (`name, version, description, author, license, skills, commands, hooks`). `repository`, `homepage`, `keywords` gibi optional alanlar şimdilik eklenmedi; spec §3 sadece zorunlu alanları listeliyor.
-**Decision:** Baseline kabul. Optional alanlar **Phase 4** (`plugin-loads-claude-code`) sırasında plugin Claude Code'a yüklenirken Claude Code resmî plugin manifest schema'sına karşı doğrulanacak; eksiklik varsa o phase'de eklenir, gerekirse yeni ADR yazılır.
-**Consequences:** Phase 4 worker plugin.json validation görevini üstlenir. GitHub repo URL (`repository.url`) ADR-002 sonrası elimizde olduğu için Phase 4'te kolayca eklenebilir. Phase 0–3 boyunca plugin.json üzerinde manuel düzenleme yapılmaz.
-
----
-
-## ADR-008 — state/outputs/inbox Plugin Repo'da YOK
-**Date:** 2026-04-30
-**Status:** accepted
-**Context:** Q-008 — Bootstrap brief "If §3 lists more (e.g., `state/`, `validation/`, `reporting/` at top level — bootstrap hints these), include them" diyordu. Ama spec §3 plugin repo top-level'da `state/`, `outputs/`, `inbox/` listelemiyor — bunlar §4 workspace tarafında. Worker C bunları plugin repo'ya eklemedi.
-**Decision:** Worker C kararı onaylandı — `state/`, `outputs/`, `inbox/` plugin repo'da YOK. Plugin = read-only tooling (skill/komut/hook); workspace = runtime state sahibi. Bu ayrım plugin-agnostic hard constraint'iyle uyumlu: plugin tek başına stateless, workspace path'i değiştirildiğinde plugin değişmez.
-**Consequences:** Smoke test (Phase 5+) `PSE_WORKSPACE_PATH` env var'ından okur; eski premium repo (ADR-005) bu yolu sağlar. Hooks/scripts dosya yazarken hep workspace path'ini hedefler — plugin dizinine ASLA yazmaz. Bu disiplin Phase 5 acceptance criteria'sına eklenecek.
+| ADR | Title | Status | Location |
+|---|---|---|---|
+| ADR-001 | Plugin Repo Yeri: platinum-seo-engine olarak Rename | accepted | DECISIONS_ARCHIVE.md |
+| ADR-002 | GitHub Repo Timing: Phase 0 Sonu, User-Created | accepted | DECISIONS_ARCHIVE.md |
+| ADR-003 | Pilot Proje: dentnotion | accepted | DECISIONS_ARCHIVE.md |
+| ADR-004 | Eski Repo Silme: v1 Acceptance + 1 Hafta Soak | accepted | DECISIONS_ARCHIVE.md |
+| ADR-005 | Workspace Repo Timing: Phase 14, User-Created | accepted | DECISIONS_ARCHIVE.md |
+| ADR-006 | LICENSE: MIT | accepted | DECISIONS_ARCHIVE.md |
+| ADR-007 | plugin.json Baseline Schema, Optional Alanlar Phase 4'te Validate | accepted | DECISIONS_ARCHIVE.md |
+| ADR-008 | state/outputs/inbox Plugin Repo'da YOK | accepted | DECISIONS_ARCHIVE.md |
+| ADR-009 | templates/master-excel.xlsx Phase 1'de Schema'dan Üretilir | accepted | (below) |
+| ADR-010 | Runtime Versions: Python 3.10+, Node Gerekmez | accepted | (below) |
+| ADR-011 | DECISIONS_ARCHIVE Rotation Stratejisi | accepted | (below) |
+| ADR-012 | JSON Schema Meta-Schema URI: HTTP (History-Stable) | accepted | (below) |
+| ADR-013 | Phase 1.4 Schema Yazım Kararları (3 Sub-Decision) | accepted | (below) |
 
 ---
 
@@ -94,3 +43,31 @@ Append-only — superseded entry'ler işaretlenir, silinmez.
 **Consequences:** Phase 1+ tüm Python script'leri 3.10+ syntax kullanabilir. CI workflow (Phase 14) Python 3.10/3.11/3.12 matrix'iyle test eder. INSTALL.md Phase 4'te iki düzeltme alır: (a) Node satırı silme, (b) plugin install komut syntax doğrulama.
 
 ---
+
+## ADR-011 — DECISIONS_ARCHIVE Rotation Stratejisi
+**Date:** 2026-04-30
+**Status:** accepted
+**Context:** DECISIONS.md Phase 0 closeout sonu 8942 byte (10 ADR, doğal birikme); spec §13 ve memory'deki <5KB hard cap aşıldı. Append-only prensip korunmalı, ama disiplin koruması da şart — büyük DECISIONS.md fresh session wakeup sequence'ını şişirir, manager bağlamını kötü etkiler.
+**Decision:** ADR-001..ADR-005 (Phase 0 closeout paketi) `docs/DECISIONS_ARCHIVE.md` dosyasına taşındı. DECISIONS.md sadece son 6 ADR (006..011) + üstte özet tablo (ADR no, title, status, archive link) tutar. Manuel rotation Phase 1.0'da yapıldı; Phase 3'te `scripts/state/rotate_decisions.py` ile otomatize edilir (>5KB trigger).
+**Consequences:** DECISIONS.md ~5KB altına iner; archive ~4KB. Trigger: her phase sonu manager rotation check; >5KB ise en eski 5 ADR archive'a taşınır. ADR numaraları monotonic — re-numbering YOK; archive'da gap'ler kabul. Fresh session her zaman summary table'ı görür, full ADR'i archive'da bulur. REFERENCE_INDEX.md'ye archive entry eklendi.
+
+---
+
+## ADR-012 — JSON Schema Meta-Schema URI: HTTP (History-Stable)
+**Date:** 2026-04-30
+**Status:** accepted
+**Context:** Phase 1.1 dispatch brief'inde HTTPS varyantı (`https://json-schema.org/draft-07/schema#`) kullanılmıştı, 13 schema dosyasına yansıdı. JSON Schema resmi standardı (RFC) HTTP varyantını öngörür (`http://json-schema.org/draft-07/schema#`). HTTPS bazı validator'larda (ajv strict, Python jsonschema) "unknown meta-schema" warning'i tetikler. Hata karar verici agent'in dispatch direktifinde, worker disiplinli flag etti — doğru worker davranışı.
+**Decision:** Tüm schema dosyalarında `$schema` HTTP. Phase 1.1'de yazılan 13 dosya sed ile toplu düzeltildi. Phase 1.2+ schema yazımlarında HTTP zorunlu; ihlal durumunda worker DURUR ve manager'a sorar.
+**Consequences:** Validator uyarıları kaybolur. Karar verici agent dispatch direktiflerinde dış standart referansları için kanıt-tabanlı doğrulama (RFC/resmi spec) zorunlu hale gelir.
+
+---
+
+## ADR-013 — Phase 1.4 Schema Yazım Kararları (3 Sub-Decision)
+**Date:** 2026-04-30
+**Status:** accepted
+**Context:** Phase 1.4 W-G dispatch'inde 3 yeni schema yazıldı (workflow-run, skill-frontmatter, project-memory). Worker spec authority'yi manager brief'inin üstünde tuttu, 3 tasarım kararı çıktı:
+**Decision:**
+1. **Skill frontmatter use_when/also_use_when/do_not_use_when** ayrı field değil, description string'i içinde (spec §9 birebir uygulandı). Drift kapısı kapalı, spec authoritative.
+2. **project-memory v1 minimum 6 field**: project_slug, domain, target_audience, kpis, mcp_scope, last_updated. Spec §14 exact field listesi vermiyor; v1 baseline kabul. Phase 5+ skill'lerinde yetersiz çıkarsa yeni ADR ile genişletilir.
+3. **workflow-run updated_at required** (manager mini-fix sonrası). Audit trail için kritik — her step değişiminde güncelleniyor. created_at opsiyonel (started_at ile genelde aynı).
+**Consequences:** Schema yazım disiplinine "spec authority > manager brief" kuralı pekişti. Worker bu prensibi koruduğu için drift kapısı kapandı. Phase 1.5 schema-validate test'lerinde 3 schema bu kararla validate edilir.

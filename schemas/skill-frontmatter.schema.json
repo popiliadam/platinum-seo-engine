@@ -1,0 +1,196 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "http://platinum-seo-engine/schemas/skill-frontmatter",
+  "title": "Skill Frontmatter v1.0",
+  "description": "YAML frontmatter discipline for every skill SKILL.md file (spec §9). Locks the auto-trigger contract: name + description + triggers describe when Claude fires the skill; inputs/outputs/consumes/produces describe its data contract; mcp_tools + budget + autonomy describe its runtime envelope. The 'description' field carries the human-readable Use when / Also use when / Do not use when blocks (string content, not separate fields) so glossary-audit can lint them. category mirrors the directory tree under skills/. Cross-reference: triggers.manual slash commands are listed in WORKFLOWS.md; mcp_tools.required must exist in mcp-tool-registry.schema.json; outputs '#sheet' anchors must match master-excel.schema.json logical sheet names. Validated by glossary-audit skill on every commit.",
+  "type": "object",
+  "required": ["name", "description", "version", "status", "category", "inputs", "outputs", "triggers"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Skill slug. Must equal the directory name under skills/. kebab-case only.",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "minLength": 2,
+      "maxLength": 64
+    },
+    "description": {
+      "type": "string",
+      "description": "Multi-line auto-trigger description containing 'Use when:', 'Also use when:', 'Do not use when:' segments per spec §9. Lints by glossary-audit; minLength enforces meaningful content.",
+      "minLength": 30
+    },
+    "version": {
+      "type": "string",
+      "description": "Skill version string. SemVer-like, written as a quoted YAML string (e.g. \"1.0\", \"1.2.3\").",
+      "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$"
+    },
+    "status": {
+      "type": "string",
+      "description": "Lifecycle marker. active = production; deprecated = scheduled removal; wip = not yet auto-triggered.",
+      "enum": ["active", "deprecated", "wip"]
+    },
+    "category": {
+      "type": "string",
+      "description": "Top-level skill grouping; must mirror skills/{category}/ directory layout (discovery, content, technical, governance, portfolio, operational).",
+      "enum": ["discovery", "content", "technical", "governance", "portfolio", "operational"]
+    },
+    "inputs": {
+      "type": "object",
+      "description": "Named input parameters the skill accepts at invocation. Keys are parameter names (snake_case); values declare type/default/required.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Parameter primitive type.",
+            "enum": ["string", "integer", "number", "boolean", "array", "object"]
+          },
+          "required": {
+            "type": "boolean",
+            "description": "True if the skill cannot run without this input."
+          },
+          "default": {
+            "description": "Default value applied when the caller omits the input. Type must match 'type'."
+          },
+          "description": {
+            "type": "string",
+            "description": "Short human-readable explanation."
+          }
+        }
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "description": "Ordered list of artifact references this skill produces. Conventions: 'master.xlsx#logical_sheet', 'outputs/reports/{date}-name.md', 'events.jsonl'. Used by the dependency graph (consumes/produces) for orphan detection.",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "consumes": {
+      "type": "array",
+      "description": "Upstream artifact references this skill reads. Each entry of the form '{producer-skill}:{artifact}' so glossary-audit can build a directed dependency graph.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "produces": {
+      "type": "array",
+      "description": "Downstream skill names that consume this skill's outputs. Stored explicitly so glossary-audit detects orphans without crawling all SKILL.md files.",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*$"
+      }
+    },
+    "triggers": {
+      "type": "object",
+      "description": "How the skill is invoked. At least one trigger surface must be populated for status=active skills (enforced by glossary-audit, not by this schema).",
+      "additionalProperties": false,
+      "properties": {
+        "manual": {
+          "type": "array",
+          "description": "Slash commands or explicit invocation aliases (e.g. ['/pseo-quickwin']).",
+          "items": {
+            "type": "string",
+            "pattern": "^/[a-z][a-z0-9-]*$"
+          }
+        },
+        "natural_language": {
+          "type": "string",
+          "description": "Comma-separated example phrases that should auto-trigger this skill. Used by Claude's description matcher; kept as one block string for readability."
+        },
+        "hooks": {
+          "type": "array",
+          "description": "Event hooks (e.g. PostToolUse, Stop) that fire this skill. Empty array if none.",
+          "items": { "type": "string" }
+        },
+        "scheduled": {
+          "type": "array",
+          "description": "Cron-driven invocations for autonomy mode. Each entry pins a cron expression and an execution mode (report-only vs auto-execute).",
+          "items": {
+            "type": "object",
+            "required": ["cron", "mode"],
+            "additionalProperties": false,
+            "properties": {
+              "cron": {
+                "type": "string",
+                "description": "Standard 5-field cron expression in UTC (e.g. '0 9 * * 1').",
+                "minLength": 9
+              },
+              "mode": {
+                "type": "string",
+                "description": "report-only writes a report and exits; auto-execute may mutate Excel/state without prompting.",
+                "enum": ["report-only", "auto-execute"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "mcp_tools": {
+      "type": "object",
+      "description": "Declares which MCP tools the skill calls. required tools are hard dependencies; optional tools are used opportunistically. Tool names must exist in mcp-tool-registry.schema.json.",
+      "additionalProperties": false,
+      "properties": {
+        "required": {
+          "type": "array",
+          "description": "Tools the skill cannot run without.",
+          "items": {
+            "type": "string",
+            "pattern": "^mcp__[a-zA-Z0-9_]+__[a-zA-Z0-9_]+$"
+          }
+        },
+        "optional": {
+          "type": "array",
+          "description": "Tools used when available; absence does not block the skill.",
+          "items": {
+            "type": "string",
+            "pattern": "^mcp__[a-zA-Z0-9_]+__[a-zA-Z0-9_]+$"
+          }
+        }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "description": "Cost envelope. Skills that touch paid MCPs (DataForSEO, paid Scrapling) must set uses_paid_mcp=true; the budget skill blocks execution when estimated_credits exceeds project.config thresholds.",
+      "required": ["uses_paid_mcp"],
+      "additionalProperties": false,
+      "properties": {
+        "uses_paid_mcp": {
+          "type": "boolean",
+          "description": "True if any required or optional MCP tool is paid."
+        },
+        "estimated_credits": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Best-effort upper-bound credit estimate per run. 0 when free."
+        }
+      }
+    },
+    "autonomy": {
+      "type": "object",
+      "description": "Autonomous-mode policy. Determines whether the skill may execute without human approval and how confident the skill is in its own outputs.",
+      "required": ["confidence", "requires_approval", "safe_auto_execute"],
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "type": "string",
+          "description": "Self-reported reliability tier; LOW skills route through extra review.",
+          "enum": ["HIGH", "MEDIUM", "LOW"]
+        },
+        "requires_approval": {
+          "type": "boolean",
+          "description": "True forces an awaiting_approval gate before destructive output (publishes, applied changes)."
+        },
+        "safe_auto_execute": {
+          "type": "boolean",
+          "description": "True allows scheduled cron triggers to run end-to-end without a human session; false means scheduled runs must stop at a report."
+        }
+      }
+    }
+  }
+}
