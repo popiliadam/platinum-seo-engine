@@ -7,6 +7,10 @@
   "required": ["run_id", "skill", "project_slug", "status", "started_at", "updated_at", "steps"],
   "additionalProperties": false,
   "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "description": "Schema version pinning. ADR-019: const \"1.0\" baseline; v2 migration için kullanılır (Phase 14+ schema skew detection)."
+    },
     "run_id": {
       "type": "string",
       "description": "Unique workflow run identifier. Convention: {project_slug}-{YYYY-MM-DD}-{hash4} where hash4 is a 4-char hex token disambiguating same-day runs (spec §10).",
@@ -175,6 +179,12 @@
       "type": "string",
       "format": "date-time",
       "description": "UTC ISO 8601 timestamp updated on every disk write. Skills set this to now() on each step transition."
+    },
+    "retry_count": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Retry attempts (incremented on each failed → running transition via retry()). ADR-019 additive bump; default 0 backward-compat."
     }
   },
 
