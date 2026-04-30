@@ -16,6 +16,17 @@
     ],
     "rationale": "Predecessor v3 W14 Dashboard formula drift — formulas silently corrupt across Excel versions. Zero-formula policy replaces all =SUM/=VLOOKUP/=INDEX/=MATCH with literal projection writes."
   },
+  "definitions": {
+    "statusEnum": {
+      "type": "string",
+      "description": "STORED value — what writers put in cells. Display decoration (emoji + date suffix) applied at Excel render time. ADR-018 hibrit: eski sistem 4 (TODO/ONGOING/EXISTS/DONE) + workflow extension 3 (BLOCKED/DEFERRED/CANCELED).",
+      "enum": ["TODO", "ONGOING", "EXISTS", "DONE", "BLOCKED", "DEFERRED", "CANCELED"]
+    },
+    "severityEnum": {
+      "type": "string",
+      "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
+    }
+  },
   "sheets": {
     "dashboard": {
       "required_cells": [

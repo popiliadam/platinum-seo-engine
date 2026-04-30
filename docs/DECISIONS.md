@@ -3,7 +3,7 @@
 Platinum SEO Engine plugin için mimari kararların kaydı.
 Append-only — superseded entry'ler işaretlenir, silinmez.
 
-> **Rotation:** ADR-001..011 archive'da → [DECISIONS_ARCHIVE.md](DECISIONS_ARCHIVE.md). ADR-014 eşik kuralı: <5KB primary, ADR sayısı flexible (3-5 active).
+> **Rotation:** ADR-001..018 archive'da (gap: 015) → [DECISIONS_ARCHIVE.md](DECISIONS_ARCHIVE.md). ADR-014 (rotation kuralı, archive): <5KB primary, 3-5 active.
 
 ## Summary Table
 
@@ -20,36 +20,39 @@ Append-only — superseded entry'ler işaretlenir, silinmez.
 | ADR-009 | templates/master-excel.xlsx Phase 1'de Schema'dan Üretilir | accepted | DECISIONS_ARCHIVE.md |
 | ADR-010 | Runtime Versions: Python 3.10+, Node Gerekmez | accepted | DECISIONS_ARCHIVE.md |
 | ADR-011 | DECISIONS_ARCHIVE Rotation Stratejisi | accepted | DECISIONS_ARCHIVE.md |
-| ADR-012 | JSON Schema Meta-Schema URI: HTTP (History-Stable) | accepted | (below) |
-| ADR-013 | Phase 1.4 Schema Yazım Kararları (3 Sub-Decision) | accepted | (below) |
-| ADR-014 | DECISIONS Rotation Eşiği: <5KB Primary, ADR Sayısı Flexible | accepted | (below) |
+| ADR-012 | JSON Schema Meta-Schema URI: HTTP (History-Stable) | accepted | DECISIONS_ARCHIVE.md |
+| ADR-013 | Phase 1.4 Schema Yazım Kararları (3 Sub-Decision) | accepted | DECISIONS_ARCHIVE.md |
+| ADR-014 | DECISIONS Rotation Eşiği: <5KB Primary, ADR Sayısı Flexible | accepted | DECISIONS_ARCHIVE.md |
+| ADR-016 | Budget Tracking: events.jsonl SSoT (Spec §16.8 Supersede) | accepted | DECISIONS_ARCHIVE.md |
+| ADR-017 | events.schema Field Naming: Schema-Correct Primary, Fallback Cleanup | accepted | DECISIONS_ARCHIVE.md |
+| ADR-018 | master-excel.schema definitions Block (Phase 1.1 Migration Miss) | accepted | DECISIONS_ARCHIVE.md |
+| ADR-019 | workflow-run.schema Additive Bump (retry_count + schema_version) | accepted | (below) |
+| ADR-020 | events.schema event_kind="workflow" + workflow_action Enum | accepted | (below) |
+| ADR-021 | events.jsonl Path: _state/ (spec §4 SSoT) | accepted | (below) |
 
 ---
 
-## ADR-012 — JSON Schema Meta-Schema URI: HTTP (History-Stable)
+## ADR-019 — workflow-run.schema Additive Bump (retry_count + schema_version)
 **Date:** 2026-04-30
 **Status:** accepted
-**Context:** Phase 1.1 dispatch brief'inde HTTPS varyantı (`https://json-schema.org/draft-07/schema#`) kullanılmıştı, 13 schema dosyasına yansıdı. JSON Schema resmi standardı (RFC) HTTP varyantını öngörür. HTTPS bazı validator'larda (ajv strict, Python jsonschema) "unknown meta-schema" warning'i tetikler. Hata karar verici agent'in dispatch direktifinde, worker disiplinli flag etti — doğru worker davranışı.
-**Decision:** Tüm schema dosyalarında `$schema` HTTP. Phase 1.1'de yazılan 13 dosya sed ile toplu düzeltildi. Phase 1.2+ schema yazımlarında HTTP zorunlu; ihlal durumunda worker DURUR ve manager'a sorar.
-**Consequences:** Validator uyarıları kaybolur. Karar verici agent dispatch direktiflerinde dış standart referansları için kanıt-tabanlı doğrulama (RFC/resmi spec) zorunlu hale gelir.
+**Context:** Phase 1.4 W-G workflow-run.schema yazımında `retry_count` (retry mechanism field) ve `schema_version` (version drift detection) atlandı. Subagent #3 W-L research'ünde tespit etti; `retry()` API method'u şu an retry_count'a refer ediyor ama schema'da yer yoktu.
+**Decision:** Additive bump — required'a EKLENMEDİ (default 0/missing kabul, backward compat). `retry_count`: integer >=0, default 0. `schema_version`: const "1.0".
+**Consequences:** workflow_runner.py retry() method retry_count'u inkremente eder (failed → running transition). schema_version Phase 14+ migrasyonlarda version skew detection için. Mevcut workflow-run.json yok (yeni özellik), backward compat sorunsuz.
 
 ---
 
-## ADR-013 — Phase 1.4 Schema Yazım Kararları (3 Sub-Decision)
+## ADR-020 — events.schema event_kind="workflow" + workflow_action Enum
 **Date:** 2026-04-30
 **Status:** accepted
-**Context:** Phase 1.4 W-G dispatch'inde 3 yeni schema yazıldı (workflow-run, skill-frontmatter, project-memory). Worker spec authority'yi manager brief'inin üstünde tuttu, 3 tasarım kararı çıktı:
-**Decision:**
-1. **Skill frontmatter use_when/also_use_when/do_not_use_when** ayrı field değil, description string'i içinde (spec §9 birebir uygulandı). Drift kapısı kapalı, spec authoritative.
-2. **project-memory v1 minimum 6 field**: project_slug, domain, target_audience, kpis, mcp_scope, last_updated. Spec §14 exact field listesi vermiyor; v1 baseline kabul. Phase 5+ skill'lerinde yetersiz çıkarsa yeni ADR ile genişletilir.
-3. **workflow-run updated_at required** (manager mini-fix sonrası). Audit trail için kritik — her step değişiminde güncelleniyor. created_at opsiyonel (started_at ile genelde aynı).
-**Consequences:** Schema yazım disiplinine "spec authority > manager brief" kuralı pekişti. Worker bu prensibi koruduğu için drift kapısı kapandı. Phase 1.5 schema-validate test'lerinde 3 schema bu kararla validate edilir.
+**Context:** Mevcut event_kind enum 3 değer (provenance/work/audit). Workflow lifecycle event'leri (started/paused/resumed/approved/rejected/retried/done/failed) için doğal yer yoktu. Subagent #3 önerisi audit routing workaround'du; drift bırakma + semantik doğruluk prensibi gereği temiz çözüm: yeni event_kind. **Schema integrity sürprizi:** Brief "run_id zaten var" dedi ama events.run_id integer/PROVENANCE-only declared (line 30); workflow-run.run_id string pattern. Type collision riski.
+**Decision:** event_kind enum genişletildi 4 değer ("provenance", "work", "audit", "workflow"). workflow_action enum 8 değer eklendi. **workflow_run_id (string, workflow-run.run_id pattern aynası)** eklendi — events.run_id integer/provenance-only kalır, type-correct ayrım. step_index optional. allOf conditional: event_kind="workflow" iken workflow_action + workflow_run_id zorunlu.
+**Consequences:** workflow_runner.py state transition'ları semantik-doğru `event_kind="workflow"` ile log'lanır. events.jsonl reader'lar (check_budget.py vb.) workflow event'lerini doğal filter ile ayırır. Type discipline (rules/schema-first.md) korundu — events.run_id integer kalmaya devam eder, workflow_run_id ayrı string field.
 
 ---
 
-## ADR-014 — DECISIONS Rotation Eşiği: <5KB Primary, ADR Sayısı Flexible
+## ADR-021 — events.jsonl Path: _state/ (spec §4 SSoT)
 **Date:** 2026-04-30
-**Status:** accepted (supersedes ADR-011 partial — eşik kuralı bölümü)
-**Context:** ADR-011 iki hedef koymuştu: "5 ADR + <5KB". Phase 1 closeout'ta çakıştı (5 ADR korundu ama 6.7KB). Uzun ADR'ler (sub-decision'lı) sayıyı kalın yapıyor — örneğin ADR-013 üç sub-decision içeriyor.
-**Decision:** Primary metric **<5KB**. ADR sayısı flexible (3-5 active aralığı). Rotation tetiği: boyut >5KB. Phase closeout'ta agresif rotation ile (en eski 1-2 ADR archive'a) <5KB sağlanır. ADR-011'in rotation pattern'i (manuel Phase 1.0; otomatize Phase 3 `rotate_decisions.py`) korunur — sadece eşik metriği ADR-014 ile revize.
-**Consequences:** Phase 2 closeout'ta DECISIONS.md (~7-8KB ADR-014 sonrası) tetiklenir; ADR-009 ve ADR-010 archive'a taşınır → DECISIONS.md ~5KB altı kalır. Phase 3 otomatik rotation script'i bu metrikle çalışacak. ADR-011'in "5 ADR" kısmı artık guideline (hard cap değil); boyut hard cap.
+**Status:** accepted
+**Context:** Phase 3.1 W-M `check_budget.py` yazımında events.jsonl path olarak `state/events.jsonl` (underscore'suz) kullanıldı. Spec §4 line 254 dir tree `_state/` (underscore'lu). Subagent #2 tespit etti; ADR-016 budget store'u kapatsa da path konvansiyonu spec §4 SSoT.
+**Decision:** Spec §4 authoritative. `_state/` standartı uygulanır. `check_budget.py` line 14 docstring + line 119 default arg fix (`state/events.jsonl` → `_state/events.jsonl`). Tüm runtime state path'leri `_state/` prefix.
+**Consequences:** check_budget.py path drift kapatıldı (replace_all 2 hit). Phase 3.3 W-L (events_writer.py + workflow_runner.py) yazımında `_state/` standartına uyacak. Phase 5 smoke test'te path mismatch hatası önlendi.

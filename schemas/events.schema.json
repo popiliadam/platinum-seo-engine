@@ -10,8 +10,8 @@
     "schema_version": { "const": "1.0" },
     "event_kind": {
       "type": "string",
-      "description": "Top-level discriminator. Determines which sub-kind required fields apply.",
-      "enum": ["provenance", "work", "audit"]
+      "description": "Top-level discriminator. Determines which sub-kind required fields apply. ADR-020: 'workflow' eklendi (workflow lifecycle event'leri için, audit routing workaround yerine semantik-doğru kategori).",
+      "enum": ["provenance", "work", "audit", "workflow"]
     },
     "event_id": {
       "type": "string",
@@ -249,6 +249,22 @@
     "actor": {
       "type": "string",
       "description": "AUDIT-only. Identity that performed the action (user email, agent id, system process)."
+    },
+
+    "workflow_action": {
+      "type": "string",
+      "description": "WORKFLOW-only (ADR-020). Workflow lifecycle transition. Logged by workflow_runner.py state machine into events.jsonl.",
+      "enum": ["started", "paused", "resumed", "approved", "rejected", "retried", "done", "failed"]
+    },
+    "workflow_run_id": {
+      "type": "string",
+      "description": "WORKFLOW-only (ADR-020). References workflow-run.schema.json $.run_id (string pattern). Distinct from provenance.run_id (integer) to avoid type collision — events.run_id remains integer/provenance-only.",
+      "pattern": "^[a-z][a-z0-9-]*-[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-f0-9]{4}$"
+    },
+    "step_index": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "WORKFLOW-only (ADR-020). Zero-based index into workflow-run.steps[] of the step this event refers to. Optional but recommended for correlation."
     }
   },
 
@@ -315,6 +331,11 @@
                  { "properties": { "event_type": { "const": "quickwin_applied" } } }
                ] },
       "then": { "required": ["cluster", "before", "after"] }
+    },
+    {
+      "description": "WORKFLOW kind required fields (ADR-020). workflow_action + workflow_run_id mandatory; step_index optional.",
+      "if":   { "properties": { "event_kind": { "const": "workflow" } } },
+      "then": { "required": ["workflow_action", "workflow_run_id"] }
     }
   ],
 

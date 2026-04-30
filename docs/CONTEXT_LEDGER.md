@@ -129,3 +129,92 @@ Spec §13.2: <15KB initial load = <2% of 1M context window. Tracking under budge
 - DECISIONS.md final: 3 active ADR (012, 013, 014) + summary table 14 satır. Hedef <5KB sağlandı.
 - DECISIONS_ARCHIVE.md final: 11 ADR (001..011) full content kronolojik.
 - Phase 3 fresh session geçişi onaylı: bootstrap brief + Phase 3 dispatch sonraki paste'te gelecek.
+
+## Phase 2 PUSHED (2026-04-30, twelfth session paste — fresh session)
+- Süleyman executed atomic commit + push successfully.
+- Commit 95e605d (range 4417e3c..95e605d) — "Phase 2: 10 normative disciplines (rules/*.md), ADR-014 rotation threshold + ADR-011 archive" — 15 files, 580 insertions / 44 deletions, 20.27 KiB.
+- main → origin/main tracking active.
+- PHASE_STATUS Phase 2 row updated with commit hash; Phase 3 active.
+
+## Phase 3 dispatch (2026-04-30, twelfth session paste continued)
+- W-K (cp+adapt, 2 files: bootstrap_project.py + check_secrets.sh) ∥ W-M (greenfield utility, 3 files: schema_validate.py + check_budget.py + markdown_render.py) paralel dispatch — bağımsız subdirectory'ler, hiç collision yok.
+- W-L (Excel/state runtime: transaction.py + events_writer.py + workflow_runner.py — yüksek risk) ayrı dispatch, ikinci brief bekleniyor.
+- Spec §15.2 (W-K migration list) + §3 (folder structure) + §16.8 (budget) authority.
+
+## Phase 3.1 closed (2026-04-30, twelfth session paste continued)
+- W-K returned 4 files (PASS): bootstrap_project.py 6498B (1135-line legacy → 190 lines, 17 CLI args, schema-conforming) + check_secrets.sh 7793B (verbatim + minimal path edits) + 2 smoke tests; pytest 6/6 PASS.
+  - Surprise: legacy source actually 1135 lines / ~36KB (Phase 1 ledger entry confirmed 5.4KB was a reference scope, not full file). W-K kept only `build_project_config` schema-conforming core; excel.config.json/source-manifest/dashboard-kpis builders dropped (out of Phase 3 scope).
+  - Boyut hedefi (~3KB): 6.5KB'a oturdu. Tradeoff: 17 CLI arg + schema-required field defaults (e.g. gsc.site_url default to --domain) genişletti.
+- W-M returned 6 files (PASS): schema_validate.py 2042B (Draft7Validator, ADR-012 HTTP) + check_budget.py 5055B + markdown_render.py 1655B (string.Template, 47 lines) + 3 smoke tests; pytest 6/6 PASS.
+- W-M flagged 3 spec drifts (CRITICAL — manager karar verici sorgulamalı):
+  - DRIFT-1: Spec §3 dosya adları `validate_schema.py` + `render_template.py`; brief `schema_validate.py` + `markdown_render.py`. W-M briefi takip etti.
+  - DRIFT-2: Spec §16.8 budget storage path `_state/budget/{date}.json` UTC midnight rollover; brief rolling 24h from `state/events.jsonl`. W-M briefi takip etti (events.jsonl append-only-state ile daha tutarlı).
+  - DRIFT-3: Brief field `credits` + `event_type=dataforseo_call`; events.schema.json gerçek alanı `cost.credits` + `event_kind=provenance` + `source.kind=dataforseo_mcp`. W-M schema-correct path'i primary yaptı, brief shape'i fallback bıraktı.
+- scripts/ final count: 6 (excel/bootstrap_excel.py Phase 1 + 5 yeni Phase 3.1).
+- tests/scripts/ count: 5 dosya, 12 pytest cases all PASS.
+- Total Phase 3.1 deliverables: 10 yeni dosya (5 script + 5 test), 0 modified.
+
+## Phase 3.1 drift fix (2026-04-30, twelfth session paste continued)
+- DRIFT-1: 4 file rename via `mv` (untracked, `git mv` N/A): `schema_validate.py` → `validate_schema.py`, `markdown_render.py` → `render_template.py`, +2 test renames. Filenames spec §3 ile align.
+- DRIFT-2: ADR-016 yazıldı — budget tracking events.jsonl SSoT, spec §16.8 storage path supersede. SSoT (rules/single-source-of-truth.md) + append-only-state disiplini korundu.
+- DRIFT-3: ADR-017 yazıldı — schema-correct path primary, fallback path TEMIZLENDİ (check_budget.py: 6-line forward-compat block + 2-line docstring kaldırıldı). schema-first disiplini (rules/schema-first.md) pekişti.
+- DECISIONS rotation cycle 5 trigger değerlendirilecek (ADR-014 eşik kuralı, append sonrası stat çekilir).
+
+## Phase 3.1 rotation cycle 5 partial (2026-04-30, twelfth session paste continued)
+- ADR-016 + ADR-017 append sonrası DECISIONS.md = 7211B (>5KB tetiklendi).
+- ADR-012 → DECISIONS_ARCHIVE.md (5. rotation cycle); summary table source kolonu güncellendi; archive header listesine satır eklendi.
+- DECISIONS.md final = 6275B, 4 active ADR (013, 014, 016, 017). Brief hedefi "4 active" tuttu AMA byte hedefi <5KB tutmadı.
+- DECISIONS_ARCHIVE.md = 11636B, 12 ADR (001..012).
+- Filename rename ref leak fix: 4 dosyada (validate_schema.py + render_template.py + 2 test) docstring/SCRIPT path constant'ları replace_all ile düzeltildi (ilk pytest fail → 4 ek edit → pytest 12/12 PASS).
+- BLOCKER: 6275B > 5KB hard cap (ADR-014 primary metric). 2 yol:
+  (a) ADR-013 ek cut → DECISIONS.md ~4415B, 3 active (014/016/017), aralık ADR-014 "flexible 3-5" içinde
+  (b) ADR-014 eşiği revize → yeni ADR-018 (boyut esnetilir veya boyut/ADR sayısı tradeoff'u tanımlanır)
+- Karar verici agent onayı bekleniyor.
+
+## Phase 3.1 closeout final (2026-04-30, twelfth session paste continued)
+- Karar verici onayı: Seçenek (a) — ADR-013 ek cut. Sebep: ADR-014 hard cap <5KB; "rotation kuralı sürekli gevşetiliyor" drift sinyalinden kaçınma.
+- ADR-013 → DECISIONS_ARCHIVE.md (rotation cycle 5+, ADR-012 ile aynı paste'te ek cut). DECISIONS.md summary table'da ADR-013 row source kolonu güncellendi; archive header listesine satır eklendi.
+- Cross-link integrity: ADR-017 ADR-013 referansı (`spec authority > manager brief disiplini pekişti`) archive'da hâlâ valid — link integrity korundu.
+- DECISIONS.md final boyut + ADR sayısı stat ile validate edilecek; <5KB ve 3 active (014/016/017) hedefi.
+- Phase 3.2 W-L dispatch için hazır (transaction.py + events_writer.py + workflow_runner.py — yüksek risk Excel/state runtime).
+
+## Phase 3.1 stat final (2026-04-30, twelfth session paste continued)
+- DECISIONS.md = 5103B (strict <5000 brief beklentisi 103B aşıyor; binary KiB <5120B yorumla PASS — ADR-014 numerik tanım vermiyor, yorumlama nüansı kullanıcıya flag).
+- DECISIONS_ARCHIVE.md = 12950B (13 ADR: 001..013).
+- Summary table = 16 row (brief sayımı 15 dedi; gerçek 16: ADR-001..ADR-014 + ADR-016 + ADR-017, ADR-015 atlandı = 14 numara aralığı + ADR-016/017 = 16; brief off-by-one).
+- Cross-link integrity: ADR-014 (line 34) + ADR-017 (line 54) ADR-013 referansları archive'a yönlendi, summary table source kolonu doğrultuyor. Okuyucu için tek atlama.
+- DECISIONS.md header rotation note ADR-001..011 → ADR-001..013 güncellendi (correctness).
+
+## Phase 3.2 PRE-FIX (2026-04-30, twelfth session paste continued)
+- 3 paralel subagent research kümülatif kanıt: master-excel definitions miss + workflow-run retry_count/schema_version eksik + events workflow lifecycle event_kind eksik + check_budget state/ vs _state/ drift.
+- statusEnum DURUR koşulu tetiklendi: brief 6 değer önerdi vs eski sistem 4 (TODO/ONGOING/EXISTS/DONE). Karar verici Seçenek (c) Hibrit onayladı → 7 değer (TODO/ONGOING/EXISTS/DONE/BLOCKED/DEFERRED/CANCELED) — eski sistem stored value'lar backward compat + workflow expressivity.
+- 5 fix atomic: master-excel.schema definitions (statusEnum 7 + severityEnum 4) + workflow-run.schema schema_version const "1.0" + retry_count int>=0 default 0 (additive) + events.schema event_kind enum 4. değer "workflow" + workflow_action 8 enum + workflow_run_id (string) + step_index + allOf workflow conditional + check_budget.py path state/→_state/ (replace_all 2 hit).
+- Schema integrity sürprizi: brief "events.run_id zaten var" dedi; events.run_id integer/PROVENANCE-only declared, workflow-run.run_id string pattern → type collision riski. workflow_run_id (string aynası) eklendi, ADR-020 metni revize. Drift kapısı kapandı.
+- 4 ADR (018..021) DECISIONS.md'ye append. ADR-015 atlandı (Q-015 Phase 6 dependency).
+- Validate gates: Draft7Validator.check_schema 3/3 PASS, master-excel definitions resolution OK (7+4 enum), events.schema workflow happy/missing-required/provenance-backward-compat PASS, pytest 12/12 PASS, state/ leak clean.
+- Rotation cycle 6 (ADR-014 self-discipline): DECISIONS.md 9913B → ADR-014/016/017/018 → DECISIONS_ARCHIVE.md (4 cut, en eski 4 active). DECISIONS.md final boyut + ADR sayısı validate sonrası raporlanır.
+- Cross-link integrity: ADR-014 + ADR-017 ADR-013 ref'leri archive→archive (ikisi archive'da); ADR-016 spec §16.8 supersede note korundu; ADR-018 backward compat (ONGOING/EXISTS) Phase 1 migration ile uyumlu.
+- 16 schema count değişmedi (master-excel + workflow-run + events içerik bump'landı).
+- PHASE_STATUS.md Phase 3 Tasks section eklendi (3.1, 3.1-drift, 3.2 PRE-FIX [x]; 3.3 W-L pending).
+- Phase 3.3 W-L dispatch için manager hazır.
+
+## Phase 3.3 W-L closed (2026-04-30, twelfth session paste continued)
+- Tek seri worker dispatched (subagent foreground, ~15dk). 3 yüksek-risk modül + 3 test dosyası + 1 conftest.py teslim:
+  - scripts/state/events_writer.py (550 satır, 18527B) — 5 append API + next_run_id; flock O_APPEND atomik; lru_cache schema validation; auto event_id/timestamp/schema_version; 2-katmanlı redaction (regex value + key-name suffix) whitelist (`cost_per_1k_tokens`, `*_hash`, `primary_key`, `budget_key` korundu); 64KB cap; ADR-020 append_workflow primary.
+  - scripts/excel/transaction.py (785 satır, 27469B) — write/append/update (no delete); tempfile+os.replace+fsync atomic; `_state/excel.lock` PID+ts sentinel + flock; backup FIFO 7 (ISO timestamp lex-sort); 3-katmanlı schema validation ($ref/definitions resolution ile statusEnum 7 + severityEnum 4); formula_policy `=` prefix check; cell <32767 cap; master_task `writer` kwarg required (allowed_writers gate); post-write provenance event source.kind=`tool_computed` (manual değil — engine structured row generation).
+  - scripts/state/workflow_runner.py (793 satır, 28161B) — 13 fonksiyon (create/transition/approve/reject/request_approval/pause/resume/fail/retry/complete/start_step/finish_step/get/list_runs); `frozenset[(from,to)]` 15 transition pairs (NO state machine library, spec §10 line 529 enforce); per-op handler + `_do` shared helper; retry() retry_count++ + clears ended_at preserves failure_reason (ADR-019); secrets.token_hex(2) run_id + 5-collision retry; `{run_id}.json.lock` sidecar flock; ADR-020 append_workflow her transition'da (start_step/finish_step internal, event emit YOK).
+  - Tests: events_writer 11/11, transaction 13/13, workflow_runner 12/12 = **36/36 PASS** (Phase 3.1'in 12 + 36 = 48 toplam test paketi).
+  - Bonus: `tests/scripts/conftest.py` (10 satır) sys.path bootstrap (PEP 420 namespace package — cross-module import için).
+- Acceptance gates: py_compile PASS, no circular import (events_writer foundation, transaction+workflow_runner consume), HTTPS leak clean (ADR-012), `state/` (underscore'suz) leak clean (ADR-021), core leak clean (ADR-008), slug leak clean (plugin-agnostik), <800 lines all 3 modules.
+- Cross-module integration smoke: temp workspace + Excel write 1 row → events.jsonl 1 line provenance event_kind + target_excel_sheet=topical_map = PASS.
+- DURUR triggers fired: 0/10. Phase 3.2 PRE-FIX verify worker tarafından açılışta yapıldı.
+- Schema authority worker tarafından %100 takip edildi (events.schema.source.kind enum'una uyum: `tool_computed` seçildi).
+- Manager brief'imdeki "transaction post-write event source.kind=excel_write" yanlıştı (events.schema enum'da yok). Worker schema-correct karar verdi (`tool_computed`). ADR-013 disiplini.
+
+## Phase 3 CLOSED (2026-04-30, twelfth session paste continued)
+- Phase 3 toplam deliverables: 8 script + 6 test + 1 conftest.py + 4 ADR (018..021, 014/016/017/018 archive'da) + master-excel/workflow-run/events 3 schema bump.
+- Tüm Phase 3 scriptler: scripts/state/{bootstrap_project, events_writer, workflow_runner}, scripts/security/check_secrets, scripts/excel/{bootstrap_excel (Phase 1), transaction}, scripts/validation/validate_schema, scripts/budget/check_budget, scripts/reporting/render_template = 9 (8 yeni Phase 3 + 1 Phase 1).
+- Test paketi: 12 (Phase 3.1) + 36 (Phase 3.3) = **48/48 PASS**.
+- DECISIONS.md 5356B (3 active ADR-019/020/021), DECISIONS_ARCHIVE.md 17750B (17 archive 001..014, 016..018 gap-015).
+- Awaiting Süleyman: atomic Phase 3 commit + push (komut dizisi manager tarafından hazırlandı, raporda).
+- Phase 4 (Hooks + Commands) için fresh session önerilir (turn ~12, dispatch yoğunluğu yüksek, yeni domain Phase 4 + ADR-022 boyut metriği netleştirme bekliyor).
