@@ -1,0 +1,190 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://platinum-seo-engine/schemas/project-config.schema.json",
+  "title": "Project Configuration Schema v1.0",
+  "description": "Per-project pack definition (projects/{slug}/config/project.config.json). See ARCHITECTURE.md §10.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "project_id", "domain", "market", "language",
+    "currency", "platform", "profiles", "paths", "gsc", "dataforseo"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "project_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "lowercase slug; matches projects/{slug}/ directory name"
+    },
+    "display_name": { "type": "string" },
+    "domain":       { "type": "string", "format": "uri" },
+    "market":       { "type": "string", "description": "ISO 3166-1 alpha-2 country or region code (e.g. TR, NG)" },
+    "language": {
+      "type": "object",
+      "required": ["content_locale"],
+      "properties": {
+        "content_locale":  { "type": "string", "description": "IETF BCP 47 (e.g. tr-TR, en-NG)" },
+        "content_variant": { "type": ["string", "null"], "default": null }
+      }
+    },
+    "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$",
+      "description": "ISO 4217 currency code"
+    },
+    "platform": {
+      "enum": ["wordpress", "wordpress+woocommerce", "ticimax", "ideasoft", "imagaza", "custom"]
+    },
+    "platform_seo_plugin": {
+      "enum": ["rankmath", "yoast", "aioseo", "seopress", "none", null]
+    },
+    "profiles": {
+      "type": "array",
+      "description": "Composable project-type profiles (union + dedup + priority merge at runtime). Drives Tier elevation in sf-required-reports.",
+      "items": { "enum": ["e-commerce", "ymyl", "local-service", "b2b-saas", "portfolio"] },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "paths": {
+      "type": "object",
+      "required": [
+        "workspace_root", "excel_filename", "sf_exports_dir",
+        "staging_dir", "reports_dir", "blog_dir", "backups_dir"
+      ],
+      "properties": {
+        "workspace_root":  { "type": "string", "description": "Absolute or ~-relative path to project pack root" },
+        "excel_filename":  { "type": "string" },
+        "sf_exports_dir":  { "type": "string" },
+        "staging_dir":     { "type": "string" },
+        "reports_dir":     { "type": "string" },
+        "blog_dir":        { "type": "string" },
+        "backups_dir":     { "type": "string" }
+      }
+    },
+    "gsc": {
+      "type": "object",
+      "required": ["site_url"],
+      "properties": {
+        "site_url":                { "type": "string", "format": "uri" },
+        "default_date_range_days": { "type": "integer", "minimum": 1, "maximum": 490, "default": 90 }
+      }
+    },
+    "dataforseo": {
+      "type": "object",
+      "required": ["location_code", "language_code"],
+      "properties": {
+        "location_code":          { "type": "integer" },
+        "language_code":          { "type": "string" },
+        "location_name":          { "type": "string" },
+        "budget_credits_per_day": { "type": "integer", "minimum": 0, "default": 500 }
+      }
+    },
+    "brand": {
+      "type": "object",
+      "properties": {
+        "patterns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Case-insensitive substring patterns used by brand_vs_generic_split (§12.1)"
+        },
+        "mention_range": {
+          "type": "object",
+          "properties": {
+            "min": { "type": "integer", "minimum": 0 },
+            "max": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    },
+    "brand_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Visual brand identity block consumed by the blog_render Tier 1 CSS injection (S11/SP4 Part 2). Opt-in — projects without this block render with per-profile neutral grey defaults. All fields optional; a populated subset overrides the corresponding render-time slots while the rest fall back to per-profile defaults.",
+      "properties": {
+        "logo_url":                { "type": "string", "format": "uri" },
+        "primary_color":           { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "secondary_color":         { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "accent_color":            { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "font_family_heading":     { "type": "string" },
+        "font_family_body":        { "type": "string" },
+        "header_template_id":      { "enum": ["minimal", "classic", "ecom"] },
+        "footer_template_id":      { "enum": ["minimal", "full"] },
+        "source_url_for_sampling": { "type": "string", "format": "uri" }
+      }
+    },
+    "pillars": {
+      "type": "array",
+      "description": "Topical map root entities. Keys used in D-01 CSR invariant.",
+      "items": {
+        "type": "object",
+        "required": ["key", "name", "hub_url"],
+        "properties": {
+          "key":     { "type": "string", "pattern": "^P[0-9]+_[a-z_]+$" },
+          "name":    { "type": "string" },
+          "hub_url": { "type": "string", "format": "uri" },
+          "slug":    { "type": "string" }
+        }
+      }
+    },
+    "url_patterns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind", "pattern"],
+        "properties": {
+          "kind":    { "enum": ["product", "category", "blog", "showroom", "hub", "tool", "about", "contact"] },
+          "pattern": { "type": "string", "description": "Regex matched against url_normalized" }
+        }
+      }
+    },
+    "competitors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["domain", "tier"],
+        "properties": {
+          "domain": { "type": "string" },
+          "tier":   { "enum": ["tier_1_protected", "tier_2_js", "tier_3_static"] },
+          "notes":  { "type": "string" }
+        }
+      }
+    },
+    "ymyl_level": { "enum": ["none", "low", "medium", "high"] },
+    "ai_bots":    { "type": "array", "items": { "type": "string" } },
+    "thresholds": {
+      "type": "object",
+      "properties": {
+        "quality_gate_pass_score": { "type": "integer", "minimum": 0, "maximum": 100, "default": 70 },
+        "citability_pass_score":   { "type": "integer", "minimum": 0, "maximum": 100, "default": 70 },
+        "faq_count_exact":         { "type": ["integer", "null"] },
+        "brand_mention_min":       { "type": ["integer", "null"] },
+        "brand_mention_max":       { "type": ["integer", "null"] }
+      }
+    },
+    "workflow": {
+      "type": "object",
+      "description": "Runtime workflow toggles. SP0/EX1 (v1.1.0): quality_iteration gates the new-blog 5-pass iteration loop; default false until L3 quality_gate lands in S18. Flip to true alongside the v1.1 release that ships the real L3 implementation.",
+      "properties": {
+        "quality_iteration": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Enables the new-blog 5-pass threshold iteration loop. When false, new-blog writes the baseline draft after L1 profile-threshold validation and skips iteration. When true AND the quality_gate/citability_scorer MCP tools are no longer STUBs, the full loop runs."
+            }
+          }
+        }
+      }
+    },
+    "rules_overlay": {
+      "type": "string",
+      "description": "Path (relative to project root) to project-specific rules JSON that layers over plugin defaults"
+    },
+    "platinum_seo_core_version": {
+      "type": "string",
+      "description": "semver constraint on the core plugin (e.g. ^1.0)",
+      "default": "^1.0"
+    }
+  }
+}

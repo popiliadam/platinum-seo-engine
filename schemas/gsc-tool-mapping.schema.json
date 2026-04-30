@@ -1,0 +1,160 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://platinum-seo-engine/schemas/gsc-tool-mapping.schema.json",
+  "title": "GSC MCP Tool Mapping Contract v1.0",
+  "description": "Meta-schema for the Google Search Console MCP integration contract (§12). Validates a use-case registry document that maps 8 canonical GSC use-cases to MCP tool calls, staging tables, Excel target sheets, projection modes, cache policy, and cross-sheet rules. URL normalization (§12.2) is mandatory: every GSC response URL becomes url_original + url_normalized in staging before any projection. Canonical use-case keys and mcp_tool names are carried in enums as the single source of truth.",
+  "type": "object",
+  "required": ["schema_version", "contract_for", "execution_mode", "use_cases"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "contract_for":   { "const": "Google Search Console MCP integration" },
+    "execution_mode": { "const": "mcp_tool_call" },
+    "mcp_server_name": {
+      "type": "string",
+      "description": "MCP server short name carrying these tools; must match the key used in .mcp.json.",
+      "default": "gsc"
+    },
+    "url_normalization": {
+      "type": "object",
+      "description": "Per §12.2 — staging must carry both url_original and url_normalized for every row that contains a URL.",
+      "required": ["mandatory", "policy_source", "staging_fields"],
+      "properties": {
+        "mandatory":      { "const": true },
+        "policy_source":  { "const": "project.config.url_policy" },
+        "staging_fields": {
+          "type": "array",
+          "items": { "enum": ["url_original", "url_normalized"] },
+          "minItems": 2,
+          "uniqueItems": true
+        }
+      }
+    },
+    "use_cases": {
+      "type": "object",
+      "description": "The 8 canonical GSC use-cases (§12.1). Keys are fixed vocabulary; values conform to #/definitions/useCase.",
+      "propertyNames": { "$ref": "#/definitions/useCaseKey" },
+      "additionalProperties": { "$ref": "#/definitions/useCase" },
+      "minProperties": 1
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "useCaseKey": {
+      "type": "string",
+      "enum": [
+        "search_analytics_query_page_daily",
+        "quick_wins_detection",
+        "content_decay_analysis",
+        "index_inspection",
+        "sitemap_list",
+        "sitemap_submit",
+        "brand_vs_generic_split",
+        "country_city_analysis"
+      ]
+    },
+    "gscMcpTool": {
+      "type": "string",
+      "description": "GSC MCP tool identifier (short form without mcp__gsc__ prefix).",
+      "enum": [
+        "gsc__search_analytics",
+        "gsc__enhanced_search_analytics",
+        "gsc__detect_quick_wins",
+        "gsc__index_inspect",
+        "gsc__list_sitemaps",
+        "gsc__submit_sitemap",
+        "gsc__get_sitemap",
+        "gsc__list_sites"
+      ]
+    },
+    "projectionMode": {
+      "type": "string",
+      "description": "Mirrors staging-to-excel-map projection_mode enum. Null means write-only action (no Excel projection).",
+      "enum": [
+        "row_match_by_url",
+        "aggregate_by_page",
+        "append_with_is_brand_column",
+        "merge_by_keyword_url",
+        "merge_with_gsc_by_url_normalized",
+        "issue_summary",
+        "nap_consistency_audit",
+        "kpi_cells"
+      ]
+    },
+    "logicalSheet": {
+      "type": "string",
+      "enum": [
+        "dashboard", "topical_map", "cluster_keywords", "cannibalization",
+        "quick_wins", "new_content_plan", "content_improve", "gsc_performance",
+        "content_decay", "on_page_audit", "opportunity", "tech_seo",
+        "crawl_sitemap", "robots_txt", "schema", "redirect_404",
+        "completed_work", "master_task"
+      ]
+    },
+    "cachePolicy": {
+      "type": "object",
+      "required": ["ttl_hours"],
+      "properties": {
+        "ttl_hours": { "type": "integer", "minimum": 0, "maximum": 8760 },
+        "key":       { "type": "string" }
+      }
+    },
+    "inputField": {
+      "type": "object",
+      "description": "One input parameter; either declares a static type (with optional format/default/enum/const) or binds to a project.config source path.",
+      "properties": {
+        "type":    { "enum": ["string", "integer", "number", "boolean", "array", "object"] },
+        "format":  { "type": "string" },
+        "default": {},
+        "const":   {},
+        "enum":    { "type": "array" },
+        "items":   { "type": "object" },
+        "source":  {
+          "type": "string",
+          "description": "Dot-path into project.config.* for runtime binding (e.g. project.config.gsc.site_url).",
+          "pattern": "^project\\.config(\\.[a-z][a-z0-9_]*)+$"
+        }
+      }
+    },
+    "useCase": {
+      "type": "object",
+      "required": ["mcp_tool", "staging_table"],
+      "properties": {
+        "mcp_tool":    { "$ref": "#/definitions/gscMcpTool" },
+        "description": { "type": "string" },
+        "input_schema": {
+          "type": "object",
+          "description": "Map of parameter name → #/definitions/inputField.",
+          "additionalProperties": { "$ref": "#/definitions/inputField" }
+        },
+        "output_fields": {
+          "type": "array",
+          "description": "Canonical staging columns preserved from the MCP response (pre-projection).",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "staging_table": {
+          "type": "string",
+          "description": "SQLite staging table (§6.2). Convention: gsc_*.",
+          "pattern": "^gsc_[a-z][a-z0-9_]*$"
+        },
+        "excel_target_sheet": {
+          "oneOf": [
+            { "$ref": "#/definitions/logicalSheet" },
+            { "type": "null", "description": "Write-only action; no Excel projection." }
+          ]
+        },
+        "projection_mode":  { "$ref": "#/definitions/projectionMode" },
+        "cross_sheet_rules": {
+          "type": "array",
+          "description": "CSR-F-NN rule ids that this use-case interacts with (§9).",
+          "items": { "type": "string", "pattern": "^CSR-[A-Z]-\\d{2}" },
+          "uniqueItems": true
+        },
+        "cache_policy": { "$ref": "#/definitions/cachePolicy" },
+        "rate_limit":   { "type": "string" },
+        "note":         { "type": "string" }
+      }
+    }
+  }
+}

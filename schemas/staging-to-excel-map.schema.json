@@ -1,0 +1,164 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://platinum-seo-engine/templates/staging-to-excel-map.schema.json",
+  "title": "Staging→Excel Projection Map v1.0",
+  "description": "Schema for the projection-map document that binds SQLite staging tables/views to Excel logical sheets and declares the projection strategy. Consumed by excel_project_sf / excel_project_* at Stage 3 of the SF pipeline. See docs/ARCHITECTURE.md §6.1 (Stage 3 — Projection) and §11.3 (per-sheet projection_mode).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "mappings"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "default_write_order_policy": {
+      "type": "string",
+      "enum": ["explicit_write_order", "source_table_alpha", "target_sheet_alpha"],
+      "default": "explicit_write_order",
+      "description": "Used when multiple mappings target the same sheet without explicit write_order values"
+    },
+    "mappings": {
+      "type": "array",
+      "description": "Ordered list of staging→excel projections. Each mapping describes ONE source→sheet projection pass.",
+      "items": { "$ref": "#/definitions/mapping" },
+      "minItems": 1
+    }
+  },
+  "definitions": {
+    "logicalSheet": {
+      "type": "string",
+      "enum": [
+        "dashboard", "topical_map", "cluster_keywords", "cannibalization",
+        "quick_wins", "new_content_plan", "content_improve", "gsc_performance",
+        "content_decay", "on_page_audit", "opportunity", "tech_seo",
+        "crawl_sitemap", "robots_txt", "schema", "redirect_404",
+        "completed_work", "master_task"
+      ]
+    },
+    "sourceKind": {
+      "type": "string",
+      "enum": ["raw_table", "normalized_view", "aggregate_view", "config_json", "mcp_staging_table"],
+      "description": "Classifies the source_table — raw_table is a base staging table; *_view is a SQL VIEW; config_json is a project config artifact read directly (dashboard KPIs); mcp_staging_table is written by a non-SF MCP feed (gsc, dataforseo, scrapling)"
+    },
+    "projectionMode": {
+      "type": "string",
+      "description": "Named strategy the projection tool recognizes. Must match one listed in excel-source-manifest.schema.json sheetEntry.projection_mode values.",
+      "enum": [
+        "row_match_by_url",
+        "merge_by_keyword_url",
+        "aggregate_by_page",
+        "issue_summary",
+        "aggregate_metrics",
+        "kpi_cells",
+        "append_with_is_brand_column",
+        "severity_summary",
+        "redirect_chain_summary",
+        "canonical_mismatch_summary",
+        "schema_type_summary",
+        "sitemap_coverage_diff",
+        "orphan_page_list"
+      ]
+    },
+    "transform": {
+      "type": "string",
+      "enum": ["none", "url_normalize", "severity_cast", "status_cast", "date_cast", "int_cast", "trim_lower", "json_compact"],
+      "default": "none",
+      "description": "Per-column transform applied at projection time. url_normalize runs the CSR-D-03 canonicalizer; status_cast maps stored statusEnum to write-time statusDisplay."
+    },
+    "writerName": {
+      "type": "string",
+      "description": "Writer actor — MUST match an allowed_writers entry in excel-source-manifest.json for the target_sheet",
+      "minLength": 1
+    },
+    "targetColumn": {
+      "type": "object",
+      "required": ["excel_col", "source_expression"],
+      "properties": {
+        "excel_col": {
+          "type": "string",
+          "pattern": "^[A-Z]+$",
+          "description": "Excel column letter(s) — references master-excel-schema.json column definitions for the target sheet"
+        },
+        "source_expression": {
+          "type": "string",
+          "description": "SQL expression, column name, or JSON pointer (when source_kind=config_json)"
+        },
+        "transform": { "$ref": "#/definitions/transform" },
+        "null_policy": {
+          "type": "string",
+          "enum": ["leave_blank", "write_empty_string", "write_sentinel"],
+          "default": "leave_blank"
+        },
+        "sentinel_value": {
+          "type": "string",
+          "description": "Required when null_policy = write_sentinel"
+        }
+      }
+    },
+    "kpiCellTarget": {
+      "type": "object",
+      "description": "Used exclusively when projection_mode=kpi_cells (dashboard sheet). Maps one staging aggregate to one cell.",
+      "required": ["cell", "compute"],
+      "properties": {
+        "cell":         { "type": "string", "pattern": "^[A-Z]+[0-9]+$" },
+        "compute":      { "type": "string", "description": "Named compute identifier (count_pillars, count_rows, count_status_done, now_date_string, ...)" },
+        "value_type":   { "enum": ["string", "integer", "number", "date", "boolean"] },
+        "source_sheet": { "$ref": "#/definitions/logicalSheet" }
+      }
+    },
+    "mapping": {
+      "type": "object",
+      "required": ["mapping_id", "source_table", "source_kind", "target_sheet", "projection_mode", "writer"],
+      "properties": {
+        "mapping_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "Unique identifier (e.g. sf_urls_to_crawl_sitemap, v_issues_by_url_to_tech_seo)"
+        },
+        "source_table":    { "type": "string", "minLength": 1 },
+        "source_kind":     { "$ref": "#/definitions/sourceKind" },
+        "staging_db":      { "type": "string", "default": "staging/sf_raw.db" },
+        "target_sheet":    { "$ref": "#/definitions/logicalSheet" },
+        "projection_mode": { "$ref": "#/definitions/projectionMode" },
+        "writer":          { "$ref": "#/definitions/writerName" },
+        "write_order": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Ordering within Stage 3; lower writes first. Critical for sheets with multiple source feeds (e.g. tech_seo aggregates from 3 staging tables)."
+        },
+        "target_columns": {
+          "type": "array",
+          "description": "Column-level mapping. Used by every projection_mode EXCEPT kpi_cells.",
+          "items": { "$ref": "#/definitions/targetColumn" }
+        },
+        "kpi_cells": {
+          "type": "array",
+          "description": "Cell-level mapping. Used by projection_mode=kpi_cells only.",
+          "items": { "$ref": "#/definitions/kpiCellTarget" }
+        },
+        "filter_sql": {
+          "type": "string",
+          "description": "Optional WHERE clause (without the WHERE keyword) applied at read time — e.g. 'status_code IN (301,302,404)'"
+        },
+        "dedup_on": {
+          "type": "array",
+          "description": "Column names used for row-level deduplication before write",
+          "items": { "type": "string" }
+        },
+        "truncate_target_before_write": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, clears the sheet data rows (keeping header) before projection writes. Reserved for full-refresh projections; merge/append modes must keep false."
+        },
+        "protected_columns_passthrough": {
+          "type": "boolean",
+          "default": true,
+          "description": "When true, preserves values in protected_columns (per excel-source-manifest.json) during a row-level update"
+        },
+        "freshness_sla_hours": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Max staging_table age before projection warns (overrides per-sheet SLA from source manifest)"
+        },
+        "notes": { "type": "string" }
+      }
+    }
+  }
+}

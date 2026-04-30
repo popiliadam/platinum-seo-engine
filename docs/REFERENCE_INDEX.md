@@ -21,7 +21,7 @@
 → `docs/PHASE_STATUS.md`
 
 ## What was decided about X?
-→ `docs/DECISIONS.md` (ADR list)
+→ `docs/DECISIONS.md` (active ADR'ler — son 6) + `docs/DECISIONS_ARCHIVE.md` (rotated ADR'ler, ADR-011 rotation kararıyla)
 
 ## What questions are open?
 → `docs/OPEN_QUESTIONS.md`

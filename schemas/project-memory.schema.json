@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "http://platinum-seo-engine/schemas/project-memory",
+  "title": "Project Memory Frontmatter v1.0",
+  "description": "YAML frontmatter for projects/{slug}/memory.md (spec §14, referenced from spec §3 file tree line: 'memory.md — project-memory.schema frontmatter + body'). Manager-style live document discipline: target file size <5KB total (frontmatter + body) so a fresh session can read it on wake without context bloat. Frontmatter pins the project's stable identity (slug, domain), audience and KPI targets that drive content/discovery skills, and the MCP scope white-list that constrains which tools any skill may invoke for this project. The free-form body below the frontmatter holds running notes (brand voice, open hypotheses, recent wins). Cross-references: project_slug must equal projects/{slug}/ directory and project-config.schema.json.project_id; mcp_scope entries must exist in mcp-tool-registry.schema.json. NOTE: spec §14 details the manager docs (PHASE_STATUS, OPEN_QUESTIONS, DECISIONS, SESSION_PROTOCOL, REFERENCE_INDEX) but does not enumerate exact memory.md frontmatter fields — these fields are the conservative minimum set sufficient to drive v1 skills; expansions require an ADR.",
+  "type": "object",
+  "required": ["project_slug", "domain", "last_updated"],
+  "additionalProperties": false,
+  "properties": {
+    "project_slug": {
+      "type": "string",
+      "description": "Project identifier. Must equal projects/{slug}/ directory name and project-config.schema.json.project_id. kebab-case only.",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "minLength": 2,
+      "maxLength": 64
+    },
+    "domain": {
+      "type": "string",
+      "description": "Primary site identity. Either a bare hostname (e.g. 'demo-dental.example') or a short brand label when the site is multi-domain. Used by GSC/SF/DFS skills as the property/site key.",
+      "minLength": 3,
+      "maxLength": 253
+    },
+    "target_audience": {
+      "type": "array",
+      "description": "Short labels describing the primary audience segments (e.g. ['dentists-tr', 'dental-clinic-managers']). Drives tone-of-voice and intent matching in content skills.",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64
+      },
+      "maxItems": 12
+    },
+    "kpis": {
+      "type": "array",
+      "description": "Tracked key performance indicators with numeric targets and source of truth. Used by monthly-report skill to render the KPI table; cross-checked by drift-check.",
+      "items": {
+        "type": "object",
+        "required": ["name", "target", "source"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Short KPI label (e.g. 'organic_clicks_28d', 'top10_keywords', 'mom_traffic_growth').",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "target": {
+            "type": ["number", "string"],
+            "description": "Numeric goal (e.g. 12000) or qualitative target string (e.g. '+15% MoM'). Strings are accepted for ratio/qualitative KPIs."
+          },
+          "source": {
+            "type": "string",
+            "description": "Where the actual value is read from. Conventions: 'gsc', 'dataforseo', 'master.xlsx#sheet', 'manual'.",
+            "minLength": 1
+          }
+        }
+      },
+      "maxItems": 20
+    },
+    "mcp_scope": {
+      "type": "array",
+      "description": "White-list of MCP tools any skill may call for this project. Entries match mcp-tool-registry.schema.json fully-qualified tool names. Empty/absent means use plugin defaults.",
+      "items": {
+        "type": "string",
+        "pattern": "^mcp__[a-zA-Z0-9_]+__[a-zA-Z0-9_]+$"
+      }
+    },
+    "last_updated": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC ISO 8601 timestamp set whenever the manager rewrites memory.md. Lets stale-detection skills warn when a project hasn't been touched in N days."
+    }
+  }
+}

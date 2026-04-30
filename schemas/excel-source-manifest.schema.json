@@ -1,0 +1,124 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://platinum-seo-engine/templates/excel-source-manifest.schema.json",
+  "title": "Excel Source Manifest Schema v1.0",
+  "description": "Per-sheet ownership + provenance contract (projects/{slug}/config/excel-source-manifest.json). Declares primary_owner, allowed_writers, source_ref/staging_tables, and projection_mode for every logical sheet. See docs/ARCHITECTURE.md §11.2 and §11.3.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "workbook_id", "source_kinds", "sheets"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "workbook_id": {
+      "type": "string",
+      "description": "Stable identifier for the workbook this manifest describes (e.g. 'master')"
+    },
+    "source_kinds": {
+      "type": "array",
+      "description": "Closed list of source kinds used across sheets. Fixed enum — any new kind must be added to the plugin schema first.",
+      "items": {
+        "enum": [
+          "static_template",
+          "project_json",
+          "sf_csv_manual",
+          "gsc_mcp",
+          "dataforseo_mcp",
+          "scrapling_mcp",
+          "scrapling_local",
+          "human_decision",
+          "tool_computed"
+        ]
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "sheets": {
+      "type": "object",
+      "description": "Keys are logical_sheet_id (matches excel-config.sheets keys).",
+      "propertyNames": { "pattern": "^[a-z][a-z0-9_]*$" },
+      "additionalProperties": { "$ref": "#/definitions/sheetEntry" }
+    }
+  },
+  "definitions": {
+    "sheetEntry": {
+      "type": "object",
+      "required": ["primary_owner", "allowed_writers", "projection_mode"],
+      "properties": {
+        "primary_owner": {
+          "type": "string",
+          "description": "Source-of-truth for this sheet. One of source_kinds OR a named pipeline tool.",
+          "enum": [
+            "static_template",
+            "project_json",
+            "sf_csv_manual",
+            "gsc_mcp",
+            "dataforseo_mcp",
+            "scrapling_mcp",
+            "scrapling_local",
+            "human_decision",
+            "tool_computed"
+          ]
+        },
+        "allowed_writers": {
+          "type": "array",
+          "description": "Named write actors. Writer name MUST be recognized by the projection tool or CSR validator. Common values: 'excel_project_json', 'excel_project_sf', 'mcp_feed', 'dashboard_refresh', 'done_protocol', 'master_task_sync', 'human'.",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "writer_scope": {
+          "type": "object",
+          "description": "Per-writer scope descriptor (free-text). Defines which columns/ranges a writer may touch; enforced by done_protocol + master_task_sync tools.",
+          "additionalProperties": { "type": "string" }
+        },
+        "source_ref": {
+          "type": "string",
+          "description": "Relative path to the canonical source artifact (e.g. data/topical-map.json, config/dashboard-kpis.json)"
+        },
+        "staging_table": {
+          "type": "string",
+          "description": "Single SQLite staging table name (preferred when one source feeds the sheet)"
+        },
+        "staging_tables": {
+          "type": "array",
+          "description": "Multiple staging tables when projection aggregates across sources (e.g. tech_seo reads sf_urls + sf_issues + sf_response_codes)",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "enrichment_sources": {
+          "type": "array",
+          "description": "Non-primary sources merged into the projection (e.g. cluster_keywords enriched by gsc_mcp + dataforseo_mcp)",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "manual_columns": {
+          "type": "array",
+          "description": "Column names that humans own even when primary_owner is a tool (never overwritten by projection)",
+          "items": { "type": "string" }
+        },
+        "protected_columns": {
+          "type": "array",
+          "description": "Columns reserved from auto-write by any non-human writer (master_task: task, category, priority, impact, duration, assignee, note)",
+          "items": { "type": "string" }
+        },
+        "computed_ranges": {
+          "type": "array",
+          "description": "Cell ranges computed in-place at write time (e.g. master_task B62:B64). Format: 'A1:B2' or single 'A1'",
+          "items": { "type": "string", "pattern": "^[A-Z]+[0-9]+(:[A-Z]+[0-9]+)?$" }
+        },
+        "projection_mode": {
+          "type": "string",
+          "description": "Named projection strategy recognized by excel_project_* tools (e.g. row_match_by_url, merge_by_keyword_url, aggregate_by_page, issue_summary, aggregate_metrics, kpi_cells, append_with_is_brand_column)"
+        },
+        "freshness_sla_hours": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Max age of source data before projection warns (MCP sources)"
+        },
+        "formula_policy": {
+          "enum": ["values_only"],
+          "description": "Enforces §8.3 zero-formula rule at the sheet level"
+        }
+      }
+    }
+  }
+}

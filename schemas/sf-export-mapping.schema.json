@@ -1,0 +1,131 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://platinum-seo-engine/schemas/sf-export-mapping.schema.json",
+  "title": "SF Export Filename Mapping v1.0",
+  "description": "Schema for the filename_alias mapping document that converts physical Screaming Frog export filenames to canonical report_type identifiers. Handles p_ prefix, Turkish ı/i case collision, version suffixes like (1)/-copy/_old, and whitespace/underscore variants (§6.4). Consumed by sf_import Stage 1.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "normalization_rules", "aliases"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "normalization_rules": {
+      "type": "array",
+      "description": "Ordered regex passes applied to raw filenames BEFORE alias matching. Lower 'order' runs first. Reference implementation lives in platinum-seo-engine/server/pipelines/filename_alias.py.",
+      "items": { "$ref": "#/definitions/normalizationRule" },
+      "minItems": 1
+    },
+    "aliases": {
+      "type": "array",
+      "description": "Filename → canonical_report_type mappings. First match wins after normalization.",
+      "items": { "$ref": "#/definitions/alias" },
+      "minItems": 1
+    },
+    "validation_policy": {
+      "type": "object",
+      "properties": {
+        "reject_ambiguous_match": {
+          "type": "boolean",
+          "default": true,
+          "description": "If a normalized filename matches multiple alias entries, abort the import (do not silently pick one)"
+        },
+        "require_hash_on_required_tier": {
+          "type": "boolean",
+          "default": true,
+          "description": "raw_reports.file_hash must be computed for every required-tier file"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "canonicalName": {
+      "type": "string",
+      "enum": [
+        "internal_all", "all_inlinks", "all_outlinks", "response_codes_all",
+        "issues_overview_report", "page_titles_all", "meta_description_all",
+        "h1_all", "canonicals_all", "directives_all", "indexability",
+        "structured_data_all", "sitemaps_all", "redirect_chains",
+        "h2_all", "images_all", "hreflang_all", "orphan_pages",
+        "all_anchor_text", "near_duplicates_report", "exact_duplicates_report",
+        "search_console_all", "crawl_depth", "pagination_all",
+        "security_all", "javascript_all", "response_times_all", "word_count",
+        "broken_internal_links", "broken_external_links", "images_missing_alt",
+        "page_speed_insights", "ga_integration", "meta_keywords", "pdf_all",
+        "amp_all", "urls_not_in_sitemap", "xml_sitemap_urls_not_in_internal",
+        "canonical_mismatch", "links_to_noindex"
+      ]
+    },
+    "encoding": {
+      "type": "string",
+      "enum": ["utf-8", "utf-8-sig", "windows-1254", "iso-8859-9"]
+    },
+    "normalizationRule": {
+      "type": "object",
+      "required": ["rule_id", "pattern", "replacement", "order"],
+      "properties": {
+        "rule_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "Unique identifier (e.g. strip_extension, lowercase, turkish_i_fold, drop_version_suffix, fold_p_prefix_to_v)"
+        },
+        "description": { "type": "string" },
+        "pattern": {
+          "type": "string",
+          "description": "Python regex (re.UNICODE assumed)"
+        },
+        "replacement": {
+          "type": "string",
+          "description": "Python regex backreference syntax (e.g. \\1, \\g<name>) or literal"
+        },
+        "order": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Application order; lower runs first"
+        },
+        "flags": {
+          "type": "array",
+          "items": { "enum": ["IGNORECASE", "UNICODE", "MULTILINE"] },
+          "uniqueItems": true,
+          "default": ["IGNORECASE", "UNICODE"]
+        }
+      }
+    },
+    "alias": {
+      "type": "object",
+      "required": ["canonical_report_type", "filename_patterns"],
+      "properties": {
+        "canonical_report_type": { "$ref": "#/definitions/canonicalName" },
+        "filename_patterns": {
+          "type": "array",
+          "description": "Regex patterns applied to the POST-normalization filename. Anchored match (re.fullmatch) unless pattern itself includes ^/$.",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "encoding": {
+          "$ref": "#/definitions/encoding",
+          "default": "utf-8-sig"
+        },
+        "delimiter": {
+          "type": "string",
+          "enum": [",", ";", "\t", "|"],
+          "default": ","
+        },
+        "expected_header_hashes": {
+          "type": "array",
+          "description": "Known-good SHA256 header hashes across SF versions (logged for drift detection; non-match is WARN, not FAIL)",
+          "items": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+        },
+        "min_row_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Absolute minimum row count expected (defensive sanity check)"
+        },
+        "source_prefix_hint": {
+          "type": "string",
+          "enum": ["v_", "p_", "none"],
+          "description": "Diagnostic hint about which SF export mode typically produces this file"
+        }
+      }
+    }
+  }
+}

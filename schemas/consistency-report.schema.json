@@ -1,0 +1,157 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://platinum-seo-engine/schemas/consistency-report.schema.json",
+  "title": "Consistency Report v1.0",
+  "description": "Schema for a single consistency-check report — emitted by the consistency_check tool after every Excel transaction checkpoint (§9.4 L6) and on demand. Merges two rule sets: (a) 20 Cross-Sheet Rules (CSR-F-01..15, CSR-D-01..03, CSR-M-01..02) defined in cross-sheet-invariants.json, and (b) 8 Critical Invariants (CI-01..08) defined in §17.2. Verdict aggregation per §17.2: any RED → RED; else any AMBER/WARN → AMBER; all PASS → GREEN. Enums are inline at each property path for direct readability.",
+  "type": "object",
+  "required": ["schema_version", "report_id", "generated_at", "project_id", "verdict", "checks"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "report_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Monotonically increasing per project."
+    },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "project_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "run_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Links to provenance-log.run_id that triggered this check (when applicable)."
+    },
+    "verdict": {
+      "type": "string",
+      "description": "Top-level roll-up per §17.2. RED = block the transaction. AMBER = warn, manual review suggested. GREEN = all clear.",
+      "enum": ["GREEN", "AMBER", "RED"]
+    },
+    "checks": {
+      "type": "array",
+      "description": "One entry per evaluated rule (CSR or CI). Empty array means no rules ran (also invalid — verdict must reflect at least one check).",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["check_id", "category", "verdict"],
+        "additionalProperties": false,
+        "properties": {
+          "check_id": {
+            "type": "string",
+            "description": "Rule identifier. CSR-F-NN / CSR-D-NN / CSR-M-NN (from cross-sheet-invariants.json) or CI-NN (§17.2). Free-form for infrastructural invariants.",
+            "pattern": "^(CSR-[FDM]-\\d{2}|CI-\\d{2}|[A-Z][A-Z0-9_-]+)$"
+          },
+          "category": {
+            "type": "string",
+            "description": "Eight categories cover every invariant the plugin enforces. csr_foundation/csr_data/csr_mcp map to cross-sheet-invariants.json rule categories. The remaining five are infrastructural invariants (row counts, hashes, URL canonicalization, schema instance validation, staging vs Excel diffs).",
+            "enum": [
+              "csr_foundation",
+              "csr_data",
+              "csr_mcp",
+              "staging_excel_diff",
+              "url_normalization",
+              "schema_validation",
+              "row_count_integrity",
+              "file_hash_integrity"
+            ]
+          },
+          "verdict": {
+            "type": "string",
+            "description": "Per-check outcome. PASS/WARN/FAIL map to the top-level GREEN/AMBER/RED via §17.2 aggregation.",
+            "enum": ["PASS", "WARN", "FAIL"]
+          },
+          "severity": {
+            "type": "string",
+            "description": "Rule's declared severity (from cross-sheet-invariants.json or §17.2). CRITICAL/HIGH→RED on FAIL, MEDIUM/LOW→AMBER on FAIL.",
+            "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
+          },
+          "rule": {
+            "type": "string",
+            "description": "Formal rule body, copied verbatim from the source-of-truth (cross-sheet-invariants.json rule field, or §17.2 table)."
+          },
+          "expected": { "description": "Reference value the check compared against. Untyped — may be integer, string, array, object per check nature." },
+          "actual":   { "description": "Observed value from the workbook/staging. Untyped — see expected." },
+          "details":  { "type": "string", "description": "Human-readable explanation, especially on WARN/FAIL." },
+          "auto_repair_available": {
+            "type": "boolean",
+            "description": "Whether §9.3 lists this check as auto-repairable. Does NOT mean it was repaired — see repair_applied."
+          },
+          "repair_applied": {
+            "type": "boolean",
+            "default": false,
+            "description": "True when the tool actually performed the repair. Also recorded in top-level auto_repair_performed."
+          },
+          "affected_sheets": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "dashboard", "topical_map", "cluster_keywords", "cannibalization",
+                "quick_wins", "new_content_plan", "content_improve", "gsc_performance",
+                "content_decay", "on_page_audit", "opportunity", "tech_seo",
+                "crawl_sitemap", "robots_txt", "schema", "redirect_404",
+                "completed_work", "master_task"
+              ]
+            },
+            "uniqueItems": true
+          },
+          "affected_rows": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "For set-membership CSRs — size of the violating subset."
+          },
+          "sample_violations": {
+            "type": "array",
+            "items": { "type": "string" },
+            "maxItems": 20,
+            "description": "Up to 20 sample values that violate the rule. Truncated so the report stays bounded."
+          },
+          "duration_ms": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "total_checks": { "type": "integer", "minimum": 0 },
+        "pass_count":   { "type": "integer", "minimum": 0 },
+        "warn_count":   { "type": "integer", "minimum": 0 },
+        "fail_count":   { "type": "integer", "minimum": 0 },
+        "by_category": {
+          "type": "object",
+          "description": "Roll-up per category — keys are the 8 category enum values.",
+          "propertyNames": {
+            "enum": [
+              "csr_foundation", "csr_data", "csr_mcp",
+              "staging_excel_diff", "url_normalization", "schema_validation",
+              "row_count_integrity", "file_hash_integrity"
+            ]
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "pass": { "type": "integer", "minimum": 0 },
+              "warn": { "type": "integer", "minimum": 0 },
+              "fail": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      }
+    },
+    "auto_repair_performed": {
+      "type": "array",
+      "description": "List of check_ids for which an auto-repair (§9.3) was successfully applied during this run. Corresponding check entries should also have repair_applied=true.",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
+    "manual_review_required": {
+      "type": "array",
+      "description": "List of check_ids requiring human decision per §9.3 (F-06, F-15, D-01 confirm).",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
+    "notes": { "type": "string" }
+  }
+}

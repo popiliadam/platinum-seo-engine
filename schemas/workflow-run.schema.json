@@ -1,0 +1,203 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "http://platinum-seo-engine/schemas/workflow-run",
+  "title": "Workflow Run State v1.0",
+  "description": "Workflow run state file written to projects/{slug}/_state/workflows/{run_id}.json by every multi-step skill (spec §10). Captures resume/retry/approval state without any state-machine library — discipline is JSON-write only. Each skill updates this file before/after every step. Status transitions: running → (awaiting_approval ↔ paused) → done | failed. The skill exits when status becomes awaiting_approval; when the user replies yes/no the next session loads the file, sets approval_decision, and continues. The steps[] array is monotonically grown; never mutate prior entries except to flip status/ended_at on the currently-running step. Cross-reference: steps[].output_ref typically points at events.jsonl entries (events.schema.json) or master.xlsx#sheet anchors. run_id pattern aligns with §10 example: {project_slug}-{YYYY-MM-DD}-{hash4}.",
+  "type": "object",
+  "required": ["run_id", "skill", "project_slug", "status", "started_at", "updated_at", "steps"],
+  "additionalProperties": false,
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "description": "Unique workflow run identifier. Convention: {project_slug}-{YYYY-MM-DD}-{hash4} where hash4 is a 4-char hex token disambiguating same-day runs (spec §10).",
+      "pattern": "^[a-z][a-z0-9-]*-[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-f0-9]{4}$"
+    },
+    "skill": {
+      "type": "string",
+      "description": "Slug of the skill that owns this run. Must match a known skill name (kebab-case, also enforced by skill-frontmatter.schema.json).",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "project_slug": {
+      "type": "string",
+      "description": "Project this run belongs to. Matches projects/{slug}/ directory name and project-config.schema.json.project_id.",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "status": {
+      "type": "string",
+      "description": "Top-level run status. Five closed values per spec §10. awaiting_approval triggers approval_meta requirement; failed triggers failure_reason requirement.",
+      "enum": ["running", "awaiting_approval", "paused", "done", "failed"]
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC ISO 8601 timestamp set when the run begins (first step transitions to running)."
+    },
+    "ended_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC ISO 8601 timestamp set when status becomes done or failed. Absent while running/awaiting_approval/paused."
+    },
+    "paused_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC ISO 8601 timestamp set when status transitions to paused (user said no to an approval gate or external pause). Cleared/ignored on resume."
+    },
+    "resumed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC ISO 8601 timestamp set when a paused or awaiting_approval run resumes back to running."
+    },
+    "current_step": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Zero-based index into steps[] of the currently active or most recently active step. Used by skills to know where to resume."
+    },
+    "total_steps": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Total number of steps the skill plans to execute. May exceed steps.length while the run is mid-flight."
+    },
+    "steps": {
+      "type": "array",
+      "description": "Append-only-ish history of step executions. Each step records its lifecycle. New entries are appended; existing entries only update status/ended_at/output_ref/approval_decision/error in place.",
+      "minItems": 0,
+      "items": {
+        "type": "object",
+        "required": ["name", "status"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Human-readable step name (e.g. 'fetch_gsc', 'project_excel', 'approve_publish'). Stable identifier across runs of the same skill.",
+            "minLength": 1
+          },
+          "status": {
+            "type": "string",
+            "description": "Step lifecycle state. Mirrors run-level status plus pending/skipped for orchestration.",
+            "enum": ["pending", "running", "done", "awaiting_approval", "failed", "skipped"]
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC ISO 8601 timestamp set when step transitions from pending to running."
+          },
+          "ended_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC ISO 8601 timestamp set when step transitions to done/failed/skipped."
+          },
+          "output_ref": {
+            "type": "string",
+            "description": "Pointer to the artifact produced by this step. Conventions: 'master.xlsx#sheet_name' for Excel writes, 'outputs/reports/{date}-name.md' for markdown, 'events.jsonl#event_id' for log entries, 'inbox/...' for ingest sources.",
+            "minLength": 1
+          },
+          "approval_prompt": {
+            "type": "string",
+            "description": "Question shown to the user when status=awaiting_approval. One sentence; the skill exits after writing this and waits for the user reply in a fresh session."
+          },
+          "approval_decision": {
+            "type": ["string", "null"],
+            "description": "User reply captured on resume. null while awaiting; 'yes' continues, 'no' pauses or fails the run depending on skill policy.",
+            "enum": ["yes", "no", null]
+          },
+          "error": {
+            "type": "string",
+            "description": "Short error message set when status=failed. Detailed traces belong in events.jsonl, not here."
+          }
+        }
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "description": "Map of named artifacts the run produced (e.g. {\"report\": \"outputs/reports/2026-04-30-monthly.md\"}). Keys are stable artifact names chosen by the skill; values are artifact path strings. Read by downstream skills via REFERENCE_INDEX conventions.",
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "errors": {
+      "type": "array",
+      "description": "Accumulated run-level error messages (distinct from per-step errors). Empty unless status reached failed at least once.",
+      "items": { "type": "string" }
+    },
+    "approval_meta": {
+      "type": "object",
+      "description": "Required when status=awaiting_approval. Captures who must approve, what is being approved, and an optional deadline. Also retained after resume for audit.",
+      "required": ["approver", "subject"],
+      "additionalProperties": false,
+      "properties": {
+        "approver": {
+          "type": "string",
+          "description": "Identifier of the human or role expected to approve (e.g. 'user', 'editor@demo-dental').",
+          "minLength": 1
+        },
+        "subject": {
+          "type": "string",
+          "description": "Short label for what is being approved (e.g. 'publish_5_drafts', 'apply_redirects', 'schema_changes').",
+          "minLength": 1
+        },
+        "deadline": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Optional UTC deadline; if missed, scheduler/skill can auto-pause or escalate."
+        }
+      }
+    },
+    "failure_reason": {
+      "type": "object",
+      "description": "Required when status=failed. Captures classification + short message. Detailed stack traces remain in events.jsonl.",
+      "required": ["code", "message"],
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "Coarse failure classification used by retry policy.",
+          "enum": ["validation_error", "mcp_error", "budget_exhausted", "user_rejected", "timeout", "internal_error"]
+        },
+        "message": {
+          "type": "string",
+          "description": "One-line human-readable failure message.",
+          "minLength": 1
+        },
+        "step_index": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Index into steps[] of the step that triggered the failure."
+        }
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC ISO 8601 timestamp written once when the run JSON file is first persisted. Used for retention and ordering."
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC ISO 8601 timestamp updated on every disk write. Skills set this to now() on each step transition."
+    }
+  },
+
+  "allOf": [
+    {
+      "description": "awaiting_approval status requires approval_meta block.",
+      "if":   { "properties": { "status": { "const": "awaiting_approval" } }, "required": ["status"] },
+      "then": { "required": ["approval_meta"] }
+    },
+    {
+      "description": "failed status requires failure_reason block.",
+      "if":   { "properties": { "status": { "const": "failed" } }, "required": ["status"] },
+      "then": { "required": ["failure_reason"] }
+    },
+    {
+      "description": "Terminal statuses (done/failed) require ended_at.",
+      "if":   { "properties": { "status": { "enum": ["done", "failed"] } }, "required": ["status"] },
+      "then": { "required": ["ended_at"] }
+    },
+    {
+      "description": "paused status requires paused_at timestamp.",
+      "if":   { "properties": { "status": { "const": "paused" } }, "required": ["status"] },
+      "then": { "required": ["paused_at"] }
+    }
+  ]
+}

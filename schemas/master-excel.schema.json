@@ -1,0 +1,293 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "schema_version": "1.0",
+  "cross_sheet_rules_ref": "cross-sheet-invariants.json",
+  "formula_policy": {
+    "mode": "values_only",
+    "forbidden_patterns": [
+      "=COUNTIF(",
+      "=SUM(",
+      "=VLOOKUP(",
+      "=INDEX(",
+      "=MATCH(",
+      "structured_reference_like Plan[Status]",
+      "named_range_formula"
+    ],
+    "rationale": "Predecessor v3 W14 Dashboard formula drift — formulas silently corrupt across Excel versions. Zero-formula policy replaces all =SUM/=VLOOKUP/=INDEX/=MATCH with literal projection writes."
+  },
+  "sheets": {
+    "dashboard": {
+      "required_cells": [
+        { "cell": "R10", "kpi": "total_pillars",         "value_type": "integer", "source": "tool_computed" },
+        { "cell": "R47", "kpi": "master_task_total",     "value_type": "integer", "source": "tool_computed" },
+        { "cell": "R48", "kpi": "master_task_done",      "value_type": "integer", "source": "tool_computed" },
+        { "cell": "R49", "kpi": "master_task_todo",      "value_type": "integer", "source": "tool_computed" },
+        { "cell": "R50", "kpi": "master_task_ongoing",   "value_type": "integer", "source": "tool_computed" },
+        { "cell": "R51", "kpi": "cannibalization_count", "value_type": "integer", "source": "tool_computed" },
+        { "cell": "R52", "kpi": "quick_wins_count",      "value_type": "integer", "source": "tool_computed" },
+        { "cell": "R59", "kpi": "last_audit_date",       "value_type": "date",    "source": "tool_computed" }
+      ],
+      "forbidden_patterns": [
+        "no Excel formulas (=...) in any cell",
+        "no hardcoded ranges like E4:E74"
+      ]
+    },
+    "topical_map": {
+      "header_row": 4,
+      "data_start_row": 5,
+      "required_columns": [
+        { "col": "A", "name": "pillar" },
+        { "col": "B", "name": "cluster" },
+        { "col": "C", "name": "primary_keyword" },
+        { "col": "D", "name": "monthly_volume",    "type": "integer" },
+        { "col": "E", "name": "data_source" },
+        { "col": "F", "name": "assigned_url" },
+        { "col": "G", "name": "page_type" },
+        { "col": "H", "name": "status",            "ref": "#/definitions/statusEnum" },
+        { "col": "I", "name": "priority" },
+        { "col": "J", "name": "note" }
+      ]
+    },
+    "cluster_keywords": {
+      "header_row": 3,
+      "data_start_row": 4,
+      "required_columns": [
+        { "col": "A", "name": "cluster" },
+        { "col": "B", "name": "keyword" },
+        { "col": "C", "name": "monthly_volume",    "type": "integer" },
+        { "col": "D", "name": "data_source" },
+        { "col": "E", "name": "assigned_url" },
+        { "col": "F", "name": "gsc_clicks",        "type": "integer" },
+        { "col": "G", "name": "gsc_impressions",   "type": "integer" },
+        { "col": "H", "name": "gsc_position",      "type": "number" },
+        { "col": "I", "name": "intent",            "enum": ["Informational", "Commercial", "Transactional", "Navigational"] },
+        { "col": "J", "name": "forbidden_kw" },
+        { "col": "K", "name": "forbidden_reason" }
+      ]
+    },
+    "cannibalization": {
+      "header_row": 4,
+      "data_start_row": 5,
+      "required_columns": [
+        { "col": "A", "name": "conflict_pair" },
+        { "col": "B", "name": "overlapping_queries_est", "type": "integer" },
+        { "col": "C", "name": "total_impact" },
+        { "col": "D", "name": "resolution" },
+        { "col": "E", "name": "note" },
+        { "col": "F", "name": "status",  "ref": "#/definitions/statusEnum" },
+        { "col": "G", "name": "priority" }
+      ]
+    },
+    "quick_wins": {
+      "header_row": 4,
+      "data_start_row": 5,
+      "required_columns": [
+        { "col": "A", "name": "query" },
+        { "col": "B", "name": "url" },
+        { "col": "C", "name": "current_position", "type": "number" },
+        { "col": "D", "name": "impressions_30d",  "type": "integer" },
+        { "col": "E", "name": "clicks_30d",       "type": "integer" },
+        { "col": "F", "name": "ctr_pct",          "type": "number" },
+        { "col": "G", "name": "potential_clicks", "type": "integer" },
+        { "col": "H", "name": "opportunity" },
+        { "col": "I", "name": "action" },
+        { "col": "J", "name": "priority" }
+      ]
+    },
+    "new_content_plan": {
+      "header_row": 3,
+      "data_start_row": 4,
+      "required_columns": [
+        { "col": "A", "name": "id" },
+        { "col": "B", "name": "title" },
+        { "col": "C", "name": "url_slug" },
+        { "col": "D", "name": "primary_keyword" },
+        { "col": "E", "name": "monthly_volume",     "type": "integer" },
+        { "col": "F", "name": "assigned_cluster" },
+        { "col": "G", "name": "target_word_count",  "type": "integer" },
+        { "col": "H", "name": "priority" },
+        { "col": "I", "name": "created_date",       "type": "date" },
+        { "col": "J", "name": "tivl_tag",           "enum": ["T", "I", "V", "L"] },
+        { "col": "K", "name": "lifecycle_status",   "enum": ["GREEN", "RED", "ON_HOLD", "REMOVED"] }
+      ]
+    },
+    "content_improve": {
+      "header_row": 4,
+      "data_start_row": 5,
+      "required_columns": [
+        { "col": "A", "name": "existing_url" },
+        { "col": "B", "name": "gsc_clicks",      "type": "integer" },
+        { "col": "C", "name": "gsc_impressions", "type": "integer" },
+        { "col": "D", "name": "current_position","type": "number" },
+        { "col": "E", "name": "issue" },
+        { "col": "F", "name": "optimization" },
+        { "col": "G", "name": "target_position", "type": "number" },
+        { "col": "H", "name": "priority" }
+      ]
+    },
+    "gsc_performance": {
+      "header_row": 4,
+      "data_start_row": 5,
+      "required_columns": [
+        { "col": "A", "name": "url" },
+        { "col": "B", "name": "clicks_recent",        "type": "integer" },
+        { "col": "C", "name": "clicks_previous",      "type": "integer" },
+        { "col": "D", "name": "clicks_delta",         "type": "integer" },
+        { "col": "E", "name": "clicks_delta_pct",     "type": "number" },
+        { "col": "F", "name": "impressions_recent",   "type": "integer" },
+        { "col": "G", "name": "impressions_previous", "type": "integer" },
+        { "col": "H", "name": "impressions_delta",    "type": "integer" },
+        { "col": "I", "name": "ctr_recent",           "type": "number" },
+        { "col": "J", "name": "position_recent",      "type": "number" },
+        { "col": "K", "name": "position_previous",    "type": "number" },
+        { "col": "L", "name": "note" }
+      ]
+    },
+    "content_decay": {
+      "header_row": 5,
+      "data_start_row": 6,
+      "required_columns": [
+        { "col": "A", "name": "url" },
+        { "col": "B", "name": "clicks_previous", "type": "integer" },
+        { "col": "C", "name": "clicks_recent",   "type": "integer" },
+        { "col": "D", "name": "clicks_delta",    "type": "integer" },
+        { "col": "E", "name": "delta_pct",       "type": "number" },
+        { "col": "F", "name": "trend" },
+        { "col": "G", "name": "pillar" },
+        { "col": "H", "name": "action" }
+      ]
+    },
+    "on_page_audit": {
+      "header_row": 4,
+      "data_start_row": 5,
+      "required_columns": [
+        { "col": "A", "name": "url" },
+        { "col": "B", "name": "target_query" },
+        { "col": "C", "name": "impressions_30d", "type": "integer" },
+        { "col": "D", "name": "clicks_30d",      "type": "integer" },
+        { "col": "E", "name": "in_title",        "type": "boolean" },
+        { "col": "F", "name": "in_meta",         "type": "boolean" },
+        { "col": "G", "name": "in_h1",           "type": "boolean" },
+        { "col": "H", "name": "action" }
+      ]
+    },
+    "opportunity": {
+      "header_row": 4,
+      "data_start_row": 5,
+      "required_columns": [
+        { "col": "A", "name": "query" },
+        { "col": "B", "name": "opportunity_score", "type": "number" },
+        { "col": "C", "name": "current_position",  "type": "number" },
+        { "col": "D", "name": "ctr_pct",           "type": "number" },
+        { "col": "E", "name": "impressions_30d",   "type": "integer" },
+        { "col": "F", "name": "clicks_30d",        "type": "integer" },
+        { "col": "G", "name": "potential_clicks",  "type": "integer" },
+        { "col": "H", "name": "assigned_url_action" }
+      ]
+    },
+    "tech_seo": {
+      "header_row": 3,
+      "data_start_row": 4,
+      "required_columns": [
+        { "col": "A", "name": "issue_category" },
+        { "col": "B", "name": "detail" },
+        { "col": "C", "name": "affected_urls" },
+        { "col": "D", "name": "impact",     "ref": "#/definitions/severityEnum" },
+        { "col": "E", "name": "resolution" },
+        { "col": "F", "name": "priority" }
+      ]
+    },
+    "crawl_sitemap": {
+      "header_row": 3,
+      "data_start_row": 4,
+      "required_columns": [
+        { "col": "A", "name": "category" },
+        { "col": "B", "name": "metric" },
+        { "col": "C", "name": "value" },
+        { "col": "D", "name": "status", "ref": "#/definitions/statusEnum" },
+        { "col": "E", "name": "action" }
+      ]
+    },
+    "robots_txt": {
+      "header_row": 4,
+      "data_start_row": 5,
+      "required_columns": [
+        { "col": "A", "name": "id" },
+        { "col": "B", "name": "level",   "ref": "#/definitions/severityEnum" },
+        { "col": "C", "name": "issue" },
+        { "col": "D", "name": "detail" },
+        { "col": "E", "name": "resolution" }
+      ]
+    },
+    "schema": {
+      "header_row": 3,
+      "data_start_row": 4,
+      "required_columns": [
+        { "col": "A", "name": "schema_type" },
+        { "col": "B", "name": "status",       "ref": "#/definitions/statusEnum" },
+        { "col": "C", "name": "location" },
+        { "col": "D", "name": "scope" },
+        { "col": "E", "name": "remaining_work" }
+      ]
+    },
+    "redirect_404": {
+      "header_row": 4,
+      "data_start_row": 5,
+      "required_columns": [
+        { "col": "A", "name": "url" },
+        { "col": "B", "name": "inlinks", "type": "integer" },
+        { "col": "C", "name": "action" },
+        { "col": "D", "name": "target_url" },
+        { "col": "E", "name": "status", "ref": "#/definitions/statusEnum" }
+      ]
+    },
+    "completed_work": {
+      "header_row": 4,
+      "data_start_row": 5,
+      "required_columns": [
+        { "col": "A", "name": "id" },
+        { "col": "B", "name": "task_or_content" },
+        { "col": "C", "name": "url" },
+        { "col": "D", "name": "date", "type": "date" },
+        { "col": "E", "name": "category" },
+        { "col": "F", "name": "note" }
+      ]
+    },
+    "master_task": {
+      "header_row": 3,
+      "data_start_row": 4,
+      "required_columns": [
+        { "col": "A", "name": "task_id" },
+        { "col": "B", "name": "task" },
+        { "col": "C", "name": "primary_source", "enum": ["content_decay", "quickwin", "tech_fix", "schema", "pillar", "manual", "sxo", "cannibalization", "redirect_404"] },
+        { "col": "D", "name": "related_sources" },
+        { "col": "E", "name": "url" },
+        { "col": "F", "name": "category" },
+        { "col": "G", "name": "priority",         "ref": "#/definitions/severityEnum" },
+        { "col": "H", "name": "impact" },
+        { "col": "I", "name": "duration_est_min", "type": "integer" },
+        { "col": "J", "name": "status",           "ref": "#/definitions/statusEnum" },
+        { "col": "K", "name": "created_date",     "type": "date" },
+        { "col": "L", "name": "done_date",        "type": "date" },
+        { "col": "M", "name": "assignee" },
+        { "col": "N", "name": "note" },
+        { "col": "O", "name": "auto_generated",   "type": "boolean" },
+        { "col": "P", "name": "dependencies" },
+        { "col": "Q", "name": "effort_actual_min","type": "integer" },
+        { "col": "R", "name": "metric_impact_json" },
+        { "col": "S", "name": "work_log_ref" }
+      ],
+      "allowed_writers": ["human", "dashboard_refresh", "done_protocol", "master_task_sync"],
+      "writer_scope": {
+        "human":             "full sheet access",
+        "dashboard_refresh": "no writes — read-only for R48/R49/R50 counts",
+        "done_protocol":     "status (J), done_date (L), effort_actual_min (Q), metric_impact_json (R), work_log_ref (S) — only rows transitioning to DONE",
+        "master_task_sync":  "append new auto-generated rows AND merge related_sources (D); forbidden to touch protected_columns"
+      },
+      "protected_columns": ["task", "category", "priority", "impact", "duration_est_min", "assignee", "note"],
+      "computed_ranges": [],
+      "formula_policy": "values_only"
+    }
+  }
+}

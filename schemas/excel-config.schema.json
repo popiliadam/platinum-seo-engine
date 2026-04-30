@@ -1,0 +1,91 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://platinum-seo-engine/templates/excel-config.schema.json",
+  "title": "Excel Config Schema v1.0",
+  "description": "Per-project Excel pack definition (projects/{slug}/config/excel.config.json). Binds logical_sheet_id to display_name (emoji allowed in display), configures backup policy, and optional per-sheet extra columns. See docs/ARCHITECTURE.md §11.1.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "excel", "source_manifest", "sheets"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "excel": {
+      "type": "object",
+      "required": ["filename"],
+      "properties": {
+        "filename": {
+          "type": "string",
+          "pattern": "^[^/\\\\]+\\.xlsx$",
+          "description": "File name only; no directory components"
+        },
+        "location_relative_to_project": {
+          "type": "string",
+          "default": ".",
+          "description": "Directory containing the workbook, relative to project root"
+        },
+        "backup_policy": {
+          "type": "object",
+          "properties": {
+            "before_write": {
+              "type": "boolean",
+              "default": true,
+              "description": "L5 — atomic write guardrail always takes a backup pre-save"
+            },
+            "retention_count": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 20
+            },
+            "naming_pattern": {
+              "type": "string",
+              "default": "{filename}-before-{operation}-{YYYYMMDD-HHMMSS}.xlsx",
+              "description": "Tokens: {filename}, {operation}, {YYYYMMDD-HHMMSS}, {run_id}"
+            }
+          }
+        }
+      }
+    },
+    "source_manifest": {
+      "type": "string",
+      "default": "config/excel-source-manifest.json",
+      "description": "Relative path (from project root) to the project's excel-source-manifest.json"
+    },
+    "sheets": {
+      "type": "object",
+      "description": "logical_sheet_id → display_name map. Display name MAY contain emoji; logical ID MUST NOT. Code references logical IDs exclusively (§8.1).",
+      "minProperties": 1,
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_]*$",
+        "description": "logical_sheet_id — lowercase, underscore-separated"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Display name (may contain emoji, spaces, punctuation)"
+      }
+    },
+    "sheet_overrides": {
+      "type": "object",
+      "description": "Per-sheet customization without touching master-excel-schema.json. Extra columns append to required_columns; header_row/data_start_row override defaults.",
+      "propertyNames": { "pattern": "^[a-z][a-z0-9_]*$" },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "header_row":     { "type": "integer", "minimum": 1 },
+          "data_start_row": { "type": "integer", "minimum": 1 },
+          "extra_columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["col", "name", "type"],
+              "properties": {
+                "col":  { "type": "string", "pattern": "^[A-Z]+$" },
+                "name": { "type": "string" },
+                "type": { "enum": ["string", "integer", "number", "date", "boolean"] }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

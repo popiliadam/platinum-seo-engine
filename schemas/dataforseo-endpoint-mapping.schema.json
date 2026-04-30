@@ -1,0 +1,191 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://platinum-seo-engine/schemas/dataforseo-endpoint-mapping.schema.json",
+  "title": "DataForSEO MCP Endpoint Mapping Contract v1.0",
+  "description": "Meta-schema for the DataForSEO MCP integration contract (§13). Validates a registry document grouping MCP endpoints into 7 architectural categories (serp_live, keyword_data, labs, ai_optimization, content_analysis, backlinks, business_data). MCP server version is locked to dataforseo-mcp-server@2.8.9 (§13.1). Every endpoint MUST declare output_fields_keep + output_fields_drop (§13.3) for response shrinkage before staging, and cost.credits_per_call (§13.4) for budget enforcement. URL normalization applies to any endpoint whose output_fields_keep includes url-bearing fields — staging rows carry both url_original and url_normalized.",
+  "type": "object",
+  "required": ["schema_version", "execution_mode", "mcp_server_name", "mcp_server_version", "endpoint_groups"],
+  "properties": {
+    "schema_version":     { "const": "1.0" },
+    "execution_mode":     { "const": "mcp_tool_call" },
+    "mcp_server_name":    { "const": "dataforseo" },
+    "mcp_server_version": {
+      "const": "2.8.9",
+      "description": "Lock: dataforseo-mcp-server@2.8.9 (npm verified 2026-04-20; @dataforseo/mcp-server scope returns E404). Changing this const is a schema revision."
+    },
+    "url_normalization": {
+      "type": "object",
+      "description": "Every endpoint whose output_fields_keep contains a url-bearing path MUST write both url_original and url_normalized to staging. Join keys across sheets use url_normalized only.",
+      "required": ["mandatory", "policy_source", "staging_fields"],
+      "properties": {
+        "mandatory":      { "const": true },
+        "policy_source":  { "const": "project.config.url_policy" },
+        "staging_fields": {
+          "type": "array",
+          "items": { "enum": ["url_original", "url_normalized"] },
+          "minItems": 2,
+          "uniqueItems": true
+        }
+      }
+    },
+    "budget_policy": {
+      "type": "object",
+      "description": "§13.4 cost control contract. Runtime reads project.config.dataforseo.budget_credits_per_day; pre-call estimator sums endpoint cost.credits_per_call across planned calls.",
+      "properties": {
+        "source_field":      { "const": "project.config.dataforseo.budget_credits_per_day" },
+        "override_flag":     { "const": "--override-budget" },
+        "estimator_hook":    { "const": "provenance_logger.estimate_cost" }
+      }
+    },
+    "endpoint_groups": {
+      "type": "object",
+      "description": "7 architectural endpoint categories. Keys are the fixed vocabulary; values are endpointGroup containers.",
+      "propertyNames": { "$ref": "#/definitions/endpointGroupKey" },
+      "additionalProperties": { "$ref": "#/definitions/endpointGroup" },
+      "minProperties": 1,
+      "maxProperties": 7
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "endpointGroupKey": {
+      "type": "string",
+      "enum": [
+        "serp_live",
+        "keyword_data",
+        "labs",
+        "ai_optimization",
+        "content_analysis",
+        "backlinks",
+        "business_data"
+      ]
+    },
+    "dfsMcpTool": {
+      "type": "string",
+      "description": "DataForSEO MCP tool identifier. Convention: dataforseo__<namespace>_<verb>. Prefix is enforced; suffix is free-form because DFS MCP exposes 70+ tools and new ones may be added without schema revision.",
+      "pattern": "^dataforseo__[a-z][a-z0-9_]+$"
+    },
+    "projectionMode": {
+      "type": "string",
+      "description": "Mirrors staging-to-excel-map projection_mode enum.",
+      "enum": [
+        "row_match_by_url",
+        "aggregate_by_page",
+        "append_with_is_brand_column",
+        "merge_by_keyword_url",
+        "merge_with_gsc_by_url_normalized",
+        "issue_summary",
+        "nap_consistency_audit",
+        "kpi_cells"
+      ]
+    },
+    "logicalSheet": {
+      "type": "string",
+      "enum": [
+        "dashboard", "topical_map", "cluster_keywords", "cannibalization",
+        "quick_wins", "new_content_plan", "content_improve", "gsc_performance",
+        "content_decay", "on_page_audit", "opportunity", "tech_seo",
+        "crawl_sitemap", "robots_txt", "schema", "redirect_404",
+        "completed_work", "master_task"
+      ]
+    },
+    "cachePolicy": {
+      "type": "object",
+      "required": ["ttl_hours"],
+      "properties": {
+        "ttl_hours": { "type": "integer", "minimum": 0, "maximum": 8760 },
+        "key":       { "type": "string" }
+      }
+    },
+    "cost": {
+      "type": "object",
+      "description": "Per-call cost metadata. credits_per_call is mandatory; typical_rows hints response size for SQLite sizing.",
+      "required": ["credits_per_call"],
+      "properties": {
+        "credits_per_call": { "type": "number", "minimum": 0 },
+        "typical_rows":     { "type": "integer", "minimum": 0 }
+      }
+    },
+    "inputField": {
+      "type": "object",
+      "description": "Same shape as GSC mapping inputField: either declares a static type or binds to project.config.* via source path.",
+      "properties": {
+        "type":    { "enum": ["string", "integer", "number", "boolean", "array", "object"] },
+        "format":  { "type": "string" },
+        "default": {},
+        "const":   {},
+        "enum":    { "type": "array" },
+        "items":   { "type": "object" },
+        "maxItems": { "type": "integer", "minimum": 0 },
+        "source":  {
+          "type": "string",
+          "pattern": "^project\\.config(\\.[a-z][a-z0-9_]*)+$"
+        }
+      }
+    },
+    "fieldPath": {
+      "type": "string",
+      "description": "Dot/bracket path into the MCP response (e.g. items[].rank_absolute, history[-12:], citations[].domain). Not strictly regex-validated — used descriptively by the field filter.",
+      "minLength": 1
+    },
+    "endpoint": {
+      "type": "object",
+      "required": ["mcp_tool", "cost", "cache", "output_fields_keep", "output_fields_drop", "staging_table"],
+      "properties": {
+        "mcp_tool":    { "$ref": "#/definitions/dfsMcpTool" },
+        "description": { "type": "string" },
+        "cost":        { "$ref": "#/definitions/cost" },
+        "rate_limit":  { "type": "string" },
+        "cache":       { "$ref": "#/definitions/cachePolicy" },
+        "input_schema": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/inputField" }
+        },
+        "output_fields_keep": {
+          "type": "array",
+          "description": "§13.3 — whitelist of response paths persisted to staging. Must be non-empty; endpoints with no payload of interest should not be registered.",
+          "items":     { "$ref": "#/definitions/fieldPath" },
+          "minItems":  1,
+          "uniqueItems": true
+        },
+        "output_fields_drop": {
+          "type": "array",
+          "description": "§13.3 — explicit blacklist documented for auditors. May be empty when the response shape has no known bulk fields to strip. Empty array still counts as an explicit policy declaration.",
+          "items":     { "$ref": "#/definitions/fieldPath" },
+          "minItems":  0,
+          "uniqueItems": true
+        },
+        "staging_table": {
+          "type": "string",
+          "description": "SQLite staging table (§6.2). Convention: dfs_*.",
+          "pattern": "^dfs_[a-z][a-z0-9_]*$"
+        },
+        "excel_target_sheet": {
+          "oneOf": [
+            { "$ref": "#/definitions/logicalSheet" },
+            { "type": "null", "description": "Staging-only; no Excel projection." }
+          ]
+        },
+        "projection_mode": { "$ref": "#/definitions/projectionMode" },
+        "fallback": {
+          "type": "string",
+          "description": "Free-text fallback recipe when the DFS tool errors (e.g. 'scrapling.bulk_get with google.com search URL')."
+        },
+        "notes": { "type": "string" }
+      }
+    },
+    "endpointGroup": {
+      "type": "object",
+      "required": ["endpoints"],
+      "properties": {
+        "endpoints": {
+          "type": "object",
+          "description": "Endpoint-key → endpoint object. Keys are free-form (DFS MCP exposes ~70 tools; restricting them to a fixed enum would block future additions).",
+          "additionalProperties": { "$ref": "#/definitions/endpoint" },
+          "minProperties": 1
+        },
+        "group_notes": { "type": "string" }
+      }
+    }
+  }
+}

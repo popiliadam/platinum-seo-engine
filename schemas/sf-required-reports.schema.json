@@ -1,0 +1,121 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://platinum-seo-engine/schemas/sf-required-reports.schema.json",
+  "title": "SF Required Reports Registry v1.0",
+  "description": "Plugin-authoritative registry of 40 Screaming Frog export types across 3 tiers (§7.1 REQUIRED/14, §7.2 RECOMMENDED/10, §7.3 OPTIONAL/16) plus profile-based elevation rules (§7.4). Validates the shape of a reports-registry document; the canonical data is carried in examples/defaults. See ARCHITECTURE.md §7.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "tiers", "profile_elevations"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "tiers": {
+      "type": "object",
+      "required": ["required", "recommended", "optional"],
+      "additionalProperties": false,
+      "properties": {
+        "required": {
+          "type": "array",
+          "description": "Tier 1 — missing → sf_import RED abort. 14 reports per §7.1.",
+          "items": { "$ref": "#/definitions/report" }
+        },
+        "recommended": {
+          "type": "array",
+          "description": "Tier 2 — missing → AMBER warn. 10 reports per §7.2.",
+          "items": { "$ref": "#/definitions/report" }
+        },
+        "optional": {
+          "type": "array",
+          "description": "Tier 3 — missing silent. 16 reports per §7.3.",
+          "items": { "$ref": "#/definitions/report" }
+        }
+      }
+    },
+    "profile_elevations": {
+      "type": "object",
+      "description": "Profile → canonical_name[] elevated into required tier. Union + dedup at runtime across all active profiles (§7.4).",
+      "propertyNames": { "enum": ["e-commerce", "ymyl", "local-service", "b2b-saas", "portfolio"] },
+      "additionalProperties": {
+        "type": "array",
+        "items": { "$ref": "#/definitions/canonicalName" },
+        "uniqueItems": true
+      }
+    },
+    "fail_modes": {
+      "type": "object",
+      "description": "Verdict policy when validating a project's sf-exports/{date}/ folder against the registry",
+      "properties": {
+        "required_missing":    { "const": "RED" },
+        "recommended_missing": { "const": "AMBER" },
+        "optional_missing":    { "const": "SILENT" },
+        "hash_mismatch":       { "const": "RED" },
+        "header_mismatch":     { "const": "RED" },
+        "row_count_mismatch":  { "const": "RED" }
+      }
+    }
+  },
+  "definitions": {
+    "canonicalName": {
+      "type": "string",
+      "enum": [
+        "internal_all", "all_inlinks", "all_outlinks", "response_codes_all",
+        "issues_overview_report", "page_titles_all", "meta_description_all",
+        "h1_all", "canonicals_all", "directives_all", "indexability",
+        "structured_data_all", "sitemaps_all", "redirect_chains",
+        "h2_all", "images_all", "hreflang_all", "orphan_pages",
+        "all_anchor_text", "near_duplicates_report", "exact_duplicates_report",
+        "search_console_all", "crawl_depth", "pagination_all",
+        "security_all", "javascript_all", "response_times_all", "word_count",
+        "broken_internal_links", "broken_external_links", "images_missing_alt",
+        "page_speed_insights", "ga_integration", "meta_keywords", "pdf_all",
+        "amp_all", "urls_not_in_sitemap", "xml_sitemap_urls_not_in_internal",
+        "canonical_mismatch", "links_to_noindex"
+      ]
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+    },
+    "logicalSheet": {
+      "type": "string",
+      "enum": [
+        "dashboard", "topical_map", "cluster_keywords", "cannibalization",
+        "quick_wins", "new_content_plan", "content_improve", "gsc_performance",
+        "content_decay", "on_page_audit", "opportunity", "tech_seo",
+        "crawl_sitemap", "robots_txt", "schema", "redirect_404",
+        "completed_work", "master_task"
+      ]
+    },
+    "stagingTarget": {
+      "type": "string",
+      "description": "SQLite staging table name, optionally with a column hint (e.g. sf_urls, sf_urls.title, sf_response_codes (chained))",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)?( \\(.+\\))?$"
+    },
+    "report": {
+      "type": "object",
+      "required": ["canonical_name", "severity"],
+      "properties": {
+        "canonical_name": { "$ref": "#/definitions/canonicalName" },
+        "aliases": {
+          "type": "array",
+          "description": "Accepted filename variants (matched AFTER normalization rules in sf-export-mapping.json)",
+          "items": { "type": "string" },
+          "uniqueItems": true,
+          "default": []
+        },
+        "severity":    { "$ref": "#/definitions/severity" },
+        "staging":     { "$ref": "#/definitions/stagingTarget" },
+        "excel":       { "$ref": "#/definitions/logicalSheet" },
+        "notes":       { "type": "string" },
+        "header_contract": {
+          "type": "object",
+          "description": "Expected header constraint for validation against raw_reports.header_hash",
+          "properties": {
+            "expected_columns":        { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+            "case_insensitive":        { "type": "boolean", "default": true },
+            "allow_additional_columns":{ "type": "boolean", "default": true }
+          }
+        }
+      }
+    }
+  }
+}
