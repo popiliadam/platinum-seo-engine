@@ -10,6 +10,7 @@ ADR-011 rotation kararıyla `DECISIONS.md`'den taşınmış eski kararlar. Appen
 - ADR-012 (Phase 3.1 closeout, 2026-04-30 — beşinci rotation cycle, ADR-016/017 eklendikten sonra >5KB tetikleyince)
 - ADR-013 (Phase 3.1 closeout cycle 5+, 2026-04-30 — ADR-014 <5KB hard cap enforced; ADR-012 cut yetmediği için ek rotation)
 - ADR-014/016/017/018 (Phase 3.2 PRE-FIX closeout, 2026-04-30 — altıncı rotation cycle, ADR-018..021 ekleme ile DECISIONS.md ~9.9KB tetiklenmesi sonrası agresif cut; gap-015 protected)
+- ADR-019 (Phase 4 ADIM 3, 2026-04-30 — yedinci rotation cycle, ADR-022 numerik clarification ekleme ile DECISIONS.md 6368B tetiklenmesi sonrası en eski active cut)
 
 **Active ADR'ler için:** [DECISIONS.md](DECISIONS.md)
 
@@ -168,3 +169,12 @@ ADR-011 rotation kararıyla `DECISIONS.md`'den taşınmış eski kararlar. Appen
 **Context:** Phase 1.1 W-D dispatch'inde master-excel.schema.json migrate edilirken `definitions/{statusEnum, severityEnum}` block taşınmadı. 9 `ref` field'ı (master_task.status, opportunity, schema, redirect_404 vb.) resolve edilemez halde idi (custom `ref` notation, draft-07 validator silent-pass). 3 paralel subagent research keşfetti (Phase 3.2 PRE-FIX).
 **Decision:** definitions block eklendi: statusEnum 7 değer (TODO, ONGOING, EXISTS, DONE, BLOCKED, DEFERRED, CANCELED) — eski sistemden ONGOING + EXISTS korundu (Phase 1 migration disiplini, eski Excel stored values backward compat), brief'ten BLOCKED + DEFERRED + CANCELED eklendi (Phase 8 planning skill'leri için workflow expressivity). severityEnum 4 değer (CRITICAL, HIGH, MEDIUM, LOW) standart. Sample row validation PASS.
 **Consequences:** master_task, opportunity, schema, redirect_404, cannibalization, tech_seo, robots_txt, crawl_sitemap, topical_map sheet'lerinde status/severity field'ları runtime validate edilebilir. Phase 1.1 closeout retroactive fix; Phase 5 GO/NO-GO öncesi şart. Backward compat: Phase 5 GO/NO-GO smoke test'te eski premium repo'dan migrate edilecek master.xlsx satırlarında ONGOING/EXISTS değerleri schema-valid kalır (rename veya migration script gerekmez).
+
+---
+
+## ADR-019 — workflow-run.schema Additive Bump (retry_count + schema_version)
+**Date:** 2026-04-30
+**Status:** accepted
+**Context:** Phase 1.4 W-G workflow-run.schema yazımında `retry_count` (retry mechanism field) ve `schema_version` (version drift detection) atlandı. Subagent #3 W-L research'ünde tespit etti; `retry()` API method'u şu an retry_count'a refer ediyor ama schema'da yer yoktu.
+**Decision:** Additive bump — required'a EKLENMEDİ (default 0/missing kabul, backward compat). `retry_count`: integer >=0, default 0. `schema_version`: const "1.0".
+**Consequences:** workflow_runner.py retry() method retry_count'u inkremente eder (failed → running transition). schema_version Phase 14+ migrasyonlarda version skew detection için. Mevcut workflow-run.json yok (yeni özellik), backward compat sorunsuz.

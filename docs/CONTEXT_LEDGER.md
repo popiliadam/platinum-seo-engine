@@ -218,3 +218,28 @@ Spec §13.2: <15KB initial load = <2% of 1M context window. Tracking under budge
 - DECISIONS.md 5356B (3 active ADR-019/020/021), DECISIONS_ARCHIVE.md 17750B (17 archive 001..014, 016..018 gap-015).
 - Awaiting Süleyman: atomic Phase 3 commit + push (komut dizisi manager tarafından hazırlandı, raporda).
 - Phase 4 (Hooks + Commands) için fresh session önerilir (turn ~12, dispatch yoğunluğu yüksek, yeni domain Phase 4 + ADR-022 boyut metriği netleştirme bekliyor).
+
+## Phase 3 PUSHED (2026-04-30, thirteenth session paste — fresh Phase 4 session)
+- Phase 3 PUSHED: 3a0e8f5 (95e605d..3a0e8f5), 24 files, 4367 insertions / 26 deletions, 60.11 KiB. 8 scripts + 48 pytest. Phase 3.1 + 3.2 PRE-FIX + 3.3 W-L atomic commit.
+- PHASE_STATUS Phase 3 row updated with commit hash; Phase 4 active.
+- Fresh session wakeup: PHASE_STATUS + OPEN_QUESTIONS + DECISIONS + REFERENCE_INDEX + CONTEXT_LEDGER (~13KB load).
+- Phase 4 dispatch brief alındı: ADR-022 (rotation eşik <5120B numerik) + W-N (4 hooks) ∥ W-O (6 commands).
+
+## Phase 4 closeout (2026-04-30, thirteenth session paste continued)
+- ADIM 1-3 (manager-only): PHASE_STATUS Phase 3 commit hash 3a0e8f5; ADR-022 yazıldı + summary table + header rotation note güncellendi; DECISIONS.md 5356B → 6368B (>5120 tetik) → ADR-019 archive (rotation cycle 7) → final 5587B.
+- W-N (4 hooks paralel) ∥ W-O (6 commands paralel) bağımsız scope dispatch — sıfır collision.
+- W-N return: 4/4 JSON valid, 3/3 DURUR handle (bootstrap_project.py --session-context yok → shell-only context detect; events_writer.py CLI yok → python -c adapter; transaction.py --precheck yok → ~$<file>.xlsx sidecar probe). 4/4 functional smoke PASS (audit event events.schema validate, master.xlsx lock pre-flight, slug leak 0). post-tool-use audit event_kind="audit"/audit_action="accessed" flatten karar (Q-WN-02 Phase 14+ governance).
+- W-O return: 6/6 frontmatter parse, ADR-013 string-internal "Use when:/Also use when:/Do not use when:" 6/6 dosya. workflow_runner.py import-only (CLI yok) — pseo-status.md python -c wrapper. Phase 5+ STUB markers explicit (skills/discovery/quick-wins, skills/governance/drift-check, skills/reporting/monthly-report, skills/meta/whats-next).
+- Q-WN-01 flag: plugin manifest "hooks":"./hooks" directory-merge belirsiz (resmi doc canonical hooks/hooks.json single file). Manager fix: plugin.json hooks → explicit 4-element array (deterministic loading garantisi).
+- Q-WO-01 fix: commands/.gitkeep silindi (6 .md placeholder rolünü devraldı, rules/.gitkeep Phase 2 precedent).
+- W-O surprise: bootstrap_project.py line 47-48 hardcoded ~/Documents/platinum-seo-engine fallback (slug leak class) — commands stricter: PSEO_WORKSPACE_ROOT zorunlu, error if unset. Phase 5+ bootstrap_project refactor candidate (Q-WO-04 imp).
+- BLOCKER: DECISIONS.md final = 5587B (>5120 ADR-022 hard cap), 3 active floor (ADR-020/021/022) — ADR-020 cut floor ihlal eder. Karar verici 4 seçenek bekliyor (raporda).
+- DURUR triggers fired: W-N 3/3 (in-line handled), W-O 0/3.
+- Awaiting Süleyman: BLOCKER kararı + atomic Phase 4 commit.
+
+## Phase 4 BLOCKER resolved (2026-04-30, thirteenth session paste continued)
+- Karar verici onayı: Seçenek (a) ADR-022 sıkılaştır + buffer kademe 1+2 (ADR-020 Context tighten + "tarihsel" word cut + ADR-021 Context tighten + ADR-022 Context tighten).
+- DECISIONS.md final = **5072B (margin: 48B PASS)**. 3 active: ADR-020, ADR-021, ADR-022. ADR-022 hard cap kendi kuralını ihlal etmedi.
+- Toplam Context tasarruf: 515B (5587 → 5072). Decision/Consequences intact (kayıt kritik).
+- Q-WN-02 → Q-016 olarak OPEN_QUESTIONS Unresolved'a eklendi (audit_action enum Phase 14+ governance refinement defer).
+- Phase 4 closeout final: PHASE_STATUS Phase 4 [x] (BLOCKER kaldırıldı), atomic commit komut dizisi Süleyman'a sunuldu.

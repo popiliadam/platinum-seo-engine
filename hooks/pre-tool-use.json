@@ -1,0 +1,23 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -c 'import json,os,sys,pathlib; raw=sys.stdin.read() or \"{}\"; data=json.loads(raw); ti=data.get(\"tool_input\") or {}; tgt=ti.get(\"file_path\") or ti.get(\"path\") or \"\"; n=os.path.basename(tgt); is_master=bool(tgt) and (n.endswith(\"_MASTER.xlsx\") or n==\"master.xlsx\" or n.endswith(\"-master.xlsx\")); p=pathlib.Path(tgt) if is_master else None; sidecar=(p.parent/(\"~$\"+p.name)) if p else None; blocked = bool(sidecar and sidecar.exists()); sys.stderr.write(\"BLOCKED: Excel/LibreOffice owner-lock present at \"+str(sidecar)+chr(10)) if blocked else None; sys.exit(2 if blocked else 0)'",
+            "timeout": 15,
+            "statusMessage": "Pre-flight: master excel lock check..."
+          },
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/security/check_secrets.sh\" \"${CLAUDE_PROJECT_DIR:-.}\"",
+            "timeout": 60,
+            "statusMessage": "Secret leak scan..."
+          }
+        ]
+      }
+    ]
+  }
+}

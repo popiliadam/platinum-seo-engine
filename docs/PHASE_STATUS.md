@@ -1,10 +1,10 @@
 # Phase Status
 
-**Last Updated:** 2026-04-30T12:00:00Z
-**Active Phase:** Phase 3 — Scripts ✅ DONE (atomic commit pending Süleyman); Phase 4 — Hooks + Commands NEXT
+**Last Updated:** 2026-04-30T13:00:00Z
+**Active Phase:** Phase 4 — Hooks + Commands ACTIVE
 
 ## Previous Phase
-**Phase 2 — Rules & Disciplines ✅ DONE 2026-04-30**
+**Phase 3 — Scripts ✅ DONE 2026-04-30 (commit 3a0e8f5)**
 
 ### Phase 2 Tasks (hepsi closed)
 - [x] W-I — 5 disiplin (naming, single-source-of-truth, schema-first, append-only-state, excel-discipline) — done; 12975B toplam, 5/5 structure PASS, drift sıfır
@@ -24,7 +24,8 @@
 | Phase 0 | done | 2026-04-30 | 2026-04-30 | b2d2094 |
 | Phase 1 | done | 2026-04-30 | 2026-04-30 | 4417e3c |
 | Phase 2 | done | 2026-04-30 | 2026-04-30 | 95e605d |
-| Phase 3 | done | 2026-04-30 | 2026-04-30 | (commit pending) |
+| Phase 3 | done | 2026-04-30 | 2026-04-30 | 3a0e8f5 |
+| Phase 4 | done | 2026-04-30 | 2026-04-30 | (commit pending) |
 
 ## Next Phase Preview
 **Phase 2 — Rules & Disciplines:** 10 normatif disiplin (naming.md, single-source-of-truth.md, schema-first.md, append-only-state.md, excel-discipline.md, secrets-management.md, glossary-discipline.md, skill-description-discipline.md, schema-versioning-discipline.md, time-discipline.md) — eski rules/universal-rules.json'dan ilham, yeniden yazım.
@@ -35,5 +36,17 @@
 - [x] Phase 3.2 PRE-FIX (ADR-018..021, 5 fix: master-excel definitions + workflow-run bump + events workflow + check_budget path)
 - [x] Phase 3.3 — W-L delivered (events_writer.py 550L + transaction.py 785L + workflow_runner.py 793L + 36/36 pytest PASS + cross-module integration smoke PASS)
 
+## Phase 4 Tasks
+- [x] ADR-022 yazıldı (rotation eşik <5120B numerik clarification, ADR-014 supersede partial)
+- [x] DECISIONS rotation cycle 7: ADR-019 → DECISIONS_ARCHIVE.md
+- [x] W-N delivered (4 hooks, 4144B toplam, 4/4 JSON valid, 4/4 functional smoke PASS, 3/3 DURUR handled)
+- [x] W-O delivered (6 commands, 20092B toplam, 6/6 frontmatter parse PASS, 0/3 DURUR fired)
+- [x] plugin.json hooks field explicit array (Q-WN-01 fix, directory-merge belirsizliğine deterministic çözüm)
+- [x] commands/.gitkeep silindi (6 .md placeholder rolünü devraldı, rules/.gitkeep precedent)
+- [x] BLOCKER kaldırıldı: ADR-022 + ADR-020/021 Context tightening (515B tasarruf), DECISIONS.md = 5072B (margin 48B), 3 active korundu
+
 ## Outstanding Open Questions
 - **Q-015** — scrapling-output-mapping pattern dependency (Phase 6 öncesi, non-blocking)
+- **Q-WN-01** — Plugin hook loader directory-merge belirsizliği (plugin.json explicit array ile geçici çözüldü, resmi doc clarification beklenebilir)
+- **Q-016** — audit_action enum mapping (Edit/Write/Bash → modified/accessed) — Phase 14+ governance refinement, non-blocking
+- **Q-WO-02** — shared/active.json mutability semantics (append-only-state.md kapsam dışı, future ADR aday)
