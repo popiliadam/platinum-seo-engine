@@ -100,3 +100,32 @@ Spec §13.2: <15KB initial load = <2% of 1M context window. Tracking under budge
 - Toplam Phase 1 deliverables: 22 yeni dosya (19 schema + bootstrap_excel.py + master-excel.xlsx + DECISIONS_ARCHIVE.md), 1 silinen (work-log.schema.json), 5 modified (DECISIONS.md, PHASE_STATUS.md, CONTEXT_LEDGER.md, OPEN_QUESTIONS.md, REFERENCE_INDEX.md).
 - Outstanding open question: Q-015 (scrapling pattern dependency, Phase 6 öncesi).
 - Awaiting Süleyman: atomic commit + push (manager prepared command sequence per ADR-002).
+
+## Phase 1 PUSHED (2026-04-30, tenth session paste)
+- Süleyman executed git add + commit + push successfully.
+- Commit 4417e3c (range b2d2094..4417e3c) — "Phase 1: Schema migration complete (19 schemas, master-excel.xlsx, ADR-011..013, DECISIONS rotated)" — 27 files, 3705 insertions, 69.15 KiB.
+- main → origin/main tracking active.
+- PHASE_STATUS Phase 1 row updated with commit hash; Phase 2 active.
+
+## Phase 2 dispatch (2026-04-30, tenth session paste continued)
+- W-I (5 disiplin) ∥ W-J (5 disiplin) paralel dispatch — bağımsız konular, kendi spec §8 paragrafları + universal-rules.json referansı.
+- Spec §8 authoritative; universal-rules.json (eski 28KB) sadece içerik referansı (READ-ONLY, ADR-004).
+- Şablon disiplini: frontmatter (name, status, applies_to, spec_section) + 6 başlık (Kural, Why, How to Apply, Examples, Anti-Patterns, Enforcement). <3KB hedef.
+- ADR-013 (skill-description-discipline use_when string-internal) skill-description-discipline.md'de yansıtılacak.
+
+## Phase 2 CLOSED (2026-04-30, eleventh session paste — Phase 2 closeout)
+- W-I returned 5 rules (PASS): naming, single-source-of-truth, schema-first, append-only-state, excel-discipline. 12975B toplam, hepsi <3KB, drift sıfır.
+- W-J returned 5 rules (PASS): secrets-management, glossary-discipline, skill-description-discipline (ADR-013 ref ✓), schema-versioning-discipline, time-discipline. 15582B toplam, 3 dosya 277-371B fazla (içerik kalitesi tradeoff'u, ADR-014 trigger'larından).
+- W-J 3 Open Question: Q-WJ-01 (path fix done), Q-WJ-02 (boyut hedefi — ADR-014 yansıması), Q-WJ-03 (minLength=30 schema'da kayıtlı, drift yok).
+- Q-WJ-01 resolved: secrets-management.md `scripts/security/check_secrets.sh` (spec §8.7 authoritative; brief'imdeki `scripts/hooks/check-secrets.sh` yanlıştı — `scripts/hooks/` dizini yok, `scripts/security/` Phase 0'da Worker C tarafından yaratıldı).
+- ADR-014 yazıldı: rotation eşiği <5KB primary metric, ADR sayısı flexible 3-5. ADR-011 partial supersede (eşik kuralı bölümü).
+- DECISIONS rotation 3. cycle: ADR-009 + ADR-010 → DECISIONS_ARCHIVE.md (10 ADR archive); DECISIONS.md 4 ADR active (011..014). Hedef <5KB.
+- rules/.gitkeep silindi (10 .md placeholder rolünü devraldı).
+- Cross-link graph: 9 cross-link kullanıldı (W-I ↔ W-J intra + inter), tüm linkler valid (forward-compatible).
+- Awaiting Süleyman: atomic Phase 2 commit + push.
+
+## Phase 2 closeout final (2026-04-30, eleventh session paste continued)
+- ADR-011 → DECISIONS_ARCHIVE.md (4. rotation cycle, ADR-014'ün ilk uygulaması — rotation pattern kendisini archive'a taşıdı; link integrity korundu çünkü ADR-014 zaten partial supersede ediyor).
+- DECISIONS.md final: 3 active ADR (012, 013, 014) + summary table 14 satır. Hedef <5KB sağlandı.
+- DECISIONS_ARCHIVE.md final: 11 ADR (001..011) full content kronolojik.
+- Phase 3 fresh session geçişi onaylı: bootstrap brief + Phase 3 dispatch sonraki paste'te gelecek.
