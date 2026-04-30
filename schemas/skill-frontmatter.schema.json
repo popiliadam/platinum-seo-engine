@@ -31,8 +31,8 @@
     },
     "category": {
       "type": "string",
-      "description": "Top-level skill grouping; must mirror skills/{category}/ directory layout (discovery, content, technical, governance, portfolio, operational).",
-      "enum": ["discovery", "content", "technical", "governance", "portfolio", "operational"]
+      "description": "Top-level skill grouping; must mirror skills/{category}/ directory layout (discovery, governance, ingestion, meta, planning, production, publishing, reporting).",
+      "enum": ["discovery", "governance", "ingestion", "meta", "planning", "production", "publishing", "reporting"]
     },
     "inputs": {
       "type": "object",
