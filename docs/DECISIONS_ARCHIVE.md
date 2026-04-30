@@ -5,6 +5,8 @@ ADR-011 rotation kararıyla `DECISIONS.md`'den taşınmış eski kararlar. Appen
 **Bu dosyadaki ADR aralığı:**
 - ADR-001..ADR-005 (Phase 0 closeout paketi, 2026-04-30 — ilk rotation)
 - ADR-006..ADR-008 (Phase 1 closeout paketi, 2026-04-30 — ikinci rotation)
+- ADR-009..ADR-010 (Phase 2 closeout paketi, 2026-04-30 — üçüncü rotation, ADR-014 eşik revizyonu)
+- ADR-011 (Phase 2 closeout final, 2026-04-30 — dördüncü rotation, ADR-014'ün ilk uygulaması; ADR-014 partial supersede)
 
 **Active ADR'ler için:** [DECISIONS.md](DECISIONS.md)
 
@@ -79,3 +81,30 @@ ADR-011 rotation kararıyla `DECISIONS.md`'den taşınmış eski kararlar. Appen
 **Context:** Q-008 — Bootstrap brief "If §3 lists more (e.g., `state/`, `validation/`, `reporting/` at top level — bootstrap hints these), include them" diyordu. Ama spec §3 plugin repo top-level'da `state/`, `outputs/`, `inbox/` listelemiyor — bunlar §4 workspace tarafında. Worker C bunları plugin repo'ya eklemedi.
 **Decision:** Worker C kararı onaylandı — `state/`, `outputs/`, `inbox/` plugin repo'da YOK. Plugin = read-only tooling (skill/komut/hook); workspace = runtime state sahibi. Bu ayrım plugin-agnostic hard constraint'iyle uyumlu: plugin tek başına stateless, workspace path'i değiştirildiğinde plugin değişmez.
 **Consequences:** Smoke test (Phase 5+) `PSE_WORKSPACE_PATH` env var'ından okur; eski premium repo (ADR-005) bu yolu sağlar. Hooks/scripts dosya yazarken hep workspace path'ini hedefler — plugin dizinine ASLA yazmaz. Bu disiplin Phase 5 acceptance criteria'sına eklenecek.
+
+---
+
+## ADR-009 — templates/master-excel.xlsx Phase 1'de Schema'dan Üretilir
+**Date:** 2026-04-30
+**Status:** accepted
+**Context:** Q-009 — `.gitignore` `*.xlsx` ignore eder ama `!templates/master-excel.xlsx` whitelist ile bu dosyayı izler. Phase 0'da dosya yok; `templates/` altında `.gitkeep` placeholder.
+**Decision:** Phase 1 worker `scripts/excel/bootstrap_excel.py` script'ini yazar; `schemas/master-excel.schema.json`'dan Excel binary'sini deterministik olarak üretir. `templates/master-excel.xlsx` ilk kez bu script ile yaratılır; aynı commit'te `templates/.gitkeep` silinir (template dosyası placeholder rolünü devralır).
+**Consequences:** Excel binary single-source-of-truth schema'dan üretildiği için drift kaynağı olmaz — schema değişirse script'i tekrar koşturup binary regenerate edilir. Phase 0 commit'inde `templates/.gitkeep` görünür; Phase 1 atomic commit'i `.gitkeep` siliniş + `master-excel.xlsx` ekleniş kombinasyonu.
+
+---
+
+## ADR-010 — Runtime Versions: Python 3.10+, Node Gerekmez
+**Date:** 2026-04-30
+**Status:** accepted
+**Context:** Q-010 — INSTALL.md placeholder'ı Python 3.10+ ve Node 18+ varsaymıştı. Plugin script'leri tamamen Python tabanlı (`scripts/excel/`, `scripts/`, `hooks/`); JS/TS bağımlılığı yok. `claude /plugin add` komut syntax'ı doğrulanmadı.
+**Decision:** **Python 3.10+** onaylandı — match-case ve PEP 604 union types serbest. **Node bağımlılığı yok** — INSTALL.md'deki Node 18+ satırı **Phase 4**'te silinir. `claude /plugin add` syntax'ı Phase 4 plugin yükleme worker'ı tarafından doğrulanır; eksiklik/hata varsa INSTALL.md o zaman düzeltilir.
+**Consequences:** Phase 1+ tüm Python script'leri 3.10+ syntax kullanabilir. CI workflow (Phase 14) Python 3.10/3.11/3.12 matrix'iyle test eder. INSTALL.md Phase 4'te iki düzeltme alır: (a) Node satırı silme, (b) plugin install komut syntax doğrulama.
+
+---
+
+## ADR-011 — DECISIONS_ARCHIVE Rotation Stratejisi
+**Date:** 2026-04-30
+**Status:** accepted (eşik kuralı ADR-014 ile partial supersede; rotation pattern korundu)
+**Context:** DECISIONS.md Phase 0 closeout sonu 8942 byte (10 ADR, doğal birikme); spec §13 ve memory'deki <5KB hard cap aşıldı. Append-only prensip korunmalı, ama disiplin koruması da şart — büyük DECISIONS.md fresh session wakeup sequence'ını şişirir, manager bağlamını kötü etkiler.
+**Decision:** ADR-001..ADR-005 (Phase 0 closeout paketi) `docs/DECISIONS_ARCHIVE.md` dosyasına taşındı. Manuel rotation Phase 1.0'da yapıldı; Phase 3'te `scripts/state/rotate_decisions.py` ile otomatize edilir. Eşik kuralı (ADR-014 ile revize): primary metric <5KB, ADR sayısı flexible 3-5.
+**Consequences:** Trigger: her phase sonu manager rotation check; >5KB ise en eski 1-2 ADR archive'a taşınır. ADR numaraları monotonic — re-numbering YOK; archive'da gap'ler kabul. Fresh session her zaman summary table'ı görür, full ADR'i archive'da bulur. REFERENCE_INDEX.md'ye archive entry eklendi.
