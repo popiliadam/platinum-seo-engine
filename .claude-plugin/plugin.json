@@ -6,5 +6,10 @@
   "license": "MIT",
   "skills": "./skills",
   "commands": "./commands",
-  "hooks": "./hooks"
+  "hooks": [
+    "./hooks/session-start.json",
+    "./hooks/pre-tool-use.json",
+    "./hooks/post-tool-use.json",
+    "./hooks/user-prompt-submit.json"
+  ]
 }

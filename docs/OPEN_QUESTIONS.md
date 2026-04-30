@@ -2,6 +2,16 @@
 
 ## Unresolved
 
+### Q-016: audit_action enum mapping (Edit/Write/Bash → modified/accessed)
+**Raised:** 2026-04-30 during Phase 4 W-N (post-tool-use.json hook)
+**Context:** events.schema audit_action enum 6 değer (created, modified, deleted, accessed, permission_changed, config_changed). post-tool-use hook tüm tool'larda (Edit/Write/Bash) `accessed` flatten ediyor — semantik kayıp (Edit/Write → `modified` olmalı). One-liner sıkışıklığı tradeoff.
+**Options:**
+- a) Tool isimine göre per-tool mapping (Edit/Write → modified, Bash → accessed) — hook one-liner büyür
+- b) audit_action enum'a `tool_invoked` jenerik değer ekle — schema bump
+- c) Phase 14+ governance refinement'a defer (mevcut audit trail completeness yeterli, semantik upgrade later)
+**Owner:** karar verici agent (Phase 14+ pre-dispatch)
+**Blocking Phase:** None (non-blocking, governance polish)
+
 ### Q-015: scrapling-output-mapping pattern dependency
 **Raised:** 2026-04-30 during Phase 1.2 (Worker W-F → OQ-WF-01)
 **Context:** `scrapling-output-mapping.schema.json` içinde `output_schema_file` pattern: `^templates/scrapling/[a-z_]+\.schema\.json$`. Yeni repo'da `templates/scrapling/` dizini yok (drift, taşınmadı — Q-014). Pattern runtime registry validation için (per-scenario sub-schema yolu), `$ref` değil.

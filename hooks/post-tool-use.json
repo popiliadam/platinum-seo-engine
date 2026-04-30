@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -c 'import json,os,sys,pathlib; ws=os.environ.get(\"PSEO_WORKSPACE_ROOT\"); marker=pathlib.Path(ws)/\"shared\"/\"active.json\" if ws else None; active=json.loads(marker.read_text(encoding=\"utf-8\")) if (marker and marker.exists()) else None; pid=(active or {}).get(\"project_id\"); raw=sys.stdin.read() or \"{}\"; data=json.loads(raw); tn=data.get(\"tool_name\") or \"unknown\"; ti=data.get(\"tool_input\") or {}; tgt=ti.get(\"file_path\") or ti.get(\"path\") or ti.get(\"command\") or \"<no-target>\"; (sys.exit(0)) if not (ws and pid) else None; sys.path.insert(0, os.environ[\"CLAUDE_PLUGIN_ROOT\"]); from scripts.state.events_writer import append_audit; append_audit(project_id=pid, audit_action=\"accessed\", audit_target=(tn+\":\"+str(tgt))[:480], actor=\"claude-code:hook:PostToolUse\", workspace_root=pathlib.Path(ws)); sys.exit(0)' || true",
+            "timeout": 15,
+            "statusMessage": "Audit event append..."
+          }
+        ]
+      }
+    ]
+  }
+}
