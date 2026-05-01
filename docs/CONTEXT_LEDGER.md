@@ -308,3 +308,10 @@ Spec §13.2: <15KB initial load = <2% of 1M context window. Tracking under budge
 - **Round 3 ek kalibrasyon (post-ADR-025 brief)**: Brief tahmin 700-900B, brief metni gerçek ~1100-1366B (6 bölüm). Sapma %50+. Manager trim ederek 530B'ye sığdırdı (brief spirit korunarak: Q-015 resolve, dizin kararı, schema mutate yok, Phase 6 unblock).
 - **Yeni formül (Round 3.1)**: ~150B × section_count + base padding YETERSİZ. Gerçek ~180-230B × section_count + Title-uzunluğu × 2 (md başlık tekrarı table+entry'de).
 - Phase 6+ ADR brief'lerinde body cap explicit: ~600B ceiling önerilen (cap aşımı önler, manager trim minimal).
+
+## Phase 6 .mcp.json env var refactor (2026-04-30, sixteenth session)
+- ADR-023 Phase 6 plan implementation: 3 mcpServers (gsc, dataforseo, ScraplingServer) uniform env var pattern. ADR yazımı YOK (plan zaten ADR-023'te kayıtlı, DECISIONS.md margin korundu 6038B).
+- .mcp.json overwrite: gsc env GSC_SA_PATH, dataforseo env DATAFORSEO_USERNAME/PASSWORD, ScraplingServer command `${SCRAPLING_BIN:-scrapling}` (shell-style default fallback PATH'teki scrapling binary'sine).
+- .env (gitignore line 87 catch, 196B, 4 KEY=VALUE) + .env.example (commit edilir, line 93 `!.env.example` allowlist, comment'li placeholder).
+- Plugin agnostik prensip korundu: hardcoded path/credentials yok .mcp.json'da; başka makinelerde aynı dosya + farklı .env ile çalışır.
+- Süleyman aksiyon listesi: Cmd+Q + restart + 3 MCP live test (gsc list_sites regression / dataforseo keyword_overview / Scrapling fetch).
