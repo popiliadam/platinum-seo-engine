@@ -315,3 +315,9 @@ Spec §13.2: <15KB initial load = <2% of 1M context window. Tracking under budge
 - .env (gitignore line 87 catch, 196B, 4 KEY=VALUE) + .env.example (commit edilir, line 93 `!.env.example` allowlist, comment'li placeholder).
 - Plugin agnostik prensip korundu: hardcoded path/credentials yok .mcp.json'da; başka makinelerde aynı dosya + farklı .env ile çalışır.
 - Süleyman aksiyon listesi: Cmd+Q + restart + 3 MCP live test (gsc list_sites regression / dataforseo keyword_overview / Scrapling fetch).
+
+## Phase 6 .mcp.json D pattern revize (2026-04-30, sixteenth session)
+- Live test 4b7128f FAIL: gsc/dataforseo env literal kalmış (Claude Code MCP loader env field'da var substitution yapmıyor); ScraplingServer command field shell expansion ile PATH fallback PASS (yanıltıcı yeşil).
+- Root cause signature: hata mesajında literal "${VAR_NAME}" substring → env unresolved (Phase 6+ debug pattern).
+- D pattern: bash -c subshell + set -a + source .env. Plugin agnostik tam korunur (zero external dep). cwd assumption: Claude Code MCP server plugin root cwd'de spawn ediyor varsayımı; live test bunu da kanıtlayacak.
+- A fallback hazır (zshrc patch + INSTALL.md) eğer D fail.
