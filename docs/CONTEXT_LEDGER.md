@@ -537,3 +537,36 @@ Spec §13.2: <15KB initial load = <2% of 1M context window. Tracking under budge
 - Phase 8 prep commit (this commit): PHASE_STATUS Phase 7 hash 759cd20 + Active Phase NEXT→ACTIVE + Last Updated bump + bu CONTEXT_LEDGER wakeup entry. Phase 5 ➡ 6 ➡ 7 prep paterni verbatim reuse (atomic prep commit, tek logical unit).
 - Phase 8 backlog (defer Phase 8+ veya v1.1+): Q-W-A4-02+Q-W-B4-02 cross-skill DFS htags shape variance, Q-W-B3-01 D-03 path-case clause, Phase 14+ CI test self-gate r-string regex exclude, transform helper shared lib refactor (5/8 transform >800L Phase 7 maturity, ADR-027 OPTIONAL).
 - Hazır: Phase 8 Wave 1 brief Süleyman'dan beklemede (5 skill paralel veya 2 dalga 3+2 — karar verici agent routing).
+
+## Phase 8 Wave 1 Dispatch (2026-05-01, eighteenth session)
+- Wave 1: W-C1 cluster-map ∥ W-C2 topical-map ∥ W-C3 new-content-plan ∥ W-C4 internal-links paralel dispatch (4 worker, Phase 7 paterni reuse).
+- Pre-dispatch manager seri: skills/planning/cluster-map + skills/planning/master-task-sync mkdir (master-task-sync Wave 2 için pre-dispatch); scripts/planning/ + __init__.py yaratıldı (Phase 1 scaffold paterni reuse, scripts/{kategori}). Mevcut planning dir: internal-links + new-content-plan + topical-map.
+- Convention authority: quick-wins (Phase 5) + Phase 6 ingestion + Phase 7 discovery (Wave 1 cannibalization 358L SKILL.md + 594L transform + 509L test = 1461L baseline) verbatim reuse. Divergence YASAK.
+- Phase 7 lessons enforced: schema field grep hijyeni (column tuple brief'te exact, jq grep'lenmiş 11/10/10), Round 3.1 ~500B ADR body cap (Wave 1 ADR yazımı YOK plan implementation), D-003 _normalize_dfs_response IMPORT zorunlu (W-C1/C2/C3 DFS heavy, scripts/ingestion/dfs_pull.py:178+1061 export), plugin agnostik word-bound regex, budget schema-first (uses_paid_mcp + estimated_credits ONLY, _per_call/_per_url UYDURMA YOK).
+- Phase 7 staging consume: 3 worker (W-C1/C2/C3) Phase 7 staging-only output input (_state/staging/content_gaps_*.json + competitive_analysis_*.json + geo_analysis_*.json). Note: workspace runtime state, manager-scope dışı; staging dir runtime'da live worker fixture fallback.
+- W-C4 internal-links output target karar 3 seçenek (A=master_task auto_generated entries D-01 SSoT extension öneri / B=yeni master.xlsx sheet schema bump gerek / C=staging-only Phase 9 consume); worker transparent karar verir, brief acceptance gate'inde raporlar (Q-W-A4-01 honest reframe paterni).
+- DRIFT FLAG (Q-CD-01): skills/discovery/cluster-map/ Phase 0 scaffold yanlış kategori (boş .gitkeep, Apr 30); §17 + §11.6 cluster-map Phase 8 Planning Suite. Wave 1 implement skills/planning/cluster-map (brief authoritative). discovery/cluster-map placeholder cleanup Phase 8 closeout defer (Süleyman onayı + .gitkeep silme veya rmdir).
+- Acceptance Phase 8 Wave 1 (§17 cross-sheet invariants): D-02 (cluster_keywords.cluster ⊆ data/cluster defs HIGH), F-09 (cluster_keywords.assigned_url ⊆ topical_map.assigned_url HIGH). Worker validate_invariants.py (1280L 20 rule Phase 5 W-S) kullanır.
+- Wave 1 atomic commit sonrası Phase 8 Wave 2 brief (1 worker master-task-sync, dependency consume) bekleniyor — Phase 7 5 master writer + Phase 8 Wave 1 3-4 master writer aggregate, master.xlsx#master_task SSoT (D-01 invariant), auto_generated=true flag.
+
+## Phase 8 Wave 1 CLOSEOUT (2026-05-01, eighteenth session)
+- 4 paralel worker tamamlandı: W-C1 cluster-map (477+993+683=2153L) + W-C2 topical-map (500+1118+695=2313L) + W-C3 new-content-plan (500+1050+688=2238L) + W-C4 internal-links (491+1138+647=2276L). Toplam Wave 1: 12 dosya, 8980L kod, 52 yeni pytest case (242→294 PASS, no regression).
+- D-003 _normalize_dfs_response IDENTITY OK 3 DFS transform (cluster_map+topical_map+new_content_plan); W-C4 SF-only, helper docstring "intentionally absent" not (line 36) — discipline dökümante.
+- Slug grep 0 hit (8 sentinel demo-dental+demo-furniture+demo-hvac+demo-petcare+demo-shop+demo-tires+demo-construction+demo-agency word-bound). _per_call/_per_url hit sadece test_topical_map.py forbidden-token guard assertion (Phase 7 W-A4 proactive defense paterni reuse, false positive — schema reject doğrulanıyor).
+- Worker output package decisions kanıtı:
+  * W-C1: D-02 source resolved master.xlsx#topical_map.cluster (col B), defs_name_set defensive re-check projection loop'ta. Budget 6 credits/run (DFS keyword_suggestions+related_keywords+intent enrichment).
+  * W-C2: page_type schema enum YOK (free string), worker {pillar,cluster,supporting} local PageTypeError enforce. Budget 2 credits/run (keyword_ideas+related_keywords). F-09 contract SKILL.md:183.
+  * W-C3: BRIEF DRIFT — schema 11 cols (lifecycle_status col K) brief 10 col diyordu. Worker schema-first uyguladı (5'inci brief drift vaka: Q-W-G-01+Q-W-A4-01+Q-W-B4-01+Q-CO-01+Q-W-C3-COL). TIVL enum schema-locked (T/I/V/L). Manager brief column tuple Süleyman'dan, refresh fırsatı kaçtı.
+  * W-C4: Output target Option A seçimi (master_task auto_generated, D-01 SSoT). master_task 19 col (A..S, schema-locked). primary_source enum 9 değer içinde "internal_links" YOK → worker "tech_fix" closest match seçti (Q-IL-1 future enum bump aday).
+- Brief disiplini lesson 5'inci vaka adoption: schema authority > brief authority sistematik (W-C3 col tuple, W-C4 enum). Phase 7 W-A4 forbidden-token guard test paterni Wave 1'e taşındı (test_topical_map proactive defense).
+- Wave 1 Open Questions sentez (≤2 per worker, 8 toplam, hepsi non-blocking):
+  * Q-W-C1-01: Turkish stem-aware tokenizer ihtiyacı (Phase 9+ governance)
+  * Q-W-C1-02: project.config.json blocklist field forbidden_kw populate (manager confirm)
+  * Q-W-C2-01: page_type schema enum promote (Phase 9+ governance, schema bump aday)
+  * Q-W-C2-02: D-01 topical_map.pillar ⊆ data/pillars.json auto-rewrite YOK (manager confirm seed→pillars-sync skill aday)
+  * Q-W-C3-COL: master-excel.schema new_content_plan 11 col (lifecycle_status col K) brief 10 col drift (RESOLVED — schema authority)
+  * Q-W-C3-TIVL: TIVL acronym expansion spec'te YOK (T/I/V/L schema locked, semantic ADR aday Phase 9+)
+  * Q-IL-1: master_task primary_source enum "internal_links" eksik (tech_fix closest match, schema bump ADR aday)
+  * Q-IL-2: SF Inlinks column legacy export uyumsuzluğu (pilot run validate)
+- Drift fix log Phase 8 closeout defer (Q-CD-01): skills/discovery/cluster-map/.gitkeep cleanup (Phase 0 scaffold yanlış kategori, Süleyman onayı + rm/rmdir).
+- Wave 1 atomic commit: 4 SKILL.md + 4 transform + 4 test + scripts/planning/__init__.py + skills/planning/master-task-sync/ pre-dispatch (Wave 2). Wave 2 NEXT — master-task-sync 1 worker dependency consume (Phase 7 5 master writer + Phase 8 Wave 1 3-4 master writer aggregate, master.xlsx#master_task SSoT D-01).
