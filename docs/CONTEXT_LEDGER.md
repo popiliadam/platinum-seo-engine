@@ -638,3 +638,28 @@ Spec §13.2: <15KB initial load = <2% of 1M context window. Tracking under budge
 - Phase 9 NEXT: Reporting 8 skill (monthly-report, weekly-summary, 6× portfolio-*: portfolio-overview + portfolio-weekly-brief + portfolio-monthly-roundup + portfolio-task-heatmap + portfolio-kpi-trend + portfolio-heatmap). Fresh manager session önerilir (CONTEXT_LEDGER ~36 entry, phase boundary fresh wakeup verim artırır). Hibrit dalga muhtemelen (4+4 Phase 7 paterni reuse).
 - Süleyman aksiyon (commit sonrası, opsiyonel): live smoke test (master_task_sync demo-dental → row count, drift-check → Phase 8 invariants validate). Phase 8 push (~5 commit batch 0ff4fc4 + 3035a55 + a534201 + 01bdcf1 + closeout) Süleyman explicit onay isteği kritik.
 - Phase 8 manager session retire — Phase 9 yeni Claude Code window'da fresh bootstrap.
+
+## Phase 8 PUSHED (2026-05-01T09:25:00Z, eighteenth session, Gate 6 self-reference resolution)
+- 5 commit batch (0ff4fc4 → 05d7814) origin/main remote updated. Push reverse-edilemez. GitHub API confirms `05d781407f3d8ee73eb5a7cc91135e1e0a8fb586`.
+- Phase 8 deliverables remote'da: 5 Planning skill (3 master writer: cluster-map+topical-map+new-content-plan + 1 SF-only: internal-links + 1 aggregator: master-task-sync) + 70 yeni Phase 8 pytest (Wave 1: 52 + Wave 2: 18) + 2 schema enum additive bumps (Q-IL-1 master_task.primary_source 9→10 +internal_links + Q-W-C2-01 topical_map.page_type promote {pillar,cluster,supporting}) + Q-CD-01 file cleanup (skills/discovery/cluster-map/) + brief disiplini lesson 6+7 process doc + 0 yeni ADR (closeout triage minimal footprint).
+- Push batch stat: 20 files / +11678 / -10 (net ~11668 line addition; 10 silme = .gitkeep + transform/test rename ders + lesson note refresh).
+- pytest 312/312 PASS (Phase 7 baseline 242 → Phase 8 Wave 1 294 → Phase 8 Wave 2 312 → Phase 8 closeout 312, no regression).
+- 4 active ADR korundu (026/027/028/029, 3-floor satisfied), DECISIONS.md 5877B byte-byte unchanged 5 commit boyunca. Cap policy reference (ADR-026) archive YASAK uygulandı (rotation cycle 14 önlendi).
+- Discovery → Staging → Planning → Master akış paterni production'da: Phase 7 staging 3 skill → Phase 8 Wave 1 3 skill consume → Phase 8 Wave 2 master-task-sync aggregate (8 sheet) → master.xlsx#master_task SSoT (intra-sheet authority allowed_writers + writer_scope + protected_columns compliance).
+
+## Phase 14+ CI Rule Production Preview (Q-W-A4-02 + Q-W-B4-02 + Phase 8 push Gate 6)
+- Phase 8 push Gate 6 self-reference hit yakalandı (CONTEXT_LEDGER:522 Phase 7 lesson note refined regex literal "DATAFORSEO_PASSWORD=[a-zA-Z0-9]{8,}|info@demo-agency|3bf73e0893f69b42" backtick içinde document edilmişti, 0ff4fc4 Phase 7 post-push commit'inde eklenmişti).
+- Çözüm A uygulandı: exclude path genişletildi `':!docs/CONTEXT_LEDGER.md'` eklendi. CONTEXT_LEDGER manager-only operational log (runtime kod değil) — exclude semantik doğru, lesson note documented value korundu.
+- Phase 14+ CI rule formal exclude list (production-ready, Q-W-A4-02 backlog resolution preview):
+  ```
+  .env.example
+  docs/superpowers/specs/
+  docs/CONTEXT_LEDGER.md
+  ```
+- Q-W-A4-02 "r-string regex literal exclude" kanıtlandı production'da: lesson dokümantasyonu refined regex literal kelimeleri içerebilir (manager-only state path), CI rule exclude path manager state'i kapsayacak şekilde genişler.
+- Phase 9+ uygulamada: pre-push Gate 6 komutu 3 exclude path standardize:
+  ```
+  git grep -nE "DATAFORSEO_PASSWORD=[a-zA-Z0-9]{8,}|info@demo-agency|3bf73e0893f69b42" \
+     HEAD -- ':!.env.example' ':!docs/superpowers/specs/' ':!docs/CONTEXT_LEDGER.md'
+  ```
+- Phase 7 push'unda (759cd20) bu lesson note henüz CONTEXT_LEDGER'da YOKTU (0ff4fc4 post-push commit'iyle eklendi); Phase 8 push'ta self-reference patladı. Ad-hoc fix → exclude path genişletme → Phase 9+ production rule. Brief disiplini lesson 6+7 paterni reuse: "iki-katman defense" (manager pre-dispatch grep + safety check FAIL DURUR + Süleyman karar verici onay).
