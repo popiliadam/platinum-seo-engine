@@ -392,3 +392,15 @@ Spec §13.2: <15KB initial load = <2% of 1M context window. Tracking under budge
   8. (closeout, this commit) — D-003 staging refactor + 6 drift fix + F4 + K11
 - Phase 6 deliverables özeti: 3 ingestion skill SKILL.md, 3 Python module (gsc_pull + dfs_pull + scrapling_ops), 3 test file (25+ pytest), 3 report template, 3 slash command, 2 schema description bump (F4 + K11), 7 drift fix (D-001..D-009 + D-010 clarify), 2 ADR (ADR-025 + ADR-026), 1 rotation cycle (10), .mcp.json D pattern + .env naming convention.
 - Açık sorular: Q-016, Q-WN-01, Q-WO-02 (non-blocking, defer Phase 7+).
+
+## Phase 6 PUSHED (2026-05-01, sixteenth session paste continued)
+- 8 commit batch (f0f33b1 → aa105d0) origin/main remote updated. Push reverse-edilemez, GitHub API confirms aa105d0b3d204c8ab881c9e4560ba77201097a00.
+- Phase 6 deliverables remote'da: 3 ingestion skill + 25 yeni Phase 6 pytest + 10 drift fix (D-001..D-010 closed) + 2 ADR (ADR-025 + ADR-026) + 1 rotation cycle + .mcp.json D pattern + .env naming + D-007 plugin agnostik.
+- F-08 GREEN milestone confirmed (Süleyman live retest 3/3 PASS). Bonus: DFS Method B TR honoring kanıtlandı (823k TR vs 135k US wrapper bug).
+- D-011 (quick_wins duplicate URLs) Phase 7+ backlog (severity INFO).
+- pytest 115/115 PASS, no regression.
+- Phase 7 NEXT: Discovery 8 skill (cannibalization, content-decay, tech-audit, on-page-audit, content-gaps, schema-audit, competitive-analysis, geo-analysis). Fresh manager session önerisi (CONTEXT_LEDGER ~22 entry, phase boundary).
+
+## Phase 14+ CI gate pattern note (2026-05-01, sixteenth session paste continued)
+- Pre-push secret leak gate context-aware grep gerek (`:!.env.example` exclude veya regex tighten `DATAFORSEO_PASSWORD=[a-zA-Z0-9]{8,}`). Manager Gate 6 false-positive yakaladı, letter vs spirit ayrımı Phase 14+ CI rule için referans pattern. D-010 Path B paterniyle uyumlu (template istisna, runtime 0-tolerance).
+- Pattern enforcement gelecek manager brief'lerinde: pre-push security check'ler placeholder dosyaları (`.env.example`, `*.example`, fixture'lar) explicit dışlamalı; aksi takdirde her push döngüsünde manager'ın "literal vs semantic" karar momentum'u tekrarlanır.
