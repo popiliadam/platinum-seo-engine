@@ -1,7 +1,7 @@
 # Phase Status
 
-**Last Updated:** 2026-05-01T10:03:03Z
-**Active Phase:** Phase 9 — Reporting ACTIVE (8 skill: monthly-report + weekly-summary + 6× portfolio-*, hibrit dalga 4+4)
+**Last Updated:** 2026-05-01T11:34:27Z
+**Active Phase:** Phase 9 — Reporting Wave 1+2 SHIPPED (8/8 skill canlı, 69 yeni pytest, closeout PENDING — karar verici brief bekleniyor: ADR-030 triage + schema bumps + push batch + post-push doc)
 
 ## Previous Phase
 **Phase 3 — Scripts ✅ DONE 2026-04-30 (commit 3a0e8f5)**
@@ -67,6 +67,12 @@
 - [x] Wave 1 — 4 paralel planning (W-C1 cluster-map + W-C2 topical-map + W-C3 new-content-plan + W-C4 internal-links, 52 yeni pytest, 294/294 full repo PASS, brief disiplini 5'inci vaka Q-W-C3-COL schema-first resolved, W-C4 Option A master_task auto_generated)
 - [x] Wave 2 — 1 worker master-task-sync (W-D1, 533+1093+931=2557L, 18 pytest, 312/312 full repo PASS, schema authority compliance: allowed_writers + writer_scope + protected_columns; append+merge D column semantik; v1→v2 brief revision manager pre-dispatch 2 drift catch)
 - [x] Closeout — 0 yeni ADR (DECISIONS.md byte unchanged 5877B margin 267B) + 2 schema enum additive bump (Q-IL-1 master_task primary_source 9→10 +internal_links + Q-W-C2-01 topical_map page_type promote {pillar,cluster,supporting}) + W-C4 internal_links_transform.py + tests refactor (PRIMARY_SOURCE_TECH_FIX → PRIMARY_SOURCE_INTERNAL_LINKS) + W-D1 PRIMARY_SOURCE_ENUM sync + test polarity flip + Q-CD-01 cleanup (skills/discovery/cluster-map/ rm+rmdir) + brief disiplini lesson 6+7 process doc CONTEXT_LEDGER + Phase 8 DONE
+
+## Phase 9 Tasks
+- [x] Phase 9 prep (PHASE_STATUS Phase 8 hash 05d7814 + Phase 9 active set, commit 8b641ff)
+- [x] Wave 1 — 4 paralel reporting (W-E1 monthly-report + W-E2 weekly-summary + W-E3 portfolio-overview + W-E4 portfolio-weekly-brief, 35 yeni pytest, 347/347 PASS, 2 finding catch: gate #7 attribution + events.jsonl convention, Q-RP-01 OQ defer Phase 14, commit 2f681cc + closeout c9c3395)
+- [x] Wave 2 — 4 paralel reporting (W-E5 portfolio-monthly-roundup + W-E6 portfolio-task-heatmap + W-E7 portfolio-kpi-trend + W-E8 portfolio-heatmap, 34 yeni pytest, 381/381 PASS, lesson 8 proaktif uygulama 0 finding, +2 yeni gate #10 path convention + #11 assert_read_only_module helper, commit 14cd7ee)
+- [ ] Closeout — karar verici brief bekleniyor (ADR-030 triage + schema bumps triage + W-E3/W-E4 path semantik divergence resolution + push batch onayı + post-push doc + brief disiplini lesson 8 success case process doc)
 
 ## Outstanding Open Questions (Phase 7 closeout sonrası, Phase 8+ defer)
 - **Q-W-A4-02 + Q-W-B4-02** — DFS htags shape variance + D-03 strict-join vs prefix-match cross-skill paterni divergence (Phase 8+ cross-skill ADR aday)
