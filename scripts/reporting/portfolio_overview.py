@@ -182,10 +182,11 @@ def resolve_project_workspace(
     *, portfolio_root: Path, workspace_path: str,
 ) -> Path:
     """Resolve workspace_path entry. Absolute → as-is; ~ → expanduser;
-    relative → relative to portfolio_root.parent.
+    relative → relative to portfolio_root (W-E4 convention authority,
+    5/6 majority + W-E8 explicit tercih, Phase 9 closeout resolution).
     """
     p = Path(workspace_path).expanduser()
-    return p if p.is_absolute() else (portfolio_root.parent / p).resolve()
+    return p if p.is_absolute() else (portfolio_root / p).resolve()
 
 
 def resolve_master_xlsx_path(
