@@ -290,3 +290,6 @@ Spec §13.2: <15KB initial load = <2% of 1M context window. Tracking under budge
 (4) gsc-pull + dfs-pull + scrapling-ops 3 skill (Phase 6 deliverables, mcp-ingestion convention quick-wins'ten reuse).
 (5) F-08 RE-EVAL otomatik gsc-pull deliverable sonrası gsc_performance sheet populated → F-08 GREEN beklenir.
 (6) F4 CTR units gsc-tool-mapping.schema dokümantasyon (detect_quick_wins percent vs enhanced_search_analytics fraction).
+
+## ADR-026 active (2026-04-30, sixteenth session)
+- ADR-026 active, hard cap 5120→6144, ADR-022 superseded for cap-only (3-floor rotation clause unchanged). DECISIONS.md 5118B → 5971B (margin 173B / 6144B). Phase 6 ADR-025 + RE-EVAL'lar için oksijen. Manager doğrudan edit (worker dispatch overkill, brief direktifi). Atomic single commit.
