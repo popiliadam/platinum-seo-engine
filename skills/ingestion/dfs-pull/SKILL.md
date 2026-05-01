@@ -3,9 +3,10 @@ name: dfs-pull
 description: |
   Use when: kullanıcı "dataforseo keyword volume al", "TR keyword araştırması",
   "dfs keyword overview", "Türkiye için keyword volume çek", "yeni keyword
-  setine volume bak" der ya da /pseo-dfs-pull çağırır. Master.xlsx'in
-  cluster_keywords + opportunity sheet'lerine atomic write yapar; raw DFS
-  JSON'larını inbox/dfs/ altına persist eder.
+  setine volume bak" der ya da /pseo-dfs-pull çağırır. Raw DFS JSON'larını
+  inbox/dfs/ altına persist eder ve `_state/staging/` altına shape-adapted
+  staging table yazar (Phase 8 `cluster-map` skill konsume eder, Excel
+  projection downstream).
   Also use when: aktif projenin keyword listesi config'te tanımlı; TR
   (location_code=2792, language_code='tr') varsayılan; budget pre-flight
   PASS; dataforseo-mcp-server@2.8.9 wrapper TR forwarding bug için A/B/C
@@ -42,8 +43,8 @@ inputs:
     default: "uncategorized"
     description: "cluster_keywords sheet'inde A sütununa yazılacak cluster ismi."
 outputs:
-  - "master.xlsx#cluster_keywords"
-  - "master.xlsx#opportunity"
+  - "_state/staging/dfs_keyword_overview_{date}_{slug}.json"
+  - "_state/staging/dfs_search_volume_{date}_{slug}.json"
   - "outputs/reports/{date}-dfs-pull.md"
   - "events.jsonl"
   - "inbox/dfs/{date}-keyword_overview-{slug}.json"
@@ -51,6 +52,7 @@ outputs:
 consumes:
   - "init-project:projects/{slug}/master.xlsx"
 produces:
+  - "cluster-map"
   - "quick-wins"
   - "drift-check"
 triggers:
@@ -103,24 +105,31 @@ test override (mirrors workflow_runner / events_writer).
 
 ## Outputs (artifacts produced)
 
-- `projects/{slug}/master.xlsx#cluster_keywords` — per-keyword volume rows (11 cols, schema-locked).
-- `projects/{slug}/master.xlsx#opportunity` — APPEND only (F-09 shared writer with quick-wins; do NOT overwrite quick-wins rows).
+- `projects/{slug}/_state/staging/dfs_keyword_overview_{date}_{slug}.json` — per-keyword volume staging table (schema-versioned, sha256 content_hash per row, ISO 8601 microsecond `fetched_at`). Columns from `dfs_pull.KEYWORD_OVERVIEW_COLUMNS`.
+- `projects/{slug}/_state/staging/dfs_search_volume_{date}_{slug}.json` — Google Ads volume staging table (idempotent overwrite). Columns from `dfs_pull.SEARCH_VOLUME_COLUMNS`.
 - `projects/{slug}/outputs/reports/{date}-dfs-pull.md` — human-readable summary.
-- `projects/{slug}/_state/events.jsonl` — `event_kind=provenance` entries (`source.kind=dataforseo_mcp`).
+- `projects/{slug}/_state/events.jsonl` — `event_kind=provenance` entries (`source.kind=dataforseo_mcp`, `target_excel_sheet=null` — staging-only).
 - `projects/{slug}/inbox/dfs/{date}-keyword_overview-{slug}.json` — raw labs payload (drift recovery).
 - `projects/{slug}/inbox/dfs/{date}-search_volume-{slug}.json` — raw Google Ads payload.
 
-## Drift note (read first)
+> **Note:** dfs-pull does NOT write to `master.xlsx`. Phase 8 `cluster-map` skill consumes the staging tables and projects to `master.xlsx#cluster_keywords` + `opportunity` downstream (F-09 shared writer disiplini orada uygulanır).
 
-The Phase 6 worker brief refers to `master.xlsx#keyword_data`. The
-canonical `schemas/master-excel.schema.json` does NOT define a
-`keyword_data` sheet — `keyword_data` is a DataForSEO endpoint
-*category* in `dataforseo-endpoint-mapping.schema.json` (alongside
-labs, serp_live, etc.), not an Excel sheet. The closest schema-locked
-sheet for per-keyword volume rows is `cluster_keywords` (11 cols, A=
-cluster..K=forbidden_reason). This skill writes to `cluster_keywords`
-and appends to `opportunity`. **Manager: confirm before commit**, or
-issue an ADR adding a `keyword_data` sheet.
+## Drift note (D-003 RESOLVED via staging-only routing)
+
+The Phase 6 worker brief originally referred to `master.xlsx#keyword_data`,
+which is not a sheet in `schemas/master-excel.schema.json` (it's a DFS
+endpoint *category* in `dataforseo-endpoint-mapping.schema.json`). The
+intermediate fix wrote to `cluster_keywords` + `opportunity`, but the
+**final D-003 resolution** routes dfs-pull output to staging JSON only:
+no Excel write from this skill. Phase 8 `cluster-map` skill consumes the
+staging tables and produces the Excel-shaped rows (cluster_keywords +
+opportunity) under its own F-09 shared-writer discipline. This pattern
+mirrors `scrapling-ops` (Phase 6 staging-only generic helper).
+
+**Shape adapter (`_normalize_dfs_response`):** runtime tolerates two DFS
+response shapes — REST envelope `tasks[0].result[0].items` AND wrapper-
+flattened `items` — so dataforseo-mcp-server version drift does not
+break ingestion silently.
 
 ## 10-Step Body Protocol
 
@@ -144,7 +153,7 @@ handle = workflow_runner.create_run(
         {"name": "fetch_volume"},
         {"name": "transform"},
         {"name": "request_approval"},
-        {"name": "write_excel"},
+        {"name": "write_staging"},
         {"name": "render_report"},
     ],
 )
@@ -217,7 +226,9 @@ volume_inbox.write_text(json.dumps(raw_volume, ensure_ascii=False, indent=2))
 
 ### Step 6 — `transform`
 
-Pure compute via `scripts/ingestion/dfs_pull.py`:
+Pure compute via `scripts/ingestion/dfs_pull.py` (staging-only output).
+The transform calls `_normalize_dfs_response()` first to flatten REST
+or wrapper shapes uniformly, then builds two staging payloads:
 
 ```bash
 python3 scripts/ingestion/dfs_pull.py \
@@ -225,13 +236,17 @@ python3 scripts/ingestion/dfs_pull.py \
     --raw-volume   inbox/dfs/{date}-search_volume-{slug}.json \
     --location-code 2792 \
     --language-code tr \
-    --output-dir _state/transform/{run_id}/
+    --staging-dir   _state/staging/ \
+    --slug          {project_slug}
 ```
 
-Produces two JSON arrays (`cluster_keywords`, `opportunity`) shaped to
-the master-excel schema. Volume from `keywords_data_google_ads_*` (when
-present) overrides keyword_overview's keyword_info.search_volume — this
-is the workaround B "alt endpoint trust" rule.
+Produces two staging JSON files (`dfs_keyword_overview_*.json` and
+`dfs_search_volume_*.json`) — each with `schema_version`, `tool`,
+`fetched_at` (ISO 8601 µs UTC), `row_count`, `columns`, `rows[]` (1-
+indexed `id` + sha256 `content_hash`). Volume from
+`keywords_data_google_ads_*` (when present) overrides keyword_overview's
+keyword_info.search_volume — workaround B "alt endpoint trust" rule
+applies inside the row builders.
 
 ### Step 7 — `request_approval` (skill EXIT awaiting_approval)
 
@@ -239,36 +254,37 @@ is the workaround B "alt endpoint trust" rule.
 workflow_runner.request_approval(
     handle.run_id, project_slug=project_slug,
     approver="user",
-    subject=f"{len(keywords)} keyword için DFS volume çekildi, master.xlsx'e yazalım mı?",
+    subject=f"{len(keywords)} keyword için DFS volume çekildi, _state/staging/'e yazalım mı?",
     step_index=5,
 )
 # Skill exits here. The user replies in a fresh session; resume below.
 ```
 
-### Step 8 — `write_excel` (atomic, schema-validated)
+### Step 8 — `write_staging` (atomic, schema-validated)
 
-Two `transaction.append` calls — one per sheet. Both go through the
-single approved write path with backup, lock, schema validation, and
-post-write provenance event emission. **F-09 invariant**: opportunity
-is shared with quick-wins; APPEND only, never overwrite.
+Two `dfs_pull.write_staging()` calls — one per DFS tool. Each writes a
+self-contained staging JSON (overwrite-idempotent) under
+`projects/{slug}/_state/staging/`. Schema validated by
+`_validate_staging_payload()` before write — `StagingSchemaError` on
+drift. NO `transaction.append` here; staging-only.
 
 ```python
-from scripts.excel import transaction
-transaction.append(
-    workbook_path=workspace_root/"projects"/project_slug/"master.xlsx",
-    sheet="cluster_keywords",
-    rows=cluster_keywords_rows,
-    project_slug=project_slug,
-    writer="dfs-pull",
+from scripts.ingestion import dfs_pull
+overview_path = dfs_pull.write_staging(
+    payload=overview_staging_payload,   # _staging_table_dict() output
+    output_path=workspace_root/"projects"/project_slug/"_state"/"staging"
+                / dfs_pull.staging_filename("keyword_overview", today, project_slug),
 )
-transaction.append(
-    workbook_path=workspace_root/"projects"/project_slug/"master.xlsx",
-    sheet="opportunity",
-    rows=opportunity_rows,
-    project_slug=project_slug,
-    writer="dfs-pull",
+volume_path = dfs_pull.write_staging(
+    payload=volume_staging_payload,
+    output_path=workspace_root/"projects"/project_slug/"_state"/"staging"
+                / dfs_pull.staging_filename("search_volume", today, project_slug),
 )
 ```
+
+**No F-09 entanglement at this stage** — opportunity-sheet shared-writer
+discipline applies in Phase 8 `cluster-map` (which projects staging
+rows into `opportunity` alongside quick-wins).
 
 ### Step 9 — Provenance event + report
 
@@ -280,9 +296,9 @@ events_writer.append_provenance(
     source={"kind": "dataforseo_mcp", "mcp_server": "dataforseo",
             "mcp_tool": "dataforseo__dataforseo_labs_google_keyword_overview",
             "response_bytes": len(json.dumps(raw_overview))},
-    operation="project_excel",
-    target_excel_sheet="cluster_keywords",
-    rows_written=len(cluster_keywords_rows),
+    operation="staging",
+    target_excel_sheet=None,    # staging-only; Phase 8 cluster-map projects to Excel
+    rows_written=overview_staging_payload["row_count"],
     cost={"provider": "dataforseo",
           "credits": float(estimate),
           "budget_key": "project.config.dataforseo.budget_credits_per_day"},
@@ -299,8 +315,9 @@ events_writer.append_provenance(
 ```python
 workflow_runner.complete(handle.run_id, project_slug=project_slug, outputs={
     # F5: outputs.* must be STRING-TYPED.
-    "cluster_keywords_rows": str(len(cluster_keywords_rows)),
-    "opportunity_rows":      str(len(opportunity_rows)),
+    "overview_staging_rows": str(overview_staging_payload["row_count"]),
+    "volume_staging_rows":   str(volume_staging_payload["row_count"]),
+    "staging_files":         ";".join([str(overview_path), str(volume_path)]),
     "tr_method":             tr_method,           # "B" / "C" / "A+B" ...
     "credits_used":          str(estimate),
     "report_path":           str(report_path),
@@ -439,31 +456,35 @@ Stop and flag the manager — do not patch, do not fall back.
 3. `inbox/dfs/` path cannot be created (workspace path missing).
 4. **TR forwarding workaround all-method fail**: A, B, AND C return
    non-TR locale → `TrWorkaroundFailed`. DO NOT silently emit US data.
-5. `master.xlsx#cluster_keywords` column count or names don't match
-   schema (drift recovery flag — also possible if manager added
-   `keyword_data` sheet without ADR).
-6. `transaction.append` raises `RowSchemaError`.
-7. `master.xlsx` missing under `projects/{slug}/` — `init-project`
-   must have run first.
+5. Staging payload column count/names don't match
+   `dfs_pull.KEYWORD_OVERVIEW_COLUMNS` or `SEARCH_VOLUME_COLUMNS`
+   (`StagingSchemaError` from `_validate_staging_payload`).
+6. `dfs_pull.write_staging` raises `StagingSchemaError` (id drift,
+   content_hash drift, or invalid `fetched_at` shape).
+7. `_state/staging/` path cannot be created under `projects/{slug}/`
+   (workspace path missing or read-only).
 8. `DATAFORSEO_USERNAME` / `DATAFORSEO_PASSWORD` env unset when method
    C is the only remaining option (`CredentialError`).
 
 ## Cross-references
 
-- Schemas: `schemas/master-excel.schema.json` (cluster_keywords,
-  opportunity, definitions), `schemas/dataforseo-endpoint-mapping.schema.json`
-  (DFS contract; cost.credits_per_call), `schemas/events.schema.json`
-  (`source.kind=dataforseo_mcp`), `schemas/skill-frontmatter.schema.json`
+- Schemas: `schemas/dataforseo-endpoint-mapping.schema.json` (DFS
+  contract; cost.credits_per_call), `schemas/events.schema.json`
+  (`source.kind=dataforseo_mcp`, `target_excel_sheet=null` for
+  staging-only ops), `schemas/skill-frontmatter.schema.json`
   (this frontmatter).
 - Cross-modules (IMPORT-only): `scripts/state/workflow_runner.py`,
-  `scripts/excel/transaction.py`, `scripts/state/events_writer.py`,
-  `scripts/budget/check_budget.py`.
-- Transform: `scripts/ingestion/dfs_pull.py`.
-- Tests: `tests/skills/test_dfs_pull.py` (7 cases incl. TR workaround +
-  budget pre-flight integration).
-- F-09 invariant: opportunity is shared between quick-wins and dfs-pull;
-  both APPEND, never overwrite. Provenance event distinguishes by
-  `source.kind=gsc_mcp` (quick-wins) vs `dataforseo_mcp` (dfs-pull).
+  `scripts/state/events_writer.py`, `scripts/budget/check_budget.py`.
+  **Note:** `scripts/excel/transaction.py` is NOT imported (staging-only).
+- Transform: `scripts/ingestion/dfs_pull.py` (`_normalize_dfs_response`,
+  `transform`, `write_staging`, `staging_filename`,
+  `_staging_table_dict`, `_validate_staging_payload`,
+  `KEYWORD_OVERVIEW_COLUMNS`, `SEARCH_VOLUME_COLUMNS`).
+- Tests: `tests/skills/test_dfs_pull.py` (TR workaround + budget pre-
+  flight integration + 3 `_normalize_dfs_response` shape adapter cases).
+- Phase 8 `cluster-map` skill consumes `_state/staging/dfs_*.json` and
+  applies F-09 shared-writer discipline when projecting to
+  `master.xlsx#opportunity` alongside quick-wins.
 
 ## Discipline checklist
 
@@ -473,11 +494,13 @@ Stop and flag the manager — do not patch, do not fall back.
 - [x] Plugin-agnostik — no slug literals; `project_slug` flows through.
 - [x] Budget pre-flight integration — `scripts.budget.check_budget`
       invoked at step 2 BEFORE any paid call.
-- [x] Append-only — all events via `events_writer`; opportunity is
-      append-only per F-09; no row deletion in `cluster_keywords`.
-- [x] Cross-module IMPORT discipline — `transaction` /
-      `workflow_runner` / `events_writer` / `check_budget` are imported,
-      never modified from this skill.
+- [x] Append-only — all events via `events_writer`; staging JSON is
+      overwrite-idempotent (re-run produces stable id/content_hash);
+      F-09 opportunity discipline deferred to Phase 8 `cluster-map`.
+- [x] Cross-module IMPORT discipline — `workflow_runner` /
+      `events_writer` / `check_budget` are imported, never modified
+      from this skill. `scripts.excel.transaction` is NOT imported
+      (staging-only — D-003 resolution).
 - [x] No hardcoded credentials — `DATAFORSEO_USERNAME` /
       `DATAFORSEO_PASSWORD` resolved from env at runtime.
 - [x] F5: `outputs.*` values are STRING-TYPED (artifact paths or

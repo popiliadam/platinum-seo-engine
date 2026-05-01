@@ -54,7 +54,7 @@
     },
     "gscMcpTool": {
       "type": "string",
-      "description": "GSC MCP tool identifier (short form without mcp__gsc__ prefix).",
+      "description": "GSC MCP tool identifier (short form without mcp__gsc__ prefix). NOTE on CTR units: gsc__detect_quick_wins.ctr returns percent (0-100, e.g. 5.2 = 5.2% click-through); gsc__enhanced_search_analytics.ctr returns fraction (0-1, e.g. 0.052 = 5.2%). Cross-tool consumers must convert: scripts/discovery/quickwins_transform.py multiplies fraction by 100 to align with percent (F4).",
       "enum": [
         "gsc__search_analytics",
         "gsc__enhanced_search_analytics",

@@ -359,3 +359,36 @@ Spec §13.2: <15KB initial load = <2% of 1M context window. Tracking under budge
 - F-08 invariant: target_url ⊆ crawl_sitemap ∪ gsc_performance subset valid.
 - Phase 5 Wave 2 W-S drift-check sparse pilot'ta AMBER (quick_wins 33 URL ⊆ crawl_sitemap 3 ∪ gsc_performance 0 = matematiksel imkansız).
 - gsc-pull deliverable + Süleyman live pull → gsc_performance populated → drift-check rerun → F-08 GREEN beklenir.
+
+## Phase 6 D-010 Path B — Plugin-Agnostik Scope Clarify (2026-05-01, sixteenth session)
+- Plugin runtime kod (skills/scripts/schemas/templates/rules/commands/hooks): 0-tolerance proje slug'ı hardcode. CI gate: word-bound regex `\b(dentnotion|vento|eykom|bigcattr|calitte|lastiksa|noraninsaat|adstark)\b`
+- Plugin design dokümanı (docs/superpowers/specs/): example/roadmap list allowed (slug'lar tasarım netliği için referans, çoklu-pilot vizyonunu göstermek için).
+- Phase 14+ CI rule: `grep -rwE` pattern (word-bound), schema description'ları gereksiz match'ten korunur (önceki tur insight: "vento" vs "in**vento**ry" false positive case).
+- Karar verici onayı: D-007 fix scope sf-import'tan whole-plugin'e genişledi, ek olarak D-010 spec istisnası tanımlandı. Bu brief sonrası f34f31d commit'inde spec'teki dentnotion → {slug} düzenlemesi geri çekilebilir mi? — Path B kararına göre HAYIR, dentnotion runtime kodda yasak; spec'te kalan vento/eykom/bigcattr OK. Manager mevcut state'i koruyor.
+
+## Phase 6 Görev 5 closeout — D-003 + 6 drift fix + F4 + K11 (2026-05-01, sixteenth session)
+- **D-003 dfs-pull staging refactor:** transaction.append=0, from scripts.excel=0, _normalize_dfs_response (REST + flat tolerate) helper, write_staging routing, StagingSchemaError DURUR. SKILL.md frontmatter outputs staging-only, Step 7 write_staging, drift note "D-003 RESOLVED" block. test_dfs_pull.py 10/10 PASS (3 unchanged + 4 rewritten + 3 normalize). Phase 8 cluster-map skill staging tablo konsume edecek.
+- **W-X agent stalled 600s mid-SKILL.md** (dfs_pull.py refactor doğru bitmişti); W-X' fresh dispatch SKILL.md update + test fix recovery yaptı (216s) — manager paralelinde SKILL.md 13 surgical Edit (manager scope'unda, W-X' test scope'unda, conflict yok).
+- **D-005 namespace package consistency:** scripts/budget/__init__.py created (sibling discovery/ingestion/state/excel/reporting __init__.py'lı).
+- **D-006 .gitkeep cleanup:** scripts/ingestion/.gitkeep removed (Phase 0 oversight, __init__.py W-W oluşturmuştu).
+- **D-008 templates:** templates/reports/{gsc-pull,dfs-pull,scrapling-ops}.template.md (quickwin.template.md paterni, $variable string.Template substitution).
+- **D-009 commands:** commands/pseo-{gsc-pull,dfs-pull,scrape}.md (pseo-quickwin.md paterni, frontmatter description + 4-step body).
+- **F4 CTR units docs:** schemas/gsc-tool-mapping.schema.json gscMcpTool definitions description'a CTR units convention notu (detect_quick_wins percent vs enhanced_search_analytics fraction, quickwins_transform ×100 conversion). Schema structure unchanged, description bump only.
+- **K11 market field path:** schemas/project-config.schema.json market description bump (resolution priority: project.config.market authoritative root > defaults.market deprecated legacy). Schema structure unchanged.
+- **D-010 Path B:** Plugin runtime 0-tolerance, design doc istisna (önceki note + word-bound regex Phase 14+ CI rule).
+- pytest 115/115 PASS (Phase 5: 39 + Phase 6 W-U/V/W: 25 + Phase 6 D-003 W-X': 10 - eski 7 = 3 yeni + 48 pre-existing = 115). No regression.
+- DECISIONS.md byte-byte unchanged (00e0c1a7..., 6038B). .mcp.json unchanged (3e9c2160...). ADR yazımı YOK (refactor + cleanup).
+
+## Phase 6 milestone — F-08 GREEN beklenir + commit zinciri (2026-05-01)
+- **F-08 GREEN milestone:** Phase 5 Wave 2 W-S drift-check sparse pilot AMBER (quick_wins 33 ⊆ crawl_sitemap 3 ∪ gsc_performance 0 = matematiksel imkansız). Phase 6 gsc-pull skill deliverable + Süleyman live test (1835229+) gsc_performance populated → drift-check rerun → F-08 invariant subset valid. Live test sonrası AMBER → GREEN geçişi beklenir.
+- **Phase 6 commit zinciri** (8 commit, origin/main 8 ahead):
+  1. f0f33b1 — Phase 6 prep: ADR-026 hard cap 5120→6144
+  2. ada6334 — Q-015→ADR-025 + rotation cycle 10 + drift fix D-001/D-002
+  3. 4b7128f — .mcp.json env var refactor + .env.example
+  4. 714d684 — .mcp.json D pattern (bash wrapper) live FAIL fix
+  5. 1835229 — .env naming convention (paket-spec direct)
+  6. 2ea8ea1 — 3 ingestion skills (gsc-pull + dfs-pull + scrapling-ops)
+  7. f34f31d — D-007 plugin agnostik (sf-import + 10 dosya)
+  8. (closeout, this commit) — D-003 staging refactor + 6 drift fix + F4 + K11
+- Phase 6 deliverables özeti: 3 ingestion skill SKILL.md, 3 Python module (gsc_pull + dfs_pull + scrapling_ops), 3 test file (25+ pytest), 3 report template, 3 slash command, 2 schema description bump (F4 + K11), 7 drift fix (D-001..D-009 + D-010 clarify), 2 ADR (ADR-025 + ADR-026), 1 rotation cycle (10), .mcp.json D pattern + .env naming convention.
+- Açık sorular: Q-016, Q-WN-01, Q-WO-02 (non-blocking, defer Phase 7+).

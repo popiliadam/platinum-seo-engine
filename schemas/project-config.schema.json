@@ -18,7 +18,7 @@
     },
     "display_name": { "type": "string" },
     "domain":       { "type": "string", "format": "uri" },
-    "market":       { "type": "string", "description": "ISO 3166-1 alpha-2 country or region code (e.g. TR, NG)" },
+    "market":       { "type": "string", "description": "ISO 3166-1 alpha-2 country or region code (e.g. TR, NG). Resolution priority: project.config.market is the authoritative root (this field); defaults.market — if present in legacy overlays — is deprecated and MUST NOT be relied on by new skills (K11)." },
     "language": {
       "type": "object",
       "required": ["content_locale"],
