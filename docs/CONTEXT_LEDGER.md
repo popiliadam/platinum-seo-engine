@@ -327,3 +327,35 @@ Spec §13.2: <15KB initial load = <2% of 1M context window. Tracking under budge
 - Karar: C — .env paket-spec direct naming. DataForSEO (DATAFORSEO_USERNAME/PASSWORD) ve Scrapling (SCRAPLING_BIN) zaten paket-spec uyumluydu; GSC_SA_PATH yalnız oddball. 12-factor convention: env var ismi paket public API'siyle birebir.
 - ADR-023 fine-tuning, yeni ADR gerekmez. Phase 6+ disiplin: yeni MCP eklerken paket env var ismini direkt .env'de kullan, abstraction katmanı yok (önceki "engine-prefixed naming" denemesi geri çevrildi).
 - .mcp.json byte-byte aynı (sha256 3e9c2160...): bash wrapper source .env yapıyor, paket env'i otomatik picks up — abstraction yok demek wrapper'da rename mapping yok demek.
+
+## Phase 6 Görev 4 — 3 ingestion skill paralel dispatch (2026-04-30, sixteenth session)
+- Wave 2 paterni reuse (Phase 5 4-paralel). 3 worker bağımsız scope: W-U gsc-pull ∥ W-V dfs-pull ∥ W-W scrapling-ops.
+- Convention authority: skills/discovery/quick-wins/SKILL.md verbatim reuse, divergence YASAK (ADR yok). Worker brief'lerinde explicit ifade.
+- Conflict matrisi sıfır: 3 worker farklı klasör/dosya yazıyor (skills/ingestion/{gsc-pull,dfs-pull,scrapling-ops}/, scripts/ingestion/{gsc_pull,dfs_pull,scrapling_ops}.py, tests/skills/test_*.py). events.jsonl shared ama append-only (Phase 3 W-L atomic discipline).
+- W-V TR forwarding workaround scope: app-side filter / alternatif endpoint / direct API HTTP (en az 1 implement).
+- Pre-dispatch: skills/ingestion/scrapling-ops/ mkdir (Phase 0 iskelet oversight), tests/skills/ + scripts/ingestion/ mevcut.
+- 3 worker output sentez sonrası atomic commit, F-08 RE-EVAL log Süleyman live test'inde GREEN beklenir.
+
+## Phase 6 Görev 4 — sentez sonucu (2026-04-30, sixteenth session)
+- W-U gsc-pull: 7/7 pytest PASS, 8 DURUR, 0 schema drift. impression-weighted mean position implementasyonu, ±100 clamp clicks_delta_pct previous=0 case için.
+- W-V dfs-pull: 7/7 pytest PASS, 8 DURUR, 3 drift finding (aşağıda). TR workaround A+B+C layered, decision matrix SKILL.md'de.
+- W-W scrapling-ops: 11/11 pytest PASS, 6 DURUR, TIER_LADDER schema const eşleşiyor, DI seam test ergonomics (mock = production binding).
+- Toplam Phase 6 tests: 25 yeni (7+7+11). Repo total tests/skills: 64/64 PASS (eski 39 + yeni 25, no regressions).
+- 3 SKILL.md frontmatter Draft7 validate PASS.
+- 5 schema dosyası shasum unchanged (skill-frontmatter, master-excel, events, scrapling-output-mapping, gsc-tool-mapping).
+- DECISIONS.md (00e0c1a7...) + .mcp.json (3e9c2160...) byte-byte unchanged. templates/scrapling/.gitkeep untouched.
+
+### Drift findings (karar verici agent için)
+- **D-003 CRITICAL:** master.xlsx#keyword_data sheet schema'da yok (W-V brief drift). Worker cluster_keywords (en yakın 11-col schema-locked sheet) + opportunity'ye routing yaptı. SKILL.md "Drift note (read first)" transparent bloğu var. Karar verici: ya routing kabul, ya yeni ADR (keyword_data sheet ekleme + events.schema target_excel_sheet enum bump).
+- **D-004:** source.kind brief `dfs_mcp` shorthand, schema canonical `dataforseo_mcp` (events.schema line 44). Worker schema authority kullandı. Brief'lerde enum doğrulama disiplin notu.
+- **D-005:** scripts/budget/ namespace package (no __init__.py), siblings (discovery, ingestion, state, excel, reporting) __init__.py'lı. PEP 420 ile çalışıyor ama yapısal tutarsızlık. Phase 7+ cleanup.
+- **D-006:** scripts/ingestion/__init__.py W-W oluşturmuş, scripts/ingestion/.gitkeep Phase 0'dan kalma — coexist. __init__.py varlığında .gitkeep gereksiz; küçük cleanup.
+- **D-007 (kapsamı dışı):** skills/ingestion/sf-import/SKILL.md 4 "dentnotion" hardcoded reference (Phase 5 W-R'den kalma). Plugin agnostik kuralı ihlali ama bu görevin scope'u dışı; ayrı cleanup brief gerekli.
+- **D-008 (defer):** templates/reports/gsc-pull.template.md + dfs-pull + scrapling-ops template'leri eksik (gsc-pull SKILL.md'de referans, Phase 6 Wave 2 deferred). Skill rendering live test sırasında "template not found" verecek; non-blocking, Phase 6 closeout brief'inde adreslenir.
+- **D-009 (defer):** /pseo-gsc-pull, /pseo-dfs-pull, /pseo-scrapling-ops slash command'ları commands/ registry'de yok (Phase 4 W-O 6 commands fix). Phase 6 closeout brief'inde adreslenir.
+
+### F-08 RE-EVAL log
+- gsc-pull skill gsc_performance sheet'i populate edecek (Süleyman live test sonrası).
+- F-08 invariant: target_url ⊆ crawl_sitemap ∪ gsc_performance subset valid.
+- Phase 5 Wave 2 W-S drift-check sparse pilot'ta AMBER (quick_wins 33 URL ⊆ crawl_sitemap 3 ∪ gsc_performance 0 = matematiksel imkansız).
+- gsc-pull deliverable + Süleyman live pull → gsc_performance populated → drift-check rerun → F-08 GREEN beklenir.
