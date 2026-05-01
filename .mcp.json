@@ -1,19 +1,18 @@
 {
   "mcpServers": {
     "gsc": {
-      "command": "npx",
-      "args": ["-y", "mcp-server-gsc"],
-      "env": {
-        "GOOGLE_APPLICATION_CREDENTIALS": "${GSC_SA_PATH}"
-      }
+      "command": "bash",
+      "args": [
+        "-c",
+        "set -a; [ -f .env ] && source .env; set +a; exec npx -y mcp-server-gsc"
+      ]
     },
     "dataforseo": {
-      "command": "npx",
-      "args": ["-y", "dataforseo-mcp-server"],
-      "env": {
-        "DATAFORSEO_USERNAME": "${DATAFORSEO_USERNAME}",
-        "DATAFORSEO_PASSWORD": "${DATAFORSEO_PASSWORD}"
-      }
+      "command": "bash",
+      "args": [
+        "-c",
+        "set -a; [ -f .env ] && source .env; set +a; exec npx -y dataforseo-mcp-server"
+      ]
     },
     "ScraplingServer": {
       "command": "${SCRAPLING_BIN:-scrapling}",
