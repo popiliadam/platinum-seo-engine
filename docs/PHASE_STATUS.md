@@ -1,7 +1,7 @@
 # Phase Status
 
-**Last Updated:** 2026-05-01T09:18:03Z
-**Active Phase:** Phase 9 — Reporting NEXT (8 skill: monthly-report, weekly-summary, portfolio-overview, portfolio-weekly-brief, portfolio-monthly-roundup, portfolio-task-heatmap, portfolio-kpi-trend, portfolio-heatmap)
+**Last Updated:** 2026-05-01T10:03:03Z
+**Active Phase:** Phase 9 — Reporting ACTIVE (8 skill: monthly-report + weekly-summary + 6× portfolio-*, hibrit dalga 4+4)
 
 ## Previous Phase
 **Phase 3 — Scripts ✅ DONE 2026-04-30 (commit 3a0e8f5)**
@@ -29,7 +29,7 @@
 | Phase 5 | done | 2026-04-30 | 2026-04-30 | 073497f |
 | Phase 6 | done | 2026-04-30 | 2026-05-01 | aa105d0 |
 | Phase 7 | done | 2026-05-01 | 2026-05-01 | 759cd20 |
-| Phase 8 | done | 2026-05-01 | 2026-05-01 | (closeout commit) |
+| Phase 8 | done | 2026-05-01 | 2026-05-01 | 05d7814 |
 
 ## Next Phase Preview
 **Phase 2 — Rules & Disciplines:** 10 normatif disiplin (naming.md, single-source-of-truth.md, schema-first.md, append-only-state.md, excel-discipline.md, secrets-management.md, glossary-discipline.md, skill-description-discipline.md, schema-versioning-discipline.md, time-discipline.md) — eski rules/universal-rules.json'dan ilham, yeniden yazım.
