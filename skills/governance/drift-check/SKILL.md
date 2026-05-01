@@ -263,7 +263,7 @@ def check_F_XX(workbook, project_slug) -> dict:
 
 ## F2 flag — F-08 RED is EXPECTED on the pilot workbook
 
-The dentnotion pilot `master.xlsx` currently contains only `quick_wins`
+The pilot project `master.xlsx` currently contains only `quick_wins`
 and `opportunity` sheets (Wave 1 Q-W output, no SF import yet). F-08
 requires `crawl_sitemap` ∪ `gsc_performance` to be populated to compute
 the subset; with both sheets missing, the rule returns:

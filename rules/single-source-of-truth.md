@@ -28,7 +28,7 @@ Drift, çoğunlukla iyi niyetli kopyala-yapıştırla başlar: aynı kural spec'
 
 ## Anti-Patterns (Ihlal)
 - Aynı kural metni hem `docs/spec.md` hem `README.md` içinde — iki yer divergea açıktır.
-- Plugin içinde hard-coded `dentnotion` ya da `vento` slug'ı — §8.3 + SSOT ihlali.
+- Plugin içinde hard-coded proje slug'ı (gerçek bir pilot/müşteri proje adı) — §8.3 + SSOT ihlali.
 - `schemas/foo.schema.json` ve `scripts/foo_writer.py` içinde alan listesinin elle tekrarlanması — schema değişince script unutulur.
 - Workspace verisinin (örn: `events.jsonl` örnekleri) plugin repo'ya commit edilmesi.
 

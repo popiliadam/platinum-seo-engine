@@ -17,8 +17,8 @@ Pure function discipline:
 
 CLI:
   python3 scripts/discovery/quickwins_transform.py \
-      --raw inbox/gsc/2026-04-30-detect_quick_wins-dentnotion.json \
-      [--enriched inbox/gsc/2026-04-30-enhanced_search_analytics-dentnotion.json] \
+      --raw inbox/gsc/{date}-detect_quick_wins-{slug}.json \
+      [--enriched inbox/gsc/{date}-enhanced_search_analytics-{slug}.json] \
       [--top-n 50] \
       [--threshold-position-max 20] \
       [--output-dir .]

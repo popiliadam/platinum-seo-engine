@@ -304,6 +304,6 @@ DURUR — those are AMBER (return empty candidate list, continue).
 - Cross-modules: `scripts/state/workflow_runner.py`,
   `scripts/state/events_writer.py`, `openpyxl` (read-only).
 - Tests: `tests/skills/test_whats_next.py` (5 cases incl. live
-  workspace-staging dentnotion smoke).
+  workspace-staging pilot smoke).
 - ADRs: ADR-013 (use_when string), ADR-019 (retry_count), ADR-020
   (event_kind=workflow), ADR-021 (`_state/` path).

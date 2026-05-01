@@ -43,7 +43,7 @@ Bu doküman **statik referans**. Canlı state için `docs/PHASE_STATUS.md` ve `d
 ### 2.1 `platinum-seo-engine` (Plugin Repo)
 - **Tek sorumluluk:** Logic, kurallar, aletler. Proje-agnostik.
 - **İçerir:** skills, commands, hooks, scripts (küçük Python helpers), schemas, BOŞ templates, rules, docs, tests.
-- **İçermez:** Proje isimleri ("dentnotion"), proje verisi, state, output.
+- **İçermez:** Proje isimleri ("{slug}"), proje verisi, state, output.
 - **Versionlama:** SemVer. `plugin.json` içinde version.
 
 ### 2.2 `platinum-seo-workspace` (Veri/State/Output Workspace)
@@ -234,7 +234,7 @@ platinum-seo-engine/
 ```
 platinum-seo-workspace/
 ├── projects/
-│   ├── dentnotion/                      # her proje aynı yapıda
+│   ├── {slug}/                      # her proje aynı yapıda
 │   │   ├── config.json                  # project-config.schema'ya uyar
 │   │   ├── memory.md                    # project-memory.schema frontmatter + body
 │   │   ├── master.xlsx                  # 18 sheet, formül yok
@@ -262,7 +262,7 @@ platinum-seo-workspace/
 │   ├── portfolio.json                   # tüm projelerin kayıt defteri
 │   ├── portfolio-heatmap.md             # üretilir (skill output)
 │   ├── shared-rules.md                  # portföy genelinde notlar
-│   └── active.json                      # {"active_project": "dentnotion"}
+│   └── active.json                      # {"active_project": "{slug}"}
 │
 ├── _archive/                            # arşivlenmiş eski projeler/data
 │
@@ -374,7 +374,7 @@ Bir terim, schema, template, kural **TEK YER**de tanımlanır. İkinci yere yaz�
 Bir veri şekli yazılmadan ÖNCE schema'sı `schemas/*.schema.json` dosyasında olmak zorundadır. Schema yoksa data yazılmaz.
 
 ### 8.3 Plugin = Proje-Agnostik (`rules/single-source-of-truth.md`)
-Plugin repo içinde "dentnotion", "vento" gibi proje adı **GEÇMEZ**. CI grep ile kontrol eder.
+Plugin repo içinde gerçek proje slug'ı (pilot/müşteri proje adı) **GEÇMEZ**. CI grep ile kontrol eder.
 
 ### 8.4 State Append-Only (`rules/append-only-state.md`)
 `events.jsonl` ve `workflows/{run_id}.json` dosyaları silinmez/üzerine yazılmaz. Sadece append edilir veya yeni dosya oluşturulur.
@@ -1226,7 +1226,7 @@ Her skill'in kullandığı MCP tool'ları. Skill yazılırken **frontmatter'a `m
 **Goal:** init-project, sf-import, quick-wins, drift-check, whats-next çalışıyor.
 **Dispatch:** 5 paralel worker (her biri 1 skill).
 **Acceptance:**
-- Pilot proje (örn dentnotion) end-to-end smoke test PASS
+- Pilot proje (örn {slug}) end-to-end smoke test PASS
 - events.jsonl tutarlı
 - drift-check GREEN
 - §11.2 detay protokolüne uygun çalışma
@@ -1292,7 +1292,7 @@ Her skill'in kullandığı MCP tool'ları. Skill yazılırken **frontmatter'a `m
 **Acceptance:** CI pipeline'da bu 3 skill'in karşılığı işliyor; drift-check + schema-validate + glossary-audit zinciri tek komutla koşturuluyor.
 
 ### Phase 14 — Workspace + CI + Pilot End-to-End
-**Goal:** Workspace repo açılır, CI tam pipeline'la çalışır, pilot proje (dentnotion) baştan sona test edilir.
+**Goal:** Workspace repo açılır, CI tam pipeline'la çalışır, pilot proje ({slug}) baştan sona test edilir.
 **Deliverables:**
 - `platinum-seo-workspace/` repo (yeni GitHub)
 - `.github/workflows/ci.yml` (7 check)
@@ -1311,7 +1311,7 @@ v1 release için TÜM şunlar geçmeli:
 4. ✅ 4 hook (session-start, pre/post-tool-use, user-prompt) tetikleniyor.
 5. ✅ 20+ schema validation PASS (17 taşınan + 3 yeni).
 6. ✅ Content rules input doc tamamen işlenmiş (Phase 10): rules/content-*.md + templates/content/*.
-7. ✅ Pilot proje (örn dentnotion) end-to-end:
+7. ✅ Pilot proje (örn {slug}) end-to-end:
    - init-project ile açıldı
    - SF + GSC + DataForSEO data ingest edildi (Phase 5+6)
    - Discovery suite çalıştırıldı (quick-wins, cannibalization, decay, tech-audit, on-page-audit, schema-audit, content-gaps, competitive-analysis, geo-analysis)
@@ -1334,7 +1334,7 @@ v1 release için TÜM şunlar geçmeli:
 
 - **Q-001:** Plugin repo'su `~/Documents/platinum-seo-workflow-os/` (mevcut cwd) içinde mi açılsın yoksa yeni `~/Documents/platinum-seo-engine/` directory'si mi yaratılsın? (Öneri: yeni directory, eski cwd taşınır.)
 - **Q-002:** GitHub repo açma timing'i: Phase 0 sonu mu, Phase 10'da mı? (Öneri: Phase 0 sonu, böylece her phase commit'leniyor.)
-- **Q-003:** Pilot proje hangisi? dentnotion / vento / eykom / bigcattr / başka? (Öneri: dentnotion — eski premium'da en olgun klasör.)
+- **Q-003:** Pilot proje hangisi? (Öneri: workspace tarafından seçilir; eski premium'da en olgun klasöre sahip pilot. RESOLVED → ADR-003)
 - **Q-004:** Eski `platinum-seo-core` ve `platinum-premium-seo` ne zaman silinecek? (Öneri: v1 acceptance sonrası, bir hafta soak süre.)
 - **Q-005:** Workspace repo'su açma timing'i: Phase 0 mı Phase 10 mu? (Öneri: Phase 10'da, çünkü plugin önce bitmeli.)
 
@@ -1352,7 +1352,7 @@ v1 release için TÜM şunlar geçmeli:
 - **Worker Session:** Manager tarafından dispatch edilen, dar scope'lu session
 - **Drift:** Schema, glossary, catalog ve gerçek state arasındaki tutarsızlık
 - **Invariant:** Cross-sheet rule, master.xlsx içi sheet'ler arası kural
-- **Pilot Proje:** v1 acceptance test'i için kullanılan proje (öneri: dentnotion)
+- **Pilot Proje:** v1 acceptance test'i için kullanılan proje (workspace tarafından seçilir, ADR-003 RESOLVED)
 - **Phase:** Roadmap'teki tek bir adım, kendi acceptance kriteri olan iş paketi
 - **ADR:** Architecture Decision Record, DECISIONS.md'de bir karar entry'si
 
@@ -1433,7 +1433,7 @@ Her kullanıcı prompt'undan ÖNCE `user-prompt-submit` hook çalışır:
 
 ```markdown
 [SISTEM NOTU]
-🔴 dentnotion: 3 RED drift bulgusu var (drift-check 2026-04-30 09:00)
+🔴 {slug}: 3 RED drift bulgusu var (drift-check 2026-04-30 09:00)
 🟠 vento: 12 yeni quick win onayı bekliyor
 🟢 eykom: tüm sistemler temiz
 ```

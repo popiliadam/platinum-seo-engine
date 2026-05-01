@@ -17,7 +17,7 @@ version: "1.0"
 status: wip
 category: meta
 inputs:
-  project_slug: { type: string, required: true, description: "Lowercase kebab-case (e.g. 'dentnotion'). Matches projects/{slug}/." }
+  project_slug: { type: string, required: true, description: "Lowercase kebab-case (e.g. 'my-project'). Matches projects/{slug}/." }
   domain:       { type: string, required: true, description: "Site URL (https://...). Used as default gsc.site_url." }
   gsc_site_url: { type: string, required: false, description: "Override GSC property URL when distinct from domain. If set, mcp__gsc__list_sites is invoked to verify ownership." }
   market:       { type: string, required: false, default: "TR",    description: "ISO 3166-1 alpha-2 country code." }
