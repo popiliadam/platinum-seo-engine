@@ -1,0 +1,92 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://platinum-seo-engine/templates/scrapling/S1_competitor_snapshot.schema.json",
+  "title": "S1 Competitor Snapshot (scrapling-output-mapping §14.2)",
+  "description": "Per-row sub-schema for weekly competitor monitoring (S1). Each row in the staging table represents one competitor URL fetched on a given snapshot_date. Fields cover snapshot identity (snapshot_date + domain + url_normalized), fetch metadata (fetch_method, tier_attempts, fetch_duration_ms, status_code), and content (content_hash, content_excerpt ≤500 char, meta_title, meta_description, h1, schema_org_count, page_size_bytes). url_normalized follows the D-03 cross-sheet invariant (lowercase scheme+host, strip trailing slash on non-root, drop fragment, drop tracking params, sort remaining query keys). The fetch_method enum mirrors the §14.5 tier_escalation invariant `['get','fetch','stealthy_fetch']` exactly — extending or reordering is a schema violation. ADR-025 Phase 7+ activation: this is the first concrete sub-schema landed under templates/scrapling/.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "snapshot_date",
+    "domain",
+    "url_normalized",
+    "fetch_method",
+    "status_code"
+  ],
+  "properties": {
+    "snapshot_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp of the snapshot. Microsecond precision recommended; same fetched_at value shared across rows of one batch."
+    },
+    "domain": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Competitor root domain (no scheme, no trailing slash, no www. unless meaningful). Sourced from the DFS competitors_domain response."
+    },
+    "url_normalized": {
+      "type": "string",
+      "format": "uri",
+      "description": "D-03 canonical URL form. Idempotent under normalize_url; used as the cross-skill join key."
+    },
+    "url_original": {
+      "type": "string",
+      "format": "uri",
+      "description": "URL as fetched, before normalization. Kept for drift recovery + debugging."
+    },
+    "fetch_method": {
+      "type": "string",
+      "enum": ["get", "fetch", "stealthy_fetch"],
+      "description": "Tier that succeeded (§14.5). Order is canonical (cheap → expensive); first-success short-circuits the ladder."
+    },
+    "tier_attempts": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3,
+      "description": "Number of tiers attempted before success (1 = get only, 2 = get+fetch, 3 = all three)."
+    },
+    "content_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA-256 hex digest of the canonical body content (UTF-8). Lowercase hex, no `sha256:` prefix on this sub-schema (raw 64-char hex per the brief)."
+    },
+    "content_excerpt": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "First 500 chars of the cleaned body for diff visibility. Truncated, not summarised."
+    },
+    "meta_title": {
+      "type": ["string", "null"],
+      "description": "Page <title> element text, trimmed. Null when absent."
+    },
+    "meta_description": {
+      "type": ["string", "null"],
+      "description": "<meta name=\"description\"> content. Null when absent."
+    },
+    "h1": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "All H1 heading texts, document order preserved. Empty array when none."
+    },
+    "schema_org_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Count of JSON-LD schema.org instances found on the page (script[type=application/ld+json] blocks)."
+    },
+    "page_size_bytes": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Raw response body byte count (UTF-8 encoded length when content is text)."
+    },
+    "status_code": {
+      "type": "integer",
+      "minimum": 100,
+      "maximum": 599,
+      "description": "HTTP status code from the successful tier (or last-attempted tier for failure rows the orchestrator decides to keep)."
+    },
+    "fetch_duration_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "End-to-end fetch wall time in milliseconds (sum across attempted tiers)."
+    }
+  }
+}
