@@ -1,7 +1,7 @@
 # Phase Status
 
 **Last Updated:** 2026-05-01T08:50:00Z
-**Active Phase:** Phase 7 — Discovery NEXT (Phase 6 DONE, 8 skill discovery: cannibalization, content-decay, tech-audit, on-page-audit, content-gaps, schema-audit, competitive-analysis, geo-analysis)
+**Active Phase:** Phase 7 — Discovery NEXT (8 skill: cannibalization, content-decay, tech-audit, on-page-audit, content-gaps, schema-audit, competitive-analysis, geo-analysis)
 
 ## Previous Phase
 **Phase 3 — Scripts ✅ DONE 2026-04-30 (commit 3a0e8f5)**
@@ -27,7 +27,7 @@
 | Phase 3 | done | 2026-04-30 | 2026-04-30 | 3a0e8f5 |
 | Phase 4 | done | 2026-04-30 | 2026-04-30 | 91248ed |
 | Phase 5 | done | 2026-04-30 | 2026-04-30 | 073497f |
-| Phase 6 | done | 2026-04-30 | 2026-05-01 | (closeout commit) |
+| Phase 6 | done | 2026-04-30 | 2026-05-01 | aa105d0 |
 
 ## Next Phase Preview
 **Phase 2 — Rules & Disciplines:** 10 normatif disiplin (naming.md, single-source-of-truth.md, schema-first.md, append-only-state.md, excel-discipline.md, secrets-management.md, glossary-discipline.md, skill-description-discipline.md, schema-versioning-discipline.md, time-discipline.md) — eski rules/universal-rules.json'dan ilham, yeniden yazım.
