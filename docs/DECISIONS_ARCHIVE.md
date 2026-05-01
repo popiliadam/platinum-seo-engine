@@ -13,6 +13,7 @@ ADR-011 rotation kararıyla `DECISIONS.md`'den taşınmış eski kararlar. Appen
 - ADR-019 (Phase 4 ADIM 3, 2026-04-30 — yedinci rotation cycle, ADR-022 numerik clarification ekleme ile DECISIONS.md 6368B tetiklenmesi sonrası en eski active cut)
 - ADR-020 (Phase 5 önü, 2026-04-30 — sekizinci rotation cycle, ADR-023 .mcp.json kararı ekleme ile DECISIONS.md 6330B tetiklenmesi sonrası en eski active cut)
 - ADR-021 (Phase 5 Wave 0, 2026-04-30 — dokuzuncu rotation cycle, ADR-024 hibrit dispatch + schema fix ekleme ile DECISIONS.md 6350B tetiklenmesi sonrası en eski active cut)
+- ADR-022 (Phase 6, 2026-04-30 — onuncu rotation cycle, ADR-025 Q-015 templates/scrapling/ ekleme ile DECISIONS.md >6144B tetiklenmesi sonrası en eski active cut; ADR-026 cap-only supersede ile uyumlu, body byte-byte korunur)
 
 **Active ADR'ler için:** [DECISIONS.md](DECISIONS.md)
 
@@ -198,3 +199,12 @@ ADR-011 rotation kararıyla `DECISIONS.md`'den taşınmış eski kararlar. Appen
 **Context:** Phase 3.1 W-M `check_budget.py` events.jsonl path `state/` (underscore'suz) kullandı. Spec §4 line 254 dir tree `_state/` (underscore'lu) — path konvansiyonu spec §4 SSoT.
 **Decision:** Spec §4 authoritative. `_state/` standartı uygulanır. `check_budget.py` line 14 docstring + line 119 default arg fix (`state/events.jsonl` → `_state/events.jsonl`). Tüm runtime state path'leri `_state/` prefix.
 **Consequences:** check_budget.py path drift kapatıldı (replace_all 2 hit). Phase 3.3 W-L (events_writer.py + workflow_runner.py) yazımında `_state/` standartına uyacak. Phase 5 smoke test'te path mismatch hatası önlendi.
+
+---
+
+## ADR-022 — DECISIONS Rotation: <5120B Hard Cap, 3-ADR Active Floor (ADR-014 Clarification)
+**Date:** 2026-04-30
+**Status:** accepted (clarifies ADR-014 in archive; no supersede)
+**Context:** ADR-014 numerik ambiguity (5000 vs 5120 KiB) Phase 3.1+3.2'de drift yarattı. Detay CONTEXT_LEDGER.
+**Decision:** Hard cap = 5120 bytes (binary KiB). Trigger: `stat -f '%z' docs/DECISIONS.md > 5120` → en eski active ADR archive'a. Floor: 3 active ADR (ADR-014 alt sınır geçerli).
+**Consequences:** ADR-014 rotation pattern korunur; numerik ambiguity kapandı. Phase 4+ DECISIONS yönetimi deterministic.

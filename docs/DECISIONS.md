@@ -3,7 +3,7 @@
 Platinum SEO Engine plugin için mimari kararların kaydı.
 Append-only — superseded entry'ler işaretlenir, silinmez.
 
-> **Rotation:** ADR-001..021 archive'da (gap: 015) → [DECISIONS_ARCHIVE.md](DECISIONS_ARCHIVE.md). ADR-014 (rotation kuralı, archive): <5120B primary (ADR-022 numerik clarification), 3 active floor.
+> **Rotation:** ADR-001..022 archive'da (gap: 015) → [DECISIONS_ARCHIVE.md](DECISIONS_ARCHIVE.md). ADR-026: hard cap 6144B primary (ADR-022 cap-only supersede), 3 active floor (ADR-014 rotation pattern, archive).
 
 ## Summary Table
 
@@ -29,19 +29,11 @@ Append-only — superseded entry'ler işaretlenir, silinmez.
 | ADR-019 | workflow-run.schema Additive Bump (retry_count + schema_version) | accepted | DECISIONS_ARCHIVE.md |
 | ADR-020 | events.schema event_kind="workflow" + workflow_action Enum | accepted | DECISIONS_ARCHIVE.md |
 | ADR-021 | events.jsonl Path: _state/ (spec §4 SSoT) | accepted | DECISIONS_ARCHIVE.md |
-| ADR-022 | DECISIONS Rotation: <5120B Hard Cap, 3-ADR Active Floor (ADR-014 Clarification) | accepted | (below) |
+| ADR-022 | DECISIONS Rotation: <5120B Hard Cap, 3-ADR Active Floor (ADR-014 Clarification) | accepted | DECISIONS_ARCHIVE.md |
 | ADR-023 | Engine MCP Server Kayıtları: Proje .mcp.json (Schema Constraint) | accepted | (below) |
 | ADR-024 | Phase 5 Hibrit Dispatch + skill-frontmatter Category Fix + Workspace Snapshot | accepted | (below) |
+| ADR-025 | Scrapling Output Sub-Schemas: templates/scrapling/ Dizin (Q-015) | accepted | (below) |
 | ADR-026 | DECISIONS Hard Cap: 5120→6144B (ADR-022 Cap-Only Supersede) | accepted | (below) |
-
----
-
-## ADR-022 — DECISIONS Rotation: <5120B Hard Cap, 3-ADR Active Floor (ADR-014 Clarification)
-**Date:** 2026-04-30
-**Status:** accepted (clarifies ADR-014 in archive; no supersede)
-**Context:** ADR-014 numerik ambiguity (5000 vs 5120 KiB) Phase 3.1+3.2'de drift yarattı. Detay CONTEXT_LEDGER.
-**Decision:** Hard cap = 5120 bytes (binary KiB). Trigger: `stat -f '%z' docs/DECISIONS.md > 5120` → en eski active ADR archive'a. Floor: 3 active ADR (ADR-014 alt sınır geçerli).
-**Consequences:** ADR-014 rotation pattern korunur; numerik ambiguity kapandı. Phase 4+ DECISIONS yönetimi deterministic.
 
 ---
 
@@ -60,6 +52,15 @@ Append-only — superseded entry'ler işaretlenir, silinmez.
 **Context:** Phase 5 3 PRE-FIX: (1) skill-frontmatter category enum 6 değer, gerçek 8 dizin (Phase 1.4 W-G drift); (2) eski premium READ-ONLY ama Phase 5 yazma; (3) 5 skill convention drift Phase 6-12 compound.
 **Decision:** (1) Category enum 8 değer (skills/{category}/ layout). (2) Workspace snapshot ~/Documents/platinum-seo-workspace-staging (PSEO_WORKSPACE_ROOT, Phase 14'te kalıcıya cp). (3) Hibrit dispatch: Wave 1 quick-wins SERI + Wave 2 4-paralel (init-project, sf-import, drift-check, whats-next).
 **Consequences:** Schema fix Phase 1.4 drift kapandı. Workspace snapshot ADR-004+005 korundu. Hibrit dispatch Phase 6+ drift minimize.
+
+---
+
+## ADR-025 — templates/scrapling/ Dizin (Q-015 Resolution)
+**Date:** 2026-04-30
+**Status:** accepted
+**Context:** scrapling-output-mapping.schema `output_schema_file` pattern S1-S4 yolu bekliyor. Dizin yok (W-F OQ-WF-01 drift).
+**Decision:** templates/scrapling/.gitkeep yaratılır. Schema pattern mutate yok. Sub-schemas (S1-S4) Phase 7+ skill'lerle (competitive-analysis P7, content-improve P9). Phase 6 scrapling-ops generic helper.
+**Consequences:** Q-015 closed. templates/ agnostik. Schema-First korunur. Phase 6 dispatch bloke değil.
 
 ---
 

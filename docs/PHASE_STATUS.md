@@ -1,7 +1,7 @@
 # Phase Status
 
-**Last Updated:** 2026-04-30T13:00:00Z
-**Active Phase:** Phase 6 — Ingestion NEXT (Phase 5 atomic commit pending — Süleyman push)
+**Last Updated:** 2026-04-30T14:00:00Z
+**Active Phase:** Phase 6 — Ingestion ACTIVE (Phase 5 committed 073497f, Phase 6 commit'leri local birikiyor — Phase 6 sonu push)
 
 ## Previous Phase
 **Phase 3 — Scripts ✅ DONE 2026-04-30 (commit 3a0e8f5)**
@@ -26,7 +26,7 @@
 | Phase 2 | done | 2026-04-30 | 2026-04-30 | 95e605d |
 | Phase 3 | done | 2026-04-30 | 2026-04-30 | 3a0e8f5 |
 | Phase 4 | done | 2026-04-30 | 2026-04-30 | 91248ed |
-| Phase 5 | done | 2026-04-30 | 2026-04-30 | (commit pending) |
+| Phase 5 | done | 2026-04-30 | 2026-04-30 | 073497f |
 
 ## Next Phase Preview
 **Phase 2 — Rules & Disciplines:** 10 normatif disiplin (naming.md, single-source-of-truth.md, schema-first.md, append-only-state.md, excel-discipline.md, secrets-management.md, glossary-discipline.md, skill-description-discipline.md, schema-versioning-discipline.md, time-discipline.md) — eski rules/universal-rules.json'dan ilham, yeniden yazım.
