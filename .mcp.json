@@ -4,8 +4,20 @@
       "command": "npx",
       "args": ["-y", "mcp-server-gsc"],
       "env": {
-        "GOOGLE_APPLICATION_CREDENTIALS": "/Users/apple/.config/seo-core/secrets/google-indexing.json"
+        "GOOGLE_APPLICATION_CREDENTIALS": "${GSC_SA_PATH}"
       }
+    },
+    "dataforseo": {
+      "command": "npx",
+      "args": ["-y", "dataforseo-mcp-server"],
+      "env": {
+        "DATAFORSEO_USERNAME": "${DATAFORSEO_USERNAME}",
+        "DATAFORSEO_PASSWORD": "${DATAFORSEO_PASSWORD}"
+      }
+    },
+    "ScraplingServer": {
+      "command": "${SCRAPLING_BIN:-scrapling}",
+      "args": ["mcp"]
     }
   }
 }
