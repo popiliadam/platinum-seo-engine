@@ -293,3 +293,18 @@ Spec §13.2: <15KB initial load = <2% of 1M context window. Tracking under budge
 
 ## ADR-026 active (2026-04-30, sixteenth session)
 - ADR-026 active, hard cap 5120→6144, ADR-022 superseded for cap-only (3-floor rotation clause unchanged). DECISIONS.md 5118B → 5971B (margin 173B / 6144B). Phase 6 ADR-025 + RE-EVAL'lar için oksijen. Manager doğrudan edit (worker dispatch overkill, brief direktifi). Atomic single commit.
+
+## Q-015 → ADR-025 + Rotation Cycle 10 (2026-04-30, sixteenth session)
+- ADR-025 active, templates/scrapling/.gitkeep yaratıldı (boş dizin, sub-schemas Phase 7+). scrapling-output-mapping.schema mutate yok (hash baseline e2aa641b...).
+- Rotation cycle 10: ADR-022 entry → DECISIONS_ARCHIVE.md (en eski active, ADR-026 cap-only supersede uyumlu, body byte-byte korunur). DECISIONS.md table'da ADR-022 satırı durur, Location "(below)" → "DECISIONS_ARCHIVE.md".
+- DECISIONS.md final 6038B / 6144B (margin 106B). 4 active body: ADR-023, 024, 025, 026 (3-floor satisfied).
+- Drift fix D-002: PHASE_STATUS.md line 4 "Phase 5 atomic commit pending" → "Phase 5 committed 073497f, Phase 6 commit'leri local birikiyor". Phase 5 row hash "(commit pending)" → "073497f".
+- Q-015 closed → OPEN_QUESTIONS Resolved section (ADR-025 ref).
+
+## ADR boyut forecast Round 3 kalibrasyon (2026-04-30, sixteenth session)
+- Round 1 metod (kelime × 6B) → %37 hata (Phase 5 Wave 0).
+- Round 2 metod (değişen karakter + whitespace netting) → %6 sapma (Phase 5 Wave 0 Round 2).
+- **Round 3 (post-ADR-026)**: Round 2 base × section_count_factor. ADR-026 tahmin 400-500B (3-4 bölüm varsayımı), gerçek 853B (6 bölüm: Title+Date+Status+Context+Decision+Consequences). Sapma %42-53.
+- **Round 3 ek kalibrasyon (post-ADR-025 brief)**: Brief tahmin 700-900B, brief metni gerçek ~1100-1366B (6 bölüm). Sapma %50+. Manager trim ederek 530B'ye sığdırdı (brief spirit korunarak: Q-015 resolve, dizin kararı, schema mutate yok, Phase 6 unblock).
+- **Yeni formül (Round 3.1)**: ~150B × section_count + base padding YETERSİZ. Gerçek ~180-230B × section_count + Title-uzunluğu × 2 (md başlık tekrarı table+entry'de).
+- Phase 6+ ADR brief'lerinde body cap explicit: ~600B ceiling önerilen (cap aşımı önler, manager trim minimal).
