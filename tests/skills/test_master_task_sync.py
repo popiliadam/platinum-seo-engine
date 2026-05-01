@@ -597,19 +597,20 @@ def test_master_task_sync_primary_source_enum_compliance(
 ) -> None:
     """master_task col C is a closed enum:
       [content_decay, quickwin, tech_fix, schema, pillar, manual,
-       sxo, cannibalization, redirect_404]
+       sxo, cannibalization, redirect_404, internal_links]
 
-    Every emitted row must carry a value from that set. Notably,
-    "internal_links" is NOT a valid value (Q-IL-1: internal-links rows
-    use "tech_fix" instead).
+    Every emitted row must carry a value from that set. Phase 8 closeout
+    Q-IL-1: schema bump 9→10 values (additive, ADR-018 pattern,
+    schema_version unchanged) — "internal_links" is now an explicit enum
+    member; W-C4 internal-links transform emits it directly.
     """
     sheet = master_excel_schema["sheets"]["master_task"]
     schema_enum = next(
         c for c in sheet["required_columns"] if c["name"] == "primary_source"
     )["enum"]
-    assert "internal_links" not in schema_enum, (
-        "internal_links must NOT be in the master_task primary_source enum "
-        "(Q-IL-1 — internal-links rows use tech_fix)"
+    assert "internal_links" in schema_enum, (
+        "internal_links MUST be in the master_task primary_source enum "
+        "(Q-IL-1 closeout schema bump applied Phase 8)"
     )
     assert frozenset(schema_enum) == mts.PRIMARY_SOURCE_ENUM
 
@@ -625,11 +626,12 @@ def test_master_task_sync_primary_source_enum_compliance(
             f"not in schema enum {schema_enum}"
         )
 
-    # Defensive: direct enum violation raises.
-    with pytest.raises(mts.PrimarySourceEnumViolation):
-        mts._ensure_primary_source_enum("internal_links")
+    # Defensive: direct enum violation raises (post-Q-IL-1 bump,
+    # internal_links IS valid; sentinel below is still rejected).
     with pytest.raises(mts.PrimarySourceEnumViolation):
         mts._ensure_primary_source_enum("anything-else")
+    with pytest.raises(mts.PrimarySourceEnumViolation):
+        mts._ensure_primary_source_enum("")
 
 
 # ---------------------------------------------------------------------------

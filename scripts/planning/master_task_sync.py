@@ -133,9 +133,10 @@ PROTECTED_COLUMNS: frozenset[str] = frozenset({
     "note",
 })
 
-#: master_task primary_source enum (schema line 275). Note: there is NO
-#: "internal_links" entry — internal-links rows live as "tech_fix" already
-#: (Q-IL-1 substitute). The aggregator must emit ONLY values from this set.
+#: master_task primary_source enum (schema line 275). Phase 8 closeout
+#: Q-IL-1: schema bump 9→10 values (additive, ADR-018 pattern,
+#: schema_version unchanged) — internal_links is now an explicit enum
+#: member; W-C4 transform refactored to emit "internal_links" directly.
 PRIMARY_SOURCE_ENUM: frozenset[str] = frozenset({
     "content_decay",
     "quickwin",
@@ -146,6 +147,7 @@ PRIMARY_SOURCE_ENUM: frozenset[str] = frozenset({
     "sxo",
     "cannibalization",
     "redirect_404",
+    "internal_links",
 })
 
 #: statusEnum (master-excel.schema.json#/definitions/statusEnum).

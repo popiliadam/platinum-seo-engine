@@ -54,7 +54,7 @@
         { "col": "D", "name": "monthly_volume",    "type": "integer" },
         { "col": "E", "name": "data_source" },
         { "col": "F", "name": "assigned_url" },
-        { "col": "G", "name": "page_type" },
+        { "col": "G", "name": "page_type",          "enum": ["pillar", "cluster", "supporting"] },
         { "col": "H", "name": "status",            "ref": "#/definitions/statusEnum" },
         { "col": "I", "name": "priority" },
         { "col": "J", "name": "note" }
@@ -272,7 +272,7 @@
       "required_columns": [
         { "col": "A", "name": "task_id" },
         { "col": "B", "name": "task" },
-        { "col": "C", "name": "primary_source", "enum": ["content_decay", "quickwin", "tech_fix", "schema", "pillar", "manual", "sxo", "cannibalization", "redirect_404"] },
+        { "col": "C", "name": "primary_source", "enum": ["content_decay", "quickwin", "tech_fix", "schema", "pillar", "manual", "sxo", "cannibalization", "redirect_404", "internal_links"] },
         { "col": "D", "name": "related_sources" },
         { "col": "E", "name": "url" },
         { "col": "F", "name": "category" },

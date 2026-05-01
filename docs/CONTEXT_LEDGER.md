@@ -595,3 +595,46 @@ Spec §13.2: <15KB initial load = <2% of 1M context window. Tracking under budge
 - Phase 8 Wave 2 = sequential consume Wave 1→Wave 2 dependency chain ilk fonksiyonel test (W-C4 Wave 1 master_task auto entries + Phase 7 5 master writer + Phase 8 Wave 1 3 master writer = 8 sheet aggregate input). master.xlsx#master_task SSoT canlı.
 - Phase 8 closeout brief NEXT: multiple ADR aday (Q-IL-1 primary_source enum bump +internal_links, Q-W-C2-01 page_type schema enum promote, Q-W-C3-TIVL acronym semantic, Q-MTS-2 column-level scope enforcement) + drift fix Q-CD-01 skills/discovery/cluster-map/.gitkeep cleanup + brief disiplini lesson 6+7 process doc CONTEXT_LEDGER (manager pre-dispatch grep precedent locked Phase 9+) + Phase 7 backlog Q-W-A4-02 + Q-W-B4-02 + Q-W-B3-01 cross-skill paterni DEFER + PHASE_STATUS Phase 8 done + Phase 9 active set.
 - Wave 2 atomic commit: 4 file (CONTEXT_LEDGER + PHASE_STATUS + 3 W-D1 deliverable). Phase 8 push'a bundle olacak (4 commit total: 0ff4fc4 + 3035a55 + a534201 + Wave 2 + closeout = 5 commit batch beklenen).
+
+## Phase 8 Brief Disiplini Lesson 6+7 (manager pre-dispatch fresh grep precedent locked)
+- 7 cumulative drift catch vakası (process doc Phase 9+ enforcement reference):
+  * Phase 1: Q-W-G-01 (worker W-G reddi, skill-frontmatter use_when ayrı field değil)
+  * Phase 7: Q-W-A4-01 (worker W-A4 reddi, estimated_credits_per_call schema reject)
+  * Phase 7: Q-W-B4-01 (worker W-B4 reddi, project_name vs display_name)
+  * Phase 7: Q-CO-01 (worker closeout reddi, tech_seo metric_name field 6 col gerçek)
+  * Phase 8 Wave 1: Q-W-C3-COL (worker W-C3 reddi, master-excel new_content_plan 11 col schema, brief 10 col karar verici head -10 limiti)
+  * Phase 8 Wave 2: D-01 invariant ID confusion (manager pre-dispatch grep yakaladı, brief master_task SSoT iddiası, schema D-01 = topical_map.pillar)
+  * Phase 8 Wave 2: master_task append+merge semantik (manager pre-dispatch grep yakaladı, brief in-place UPDATE iddiası, schema "append + merge D column only" + protected_columns 7 sütun)
+- Hiyerarşi (kanıtlanmış): manager pre-dispatch fresh grep > worker schema-first reddi > brief authority. Phase 7 4 vaka worker-only catch, Wave 1 1 vaka worker catch (manager kaçırdı), Wave 2 2 vaka manager catch worker dispatch öncesi.
+- Phase 9+ enforcement protocol: karar verici brief'lerde schema field/invariant ID/sheet column tuple/enum değerleri jq + grep ile cross-check ZORUNLU. Drift varsa karar verici'ye revize talebi (Wave 2 v1→v2 paterni). Brief authority schema authority altında kalır, manager katmanı drift propagation worker'a ulaşmaz.
+- Process commands library:
+  * jq '.properties.sheets.properties.{sheet}.required_columns | length' schemas/master-excel.schema.json (col count verify)
+  * jq '.properties.sheets.properties.{sheet}.required_columns[] | select(.name=="{field}") | .enum' (enum verify)
+  * grep -nE '"id":\s*"D-\d+"' schemas/cross-sheet-invariants.json (invariant ID listing)
+  * grep -A2 '"name": "{field}"' schemas/master-excel.schema.json (field definition context)
+  * grep -nE 'allowed_writers|writer_scope|protected_columns' schemas/master-excel.schema.json (intra-sheet authority)
+
+## Phase 8 CLOSED (2026-05-01T09:18:03Z, eighteenth session, manager session retire)
+- 5 commit zinciri: prep (3035a55) + Wave 1 (a534201) + Wave 2 (01bdcf1) + Closeout (this commit) + post-push (Phase 7 0ff4fc4 dahil) = 5 commit Phase 8 push'a bundle.
+- 5 Planning skill canlı: cluster-map (W-C1) + topical-map (W-C2) + new-content-plan (W-C3) + internal-links (W-C4) + master-task-sync (W-D1). Toplam Phase 8: 15 dosya, ~11700L kod (Wave 1: 9019 + Wave 2: 2585 + closeout schema bump+refactor: ~100).
+- 70 yeni Phase 8 pytest (Wave 1: 52 + Wave 2: 18) → repo 312/312 PASS no regression. Phase 7 baseline 242 + 70 = 312.
+- 0 yeni ADR (closeout triage minimal footprint, DECISIONS.md byte-byte unchanged 5877B / 6144B margin 267B, 4 active 026/027/028/029, 3-floor satisfied). Rotation cycle 14 önlendi (cap policy reference korundu memory tek otorite kuralı).
+- 2 schema enum additive bump (ADR-018 paterni, schema_version unchanged):
+  * Q-IL-1: master_task.primary_source enum 9→10 (+ "internal_links"). W-C4 PRIMARY_SOURCE_TECH_FIX → PRIMARY_SOURCE_INTERNAL_LINKS = "internal_links" rename + value flip + 5 docstring/comment refresh. test_internal_links.py 9 reference rename + 5 comment refresh + Test 13 function rename test_primary_source_tech_fix_enum_value → test_primary_source_internal_links_enum_value. W-D1 PRIMARY_SOURCE_ENUM constant 9→10 sync + comment Q-IL-1 closeout reframe + test_master_task_sync.py Test 9 polarity flip ("internal_links not in" → "internal_links in") + Defensive sentinel "internal_links" → "" empty string.
+  * Q-W-C2-01: topical_map.page_type col G enum promote (W-C2 local enum {pillar,cluster,supporting} schema authority). W-C2 transform PAGE_TYPE_PILLAR/CLUSTER/SUPPORTING constants schema enum compatible (worker self-test PASS).
+- File cleanup Q-CD-01: skills/discovery/cluster-map/ rm + rmdir (Phase 0 scaffold yanlış kategori, .gitkeep + boş dir). skills/discovery/ 9 dir kaldı (8 Phase 7 Discovery + 1 quick-wins Phase 5; brief 7 dir hesabı yanlış, manager pre-dispatch grep yine yararlı drift catch).
+- Process doc: brief disiplini lesson 6+7 manager pre-dispatch fresh grep precedent locked Phase 9+ enforcement (yukarı bölüm).
+- Phase 9+ defer 8 OQ + Phase 7 backlog 3:
+  * Q-MTS-1: read_master_xlsx_sheets() helper transaction.py'de YOK (skill body author thin openpyxl wrapper)
+  * Q-MTS-2: transaction.update column-level scope enforcement YOK (defense-in-depth ADR aday Phase 9+)
+  * Q-W-C1-01/02: Turkish stem-aware tokenizer + project blocklist field
+  * Q-W-C2-02: D-01 topical_map.pillar ⊆ data/pillars.json auto-rewrite YOK (pillars-sync skill aday)
+  * Q-W-C3-TIVL: TIVL acronym semantic ADR aday (T/I/V/L schema-locked, semantic spec'te yok)
+  * Q-IL-2: SF Inlinks column legacy export uyumsuzluğu (pilot run validate)
+  * Phase 7 backlog: Q-W-A4-02 + Q-W-B4-02 cross-skill DFS htags shape variance, Q-W-B3-01 D-03 path-case clause, Phase 14+ CI test self-gate r-string regex exclude, transform helper shared lib refactor (5/8 transform >800L Phase 7 maturity)
+- ADR-025 first activation (Phase 7 templates/scrapling/S1_competitor_snapshot.schema.json) Phase 8'de unchanged (W-C4 staging consume hash referans, sub-schema değişmedi).
+- Discovery → Staging → Planning → Master akış paterni production'da: Phase 7 staging 3 skill (content-gaps + competitive-analysis + geo-analysis) → Phase 8 Wave 1 3 skill consume (cluster-map + topical-map + new-content-plan) → Phase 8 Wave 2 master-task-sync aggregate (8 sheet) → master.xlsx#master_task SSoT (allowed_writers + writer_scope + protected_columns intra-sheet authority compliance).
+- Cross-sheet invariants Phase 8 acceptance (spec §17): D-01 (W-C2 scope), D-02 (W-C1 scope), F-06/F-09 (cross-sheet column constraints) — workers validate_invariants.py kullanır, master-task-sync delegasyon değil.
+- Phase 9 NEXT: Reporting 8 skill (monthly-report, weekly-summary, 6× portfolio-*: portfolio-overview + portfolio-weekly-brief + portfolio-monthly-roundup + portfolio-task-heatmap + portfolio-kpi-trend + portfolio-heatmap). Fresh manager session önerilir (CONTEXT_LEDGER ~36 entry, phase boundary fresh wakeup verim artırır). Hibrit dalga muhtemelen (4+4 Phase 7 paterni reuse).
+- Süleyman aksiyon (commit sonrası, opsiyonel): live smoke test (master_task_sync demo-dental → row count, drift-check → Phase 8 invariants validate). Phase 8 push (~5 commit batch 0ff4fc4 + 3035a55 + a534201 + 01bdcf1 + closeout) Süleyman explicit onay isteği kritik.
+- Phase 8 manager session retire — Phase 9 yeni Claude Code window'da fresh bootstrap.
