@@ -32,6 +32,7 @@ Append-only — superseded entry'ler işaretlenir, silinmez.
 | ADR-022 | DECISIONS Rotation: <5120B Hard Cap, 3-ADR Active Floor (ADR-014 Clarification) | accepted | (below) |
 | ADR-023 | Engine MCP Server Kayıtları: Proje .mcp.json (Schema Constraint) | accepted | (below) |
 | ADR-024 | Phase 5 Hibrit Dispatch + skill-frontmatter Category Fix + Workspace Snapshot | accepted | (below) |
+| ADR-026 | DECISIONS Hard Cap: 5120→6144B (ADR-022 Cap-Only Supersede) | accepted | (below) |
 
 ---
 
@@ -59,3 +60,12 @@ Append-only — superseded entry'ler işaretlenir, silinmez.
 **Context:** Phase 5 3 PRE-FIX: (1) skill-frontmatter category enum 6 değer, gerçek 8 dizin (Phase 1.4 W-G drift); (2) eski premium READ-ONLY ama Phase 5 yazma; (3) 5 skill convention drift Phase 6-12 compound.
 **Decision:** (1) Category enum 8 değer (skills/{category}/ layout). (2) Workspace snapshot ~/Documents/platinum-seo-workspace-staging (PSEO_WORKSPACE_ROOT, Phase 14'te kalıcıya cp). (3) Hibrit dispatch: Wave 1 quick-wins SERI + Wave 2 4-paralel (init-project, sf-import, drift-check, whats-next).
 **Consequences:** Schema fix Phase 1.4 drift kapandı. Workspace snapshot ADR-004+005 korundu. Hibrit dispatch Phase 6+ drift minimize.
+
+---
+
+## ADR-026 — DECISIONS Hard Cap: 5120→6144B (ADR-022 Cap-Only Supersede)
+**Date:** 2026-04-30
+**Status:** accepted
+**Context:** Phase 4+5 3 ardışık tightening turu 5120B cap'i pratik FROZEN ettiğini kanıtladı (3-floor × ~800B body + header ≈ 5000B+ taban, 120B oynama). ADR-025 (Q-015) + Phase 6-9 RE-EVAL'lar sığmıyor.
+**Decision:** Hard cap 5120 → 6144 bytes (1KB ek hava, ~+2 ADR). Trigger güncellenir: `stat -f '%z' docs/DECISIONS.md > 6144`. 3-ADR floor korunur. Supersedes ADR-022 hard cap clause (5120B → 6144B); 3-floor rotation clause unchanged.
+**Consequences:** Phase 6+ deterministic, ADR-025 + RE-EVAL'lar sığar. ADR-022 entry mutate yok (append-only). ADR-014 rotation pattern korunur, sadece numerik cap revize.
