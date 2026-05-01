@@ -246,7 +246,7 @@ def test_internal_links_orphan_page_detection(
                       and r["note"].startswith(f"{ilt.NOTE_PREFIX}/{ilt.KIND_ORPHAN}]")]
     assert len(orphan_finding) == 1
     row = orphan_finding[0]
-    assert row["primary_source"] == ilt.PRIMARY_SOURCE_TECH_FIX
+    assert row["primary_source"] == ilt.PRIMARY_SOURCE_INTERNAL_LINKS
     assert row["impact"] == ilt.SEVERITY_HIGH
     assert row["auto_generated"] is True
     assert "Orphan page" in row["task"]
@@ -395,9 +395,9 @@ def test_internal_links_auto_generated_flag_set_true(
             f"auto_generated must be True on row {r['task_id']}, "
             f"got {r['auto_generated']!r}"
         )
-        # primary_source MUST be the closed-enum value tech_fix
-        # (master_task col C enum, no internal_links value).
-        assert r["primary_source"] == ilt.PRIMARY_SOURCE_TECH_FIX
+        # primary_source MUST be the closed-enum value internal_links
+        # (master_task col C enum — Q-IL-1 schema bump applied Phase 8 closeout).
+        assert r["primary_source"] == ilt.PRIMARY_SOURCE_INTERNAL_LINKS
         # note carries the [internal-links/...] prefix for lineage.
         assert r["note"].startswith(ilt.NOTE_PREFIX), (
             f"note prefix missing on row {r['task_id']}: {r['note']!r}"
@@ -595,7 +595,7 @@ def test_smoke_e2e_cli_output(
     for r in payload:
         assert set(r.keys()) == expected_cols
         assert r["auto_generated"] is True
-        assert r["primary_source"] == ilt.PRIMARY_SOURCE_TECH_FIX
+        assert r["primary_source"] == ilt.PRIMARY_SOURCE_INTERNAL_LINKS
 
     # Idempotency: re-run with same input → byte-identical output file.
     first_bytes = out_file.read_bytes()
@@ -613,24 +613,24 @@ def test_smoke_e2e_cli_output(
 
 
 # ---------------------------------------------------------------------------
-# Test 13 — primary_source uses the closed master_task enum (tech_fix)
+# Test 13 — primary_source uses the closed master_task enum (internal_links)
 # ---------------------------------------------------------------------------
 
-def test_primary_source_tech_fix_enum_value(
+def test_primary_source_internal_links_enum_value(
     loaded_sf_data: tuple[list[dict], list[dict]],
     master_excel_schema: dict,
 ) -> None:
     """master_task col C `primary_source` is a closed enum. The transform
-    MUST emit a value present in that enum — we use 'tech_fix' as the
-    closest structural match (no 'internal_links' value exists in the
-    enum; a future schema bump could add one but is out of Wave 1 scope).
+    MUST emit a value present in that enum — Phase 8 closeout Q-IL-1 schema
+    bump added 'internal_links' as an explicit enum member (additive,
+    schema_version unchanged, ADR-018 pattern).
     """
     sheet = master_excel_schema["sheets"]["master_task"]
     cols = sheet["required_columns"]
     primary_source_col = next(c for c in cols if c["name"] == "primary_source")
     enum = set(primary_source_col["enum"])
-    assert ilt.PRIMARY_SOURCE_TECH_FIX in enum, (
-        f"transform emits {ilt.PRIMARY_SOURCE_TECH_FIX!r} but it is not in the "
+    assert ilt.PRIMARY_SOURCE_INTERNAL_LINKS in enum, (
+        f"transform emits {ilt.PRIMARY_SOURCE_INTERNAL_LINKS!r} but it is not in the "
         f"master_task primary_source enum: {sorted(enum)}"
     )
 

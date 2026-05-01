@@ -25,9 +25,9 @@ The transform aggregates four planning signals per URL:
 
 Each signal row maps 1:1 to a master_task entry with `auto_generated=true`,
 schema-locked to the 19 columns in master-excel.schema.json#master_task.
-The `primary_source` column is set to "tech_fix" (closest enum match for
-internal-links structural issues — the master_task primary_source enum
-does NOT include an "internal_links" value, see ADR scope).
+The `primary_source` column is set to "internal_links" (master_task col C
+enum, Phase 8 closeout Q-IL-1 schema bump applied — internal_links is now
+an explicit enum member alongside tech_fix/schema/pillar/etc.).
 
 Pure function discipline (mirrors quickwins_transform + cannibalization):
   - No state mutation.
@@ -112,11 +112,10 @@ MASTER_TASK_COLUMNS: tuple[str, ...] = (
 )
 
 #: master_task primary_source enum (master-excel.schema.json#master_task col C).
-#: NOTE: there is NO "internal_links" entry in this enum; the closest
-#: structural match is "tech_fix". A future schema bump (Option B) could
-#: extend this enum but that is OUT OF SCOPE for Phase 8 Wave 1 (manager
-#: scope, ADR-required).
-PRIMARY_SOURCE_TECH_FIX = "tech_fix"
+#: Phase 8 closeout Q-IL-1: schema enum bump 9→10 values (additive, ADR-018
+#: pattern, schema_version unchanged) — internal_links is now an explicit
+#: enum member; W-C4 Wave 1 used "tech_fix" as substitute pre-bump.
+PRIMARY_SOURCE_INTERNAL_LINKS = "internal_links"
 
 #: statusEnum (master-excel.schema.json#/definitions/statusEnum).
 STATUS_ENUM = frozenset({
@@ -138,7 +137,7 @@ _SEVERITY_RANK = {s: i for i, s in enumerate(SEVERITY_ENUM)}
 #: Source-field convention for auto_generated entries: the analysis kind
 #: (internal-links + sub-finding) goes into the `note` column as a
 #: machine-parseable prefix (`[internal-links/{kind}]`). The schema
-#: `primary_source` column carries the enum value (tech_fix); the
+#: `primary_source` column carries the enum value (internal_links); the
 #: detailed analysis lineage lives in note + metric_impact_json.
 NOTE_PREFIX = "[internal-links"
 KIND_ORPHAN = "orphan-page"
@@ -658,7 +657,7 @@ def _build_master_task_row(
     row = {
         "task_id": _build_task_id(project_slug, run_date, finding.kind, finding.url, idx),
         "task": finding.label,
-        "primary_source": PRIMARY_SOURCE_TECH_FIX,
+        "primary_source": PRIMARY_SOURCE_INTERNAL_LINKS,
         "related_sources": "internal-links",
         "url": finding.url,
         "category": "internal-links",
@@ -687,9 +686,9 @@ def _validate_row(row: dict) -> None:
             f"master_task row column drift: got={tuple(row.keys())}, "
             f"expected={MASTER_TASK_COLUMNS}"
         )
-    if row["primary_source"] != PRIMARY_SOURCE_TECH_FIX:
+    if row["primary_source"] != PRIMARY_SOURCE_INTERNAL_LINKS:
         raise RowSchemaError(
-            f"primary_source must be {PRIMARY_SOURCE_TECH_FIX!r}, "
+            f"primary_source must be {PRIMARY_SOURCE_INTERNAL_LINKS!r}, "
             f"got {row['primary_source']!r}"
         )
     if row["status"] not in STATUS_ENUM:
@@ -1106,7 +1105,7 @@ if __name__ == "__main__":
 
 __all__ = (
     "MASTER_TASK_COLUMNS",
-    "PRIMARY_SOURCE_TECH_FIX",
+    "PRIMARY_SOURCE_INTERNAL_LINKS",
     "STATUS_ENUM",
     "SEVERITY_ENUM",
     "SEVERITY_CRITICAL",

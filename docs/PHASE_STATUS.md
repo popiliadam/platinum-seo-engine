@@ -1,7 +1,7 @@
 # Phase Status
 
-**Last Updated:** 2026-05-01T09:07:14Z
-**Active Phase:** Phase 8 — Planning ACTIVE (5 skill: cluster-map, topical-map, new-content-plan, internal-links, master-task-sync)
+**Last Updated:** 2026-05-01T09:18:03Z
+**Active Phase:** Phase 9 — Reporting NEXT (8 skill: monthly-report, weekly-summary, portfolio-overview, portfolio-weekly-brief, portfolio-monthly-roundup, portfolio-task-heatmap, portfolio-kpi-trend, portfolio-heatmap)
 
 ## Previous Phase
 **Phase 3 — Scripts ✅ DONE 2026-04-30 (commit 3a0e8f5)**
@@ -29,6 +29,7 @@
 | Phase 5 | done | 2026-04-30 | 2026-04-30 | 073497f |
 | Phase 6 | done | 2026-04-30 | 2026-05-01 | aa105d0 |
 | Phase 7 | done | 2026-05-01 | 2026-05-01 | 759cd20 |
+| Phase 8 | done | 2026-05-01 | 2026-05-01 | (closeout commit) |
 
 ## Next Phase Preview
 **Phase 2 — Rules & Disciplines:** 10 normatif disiplin (naming.md, single-source-of-truth.md, schema-first.md, append-only-state.md, excel-discipline.md, secrets-management.md, glossary-discipline.md, skill-description-discipline.md, schema-versioning-discipline.md, time-discipline.md) — eski rules/universal-rules.json'dan ilham, yeniden yazım.
@@ -65,7 +66,7 @@
 - [x] Phase 8 prep (PHASE_STATUS Phase 7 hash 759cd20 + Phase 8 active set, commit 3035a55)
 - [x] Wave 1 — 4 paralel planning (W-C1 cluster-map + W-C2 topical-map + W-C3 new-content-plan + W-C4 internal-links, 52 yeni pytest, 294/294 full repo PASS, brief disiplini 5'inci vaka Q-W-C3-COL schema-first resolved, W-C4 Option A master_task auto_generated)
 - [x] Wave 2 — 1 worker master-task-sync (W-D1, 533+1093+931=2557L, 18 pytest, 312/312 full repo PASS, schema authority compliance: allowed_writers + writer_scope + protected_columns; append+merge D column semantik; v1→v2 brief revision manager pre-dispatch 2 drift catch)
-- [ ] Closeout — multiple ADR aday (Q-IL-1 + Q-W-C2-01 + Q-W-C3-TIVL) + drift fix Q-CD-01 + brief disiplini lesson 6+7 process doc + Phase 8 DONE
+- [x] Closeout — 0 yeni ADR (DECISIONS.md byte unchanged 5877B margin 267B) + 2 schema enum additive bump (Q-IL-1 master_task primary_source 9→10 +internal_links + Q-W-C2-01 topical_map page_type promote {pillar,cluster,supporting}) + W-C4 internal_links_transform.py + tests refactor (PRIMARY_SOURCE_TECH_FIX → PRIMARY_SOURCE_INTERNAL_LINKS) + W-D1 PRIMARY_SOURCE_ENUM sync + test polarity flip + Q-CD-01 cleanup (skills/discovery/cluster-map/ rm+rmdir) + brief disiplini lesson 6+7 process doc CONTEXT_LEDGER + Phase 8 DONE
 
 ## Outstanding Open Questions (Phase 7 closeout sonrası, Phase 8+ defer)
 - **Q-W-A4-02 + Q-W-B4-02** — DFS htags shape variance + D-03 strict-join vs prefix-match cross-skill paterni divergence (Phase 8+ cross-skill ADR aday)
