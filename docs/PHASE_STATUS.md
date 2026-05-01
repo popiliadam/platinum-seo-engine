@@ -1,7 +1,7 @@
 # Phase Status
 
-**Last Updated:** 2026-05-01T08:50:00Z
-**Active Phase:** Phase 7 — Discovery NEXT (8 skill: cannibalization, content-decay, tech-audit, on-page-audit, content-gaps, schema-audit, competitive-analysis, geo-analysis)
+**Last Updated:** 2026-05-01T15:00:00Z
+**Active Phase:** Phase 8 — Planning NEXT (5 skill: cluster-map, topical-map, new-content-plan, internal-links, master-task-sync)
 
 ## Previous Phase
 **Phase 3 — Scripts ✅ DONE 2026-04-30 (commit 3a0e8f5)**
@@ -28,6 +28,7 @@
 | Phase 4 | done | 2026-04-30 | 2026-04-30 | 91248ed |
 | Phase 5 | done | 2026-04-30 | 2026-04-30 | 073497f |
 | Phase 6 | done | 2026-04-30 | 2026-05-01 | aa105d0 |
+| Phase 7 | done | 2026-05-01 | 2026-05-01 | (closeout commit) |
 
 ## Next Phase Preview
 **Phase 2 — Rules & Disciplines:** 10 normatif disiplin (naming.md, single-source-of-truth.md, schema-first.md, append-only-state.md, excel-discipline.md, secrets-management.md, glossary-discipline.md, skill-description-discipline.md, schema-versioning-discipline.md, time-discipline.md) — eski rules/universal-rules.json'dan ilham, yeniden yazım.
@@ -54,15 +55,22 @@
 - [x] Wave 2 — 4 paralel: W-Q init-project (8 pytest) ∥ W-R sf-import (7 pytest) ∥ W-S drift-check (11 pytest, validate_invariants.py 1280L 20 rule) ∥ W-T whats-next (5 pytest)
 - [x] Wave 3 — closeout (CONTEXT_LEDGER Phase 5 + F-08 + Phase 6 prep + PHASE_STATUS [x] + atomic commit dizisi)
 
-## Phase 6 NEXT — Ingestion (3 skill: gsc-pull, dfs-pull, scrapling-ops)
-- ADR-026 hard cap formal revision (5120→6144B) — Phase 4+5 R1+R2 3 tightening turu matematiksel kanıtlıyor
-- Q-015 scrapling-output-mapping pattern resolve (ADR-025 adayı)
-- DataForSEO + Scrapling MCP .mcp.json append (env var: ${DFS_API_TOKEN}, ${SCRAPLING_API_TOKEN})
-- F-08 RE-EVAL otomatik gsc-pull deliverable sonrası
-- F4 CTR units gsc-tool-mapping.schema dokümantasyon
+## Phase 7 Tasks
+- [x] Phase 7 prep (PHASE_STATUS Phase 6 hash aa105d0 + Phase 7 active set, commit 9803250)
+- [x] Wave 1 — 4 paralel discovery (W-A1 cannibalization + W-A2 content-decay + W-A3 tech-audit + W-A4 on-page-audit, 64 yeni pytest, 5d3d964)
+- [x] Wave 2 — 4 paralel discovery (W-B1 content-gaps + W-B2 schema-audit + W-B3 competitive-analysis + W-B4 geo-analysis, 62 yeni pytest, ADR-025 first activation S1 schema, 528c43e)
+- [x] Closeout — 3 ADR (027 transform size / 028 tech_seo enum + Web Vitals / 029 budget per-run) + 3 rotation cycle (023+024+025→archive) + D-011 quickwins dedup_by_url fix + tech_seo schema enum bump + Phase 7 DONE
 
-## Outstanding Open Questions
-- **Q-015** — scrapling-output-mapping pattern dependency (Phase 6 öncesi, non-blocking; Phase 6 başında ADR-025 + ADR-026 hard cap revision birlikte gündem)
-- **Q-WN-01** — Plugin hook loader directory-merge belirsizliği (plugin.json explicit array ile geçici çözüldü, resmi doc clarification beklenebilir)
-- **Q-016** — audit_action enum mapping (Edit/Write/Bash → modified/accessed) — Phase 14+ governance refinement, non-blocking
-- **Q-WO-02** — shared/active.json mutability semantics (append-only-state.md kapsam dışı, future ADR aday)
+## Phase 8 NEXT — Planning (5 skill: cluster-map, topical-map, new-content-plan, internal-links, master-task-sync)
+- Phase 7 staging tabloları konsume edilecek: content-gaps + competitive-analysis + geo-analysis staging → master.xlsx routing
+- master_task sheet otorite olarak güncel; CSR F-06, F-09, D-01, D-02 PASS hedefleri
+- D-011 cannibalization semantik benzerlik review (Phase 8 cluster-map ile share aday)
+- Fresh manager session önerilir (CONTEXT_LEDGER ~28 entry, phase boundary)
+
+## Outstanding Open Questions (Phase 7 closeout sonrası, Phase 8+ defer)
+- **Q-W-A4-02 + Q-W-B4-02** — DFS htags shape variance + D-03 strict-join vs prefix-match cross-skill paterni divergence (Phase 8+ cross-skill ADR aday)
+- **Q-W-B3-01** — D-03 path-case clause explicit (cross-skill consistency lock'lu, future ADR aday)
+- **Phase 14+ CI test self-gate** — r-string regex literal exclude (D-010 Path B + .env.example precedent)
+- **Q-WN-01** — Plugin hook loader directory-merge (plugin.json explicit array ile çözüldü, resmi doc clarification opsiyonel)
+- **Q-016** — audit_action enum mapping (Phase 14+ governance refinement, non-blocking)
+- **Q-WO-02** — shared/active.json mutability semantics (future ADR aday)

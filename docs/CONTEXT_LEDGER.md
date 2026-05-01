@@ -489,3 +489,25 @@ Spec §13.2: <15KB initial load = <2% of 1M context window. Tracking under budge
 9. Phase 14+ CI test self-gate r-string regex exclude (D-010 Path B + .env.example precedent)
 10. F-08 RE-EVAL Phase 7 8 skill master.xlsx populate sonrası drift-check
 11. Phase 7 push (Süleyman onayı kritik, ~5-7 commit batch)
+
+## Phase 7 Brief Disiplini Lesson (2026-05-01, seventeenth session paste continued)
+- Manager brief'lerde uydurma schema field reddedildi worker schema-first disiplini ile (ADR-013 paterni). 3 vaka:
+  - Phase 1 W-G Q-W-G-01: skill-frontmatter `use_when`/`also_use_when`/`do_not_use_when` ayrı field değil (description string-internal); worker brief'i reddetti.
+  - Phase 7 W-A4 Q-W-A4-01: `budget.estimated_credits_per_call` schema-frontmatter `additionalProperties: false` budget block'unda yok (sadece `uses_paid_mcp` + `estimated_credits` izinli); worker reddetti.
+  - Phase 7 W-B4 Q-W-B4-01: `project_name` schema-config field değil (`display_name`); worker mapping documented.
+- **Phase 7+ disiplin:** brief yazmadan önce `jq '.properties... | keys'` veya `grep -nE` ile schema field isimleri grep et. Wave 2 brief'inden itibaren enforcement: brief acceptance gate'inde `grep estimated_credits_per_call → 0`. Worker self-gate (forbidden-token assertion) proactive defense kanıtladı.
+- **ADR-013 paterni reaffirmed:** spec/schema authority > manager brief disiplini. Worker schema-first reddi DOĞRU karar; manager brief drift normalleşmemeli, grep hijyeni şart.
+
+## Phase 7 CLOSED (2026-05-01, seventeenth session paste continued)
+- Phase 7 commit zinciri: prep (9803250) + Wave 1 (5d3d964) + Wave 2 (528c43e) + Closeout (this commit). Toplam 4 commit Phase 7.
+- 8 Discovery skill canlı (5 master.xlsx writer: cannibalization+content_decay+tech_seo+on_page_audit+schema; 3 staging-only: content-gaps+competitive-analysis+geo-analysis).
+- pytest 242/242 PASS (Wave 1: 64 + Wave 2: 62 + D-011 dedup +1 = 127 yeni Phase 7 toplam, repo total 242, no regression).
+- 3 yeni ADR (027 transform size <1500L / 028 tech_seo issue_category enum + Web Vitals 2024 note / 029 budget per-run convention).
+- 3 rotation cycle (11/12/13: ADR-023+024+025 → archive). 4 active body: ADR-026, 027, 028, 029 (3-floor satisfied).
+- DECISIONS.md 5877B (margin 267B / 6144B), DECISIONS_ARCHIVE.md 24759B.
+- D-011 fix: scripts/discovery/quickwins_transform.py `dedup_by_url` parameter (default True, opt-out False); test_quick_wins.py +1 case (test_dedup_by_url_keeps_top_score). Phase 6 live capture 33 row → 7 unique URL bug closed.
+- Schema enum bump: master-excel.schema sheets.tech_seo issue_category enum 5 değer + description Web Vitals 2024 note (ADR-028 implementation).
+- Q-CO-01 closeout brief drift kayıt: brief tech_seo `metric_name` field iddiası yanlış (6 col, metric_name yok); ADR-028 honest reframe (issue_category enum + description). Brief disiplini lesson eklendi (yukarı bölüm).
+- Defer Phase 8+ veya v1.1+: Q-W-A4-02 + Q-W-B4-02 cross-skill DFS htags + D-03 strict-join/prefix-match, Q-W-B3-01 D-03 path-case clause, Phase 14+ CI test self-gate, transform helper shared lib (ADR-027 OPTIONAL).
+- Phase 8 NEXT: Planning 5 skill (cluster-map, topical-map, new-content-plan, internal-links, master-task-sync). Fresh manager session önerilir (CONTEXT_LEDGER ~30 entry, phase boundary).
+- Süleyman aksiyon (commit sonrası, opsiyonel): F-08 RE-EVAL drift-check rerun (8 skill master.xlsx populate sonrası invariants). Phase 7 push (~5 commit batch: 296c49c → closeout) Süleyman onayı kritik.

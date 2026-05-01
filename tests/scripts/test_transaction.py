@@ -282,7 +282,7 @@ def test_severity_enum_validates(tmp_path: Path) -> None:
 
     def _tech_row(impact: str) -> dict:
         return {
-            "issue_category": "perf",
+            "issue_category": "Performance",
             "detail": "slow LCP",
             "affected_urls": "/page",
             "impact": impact,

@@ -200,8 +200,9 @@
     "tech_seo": {
       "header_row": 3,
       "data_start_row": 4,
+      "description": "Tech audit findings. Modern Web Vitals 2024: INP supersedes FID for responsiveness measurement (Q-W-A3-01 closure); transform-owned threshold logic (rules/schema-first.md). issue_category enum locked per ADR-028; future categories require additive bump (ADR-018 paterni).",
       "required_columns": [
-        { "col": "A", "name": "issue_category" },
+        { "col": "A", "name": "issue_category", "enum": ["Performance", "Layout Stability", "Meta Tags", "Structured Data", "Accessibility"] },
         { "col": "B", "name": "detail" },
         { "col": "C", "name": "affected_urls" },
         { "col": "D", "name": "impact",     "ref": "#/definitions/severityEnum" },
