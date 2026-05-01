@@ -1,6 +1,6 @@
 # Phase Status
 
-**Last Updated:** 2026-05-01T08:13:39Z
+**Last Updated:** 2026-05-01T08:42:00Z
 **Active Phase:** Phase 8 — Planning ACTIVE (5 skill: cluster-map, topical-map, new-content-plan, internal-links, master-task-sync)
 
 ## Previous Phase
@@ -61,11 +61,11 @@
 - [x] Wave 2 — 4 paralel discovery (W-B1 content-gaps + W-B2 schema-audit + W-B3 competitive-analysis + W-B4 geo-analysis, 62 yeni pytest, ADR-025 first activation S1 schema, 528c43e)
 - [x] Closeout — 3 ADR (027 transform size / 028 tech_seo enum + Web Vitals / 029 budget per-run) + 3 rotation cycle (023+024+025→archive) + D-011 quickwins dedup_by_url fix + tech_seo schema enum bump + Phase 7 DONE
 
-## Phase 8 NEXT — Planning (5 skill: cluster-map, topical-map, new-content-plan, internal-links, master-task-sync)
-- Phase 7 staging tabloları konsume edilecek: content-gaps + competitive-analysis + geo-analysis staging → master.xlsx routing
-- master_task sheet otorite olarak güncel; CSR F-06, F-09, D-01, D-02 PASS hedefleri
-- D-011 cannibalization semantik benzerlik review (Phase 8 cluster-map ile share aday)
-- Fresh manager session önerilir (CONTEXT_LEDGER ~28 entry, phase boundary)
+## Phase 8 Tasks
+- [x] Phase 8 prep (PHASE_STATUS Phase 7 hash 759cd20 + Phase 8 active set, commit 3035a55)
+- [x] Wave 1 — 4 paralel planning (W-C1 cluster-map + W-C2 topical-map + W-C3 new-content-plan + W-C4 internal-links, 52 yeni pytest, 294/294 full repo PASS, brief disiplini 5'inci vaka Q-W-C3-COL schema-first resolved, W-C4 Option A master_task auto_generated)
+- [ ] Wave 2 — 1 worker master-task-sync (D-01 SSoT aggregate, NEXT)
+- [ ] Closeout — drift fix Q-CD-01 skills/discovery/cluster-map/.gitkeep + Phase 8 DONE
 
 ## Outstanding Open Questions (Phase 7 closeout sonrası, Phase 8+ defer)
 - **Q-W-A4-02 + Q-W-B4-02** — DFS htags shape variance + D-03 strict-join vs prefix-match cross-skill paterni divergence (Phase 8+ cross-skill ADR aday)
