@@ -1,23 +1,32 @@
 """
-tests/skills/test_dfs_pull.py — dfs-pull ingestion skill end-to-end tests.
+tests/skills/test_dfs_pull.py — dfs-pull ingestion skill tests (D-003 staging-only).
 
-Seven cases mirroring the W-V worker brief acceptance gate (Phase 6
-Wave 1, paid-MCP authority). The TR forwarding workaround (live test
-1835229: dataforseo-mcp-server@2.8.9 returns location_code=2840 even
-when 2792 is requested) is tested via mock fixtures — no live API
-needed.
+Phase 6 Wave 1, paid-MCP authority. The TR forwarding workaround
+(live test 1835229: dataforseo-mcp-server@2.8.9 returns
+location_code=2840 even when 2792 is requested) is exercised via mock
+fixtures — no live API needed.
+
+Routing change (D-003): dfs_pull no longer writes to master.xlsx; it
+emits SQLite-style staging JSON files at
+``_state/staging/dfs_{tool}_{date}_{slug}.json`` (mirrors scrapling-ops).
+The Phase 8 cluster-map skill consumes the staging JSON downstream.
 
 Cross-module IMPORT-only discipline:
-  - scripts.excel.transaction       (atomic per-sheet write + backup FIFO 7)
-  - scripts.state.workflow_runner   (10-step run shell)
-  - scripts.state.events_writer     (dataforseo_mcp provenance event)
+  - scripts.ingestion.dfs_pull      (transform + TR workaround helpers
+                                     + write_staging + StagingSchemaError)
+  - scripts.state.events_writer     (dataforseo_mcp provenance event;
+                                     target_excel_sheet=null in staging-only mode)
   - scripts.budget.check_budget     (§16.8 pre-flight; FIRST paid skill)
-  - scripts.ingestion.dfs_pull      (transform + TR workaround helpers)
+    (imported indirectly via dfs_pull.preflight_budget)
 
 Schemas referenced:
-  - schemas/skill-frontmatter.schema.json    (frontmatter draft7)
-  - schemas/master-excel.schema.json         (cluster_keywords, opportunity)
-  - schemas/events.schema.json               (source.kind=dataforseo_mcp)
+  - schemas/skill-frontmatter.schema.json   (frontmatter draft7)
+  - schemas/events.schema.json              (source.kind=dataforseo_mcp,
+                                             target_excel_sheet=null)
+
+NOTE: scripts.excel.transaction is intentionally NOT imported — staging-
+only routing means dfs_pull does not produce Excel rows. Cluster-map
+(Phase 8) is the consumer that lifts staging JSON into master.xlsx.
 
 Run from repo root:
     PYTHONPATH=. pytest tests/skills/test_dfs_pull.py -v
@@ -26,14 +35,12 @@ Run from repo root:
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 
 import pytest
 import yaml
 from jsonschema import Draft7Validator
 
-from scripts.excel import transaction
 from scripts.ingestion import dfs_pull
 from scripts.state import events_writer
 
@@ -56,11 +63,6 @@ def skill_frontmatter_schema() -> dict:
     return json.loads(
         (SCHEMAS / "skill-frontmatter.schema.json").read_text("utf-8")
     )
-
-
-@pytest.fixture(scope="module")
-def master_excel_schema() -> dict:
-    return json.loads((SCHEMAS / "master-excel.schema.json").read_text("utf-8"))
 
 
 @pytest.fixture(scope="module")
@@ -93,7 +95,7 @@ def overview_payload_us_drift() -> dict:
                 "language_code": "en",
                 "items": [
                     {
-                        "keyword": "diş kliniği",
+                        "keyword": "dis klinigi",
                         "keyword_info": {"search_volume": 9100, "competition": "MEDIUM"},
                         "search_intent_info": {"main_intent": "commercial"},
                         "language_code": "en",
@@ -121,22 +123,40 @@ def overview_payload_tr_correct() -> dict:
                 "language_code": "tr",
                 "items": [
                     {
-                        "keyword": "diş kliniği",
-                        "keyword_info": {"search_volume": 12100, "competition": "MEDIUM"},
+                        "keyword": "kw-alpha",
+                        "keyword_info": {
+                            "search_volume": 12100,
+                            "competition": 0.55,
+                            "competition_level": "MEDIUM",
+                            "cpc": 1.05,
+                        },
                         "search_intent_info": {"main_intent": "commercial"},
                         "language_code": "tr",
+                        "location_code": 2792,
                     },
                     {
-                        "keyword": "implant fiyatları",
-                        "keyword_info": {"search_volume": 8100, "competition": "HIGH"},
+                        "keyword": "kw-beta",
+                        "keyword_info": {
+                            "search_volume": 8100,
+                            "competition": 0.85,
+                            "competition_level": "HIGH",
+                            "cpc": 2.30,
+                        },
                         "search_intent_info": {"main_intent": "transactional"},
                         "language_code": "tr",
+                        "location_code": 2792,
                     },
                     {
-                        "keyword": "diş beyazlatma",
-                        "keyword_info": {"search_volume": 5400, "competition": "LOW"},
+                        "keyword": "kw-gamma",
+                        "keyword_info": {
+                            "search_volume": 5400,
+                            "competition": 0.20,
+                            "competition_level": "LOW",
+                            "cpc": 0.65,
+                        },
                         "search_intent_info": {"main_intent": "informational"},
                         "language_code": "tr",
+                        "location_code": 2792,
                     },
                 ],
             }],
@@ -147,7 +167,7 @@ def overview_payload_tr_correct() -> dict:
 @pytest.fixture
 def volume_payload_tr_correct() -> dict:
     """Mock Google Ads search_volume response (workaround B alt endpoint),
-    locale honoured. Keys match what dfs_pull.load_volume_index expects.
+    locale honoured.
     """
     return {
         "tasks": [{
@@ -156,12 +176,18 @@ def volume_payload_tr_correct() -> dict:
                 "location_code": 2792,
                 "language_code": "tr",
                 "items": [
-                    {"keyword": "diş kliniği",
-                     "search_volume": 12100, "competition": "MEDIUM", "cpc": 1.05},
-                    {"keyword": "implant fiyatları",
-                     "search_volume": 8100, "competition": "HIGH", "cpc": 2.30},
-                    {"keyword": "diş beyazlatma",
-                     "search_volume": 5400, "competition": "LOW", "cpc": 0.65},
+                    {"keyword": "kw-alpha",
+                     "search_volume": 12100, "competition": "MEDIUM",
+                     "competition_level": "MEDIUM", "cpc": 1.05,
+                     "language_code": "tr", "location_code": 2792},
+                    {"keyword": "kw-beta",
+                     "search_volume": 8100, "competition": "HIGH",
+                     "competition_level": "HIGH", "cpc": 2.30,
+                     "language_code": "tr", "location_code": 2792},
+                    {"keyword": "kw-gamma",
+                     "search_volume": 5400, "competition": "LOW",
+                     "competition_level": "LOW", "cpc": 0.65,
+                     "language_code": "tr", "location_code": 2792},
                 ],
             }],
         }],
@@ -169,7 +195,7 @@ def volume_payload_tr_correct() -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Test (a) — Frontmatter parse + schema validate
+# Test (a) — Frontmatter parse + schema validate (PRESERVED)
 # ---------------------------------------------------------------------------
 
 def test_frontmatter_validates_against_schema(
@@ -203,86 +229,168 @@ def test_frontmatter_validates_against_schema(
 
 
 # ---------------------------------------------------------------------------
-# Test (b) — Transform unit: TR-correct fixture → expected rows
+# Test (b) — _normalize_dfs_response: tolerate REST + flat shapes,
+#                                     reject the rest. Parametrized.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize(
+    "case,raw,expected",
+    [
+        (
+            "rest_envelope",
+            {"tasks": [{"result": [{"items": [{"keyword": "a"}]}]}]},
+            [{"keyword": "a"}],
+        ),
+        (
+            "flat_wrapper",
+            {"items": [{"keyword": "a"}]},
+            [{"keyword": "a"}],
+        ),
+    ],
+)
+def test_normalize_dfs_response_tolerates_known_shapes(
+    case: str, raw: dict, expected: list,
+) -> None:
+    """Both the REST envelope (tasks[0].result[0].items) and the flat
+    wrapper ({"items": [...]}) must normalise to the same list-of-dicts.
+    Live confirmed shapes (D-003 root-cause fix).
+    """
+    items = dfs_pull._normalize_dfs_response(raw)
+    assert items == expected, f"case={case!r} produced {items!r}"
+
+
+def test_normalize_dfs_response_unrecognized_shape_raises() -> None:
+    """Inputs that match neither known DFS shape must raise ValueError
+    with a message containing 'Unrecognized DFS response shape'."""
+    with pytest.raises(ValueError) as ei:
+        dfs_pull._normalize_dfs_response({"foo": "bar"})
+    assert "Unrecognized DFS response shape" in str(ei.value)
+
+
+# ---------------------------------------------------------------------------
+# Test (c) — Transform unit: TR-correct fixture → keyword_overview staging
 # ---------------------------------------------------------------------------
 
 def test_transform_tr_correct_payload(
     overview_payload_tr_correct: dict,
     volume_payload_tr_correct: dict,
+    tmp_path: Path,
 ) -> None:
-    """Happy path: payload honors TR, transform emits 3 cluster_keywords
-    rows + 3 opportunity rows, sorted by volume desc / score desc."""
+    """Happy path: payload honors TR, transform emits a keyword_overview
+    staging payload AND a search_volume staging payload. write_staging
+    persists each to ``_state/staging/dfs_{tool}_{date}_{slug}.json``.
+    """
+    project_slug = "p-test"
     out = dfs_pull.transform(
         overview_payload_tr_correct,
         raw_volume=volume_payload_tr_correct,
-        cluster_default="dental",
+        project_slug=project_slug,
         location_code=2792,
         language_code="tr",
     )
-    ck = out["cluster_keywords"]
-    op = out["opportunity"]
 
-    assert len(ck) == 3
-    assert len(op) == 3
+    # In-memory shape: keyword_overview AND search_volume staging tables.
+    ov = out["keyword_overview"]
+    vol = out["search_volume"]
+    assert ov is not None and vol is not None
+    assert ov["row_count"] == 3
+    assert vol["row_count"] == 3
+    assert ov["schema_version"] == dfs_pull.STAGING_SCHEMA_VERSION
+    assert ov["tool"] == "keyword_overview"
+    assert vol["tool"] == "search_volume"
+    assert ov["project_slug"] == project_slug
+    # Columns lock — no extra/missing keys.
+    assert tuple(ov["columns"]) == dfs_pull.KEYWORD_OVERVIEW_COLUMNS
+    assert tuple(vol["columns"]) == dfs_pull.SEARCH_VOLUME_COLUMNS
 
-    # Sort: monthly_volume desc → diş kliniği(12100) > implant fiyatları(8100) > diş beyazlatma(5400)
-    assert ck[0]["keyword"] == "diş kliniği"
-    assert ck[0]["monthly_volume"] == 12100
-    assert ck[0]["data_source"] == "dfs_keyword_overview"
-    assert ck[0]["cluster"] == "dental"
-    assert ck[0]["intent"] == "Commercial"  # search_intent main_intent="commercial"
+    # Per-row invariants: id monotonic from 1, content_hash sha256:hex.
+    for idx, row in enumerate(ov["rows"], start=1):
+        assert row["id"] == idx
+        assert isinstance(row["content_hash"], str)
+        assert row["content_hash"].startswith("sha256:")
+        # exact column projection — staging-shape lock.
+        assert set(row.keys()) == set(dfs_pull.KEYWORD_OVERVIEW_COLUMNS)
+        # locale honoured.
+        assert row["language_code"] == "tr"
+        assert row["location_code"] == 2792
 
-    # Schema-shape: exactly the 11 cluster_keywords columns.
-    assert set(ck[0].keys()) == set(dfs_pull.CLUSTER_KEYWORDS_COLUMNS)
+    # Persist to staging directory under tmp_path/_state/staging/.
+    staging_dir = tmp_path / "_state" / "staging"
+    written = dfs_pull.write_staging(
+        out,
+        staging_dir=staging_dir,
+        project_slug=project_slug,
+        date="2026-05-01",
+    )
+    assert "keyword_overview" in written
+    assert "search_volume" in written
 
-    # Opportunity scoring: diş beyazlatma (5400 × 1.0 LOW) = 5400 should
-    # outrank implant fiyatları (8100 × 0.3 HIGH) = 2430 and diş kliniği
-    # (12100 × 0.6 MEDIUM) = 7260 — actually diş kliniği wins.
-    assert op[0]["query"] == "diş kliniği"
-    # Schema-shape: 8 opportunity columns.
-    assert set(op[0].keys()) == set(dfs_pull.OPPORTUNITY_COLUMNS)
+    ov_path = Path(written["keyword_overview"])
+    assert ov_path.exists()
+    assert ov_path.name == dfs_pull.staging_filename(
+        tool="keyword_overview", date="2026-05-01", project_slug=project_slug,
+    )
+    # File round-trip: bytes match the in-memory payload.
+    on_disk = json.loads(ov_path.read_text("utf-8"))
+    assert on_disk == ov
+
+    vol_path = Path(written["search_volume"])
+    assert vol_path.exists()
+    assert json.loads(vol_path.read_text("utf-8")) == vol
+
+    # IMPORTANT: no master.xlsx written.
+    assert not (tmp_path / "master.xlsx").exists()
 
 
 # ---------------------------------------------------------------------------
-# Test (c) — Schema column match (cluster_keywords + opportunity)
+# Test (d) — Staging columns are the SSoT for dfs-pull (NOT master schema).
+#            (Renamed semantics: D-003 staging-only.)
 # ---------------------------------------------------------------------------
 
 def test_transform_columns_match_master_schema(
     overview_payload_tr_correct: dict,
-    master_excel_schema: dict,
 ) -> None:
-    """Transform output must match master-excel.schema column names
-    exactly — no extra keys, no missing keys."""
+    """Under D-003 (staging-only), the column SSoT is the dfs_pull module
+    constants (KEYWORD_OVERVIEW_COLUMNS / SEARCH_VOLUME_COLUMNS) — these
+    are the contract the cluster-map skill consumes from staging JSON.
+
+    Test name preserved for diff-traceability; semantics updated: we no
+    longer cross-check master-excel.schema (cluster_keywords/opportunity
+    are produced downstream by cluster-map, not by dfs-pull).
+    """
     out = dfs_pull.transform(
         overview_payload_tr_correct,
-        cluster_default="dental",
+        project_slug="p-test",
         location_code=2792,
         language_code="tr",
     )
 
-    sheets = master_excel_schema["sheets"]
-    ck_cols = {c["name"] for c in sheets["cluster_keywords"]["required_columns"]}
-    op_cols = {c["name"] for c in sheets["opportunity"]["required_columns"]}
+    ov = out["keyword_overview"]
+    assert ov is not None
 
-    # Module constants must equal the schema (not a superset, not a subset).
-    assert set(dfs_pull.CLUSTER_KEYWORDS_COLUMNS) == ck_cols, (
-        f"cluster_keywords drift: module={set(dfs_pull.CLUSTER_KEYWORDS_COLUMNS)} "
-        f"schema={ck_cols}"
-    )
-    assert set(dfs_pull.OPPORTUNITY_COLUMNS) == op_cols, (
-        f"opportunity drift: module={set(dfs_pull.OPPORTUNITY_COLUMNS)} "
-        f"schema={op_cols}"
-    )
+    # Module constants are sealed: id + content_hash + envelope fields
+    # mirror scrapling-ops staging-table conventions.
+    expected_overview = {
+        "id", "keyword", "search_volume", "cpc", "competition",
+        "competition_level", "search_intent", "language_code",
+        "location_code", "content_hash", "fetched_at",
+    }
+    assert set(dfs_pull.KEYWORD_OVERVIEW_COLUMNS) == expected_overview
 
-    # Each emitted row carries exactly the schema's columns, nothing more.
-    for row in out["cluster_keywords"]:
-        assert set(row.keys()) == ck_cols
-    for row in out["opportunity"]:
-        assert set(row.keys()) == op_cols
+    expected_volume = {
+        "id", "keyword", "search_volume", "cpc", "competition",
+        "competition_level", "language_code", "location_code",
+        "content_hash", "fetched_at",
+    }
+    assert set(dfs_pull.SEARCH_VOLUME_COLUMNS) == expected_volume
+
+    # Each emitted row carries exactly the staging columns, nothing more.
+    for row in ov["rows"]:
+        assert set(row.keys()) == set(dfs_pull.KEYWORD_OVERVIEW_COLUMNS)
 
 
 # ---------------------------------------------------------------------------
-# Test (d) — TR workaround method tests (the 1835229 bug fixture)
+# Test (e) — TR workaround method tests (the 1835229 bug fixture)  PRESERVED
 # ---------------------------------------------------------------------------
 
 def test_tr_workaround_detects_us_drift(
@@ -294,28 +402,23 @@ def test_tr_workaround_detects_us_drift(
       - return False for the drifted (US) payload,
       - return True for the workaround-C HTTP-bypass payload.
     """
-    # Sanity: the env-detector pulls the SERVED locale, not the echoed
-    # request — that's the whole point of the bug.
     served_loc, served_lang = dfs_pull.detect_response_locale(overview_payload_us_drift)
     assert served_loc == 2840
     assert served_lang == "en"
 
-    # response_honors_tr respects served, not echoed → False.
     assert dfs_pull.response_honors_tr(
         overview_payload_us_drift,
         expected_location=2792, expected_language="tr",
     ) is False
 
-    # The TR-correct fixture passes.
     assert dfs_pull.response_honors_tr(
         overview_payload_tr_correct,
         expected_location=2792, expected_language="tr",
     ) is True
 
-    # Workaround C HTTP body builder: location_code/language_code carried
-    # in the JSON body (wrapper bypass — REST honours these).
+    # Workaround C HTTP body builder.
     body = dfs_pull.build_http_payload_tr(
-        keywords=["diş kliniği"], location_code=2792, language_code="tr",
+        keywords=["kw-alpha"], location_code=2792, language_code="tr",
     )
     assert isinstance(body, list) and len(body) == 1
     assert body[0]["location_code"] == 2792
@@ -335,7 +438,7 @@ def test_tr_workaround_detects_us_drift(
 
 
 # ---------------------------------------------------------------------------
-# Test (e) — Budget pre-flight integration (FIRST paid skill)
+# Test (f) — Budget pre-flight integration (FIRST paid skill)  PRESERVED
 # ---------------------------------------------------------------------------
 
 def test_budget_preflight_integration(tmp_path: Path) -> None:
@@ -353,7 +456,6 @@ def test_budget_preflight_integration(tmp_path: Path) -> None:
         "dataforseo": {"budget_credits_per_day": 500}
     }))
     events_path = tmp_path / "events.jsonl"
-    # No events file = treated as zero usage.
     envelope = dfs_pull.preflight_budget(
         estimated_credits=est,
         project_config_path=cfg_path,
@@ -378,41 +480,73 @@ def test_budget_preflight_integration(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test (f) — DURUR fired: TR workaround all-fail + missing creds + drift
+# Test (g) — DURUR fired: TR workaround all-fail + missing creds + drift
 # ---------------------------------------------------------------------------
 
 def test_durur_conditions_fire(
     overview_payload_us_drift: dict,
+    overview_payload_tr_correct: dict,
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """DURUR coverage:
+    """DURUR coverage (D-003 staging-only):
       #4: TR workaround all-fail → TrWorkaroundFailed when transform sees
           a non-TR payload and skip_tr_check=False.
+      #5: Staging payload drift → StagingSchemaError.
       #8: DATAFORSEO_USERNAME / DATAFORSEO_PASSWORD missing →
           CredentialError on http_credentials_from_env().
+      Subclass invariant: every raised error inherits from DfsPullError.
     """
     # #4 — transform refuses to silently emit US data.
-    with pytest.raises(dfs_pull.TrWorkaroundFailed):
+    with pytest.raises(dfs_pull.TrWorkaroundFailed) as ei4:
         dfs_pull.transform(
             overview_payload_us_drift,
+            project_slug="p-test",
             location_code=2792, language_code="tr",
             skip_tr_check=False,
         )
+    assert isinstance(ei4.value, dfs_pull.DfsPullError)
 
     # Caller can opt in via skip_tr_check=True after running A/B/C — then
-    # transform proceeds (this is the normal happy path AFTER workaround).
+    # transform proceeds with what's in the (drifted) payload.
     out = dfs_pull.transform(
         overview_payload_us_drift,
+        project_slug="p-test",
         location_code=2792, language_code="tr",
         skip_tr_check=True,
     )
-    assert len(out["cluster_keywords"]) == 1   # one item in the fixture
+    assert out["keyword_overview"]["row_count"] == 1   # one item in drift fixture
+
+    # #5 — StagingSchemaError when handing a malformed payload to
+    # write_staging (defensive re-validation must catch drift before disk).
+    bad_payload = {
+        "keyword_overview": {
+            "schema_version": "1.0",
+            "tool": "keyword_overview",
+            "project_slug": "p-test",
+            "fetched_at": "2026-05-01T00:00:00.000000+00:00",
+            "row_count": 1,
+            # Drift: columns don't match KEYWORD_OVERVIEW_COLUMNS.
+            "columns": ["id", "keyword"],
+            "rows": [{"id": 1, "keyword": "kw"}],
+        },
+        "search_volume": None,
+    }
+    with pytest.raises(dfs_pull.StagingSchemaError) as ei5:
+        dfs_pull.write_staging(
+            bad_payload,
+            staging_dir=tmp_path / "_state" / "staging",
+            project_slug="p-test",
+            date="2026-05-01",
+        )
+    assert isinstance(ei5.value, dfs_pull.DfsPullError)
 
     # #8 — credentials missing.
     monkeypatch.delenv("DATAFORSEO_USERNAME", raising=False)
     monkeypatch.delenv("DATAFORSEO_PASSWORD", raising=False)
-    with pytest.raises(dfs_pull.CredentialError):
+    with pytest.raises(dfs_pull.CredentialError) as ei8:
         dfs_pull.http_credentials_from_env()
+    assert isinstance(ei8.value, dfs_pull.DfsPullError)
 
     # #8 happy: both set.
     monkeypatch.setenv("DATAFORSEO_USERNAME", "test@example.com")
@@ -423,8 +557,7 @@ def test_durur_conditions_fire(
 
 
 # ---------------------------------------------------------------------------
-# Test (g) — Smoke E2E: provenance event emitted + opportunity sheet shared
-#                       writer (F-09 invariant) verified
+# Test (h) — Smoke E2E: staging file written + provenance event (null sheet)
 # ---------------------------------------------------------------------------
 
 def test_smoke_e2e_with_mock(
@@ -433,99 +566,92 @@ def test_smoke_e2e_with_mock(
     volume_payload_tr_correct: dict,
     events_schema: dict,
 ) -> None:
-    """End-to-end smoke:
-      1. Transform mock TR payload → 3 cluster_keywords + 3 opportunity rows.
-      2. transaction.append both sheets to a fresh workbook in tmp_path.
-      3. Emit a dataforseo_mcp provenance event via events_writer.
-      4. Re-validate the event against schemas/events.schema.json.
-      5. Assert opportunity is shared-writer safe: append a quick-wins
-         row AFTER dfs-pull and ensure both survive (F-09 invariant).
+    """End-to-end smoke (staging-only flow):
+      1. transform() mock TR payload → keyword_overview + search_volume
+         staging dicts.
+      2. write_staging() persists each to
+         tmp_path/_state/staging/dfs_{tool}_{date}_{slug}.json.
+      3. _validate_staging_payload accepts each on-disk file (no drift).
+      4. events_writer.append_provenance emits a dataforseo_mcp event
+         with target_excel_sheet=null (staging-only mode).
+      5. The emitted event validates against schemas/events.schema.json.
     """
-    slug = "dfs-test"
-    workbook = tmp_path / "projects" / slug / "master.xlsx"
-    workbook.parent.mkdir(parents=True, exist_ok=True)
-    state_dir = tmp_path / "projects" / slug / "_state"
-    state_dir.mkdir(parents=True, exist_ok=True)
+    project_slug = "p-test"
+    date_str = "2026-05-01"
 
+    # Step 1+2 — transform → staging payload → write to disk.
     out = dfs_pull.transform(
         overview_payload_tr_correct,
         raw_volume=volume_payload_tr_correct,
-        cluster_default="dental",
-        location_code=2792, language_code="tr",
+        project_slug=project_slug,
+        location_code=2792,
+        language_code="tr",
     )
 
-    # Step 8 — atomic per-sheet append.
-    res_ck = transaction.append(
-        workbook_path=workbook,
-        sheet="cluster_keywords",
-        rows=out["cluster_keywords"],
-        project_slug=slug,
-        writer="dfs-pull",
-    )
-    assert res_ck.rows_affected == 3
+    project_dir = tmp_path / "projects" / project_slug
+    state_dir = project_dir / "_state"
+    staging_dir = state_dir / "staging"
+    state_dir.mkdir(parents=True, exist_ok=True)
 
-    res_op = transaction.append(
-        workbook_path=workbook,
-        sheet="opportunity",
-        rows=out["opportunity"],
-        project_slug=slug,
-        writer="dfs-pull",
-    )
-    assert res_op.rows_affected == 3
-
-    # F-09 invariant: opportunity is shared with quick-wins. Append a
-    # quick-wins-shaped row and confirm BOTH survive (no overwrite).
-    qw_op_row = {
-        "query": "kw-from-quickwins",
-        "opportunity_score": 9999.0,
-        "current_position": 12.5,
-        "ctr_pct": 1.2,
-        "impressions_30d": 850,
-        "clicks_30d": 5,
-        "potential_clicks": 80,
-        "assigned_url_action": "https://example.com/page | refresh meta",
-    }
-    res_qw = transaction.append(
-        workbook_path=workbook,
-        sheet="opportunity",
-        rows=[qw_op_row],
-        project_slug=slug,
-        writer="quick-wins",
-    )
-    assert res_qw.rows_affected == 1
-
-    # Verify physical row count: 3 dfs + 1 qw = 4 data rows + 1 header.
-    from openpyxl import load_workbook
-    wb = load_workbook(str(workbook))
-    ws = wb["opportunity"]
-    assert ws.max_row == 5, (
-        f"shared-writer F-09 invariant broken: opportunity has "
-        f"{ws.max_row - 1} data rows, expected 4"
+    written = dfs_pull.write_staging(
+        out,
+        staging_dir=staging_dir,
+        project_slug=project_slug,
+        date=date_str,
     )
 
-    # Step 9 — provenance event with source.kind=dataforseo_mcp.
-    rid = events_writer.next_run_id(slug, workspace_root=tmp_path)
+    ov_path = Path(written["keyword_overview"])
+    vol_path = Path(written["search_volume"])
+    assert ov_path.exists()
+    assert vol_path.exists()
+    # Filename convention.
+    assert ov_path.name == f"dfs_keyword_overview_{date_str}_{project_slug}.json"
+    assert vol_path.name == f"dfs_search_volume_{date_str}_{project_slug}.json"
+    # Files live under the canonical staging path.
+    assert staging_dir in ov_path.parents
+
+    # Step 3 — re-validate on-disk JSON shape (defensive — should not raise).
+    on_disk_ov = json.loads(ov_path.read_text("utf-8"))
+    dfs_pull._validate_staging_payload(
+        on_disk_ov, columns=dfs_pull.KEYWORD_OVERVIEW_COLUMNS,
+    )
+    on_disk_vol = json.loads(vol_path.read_text("utf-8"))
+    dfs_pull._validate_staging_payload(
+        on_disk_vol, columns=dfs_pull.SEARCH_VOLUME_COLUMNS,
+    )
+
+    # IMPORTANT: no master.xlsx written. Cluster-map (Phase 8) is the
+    # downstream consumer that lifts staging JSON into Excel.
+    assert not (project_dir / "master.xlsx").exists()
+
+    # Step 4 — provenance event with source.kind=dataforseo_mcp and
+    # target_excel_sheet=null (staging-only ⇒ no Excel write).
+    rid = events_writer.next_run_id(project_slug, workspace_root=tmp_path)
+    response_bytes = len(json.dumps(overview_payload_tr_correct))
     result = events_writer.append_provenance(
-        project_id=slug,
+        project_id=project_slug,
         run_id=rid,
         source={
             "kind": "dataforseo_mcp",
             "mcp_server": "dataforseo",
             "mcp_tool": "dataforseo__dataforseo_labs_google_keyword_overview",
-            "response_bytes": len(json.dumps(overview_payload_tr_correct)),
+            "response_bytes": response_bytes,
+            "row_count": out["keyword_overview"]["row_count"],
         },
-        operation="project_excel",
-        target_excel_sheet="cluster_keywords",
-        rows_written=3,
+        operation="ingest",
+        target_table="dfs_keyword_overview",
+        target_excel_sheet=None,
+        rows_written=0,         # staging-only: no Excel rows yet.
         cost={
             "provider": "dataforseo",
-            "credits": 4.5,   # 3 keywords × 1.5
+            "credits": 4.5,     # 3 keywords × 1.5 (overview + volume)
             "budget_key": "project.config.dataforseo.budget_credits_per_day",
         },
         workspace_root=tmp_path,
     )
     assert result.event_id
 
+    # Read back events.jsonl and pick the dataforseo_mcp provenance entry.
     events_path = state_dir / "events.jsonl"
     lines = [
         json.loads(line)
@@ -541,12 +667,20 @@ def test_smoke_e2e_with_mock(
         "no provenance event_kind=provenance source.kind=dataforseo_mcp emitted"
     )
 
-    # Re-validate against the canonical events schema.
+    evt = dfs_provs[-1]
+    # Staging-only invariants.
+    assert evt["target_excel_sheet"] is None, (
+        "staging-only: target_excel_sheet must be null until cluster-map runs"
+    )
+    assert evt["source"]["kind"] == "dataforseo_mcp"
+    assert evt["operation"] == "ingest"
+
+    # Step 5 — re-validate against the canonical events schema (Draft 7).
     validator = Draft7Validator(events_schema)
-    for evt in dfs_provs:
-        errs = sorted(validator.iter_errors(evt),
-                      key=lambda e: list(e.absolute_path))
+    for e in dfs_provs:
+        errs = sorted(validator.iter_errors(e),
+                      key=lambda err: list(err.absolute_path))
         assert not errs, (
             "emitted dataforseo_mcp provenance event invalid: "
-            f"{[(list(e.absolute_path), e.message) for e in errs]}"
+            f"{[(list(err.absolute_path), err.message) for err in errs]}"
         )
