@@ -412,3 +412,36 @@ Spec §13.2: <15KB initial load = <2% of 1M context window. Tracking under budge
 - Açık sorular: Q-016, Q-WN-01, Q-WO-02 (non-blocking). Phase 7+ backlog: D-011 quick_wins duplicate URLs (Discovery skill closeout).
 - Phase 7 prep cosmetic fix: PHASE_STATUS line 4 Active Phase sadeleştirme (Phase 6 DONE prefix + discovery word duplication çıkarıldı) + Phase History row Phase 6 hash `aa105d0`.
 - Phase 7 NEXT: Discovery 8 skill — Wave 1 (cannibalization, content-decay, tech-audit, on-page-audit) ∥ Wave 2 (content-gaps, schema-audit, competitive-analysis, geo-analysis). Convention authority: skills/discovery/quick-wins/SKILL.md (Phase 5) + Phase 6 ingestion paterni reuse.
+
+## Phase 7 Wave 1 — 4 discovery skill paralel dispatch (2026-05-01, seventeenth session)
+- Wave 1: W-A1 cannibalization ∥ W-A2 content-decay ∥ W-A3 tech-audit ∥ W-A4 on-page-audit paralel dispatch.
+- Pre-dispatch: skills/discovery/on-page-audit/ mkdir (Phase 0 iskelet eksikti, Phase 6 W-W paterni). Diğer 3 dizin Phase 0'dan boş hazır.
+- Convention authority: skills/discovery/quick-wins/SKILL.md (Phase 5) + skills/ingestion/gsc-pull/SKILL.md (Phase 6) verbatim reuse, divergence YASAK (ADR yok).
+- Conflict matrisi sıfır: 4 farklı klasör/dosya (skills/discovery/{cannibalization,content-decay,tech-audit,on-page-audit}/SKILL.md + scripts/discovery/{cannibalization,content_decay,tech_audit,on_page_audit}_transform.py + tests/skills/test_*.py). events.jsonl shared ama append-only (Phase 3 W-L atomic discipline).
+- Schema-locked sheets (master-excel.schema): cannibalization 7 col / content_decay 8 col / on_page_audit 8 col / tech_seo 6 col.
+- Budget pre-flight first activation: W-A3 + W-A4 DFS heavy (lighthouse ~5-10 credit/URL, content_parsing ~2-3 credit/URL). scripts/budget/check_budget.py production deployment (ADR-016, events.jsonl SSoT).
+- 4 worker output package sentez sonrası atomic commit. ADR yazımı YOK (Phase 7 plan implementation, ADR-024 hibrit dispatch geçerli).
+
+## Phase 7 Wave 1 — sentez (2026-05-01, seventeenth session paste continued)
+- W-A1 cannibalization: 4 dosya (SKILL.md 13990B + transform 20812B + test 19595B + template 631B), 10/10 pytest, 8 DURUR, 0 drift.
+- W-A2 content-decay: 4 dosya (SKILL.md 17519B + transform 17794B + test 17259B + template 856B), 10/10 pytest, 9 DURUR (incl. DFS budget non-fallback DURUR), 0 drift.
+- W-A3 tech-audit: 4 dosya (SKILL.md 18594B + transform 36462B + test 23409B + template 1161B), 25/25 pytest, 10 DURUR, 3 question (Q-W-A3-01..03 non-blocking).
+- W-A4 on-page-audit: 4 dosya (SKILL.md 17305B + transform 23039B + test 19463B + template 1105B), 19/19 pytest, 9 DURUR, 2 question (Q-W-A4-01..02).
+- Toplam: 16 yeni dosya (4 SKILL.md + 4 transform + 4 test + 4 template). Phase 7 yeni pytest: 64 (10+10+25+19). Repo total: **179/179 PASS** (Phase 6: 115 + Phase 7 Wave 1: 64, no regressions).
+- 4 SKILL.md frontmatter Draft7 validate PASS. py_compile PASS. Cross-module imports OK.
+- DECISIONS.md byte-byte unchanged (00e0c1a7..., 6038B). .mcp.json byte-byte unchanged (3e9c2160...).
+- Budget pre-flight subprocess wrapper paterni: W-A3 ve W-A4 her iki test'te `check_budget.py --check` exit 0/1 mock'lu test PASS. ADR-016 events.jsonl SSoT korundu (transform → cost.credits provenance event).
+
+### Drift findings + open questions (Wave 2 / Phase 7 closeout adayları)
+- **Q-W-A3-01**: Lighthouse FID metriği deprecated (modern: INP); transform TBT proxy kullandı. Manager karar: TBT yeterli (mobile responsiveness coverage). Phase 7+ INP threshold ADR adayı.
+- **Q-W-A3-02**: "Images without alt" extracted ama master-excel.schema#tech_seo'da "Accessibility" category yok. Phase 7+ accessibility-audit skill ADR adayı (yeni issue_category enum).
+- **Q-W-A3-03**: `budget.estimated_credits` per-URL vs per-run konvansiyonu — dfs-pull paterni (per unit) takip edildi. Phase 7+ ADR ile run-level standartlaşır.
+- **Q-W-A4-01 (manager brief drift)**: Manager brief'i `budget.estimated_credits_per_call` field şart koştu, schema-frontmatter.schema sadece `estimated_credits` tanımlıyor. W-A4 schema-first disiplini gereği brief reddetti (ADR-013 paterni). **Manager kayıt:** brief drift, worker doğru karar verdi, gelecek brief'lerde schema field isimlerini ön-doğrula.
+- **Q-W-A4-02**: DFS on_page_content_parsing wrapper response shape varyansı (page-level vs item-level htags); transform her ikisini tolere ediyor. Phase 7 Wave 2 live capture confirme edecek.
+
+### Phase 14+ CI gate scope note (D-010 Path B extension)
+- Pre-push slug regex grep gate, r-string regex literal'lerini (test self-gates) exclude etmeli. Phase 6 `.env.example` precedent + bu Phase 7 W-A3 self-gate vakası iki örnek pattern oluşturdu. Letter-vs-spirit ayrımı: hardcoded slug referansı vs gate'in pattern literal'i. Phase 14+ CI implementation: `grep -rwE 'pattern' --exclude-from=.ci-gate-exclude` veya path-aware exclude (`tests/skills/test_*.py` self-gate r-string pattern'leri).
+
+### Cross-sheet invariants honored
+- D-03 URL canonicalization: W-A1 (cannibalization conflict_pair URL set) + W-A4 (DFS↔GSC join normalize) explicit honor; W-A2 (URL idempotency self-check DURUR), W-A3 (URL → affected_urls join). Cross-skill canonical form korundu.
+- F-08 (target_url ⊆ crawl_sitemap ∪ gsc_performance): Wave 1 4 skill'in tetikleyeceği master.xlsx populate Phase 7 closeout drift-check'te validate edilir.
