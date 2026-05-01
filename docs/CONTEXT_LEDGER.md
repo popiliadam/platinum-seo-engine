@@ -445,3 +445,47 @@ Spec §13.2: <15KB initial load = <2% of 1M context window. Tracking under budge
 ### Cross-sheet invariants honored
 - D-03 URL canonicalization: W-A1 (cannibalization conflict_pair URL set) + W-A4 (DFS↔GSC join normalize) explicit honor; W-A2 (URL idempotency self-check DURUR), W-A3 (URL → affected_urls join). Cross-skill canonical form korundu.
 - F-08 (target_url ⊆ crawl_sitemap ∪ gsc_performance): Wave 1 4 skill'in tetikleyeceği master.xlsx populate Phase 7 closeout drift-check'te validate edilir.
+
+## Phase 7 Wave 2 — 4 discovery skill paralel dispatch (2026-05-01, seventeenth session)
+- Wave 2: W-B1 content-gaps ∥ W-B2 schema-audit ∥ W-B3 competitive-analysis ∥ W-B4 geo-analysis paralel dispatch.
+- Pre-dispatch: 3 yeni dizin yaratıldı (skills/discovery/{schema-audit,competitive-analysis,geo-analysis}/). content-gaps Phase 0'dan boş hazırdı.
+- Q-W-A4-01 lesson enforced via schema verify: skill-frontmatter.schema.json budget block `additionalProperties: false`; sadece `uses_paid_mcp` (required bool) + `estimated_credits` (number ≥0) izinli — `_per_call/_per_url` uydurma schema validate-time'da bloke.
+- Wave 1 paterni reuse + 3 routing yeniliği:
+  - W-B1 content-gaps: STAGING-ONLY (D-003 paterni, _state/staging/), D-003 `_normalize_dfs_response` helper IMPORT (scripts/ingestion/dfs_pull.py:178), KOPYA YASAK
+  - W-B2 schema-audit: master.xlsx#schema sheet write (5 col: schema_type, status, location, scope, remaining_work — workflow_runner pattern Step 5 paterni)
+  - W-B3 competitive-analysis: STAGING-ONLY + ADR-025 first activation (templates/scrapling/S1_competitor_snapshot.schema.json yaratılacak, scrapling-output-mapping.schema §14.2 + tier_escalation §14.5 ['get','fetch','stealthy_fetch'] honor)
+  - W-B4 geo-analysis: STAGING-ONLY + D-003 helper IMPORT (LLM mentions paid + SERP organic)
+- Conflict matrisi sıfır: 4 farklı klasör/dosya. _state/staging/ append-only (W-B1/B3/B4 sub-namespace farklı), master.xlsx#schema W-B2 only.
+- 4 worker output package sentez sonrası atomic commit. ADR yazımı YOK (ADR-024 + ADR-025 zaten geçerli, S1 schema ADR-025 implementation).
+
+## Phase 7 Wave 2 — sentez (2026-05-01, seventeenth session paste continued)
+- W-B1 content-gaps: 4 dosya (SKILL 20881B + transform 30924B + test 23836B + template 1507B), 11/11 pytest, 9 DURUR, 0 drift. D-003 helper `_normalize_dfs_response` + `StagingSchemaError` IMPORT identity confirmed (`is` operator).
+- W-B2 schema-audit: 4 dosya (SKILL 18791B + transform 32239B + test 20031B + template 637B), 16/16 pytest, 8 DURUR, 0 drift. master.xlsx#schema 5-col write (workflow_runner pattern Step 5).
+- W-B3 competitive-analysis: 5 dosya (SKILL 22399B + transform 38101B + test 22263B + template 832B + **S1 schema 4262B ADR-025 first activation**), 16/16 pytest, 9 DURUR, 1 question (Q-W-B3-01 D-03 path-case cross-skill consistency).
+- W-B4 geo-analysis: 4 dosya (SKILL 22647B + transform 34420B + test 26737B + template 1016B), 19/19 pytest, 10 DURUR, 3 question (Q-W-B4-01..03).
+- Toplam: 17 yeni dosya (4 SKILL.md + 4 transform + 4 test + 4 template + 1 S1 schema). Phase 7 Wave 2 yeni pytest: 62 (11+16+16+19). Repo total: **241/241 PASS** (Wave 1: 179 + Wave 2: 62, no regressions).
+- 4 SKILL.md frontmatter Draft7 PASS. py_compile PASS. Cross-module imports OK.
+- DECISIONS.md byte-byte unchanged (00e0c1a7..., 6038B). .mcp.json byte-byte unchanged.
+- **ADR-025 first activation milestone:** templates/scrapling/S1_competitor_snapshot.schema.json yaratıldı (draft-07, $id `https://platinum-seo-engine/templates/scrapling/S1_competitor_snapshot.schema.json`, 5 required + 15 properties, additionalProperties:false). scrapling-output-mapping.schema §14.2 S1 reference + §14.5 tier_escalation invariant honored.
+- **Q-W-A4-01 enforcement:** Wave 2 4 worker hepsi `additionalProperties: false` budget block'la uyumlu, runtime'da `_per_call/_per_url` 0 leakage; W-B2/B3/B4 test'lerine self-gate forbidden-token assertion eklendi (proactive defense).
+- **D-003 paterni cross-skill SSoT realization:** content_gaps + geo_analysis transform IMPORTS `_normalize_dfs_response` from dfs_pull (Python `is` identity confirmed). Tek değişiklik 3 skill atomik etkiler.
+
+### Drift findings + open questions (Phase 7 closeout adayları)
+- **Q-W-B3-01 (resolved by convention):** Brief D-03 example "HTTPS://Example.COM/Path/ → https://example.com/path" path lowercasing implied but cross-skill paterni (cannibalization Wave 1) path case preserves. Worker cross-skill consistency tercih etti. Phase 7 closeout: D-03 spec'in path-case clause'u explicit yazılırsa cross-skill ADR adayı (mevcut state'te invariant lock'lu).
+- **Q-W-B4-01 (manager brief drift):** Brief `project_name` field şart koştu, schemas/project-config.schema.json field is `display_name`. Worker mapping documented (transform param=project_name, orchestrator maps display_name→project_name). **Manager kayıt:** Q-W-A4-01 + Q-W-B4-01 toplam 2 brief drift, schema field grep hijyeni Phase 7 closeout process improvement adayı.
+- **Q-W-B4-02 (cross-skill paterni divergence):** D-03 cross-source mismatch handling — W-A4 on-page-audit strict-join (paired URL) vs W-B4 geo-analysis prefix-match (project-root). İkisi de doğru tasarım kararı (W-A4 row-level cross-ref needs strict join; W-B4 brand visibility needs project-root scope). Phase 7 closeout: cross-skill D-03 invariant rule clarification ADR adayı.
+- **Q-W-B4-03:** geo_signals 7-col layout master-excel.schema'da YOK (staging-only by design). Phase 8+ cluster-map/monthly-report sheet definition ekleyebilir downstream'de.
+- **Phase 7 transform size pattern:** W-A3 1011L + W-B1 851L + W-B2 915L + W-B3 1047L + W-B4 973L → 5 transform >800L. <800L Phase 3 W-L paterni 5 skill'de aşıldı. Phase 7 closeout: kabul (transform domain complexity tradeoff) / split (helpers modülü extraction) karar.
+
+### Phase 7 closeout brief adayları (Süleyman + karar verici agent)
+1. D-011 quick_wins duplicate URLs (cannibalization semantik review — duplicate detection logic share edebilir)
+2. Phase 7 transform size 5×>800L: kabul / split policy
+3. Q-W-A3-01 INP threshold ADR (Lighthouse FID deprecated)
+4. Q-W-A3-02 accessibility issue_category enum bump ADR
+5. Q-W-A3-03 budget.estimated_credits per-URL vs per-run convention ADR
+6. Q-W-A4-01 + Q-W-B4-01 brief disiplini doc (CONTEXT_LEDGER process improvement, schema field grep hijyeni)
+7. Q-W-A4-02 + Q-W-B4-02 cross-skill paterni note (DFS htags shape variance + D-03 strict-join vs prefix-match)
+8. Q-W-B3-01 D-03 path-case clause explicit ADR adayı
+9. Phase 14+ CI test self-gate r-string regex exclude (D-010 Path B + .env.example precedent)
+10. F-08 RE-EVAL Phase 7 8 skill master.xlsx populate sonrası drift-check
+11. Phase 7 push (Süleyman onayı kritik, ~5-7 commit batch)
