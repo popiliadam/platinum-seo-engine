@@ -36,7 +36,7 @@ Drift'in en sessiz girişi, isim kayışıdır: aynı varlık iki yerde iki fark
 - `$id: "https://example.com/x"` — proje dışı host (ADR-012 ihlali).
 - `/init-project` — `pseo-` prefix yok, çakışma riski.
 - `run_id: "InitProject_20260430"` — tarih formatı bozuk, slug CamelCase.
-- Plugin repo içinde proje-spesifik slug (örn: `demo-dental-init`) — §8.3 ihlali.
+- Plugin repo içinde proje-spesifik slug (örn: `acme-init` gibi gerçek proje slug'ı ile prefiks/suffiks) — §8.3 ihlali.
 
 ## Enforcement
 - CI: `tests/naming/test_slug_regex.py` tüm `*.schema.json`, `commands/*.md`, `skills/*/SKILL.md` taranır.

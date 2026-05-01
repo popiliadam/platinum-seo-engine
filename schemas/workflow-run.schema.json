@@ -132,7 +132,7 @@
       "properties": {
         "approver": {
           "type": "string",
-          "description": "Identifier of the human or role expected to approve (e.g. 'user', 'editor@demo-dental').",
+          "description": "Identifier of the human or role expected to approve (e.g. 'user', 'editor@example').",
           "minLength": 1
         },
         "subject": {

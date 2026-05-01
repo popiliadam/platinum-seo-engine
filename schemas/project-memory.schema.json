@@ -16,7 +16,7 @@
     },
     "domain": {
       "type": "string",
-      "description": "Primary site identity. Either a bare hostname (e.g. 'demo-dental.example') or a short brand label when the site is multi-domain. Used by GSC/SF/DFS skills as the property/site key.",
+      "description": "Primary site identity. Either a bare hostname (e.g. 'example.com') or a short brand label when the site is multi-domain. Used by GSC/SF/DFS skills as the property/site key.",
       "minLength": 3,
       "maxLength": 253
     },

@@ -8,7 +8,7 @@ description: |
   redirect_404, schema, on_page_audit, tech_seo, robots_txt) atomic write
   yapar; raw CSV'leri inbox/sf/ altına envelope-li JSON olarak persist
   eder.
-  Also use when: pilot demo-dental sf-exports/2026-04-27/raw/ dizini hazır;
+  Also use when: pilot project sf-exports/{export_date}/raw/ dizini hazır;
   Tier 1 14/14 zorunlu rapor mevcut; Tier 2 search_console_all eksik AMBER
   warning üretilmesi gerek; mcp__gsc__list_sitemaps ile cross-check
   yapılacak; sf_imported provenance event yazılacak.
@@ -146,7 +146,7 @@ Cross-references `schemas/sf-required-reports.schema.json` definitions.canonical
 `v_` / `p_` prefixes, strip `(1)` suffixes, fold Turkish `ı→i`), and
 matches each canonical_name. Tier 1 missing → RED FAIL. Tier 2 missing →
 AMBER warn, NOT a fail (search_console_all is the canonical Tier 2
-exemption surfaced in the demo-dental pilot).
+exemption surfaced in pilot validation).
 
 ```python
 matched, missing_t1, missing_t2 = scripts.ingestion.sf_validate.match_tiers(raw_dir)
@@ -291,7 +291,7 @@ workflow_runner.complete(handle.run_id, project_slug=project_slug, outputs={
 
 ## Filename normalization (Tier 1 matching)
 
-The pilot demo-dental export ships every Tier 1 file twice: once with the
+The pilot project export ships every Tier 1 file twice: once with the
 canonical name (`internal_all.csv`) and once with a `de_` prefix (German
 locale shadow `de_internal_all.csv`). Plus a third Turkish-i variant
 (`de_ınternal_all.csv`). Normalization rules, applied in order:
@@ -344,7 +344,7 @@ Stop and flag the manager — do not patch, do not fall back.
   `scripts/excel/transaction.py`, `scripts/state/events_writer.py`,
   `scripts/validation/validate_schema.py`.
 - Tests: `tests/skills/test_sf_import.py` (6 cases incl. live SF batch).
-- Pilot data: `projects/demo-dental/sf-exports/2026-04-27/raw/`
+- Pilot data path: `projects/{slug}/sf-exports/{export_date}/raw/`
   (Tier 1 14/14 + Tier 2 9/10 with `search_console_all` AMBER).
 
 ## Discipline checklist
