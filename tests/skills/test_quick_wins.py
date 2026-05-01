@@ -355,3 +355,73 @@ def test_provenance_event_emitted(tmp_path: Path, events_schema: dict) -> None:
     for evt in prov:
         errs = sorted(validator.iter_errors(evt), key=lambda e: e.path)
         assert not errs, f"emitted event invalid: {[(list(e.absolute_path), e.message) for e in errs]}"
+
+
+# ---------------------------------------------------------------------------
+# Test 9 — D-011 dedup_by_url collapses multi-query rows sharing a URL
+# ---------------------------------------------------------------------------
+
+def test_dedup_by_url_keeps_top_score() -> None:
+    """D-011 fix (Phase 7 closeout): when the GSC payload returns multiple
+    rows that share the same URL (different queries), dedup_by_url=True
+    (default) collapses them by keeping only the highest-_score row per
+    url_normalized. Phase 6 live capture surfaced 33 quick_wins rows but
+    only 7 unique URLs (~26 duplicates). The opt-out path (False) preserves
+    every (query, URL) pair for callers that need multi-query analysis."""
+    raw = {
+        "quickWins": [
+            # Same URL, lower-score row (low impressions × small headroom).
+            {
+                "query": "alpha-low",
+                "page": "https://example.com/page-x/",
+                "currentPosition": 18.0,
+                "impressions": 100,
+                "currentClicks": 1,
+                "currentCtr": 0.01,
+                "potentialClicks": 5,
+            },
+            # Same URL, higher-score row (high impressions × big headroom).
+            {
+                "query": "alpha-high",
+                "page": "https://example.com/page-x/",
+                "currentPosition": 9.0,
+                "impressions": 2000,
+                "currentClicks": 10,
+                "currentCtr": 0.005,
+                "potentialClicks": 100,
+            },
+            # Different URL — should always be present.
+            {
+                "query": "beta",
+                "page": "https://example.com/page-y/",
+                "currentPosition": 14.0,
+                "impressions": 250,
+                "currentClicks": 0,
+                "currentCtr": 0.0,
+                "potentialClicks": 12,
+            },
+        ],
+        "totalOpportunities": 3,
+    }
+
+    # Default behavior: dedup_by_url=True.
+    out = quickwins_transform.transform(raw, top_n=10)
+    urls = [r["url"] for r in out["quick_wins"]]
+    assert len(urls) == len(set(urls)), (
+        f"D-011 violated — duplicate URLs leaked into quick_wins: {urls}"
+    )
+    page_x_row = next(r for r in out["quick_wins"] if "page-x" in r["url"])
+    assert page_x_row["query"] == "alpha-high", (
+        f"dedup must keep the higher-_score row, got {page_x_row['query']}"
+    )
+    assert page_x_row["impressions_30d"] == 2000
+    assert out["meta"]["dedup_by_url_applied"] is True
+
+    # Opt-out: dedup_by_url=False preserves every (query, URL) pair.
+    out2 = quickwins_transform.transform(raw, top_n=10, dedup_by_url=False)
+    urls2 = [r["url"] for r in out2["quick_wins"]]
+    page_x_count = sum(1 for u in urls2 if "page-x" in u)
+    assert page_x_count == 2, (
+        f"opt-out must preserve duplicates, got {page_x_count} page-x rows"
+    )
+    assert out2["meta"]["dedup_by_url_applied"] is False

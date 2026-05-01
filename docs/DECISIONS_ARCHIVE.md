@@ -14,6 +14,9 @@ ADR-011 rotation kararıyla `DECISIONS.md`'den taşınmış eski kararlar. Appen
 - ADR-020 (Phase 5 önü, 2026-04-30 — sekizinci rotation cycle, ADR-023 .mcp.json kararı ekleme ile DECISIONS.md 6330B tetiklenmesi sonrası en eski active cut)
 - ADR-021 (Phase 5 Wave 0, 2026-04-30 — dokuzuncu rotation cycle, ADR-024 hibrit dispatch + schema fix ekleme ile DECISIONS.md 6350B tetiklenmesi sonrası en eski active cut)
 - ADR-022 (Phase 6, 2026-04-30 — onuncu rotation cycle, ADR-025 Q-015 templates/scrapling/ ekleme ile DECISIONS.md >6144B tetiklenmesi sonrası en eski active cut; ADR-026 cap-only supersede ile uyumlu, body byte-byte korunur)
+- ADR-023 (Phase 7 closeout, 2026-05-01 — onbirinci rotation cycle, Phase 7 closeout ADR-027/028/029 ekleme ile DECISIONS.md hard cap tetiklenmesi sonrası en eski active cut)
+- ADR-024 (Phase 7 closeout, 2026-05-01 — onikinci rotation cycle, ADR-027 transform size policy ekleme sonrası en eski active cut)
+- ADR-025 (Phase 7 closeout, 2026-05-01 — onüçüncü rotation cycle, ADR-028+ADR-029 ekleme sonrası en eski active cut; templates/scrapling/S1_competitor_snapshot.schema.json W-B3 yarattı, ADR-025 implementation realize)
 
 **Active ADR'ler için:** [DECISIONS.md](DECISIONS.md)
 
@@ -208,3 +211,30 @@ ADR-011 rotation kararıyla `DECISIONS.md`'den taşınmış eski kararlar. Appen
 **Context:** ADR-014 numerik ambiguity (5000 vs 5120 KiB) Phase 3.1+3.2'de drift yarattı. Detay CONTEXT_LEDGER.
 **Decision:** Hard cap = 5120 bytes (binary KiB). Trigger: `stat -f '%z' docs/DECISIONS.md > 5120` → en eski active ADR archive'a. Floor: 3 active ADR (ADR-014 alt sınır geçerli).
 **Consequences:** ADR-014 rotation pattern korunur; numerik ambiguity kapandı. Phase 4+ DECISIONS yönetimi deterministic.
+
+---
+
+## ADR-023 — Engine MCP Server Kayıtları: Proje .mcp.json (Schema Constraint)
+**Date:** 2026-04-30
+**Status:** accepted
+**Context:** Phase 5 GSC MCP: ~/.claude/settings.json mcpServers reddedildi (Claude Desktop format). Doğru: proje-root .mcp.json. enableAllProjectMcpServers:true otomatik onay.
+**Decision:** Engine repo'suna ait MCP server kayıtları (.mcp.json) `/Users/apple/Documents/platinum-seo-engine/.mcp.json` dosyasında yaşar. Phase 5: gsc. Phase 6: dataforseo + scrapling aynı dosyaya append. SA path absolute şu an; Phase 6'da env var refactor (${GSC_SA_PATH}, ${DFS_API_TOKEN}). SA depolama: `/Users/apple/.config/seo-core/secrets/` agnostik klasör (proje-spesifik path YASAK).
+**Consequences:** Plugin agnostik prensip (ADR-008) korunur — başka makinelerde aynı .mcp.json + farklı env var değerleri. enableAllProjectMcpServers:true sayesinde kullanıcı prompt çıkmadan aktif. Phase 6 öncesi ek ADR: env var standartı + secrets klasör konvansiyonu.
+
+---
+
+## ADR-024 — Phase 5 Hibrit Dispatch + skill-frontmatter Category Fix + Workspace Snapshot
+**Date:** 2026-04-30
+**Status:** accepted
+**Context:** Phase 5 3 PRE-FIX: (1) skill-frontmatter category enum 6 değer, gerçek 8 dizin (Phase 1.4 W-G drift); (2) eski premium READ-ONLY ama Phase 5 yazma; (3) 5 skill convention drift Phase 6-12 compound.
+**Decision:** (1) Category enum 8 değer (skills/{category}/ layout). (2) Workspace snapshot ~/Documents/platinum-seo-workspace-staging (PSEO_WORKSPACE_ROOT, Phase 14'te kalıcıya cp). (3) Hibrit dispatch: Wave 1 quick-wins SERI + Wave 2 4-paralel (init-project, sf-import, drift-check, whats-next).
+**Consequences:** Schema fix Phase 1.4 drift kapandı. Workspace snapshot ADR-004+005 korundu. Hibrit dispatch Phase 6+ drift minimize.
+
+---
+
+## ADR-025 — templates/scrapling/ Dizin (Q-015 Resolution)
+**Date:** 2026-04-30
+**Status:** accepted
+**Context:** scrapling-output-mapping.schema `output_schema_file` pattern S1-S4 yolu bekliyor. Dizin yok (W-F OQ-WF-01 drift).
+**Decision:** templates/scrapling/.gitkeep yaratılır. Schema pattern mutate yok. Sub-schemas (S1-S4) Phase 7+ skill'lerle (competitive-analysis P7, content-improve P9). Phase 6 scrapling-ops generic helper.
+**Consequences:** Q-015 closed. templates/ agnostik. Schema-First korunur. Phase 6 dispatch bloke değil.

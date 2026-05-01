@@ -328,6 +328,7 @@ def transform(
     enriched: dict[tuple[str, str], EnrichmentRow] | None = None,
     top_n: int = 50,
     threshold_position_max: int = 20,
+    dedup_by_url: bool = True,
 ) -> dict:
     """
     Transform an mcp__gsc__detect_quick_wins payload into schema-shaped
@@ -341,6 +342,12 @@ def transform(
                   the quick-wins payload is sparse.
         top_n: Cap on output row count (after ranking).
         threshold_position_max: Position ceiling used in scoring.
+        dedup_by_url: D-011 fix (Phase 7 closeout). When True (default),
+                      keep only the highest-_score row per url_normalized
+                      (collapses multi-query rows that share a URL).
+                      Phase 6 live capture surfaced 33 quick_wins rows
+                      → 7 unique URLs (~26 duplicate). Set False for
+                      multi-query analysis where duplicates are desired.
 
     Returns:
         {"quick_wins": [...], "opportunity": [...], "meta": {...}}.
@@ -417,6 +424,22 @@ def transform(
             "priority": _priority_label(score),
         })
 
+    # D-011 fix (Phase 7 closeout): collapse rows that share the same
+    # url_normalized — keep the row with the highest _score per URL.
+    # Tie-break by query asc for determinism (stable on identical scores).
+    if dedup_by_url:
+        by_url: dict[str, dict] = {}
+        for r in scored:
+            existing = by_url.get(r["url"])
+            if existing is None:
+                by_url[r["url"]] = r
+                continue
+            if r["_score"] > existing["_score"]:
+                by_url[r["url"]] = r
+            elif r["_score"] == existing["_score"] and r["query"] < existing["query"]:
+                by_url[r["url"]] = r
+        scored = list(by_url.values())
+
     # Stable sort: score desc, then by query asc for determinism.
     scored.sort(key=lambda r: (-r["_score"], r["query"], r["url"]))
     top = scored[:top_n]
@@ -462,6 +485,7 @@ def transform(
             "opportunity_count": len(opportunity_rows),
             "threshold_position_max": threshold_position_max,
             "enriched_used": bool(enrich),
+            "dedup_by_url_applied": bool(dedup_by_url),
         },
     }
 
