@@ -1,6 +1,6 @@
 # Phase Status
 
-**Last Updated:** 2026-05-01T08:42:00Z
+**Last Updated:** 2026-05-01T09:07:14Z
 **Active Phase:** Phase 8 — Planning ACTIVE (5 skill: cluster-map, topical-map, new-content-plan, internal-links, master-task-sync)
 
 ## Previous Phase
@@ -64,8 +64,8 @@
 ## Phase 8 Tasks
 - [x] Phase 8 prep (PHASE_STATUS Phase 7 hash 759cd20 + Phase 8 active set, commit 3035a55)
 - [x] Wave 1 — 4 paralel planning (W-C1 cluster-map + W-C2 topical-map + W-C3 new-content-plan + W-C4 internal-links, 52 yeni pytest, 294/294 full repo PASS, brief disiplini 5'inci vaka Q-W-C3-COL schema-first resolved, W-C4 Option A master_task auto_generated)
-- [ ] Wave 2 — 1 worker master-task-sync (D-01 SSoT aggregate, NEXT)
-- [ ] Closeout — drift fix Q-CD-01 skills/discovery/cluster-map/.gitkeep + Phase 8 DONE
+- [x] Wave 2 — 1 worker master-task-sync (W-D1, 533+1093+931=2557L, 18 pytest, 312/312 full repo PASS, schema authority compliance: allowed_writers + writer_scope + protected_columns; append+merge D column semantik; v1→v2 brief revision manager pre-dispatch 2 drift catch)
+- [ ] Closeout — multiple ADR aday (Q-IL-1 + Q-W-C2-01 + Q-W-C3-TIVL) + drift fix Q-CD-01 + brief disiplini lesson 6+7 process doc + Phase 8 DONE
 
 ## Outstanding Open Questions (Phase 7 closeout sonrası, Phase 8+ defer)
 - **Q-W-A4-02 + Q-W-B4-02** — DFS htags shape variance + D-03 strict-join vs prefix-match cross-skill paterni divergence (Phase 8+ cross-skill ADR aday)
