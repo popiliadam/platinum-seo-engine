@@ -321,3 +321,9 @@ Spec §13.2: <15KB initial load = <2% of 1M context window. Tracking under budge
 - Root cause signature: hata mesajında literal "${VAR_NAME}" substring → env unresolved (Phase 6+ debug pattern).
 - D pattern: bash -c subshell + set -a + source .env. Plugin agnostik tam korunur (zero external dep). cwd assumption: Claude Code MCP server plugin root cwd'de spawn ediyor varsayımı; live test bunu da kanıtlayacak.
 - A fallback hazır (zshrc patch + INSTALL.md) eğer D fail.
+
+## Phase 6 .env naming convention fix (2026-04-30, sixteenth session)
+- 714d684 live retest: D pattern PASS (env resolve çalışıyor, cwd assumption doğrulandı — Claude Code MCP server plugin root cwd'de spawn ediyor), ama GSC FAIL — naming mismatch (paket mcp-server-gsc GOOGLE_APPLICATION_CREDENTIALS bekliyor, .env'de GSC_SA_PATH).
+- Karar: C — .env paket-spec direct naming. DataForSEO (DATAFORSEO_USERNAME/PASSWORD) ve Scrapling (SCRAPLING_BIN) zaten paket-spec uyumluydu; GSC_SA_PATH yalnız oddball. 12-factor convention: env var ismi paket public API'siyle birebir.
+- ADR-023 fine-tuning, yeni ADR gerekmez. Phase 6+ disiplin: yeni MCP eklerken paket env var ismini direkt .env'de kullan, abstraction katmanı yok (önceki "engine-prefixed naming" denemesi geri çevrildi).
+- .mcp.json byte-byte aynı (sha256 3e9c2160...): bash wrapper source .env yapıyor, paket env'i otomatik picks up — abstraction yok demek wrapper'da rename mapping yok demek.
