@@ -719,3 +719,77 @@ Spec §13.2: <15KB initial load = <2% of 1M context window. Tracking under budge
 - DECISIONS.md 5877B byte-byte unchanged (0 yeni ADR Wave 2, 4 active 026/027/028/029 korundu, 3-floor satisfied, margin 267B). Phase 9 closeout brief'inde ADR-030 triage planlanan (karar verici brief).
 - Phase 9 status: **8/8 reporting skill SHIPPED**, Wave 1 + Wave 2 toplam 32 dosya / +12505 line / 69 yeni pytest. Phase 9 closeout brief karar verici tarafından hazırlanacak (ADR-030 triage + schema bumps triage + push batch onayı + post-push doc + brief disiplini lesson 8 process doc).
 - Brief disiplini lesson 8 success case (Wave 2'de proven): proaktif schema-first cross-check + W-E3/W-E4 surface'lanmış convention reuse formal acceptance gate'lere yükselince (gate #10 + #11) → manager spot-check 0 finding + 4 worker zero brief revision dispatch. Wave 1'de 2 finding (gate #7 attribution + events.jsonl convention) → Wave 2'de 0 finding. Lesson 8 ROI kanıtlandı: brief revision cycle reduction + dispatch directness.
+
+## Phase 9 CLOSEOUT (2026-05-01T11:48:06Z, twenty-first session, push pending)
+- Phase 9 manager session retire — 8/8 reporting skill canlı (spec §17 Phase 9 acceptance karşılandı), Wave 1 + Wave 2 + closeout 2-commit yapısı tamamlandı.
+- 8 commit zinciri Phase 9 push'a bundle hazır (push pending Süleyman explicit onay):
+  * cdb5317 — Phase 8 post-push: CONTEXT_LEDGER append (carryover, Phase 9 manager session başında dahil)
+  * 8b641ff — Phase 9 prep: PHASE_STATUS Phase 8 hash + Phase 9 active set
+  * 2f681cc — Phase 9 Wave 1: 4 reporting skills (16 files / +5635 lines)
+  * c9c3395 — Phase 9 Wave 1 closeout: CONTEXT_LEDGER + Q-RP-01 OQ append
+  * 14cd7ee — Phase 9 Wave 2: 4 reporting skills (16 files / +6870 lines)
+  * f7009ca — Phase 9 Wave 2 closeout: CONTEXT_LEDGER + PHASE_STATUS update
+  * 27c22d0 — Phase 9 closeout (1/2): W-E3 backport refactor (W-E4 alignment, ~3 line diff, 8/8 + 381/381 PASS)
+  * (commit B placeholder) — Phase 9 closeout (2/2): PHASE_STATUS Phase 9 row + Phase 10 active set + CONTEXT_LEDGER 5 yeni section + Phase 9 DONE
+- Push batch stat (estimated): ~33 yeni dosya (Wave 1: 16 + Wave 2: 16 + closeout: doc-only) + ~12,500+ insertions / 0-2 deletion
+- pytest 312 (Phase 8 baseline) → 347 (Wave 1) → 381 (Wave 2) PASS, regression sıfır 8 commit boyunca, +69 yeni test (Wave 1: 35 + Wave 2: 34)
+- DECISIONS.md 5877B byte-byte unchanged 8 commit boyunca (4 active 026/027/028/029, 0 yeni ADR Phase 9, 3-floor satisfied, margin 267B). Phase 8 closeout paterni reuse (Q-IL-1 + Q-W-C2-01 = 0 ADR triage) Phase 9'da da uygulandı (worker decisions surface multi-source documentation: transform docstrings + SKILL.md cross-references + closeout commit body + CONTEXT_LEDGER lesson section, ADR yazımı redundant).
+- Discovery → Staging → Planning → Master → Reporting tam akış production'da (Phase 7 Discovery 8 skill → Phase 8 Planning 5 skill → Phase 9 Reporting 8 skill = 21 skill ekosistemi, Phase 5 Critical Path 5 + Phase 6 Ingestion 3 = 29 toplam skill canlı, Phase 10+ Content Rules + Production önkoşul olarak Reporting consume eder).
+- Q-RP-01 OQ Phase 14 governance refinement defer korundu (8/8 reporting skill events.jsonl-no-write paterni compliant). Detaylı recap aşağı.
+- Phase 10 fresh manager session ÖNERİLİR (CONTEXT_LEDGER ~40 entry boundary, Phase 10 = Content Rules Processing scope ayrı domain, fresh wakeup verim artırır).
+
+## Path Semantic Resolution Lesson (W-E3 Backport, Phase 9 Closeout)
+- Wave 2 sırasında W-E8 (portfolio-heatmap worker) catch'i: portfolio_overview.py (W-E3) workspace_path resolution `portfolio_root.parent` kullanıyordu, portfolio_weekly_brief.py (W-E4) ise `portfolio_root` direct kullanıyor. W-E3 outlier, W-E4 majority.
+- Wave 2 worker tercihleri convention authority kanıtladı: W-E5 mirrored W-E4 + .pse-workspace marker fallback (hybrid), W-E6 W-E4 paterni reuse, W-E7 W-E4 paterni reuse, W-E8 W-E4 paterni explicit tercih ("workspace_path resolves relative to portfolio_root itself, NOT portfolio_root.parent like W-E3").
+- Final tally: 5 W-E4 paterni (W-E4 + W-E5 hybrid + W-E6 + W-E7 + W-E8) vs 1 W-E3 outlier (portfolio_root.parent). 5/6 majority + W-E8 explicit tercih = convention drift resolution sinyal güçlü.
+- Resolution Phase 9 closeout (Karar 1): W-E3 backport refactor — `scripts/reporting/portfolio_overview.py:184-188` docstring + line 188 `(portfolio_root.parent / p)` → `(portfolio_root / p)` + W-E4 alignment notu inline (~3 line diff, commit 27c22d0).
+- Test impact analysis: 8/8 W-E3 test PASS (test fixture revize gereksiz çünkü tüm test'ler "missing master.xlsx tolerated" senaryosu kullanıyor — actual master.xlsx setup yapan test yok, path resolution değişiklik observe edilmiyor). Smoke validate 3 case PASS: absolute intact + relative W-E4 alignment (`/tmp/portfolio/ws-1`) + home expanduser intact.
+- Phase 14+ ADR aday: workspace_path semantics formal documentation (mevcut convention codified, multi-skill convention authority kayıt altına alınmış, future-proof). DECISIONS margin 267B yeterli ama Phase 9'da yazımı redundant (multi-source documentation paterni reuse: 8 worker SKILL.md + transform docstrings + closeout commit body + bu lesson section).
+- Phase 10+ programmatic SEO portfolio path ihtiyacı öncesi convention drift resolved (Phase 11+ Production skill'leri portfolio_root altında multi-project resource lookup yapacak, drift bug'ları önlenmiş).
+
+## Brief Disiplini Lesson 8 Process Doc (Wave 1 → Wave 2 Meta-Evrim)
+- Wave 1 (manager pre-dispatch schema-first cross-check sırasında): 7 spot-check, **2 finding catch**:
+  * Finding 1 (gate #7 attribution): brief "natural_language min 30 char (skill-frontmatter validation)" iddiası schema-level değildi (triggers.natural_language minLength tanımsız). Çözüm Seçenek A: brief revize "manager review checklist + worker pytest sentinel; schema-level constraint YOK" + 4 worker test_natural_language_min_length sentinel ekle.
+  * Finding 2 (events.jsonl convention): brief "events_writer.py reuse + operation=normalize/report_generation" iddiası W-D1 fiili pattern ile çelişti (W-D1 1095L scan: events.jsonl write YOK; operation enum 5 değer "PROVENANCE-only", "report_generation" YOK). Çözüm Seçenek C: events.jsonl YAZMA, W-D1 paterni gerçek anlamda reuse + Q-RP-01 OQ Phase 14 governance defer.
+- Wave 2 (karar verici proaktif schema-first cross-check brief'in altında): 6 spot-check, **0 finding** ✅. Brief authority self-verification (jq output kanıtları + W-E3/W-E4 surface'lanmış convention reuse + 11 acceptance gate explicit + lesson 8 referansı) → manager spot-check redundancy minimum, dispatch directness maximum.
+- Brief disiplini meta-evrim:
+  * **Lesson 6** (Phase 8 Wave 2): manager pre-dispatch fresh grep precedent — manager schema-first sorumluluğu enforce, brief authority blind trust YASAK
+  * **Lesson 7** (Phase 8 Wave 2): worker schema-first reddi precedent — worker schema authority hierarchy 1, brief authority hierarchy 2, dispatch sırasında çelişki olursa worker DUR + report
+  * **Lesson 8** (Phase 9 Wave 1 → Wave 2): manager schema-first proaktif — karar verici brief yazımı SIRASINDA schema cross-check + fiili pattern grep + brief authority self-verification → Wave 2'de 0 finding hedefe ulaştı
+- Phase 10+ enforcement protokolü (Lesson 8 codify):
+  1. Karar verici brief yazımı sırasında: schema cross-check (`jq` output) + fiili pattern grep (transform code + SKILL.md cross-ref) + brief'in altında "Schema Cross-Check Kanıtları" section
+  2. Manager pre-dispatch spot-check redundancy azaltır ama tamamen elimine etmez — brief'in kapsamadığı (deep dependency claims, multi-skill cross-skill convention) noktalarda spot-check zorunlu (lesson 8 sınırı)
+  3. Worker decisions surface → formal acceptance gate yükseltme (W-E4 path → gate #10, W-E3 helper → gate #11 paterni reuse): informational surface'i Wave/Phase boundary'sinde formal gate'e dönüştür
+  4. Convention authority "isim üzerinden" değil "fiili kod davranışı üzerinden" doğrulanır (lesson 8 W-D1 events.jsonl-no-write paterni catch precedent)
+- Lesson 8 ROI ölçümü (Wave 1 vs Wave 2):
+  * Brief revision cycle: Wave 1 = 2 yer revize (Seçenek A + Seçenek C), Wave 2 = 0
+  * Dispatch directness: Wave 1 = 2 finding raporu + Süleyman karar + brief revize + dispatch hazır = ~3 turn; Wave 2 = manager spot-check + 0 finding rapor + dispatch hazır = ~2 turn
+  * Worker zero-rework: Wave 1 + Wave 2 toplam 8 worker, hiçbiri convention drift nedeniyle re-dispatch ÖNERMEMİŞ (acceptance gates 36+44 = 80/80 PASS)
+- Phase 14+ aday: brief disiplini full process doc kodifikasyonu (Lesson 1-8 numara mapping + decision tree + protokol checklist) → "manager-brief-discipline-protocol.md" rules/ altında.
+
+## Q-RP-01 OQ Recap (Phase 14 Governance Defer)
+- Q-RP-01 OPEN_QUESTIONS.md'de Wave 1 closeout'unda eklendi (raised: 2026-05-01 during Phase 9 Wave 1 closeout, W-D1 fiili pattern + operation enum constraint cross-check sırasında ortaya çıktı).
+- 8/8 reporting skill events.jsonl-no-write paterni compliant (Wave 1 4 + Wave 2 4): monthly-report + weekly-summary + portfolio-overview + portfolio-weekly-brief + portfolio-monthly-roundup + portfolio-task-heatmap + portfolio-kpi-trend + portfolio-heatmap.
+- 4 seçenek dokümante (OPEN_QUESTIONS.md Q-RP-01 entry):
+  * (a) event_kind=audit + audit_action="read" + audit_target="master.xlsx" + actor="reporting-skill:{name}" — schema-pure, governance kategorisi semantik doğru, future Wave/Phase'lerde convention lock
+  * (b) events.schema operation enum additive bump (+ "report_generation" veya + "aggregate") — Phase 14 ADR-aday, schema_version bump, mevcut 5 enum geri uyumlu
+  * (c) Phase 14+ governance refinement'a defer (mevcut karar) — LOCAL aggregation audit trail'e değmez assumption
+  * (d) Reporting-specific audit log (`outputs/reports/_audit.jsonl` ayrı dosya) — events.jsonl scope'u dışı, ayrı convention
+- Owner: karar verici agent (Phase 14+ pre-dispatch, pilot smoke test deneyimi sonrası)
+- Blocking Phase: None (non-blocking, governance polish; Phase 9 boyunca tüm reporting skill'ler defer kararı geçerli)
+
+## Phase 10 NEXT Preview (Content Rules Processing)
+- Spec §17 Phase 10: `docs/superpowers/specs/2026-04-30-content-rules-input.md` (15.1KB) → `rules/content-*.md` + `templates/content/*` dönüşümü
+- Deliverables (spec):
+  * `rules/content-quality.md` (universal kurallar)
+  * `rules/content-html-discipline.md` (semantic HTML, CSS, kurumsal renk)
+  * `rules/content-seo-discipline.md` (linking, FAQ, keywords, intent, AEO/GEO)
+  * `templates/content/new-blog.template.md` (skeleton)
+  * `templates/content/new-blog.template.html` (kurumsal CSS slot'lı)
+  * `templates/content/revision.template.md`
+  * `templates/content/faq-block.template.html` (snippet-friendly)
+- Dispatch: 1 worker, dikkatli (production skill'lerini şekillendiriyor — Phase 11 Production Suite'in zorunlu önkoşulu)
+- Acceptance: tüm ~26 content rule kayıt altında; v1.3 production skill'leri için açık sözleşme; user review approval
+- Open Questions: 9 Q-CR-02..10 Süleyman input gerek (R-02 typo Phase 5'te kapatıldı). Karar verici brief Phase 10 başında 9 soruyu Süleyman'a iletir.
+- Fresh manager session ÖNERİLİR — Phase 10 ayrı domain (content rules), CONTEXT_LEDGER ~40 entry phase boundary, fresh wakeup spec §13.2 protokolü reuse + manager dosya seti yeniden okunur (<15KB ilk yükleme intact).
+- ETA: ~5 phase kalan (Phase 10 + 11 Production + 12 Publishing + 13 Governance + 14 Workspace+CI = v1 release).

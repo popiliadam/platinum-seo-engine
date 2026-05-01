@@ -1,10 +1,10 @@
 # Phase Status
 
-**Last Updated:** 2026-05-01T11:34:27Z
-**Active Phase:** Phase 9 — Reporting Wave 1+2 SHIPPED (8/8 skill canlı, 69 yeni pytest, closeout PENDING — karar verici brief bekleniyor: ADR-030 triage + schema bumps + push batch + post-push doc)
+**Last Updated:** 2026-05-01T11:48:06Z
+**Active Phase:** Phase 10 — Content Rules Processing NEXT (3 rules: /content-quality + /content-html-discipline + /content-seo-discipline + 4 templates: new-blog.md/html + revision + faq-block + 9 Q-CR-02..10 user input + Phase 11 Production Suite zorunlu önkoşul)
 
 ## Previous Phase
-**Phase 3 — Scripts ✅ DONE 2026-04-30 (commit 3a0e8f5)**
+**Phase 9 — Reporting ✅ DONE 2026-05-01 (commit B placeholder, 8/8 reporting skill canlı, 69 yeni pytest 312→381 PASS, 0 ADR + 0 schema bump triage Q-CD-01 paterni reuse, brief disiplini lesson 8 success case 0 finding Wave 2)**
 
 ### Phase 2 Tasks (hepsi closed)
 - [x] W-I — 5 disiplin (naming, single-source-of-truth, schema-first, append-only-state, excel-discipline) — done; 12975B toplam, 5/5 structure PASS, drift sıfır
@@ -30,9 +30,10 @@
 | Phase 6 | done | 2026-04-30 | 2026-05-01 | aa105d0 |
 | Phase 7 | done | 2026-05-01 | 2026-05-01 | 759cd20 |
 | Phase 8 | done | 2026-05-01 | 2026-05-01 | 05d7814 |
+| Phase 9 | done | 2026-05-01 | 2026-05-01 | (closeout commit B) |
 
 ## Next Phase Preview
-**Phase 2 — Rules & Disciplines:** 10 normatif disiplin (naming.md, single-source-of-truth.md, schema-first.md, append-only-state.md, excel-discipline.md, secrets-management.md, glossary-discipline.md, skill-description-discipline.md, schema-versioning-discipline.md, time-discipline.md) — eski rules/universal-rules.json'dan ilham, yeniden yazım.
+**Phase 10 — Content Rules Processing:** `docs/superpowers/specs/2026-04-30-content-rules-input.md` (15.1KB) → 3 rules dosyası (`rules/content-quality.md` + `rules/content-html-discipline.md` + `rules/content-seo-discipline.md`) + 4 template (`templates/content/new-blog.template.{md,html}` + `revision.template.md` + `faq-block.template.html`); 9 açık soru Q-CR-02..10 Süleyman'a sorulur (R-02 typo Phase 5'te kapatıldı). Phase 11 Production Skills'in zorunlu önkoşulu (5 production skill — new-blog/revise-content/generate-images/content-remediation/faq-optimization — Phase 10 çıktılarını consume eder). Dispatch: 1 worker dikkatli (production skill'lerini şekillendiriyor). ETA ~5 phase kalan (10-14 = v1 release). Fresh manager session ÖNERİLİR Phase 10 başında (CONTEXT_LEDGER ~40 entry phase boundary fresh wakeup verim).
 
 ## Phase 3 Tasks
 - [x] Phase 3.1 — Scripts taşıma + utility (W-K + W-M, 5 script + 5 test, 12/12 pytest PASS)
@@ -71,8 +72,11 @@
 ## Phase 9 Tasks
 - [x] Phase 9 prep (PHASE_STATUS Phase 8 hash 05d7814 + Phase 9 active set, commit 8b641ff)
 - [x] Wave 1 — 4 paralel reporting (W-E1 monthly-report + W-E2 weekly-summary + W-E3 portfolio-overview + W-E4 portfolio-weekly-brief, 35 yeni pytest, 347/347 PASS, 2 finding catch: gate #7 attribution + events.jsonl convention, Q-RP-01 OQ defer Phase 14, commit 2f681cc + closeout c9c3395)
-- [x] Wave 2 — 4 paralel reporting (W-E5 portfolio-monthly-roundup + W-E6 portfolio-task-heatmap + W-E7 portfolio-kpi-trend + W-E8 portfolio-heatmap, 34 yeni pytest, 381/381 PASS, lesson 8 proaktif uygulama 0 finding, +2 yeni gate #10 path convention + #11 assert_read_only_module helper, commit 14cd7ee)
-- [ ] Closeout — karar verici brief bekleniyor (ADR-030 triage + schema bumps triage + W-E3/W-E4 path semantik divergence resolution + push batch onayı + post-push doc + brief disiplini lesson 8 success case process doc)
+- [x] Wave 2 — 4 paralel reporting (W-E5 portfolio-monthly-roundup + W-E6 portfolio-task-heatmap + W-E7 portfolio-kpi-trend + W-E8 portfolio-heatmap, 34 yeni pytest, 381/381 PASS, lesson 8 proaktif uygulama 0 finding, +2 yeni gate #10 path convention + #11 assert_read_only_module helper, commit 14cd7ee + closeout f7009ca)
+- [x] W-E3 backport refactor — portfolio_overview path resolution W-E4 alignment (5/6 majority + W-E8 explicit tercih, ~3 line diff: docstring + line 188 portfolio_root.parent → portfolio_root, test fixture revize gereksiz çünkü tüm 8 test missing-master.xlsx senaryosu kullanıyor, smoke validate 3 case PASS, full repo 381/381 PASS regression sıfır, commit 27c22d0)
+- [x] Atomic Phase 9 closeout commit B (PHASE_STATUS Phase 9 row + Phase 10 active set + Previous Phase Phase 3→9 cosmetic fix + Phase 9 Tasks closure + Next Phase Preview Phase 10)
+- [x] CONTEXT_LEDGER append — 5 yeni section (Phase 9 CLOSEOUT 8 commit zinciri + Path Semantic Resolution Lesson W-E3 backport + Brief Disiplini Lesson 8 Process Doc Wave 1→Wave 2 meta-evrim + Q-RP-01 OQ Recap + Phase 10 NEXT Preview)
+- [ ] Push batch (8 commit cdb5317 → closeout commit B) — Süleyman explicit "push" komutu bekleniyor, pre-push 7-gate + post-push 4-gate manager protokolü hazır
 
 ## Outstanding Open Questions (Phase 7 closeout sonrası, Phase 8+ defer)
 - **Q-W-A4-02 + Q-W-B4-02** — DFS htags shape variance + D-03 strict-join vs prefix-match cross-skill paterni divergence (Phase 8+ cross-skill ADR aday)
