@@ -511,3 +511,15 @@ Spec §13.2: <15KB initial load = <2% of 1M context window. Tracking under budge
 - Defer Phase 8+ veya v1.1+: Q-W-A4-02 + Q-W-B4-02 cross-skill DFS htags + D-03 strict-join/prefix-match, Q-W-B3-01 D-03 path-case clause, Phase 14+ CI test self-gate, transform helper shared lib (ADR-027 OPTIONAL).
 - Phase 8 NEXT: Planning 5 skill (cluster-map, topical-map, new-content-plan, internal-links, master-task-sync). Fresh manager session önerilir (CONTEXT_LEDGER ~30 entry, phase boundary).
 - Süleyman aksiyon (commit sonrası, opsiyonel): F-08 RE-EVAL drift-check rerun (8 skill master.xlsx populate sonrası invariants). Phase 7 push (~5 commit batch: 296c49c → closeout) Süleyman onayı kritik.
+
+## Phase 7 PUSHED (2026-05-01, seventeenth session paste continued)
+- 5 commit batch (296c49c → 759cd20) origin/main remote updated. Push reverse-edilemez, GitHub API confirms 759cd204a8f5bf48ef5f532148337dc6bb268157.
+- Phase 7 deliverables remote'da: 8 Discovery skill (5 master.xlsx writer: cannibalization+content_decay+tech_seo+on_page_audit+schema; 3 staging-only: content-gaps+competitive-analysis+geo-analysis) + 127 yeni Phase 7 pytest (Wave 1: 64 + Wave 2: 62 + D-011: 1) + 3 ADR (027 transform / 028 tech_seo enum + Web Vitals 2024 / 029 budget per-run) + 3 rotation cycle (cycles 11/12/13: ADR-023+024+025 archive) + ADR-025 first activation (templates/scrapling/S1_competitor_snapshot.schema.json W-B3 Wave 2 yarattı) + D-011 quick_wins dedup_by_url fix + schema enum bumps (master-excel.schema sheets.tech_seo issue_category enum + Web Vitals 2024 description).
+- Push batch stat: 41 files / +15258 / -39 (net ~15219 line addition; 39 silme = 3 ADR rotation body removal + test placeholder fix + minor edits).
+- Discovery → Staging → Planning → Master akış paterni kanıtlandı (3 staging-only skill Phase 8 planning input tedarik zinciri).
+- pytest 242/242 PASS, no regression (Phase 6: 115 → Phase 7 Wave 1: 179 → Phase 7 Wave 2: 241 → Phase 7 Closeout D-011: 242).
+- 4 brief drift vaka resolution: Q-W-G-01 (Phase 1 use_when) + Q-W-A4-01 (estimated_credits_per_call) + Q-W-B4-01 (project_name vs display_name) + Q-CO-01 (closeout tech_seo metric_name). Schema field grep hijyeni Phase 8+ enforcement (CONTEXT_LEDGER process doc Phase 7 Brief Disiplini Lesson section).
+- Phase 6 Gate 6 false-positive lesson uygulandı: refined regex `DATAFORSEO_PASSWORD=[a-zA-Z0-9]{8,}|info@demo-agency|3bf73e0893f69b42` + `.env.example`/`docs/superpowers/specs/` exclude → 0 hit pre-push.
+- DECISIONS.md final 5877B (margin 267B / 6144B), 4 active body 026/027/028/029 (3-floor satisfied). DECISIONS_ARCHIVE.md 24759B (ADR-001..025, gap-015).
+- Phase 8 NEXT: Planning 5 skill (cluster-map + topical-map + new-content-plan + internal-links + master-task-sync). Fresh manager session önerilir (CONTEXT_LEDGER ~30 entry, phase boundary fresh wakeup).
+- Phase 7 manager session retire — Phase 8 yeni Claude Code window'da fresh bootstrap.
