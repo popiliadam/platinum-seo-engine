@@ -87,7 +87,12 @@ from scripts.ingestion.dfs_pull import (   # noqa: E402  (sys.path mutation abov
 # (master-excel.schema.json#new_content_plan required_columns)
 # ---------------------------------------------------------------------------
 
-#: Schema-locked column tuple — 11 cols. ANY drift = DURUR #3.
+#: Schema-locked column tuple — 14 cols (Phase 10 additive bump). ANY drift = DURUR #3.
+#: Phase 10 added L=image_prompt + M=alt_text + N=content_type (R-71/R-72/R-77 image
+#: discipline + content_type enum widening). New cols default to empty string;
+#: skill caller (Phase 11+ new-blog/generate-images) overrides as it materialises
+#: image prompt + alt text + content_type kind. Q-IL-1 + Q-W-C2-01 paterni reuse
+#: (additive, schema_version bump değil, ADR-018).
 NEW_CONTENT_PLAN_COLUMNS: tuple[str, ...] = (
     "id",
     "title",
@@ -100,7 +105,17 @@ NEW_CONTENT_PLAN_COLUMNS: tuple[str, ...] = (
     "created_date",
     "tivl_tag",
     "lifecycle_status",
+    "image_prompt",
+    "alt_text",
+    "content_type",
 )
+
+#: content_type enum (master-excel.schema.json#new_content_plan column N).
+#: Phase 10 additive — default empty string for staging rows; skill caller
+#: refines to one of these values when materialising image+brief plan.
+_CONTENT_TYPE_ENUM: frozenset[str] = frozenset({
+    "listicle", "guide", "comparison", "research", "tutorial", "review",
+})
 
 #: statusEnum allowed values
 #: (master-excel.schema.json#/definitions/statusEnum). Used to validate
@@ -838,6 +853,12 @@ def transform(
             "created_date": created,
             "tivl_tag": tivl_tag,
             "lifecycle_status": _DEFAULT_LIFECYCLE,
+            # Phase 10 additive cols — staging-time defaults are empty strings
+            # so the row column tuple stays schema-aligned. Skill caller
+            # (Phase 11 new-blog / generate-images) materialises these later.
+            "image_prompt": "",
+            "alt_text": "",
+            "content_type": "",
         }
 
         # Schema-shape self-check (defensive — catches any future drift in

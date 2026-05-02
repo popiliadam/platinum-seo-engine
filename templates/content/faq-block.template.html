@@ -1,0 +1,94 @@
+<!--
+  templates/content/faq-block.template.html
+  Phase 10 deliverable. Consumed by Phase 11 new-blog + faq-optimization skills.
+
+  Rules consumed:
+  - R-09 FAQ 10 sabit / 3000+ word 15 cap
+  - R-43 accordion YASAK — statik visible
+  - R-79 FAQPage schema @graph inline
+  - R-21 semantic HTML5 (h3, p)
+  - R-39 WCAG 2.1 AA (heading hierarchy, focus-visible)
+  - R-61 pse- prefix BEM
+  - R-83 JSON-LD only (microdata YASAK)
+
+  Rendering note:
+  - Skill render time her FAQ için <div class="pse-faq-item"> repeat.
+  - FAQPage schema {{FAQ_ITEMS_ARRAY}} array → new-blog.template.html @graph içine inject.
+-->
+
+<!-- ============================================================================
+     FAQ STATIC VISIBLE BLOCK (R-43 accordion YASAK, R-09 10 sabit)
+     ============================================================================ -->
+<div class="pse-faq__list">
+
+  {{!-- Repeat 10 (or 15 for 3000+ word) FAQ items.
+        Skill yields one <div class="pse-faq-item"> per Q&A.
+        Schema @graph below renders parallel JSON-LD entries (R-79 + R-83). --}}
+
+  <div class="pse-faq-item">
+    <h3 class="pse-faq-item__question">{{QUESTION_1}}</h3>
+    <p class="pse-faq-item__answer">{{ANSWER_1}}</p>
+  </div>
+
+  <div class="pse-faq-item">
+    <h3 class="pse-faq-item__question">{{QUESTION_2}}</h3>
+    <p class="pse-faq-item__answer">{{ANSWER_2}}</p>
+  </div>
+
+  <!-- ... 8 more for 10 standard, or up to 15 for 3000+ word ... -->
+
+  <div class="pse-faq-item">
+    <h3 class="pse-faq-item__question">{{QUESTION_N}}</h3>
+    <p class="pse-faq-item__answer">{{ANSWER_N}}</p>
+  </div>
+
+</div>
+
+<!-- ============================================================================
+     FAQPage SCHEMA — JSON-LD @graph inline (R-79 + R-83)
+     Skill render time @graph node, parent <script type="application/ld+json">
+     içine append. Bu fragment standalone değil — new-blog.template.html
+     @graph array'inin bir node'u.
+     ============================================================================ -->
+<!--
+{
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "{{QUESTION_1}}",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "{{ANSWER_1}}"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "{{QUESTION_2}}",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "{{ANSWER_2}}"
+      }
+    },
+    ...
+    {
+      "@type": "Question",
+      "name": "{{QUESTION_N}}",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "{{ANSWER_N}}"
+      }
+    }
+  ]
+}
+-->
+
+<!-- ============================================================================
+     CONSTRAINTS REFERENCE (skill validation)
+     - count: 10 standard; if word_count >= 3000 then up to 15 (R-09)
+     - each Q ≤ 100 char (snippet truncation, R-108)
+     - each A 40-50 word (definition snippet, R-107)
+     - no `:` or `-` in Question text (R-04)
+     - no JS accordion / `<details>` / `display:none` (R-43)
+     - WCAG: heading h3 (parent h2), focus-visible (R-39)
+     ============================================================================ -->

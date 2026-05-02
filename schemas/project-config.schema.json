@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://platinum-seo-engine/schemas/project-config.schema.json",
-  "title": "Project Configuration Schema v1.0",
-  "description": "Per-project pack definition (projects/{slug}/config/project.config.json). See ARCHITECTURE.md §10.",
+  "title": "Project Configuration Schema v1.1",
+  "description": "Per-project pack definition (projects/{slug}/config/project.config.json). See ARCHITECTURE.md §10. v1.1 (Phase 10): additive bump — content_settings + brand_identity extension fields. Required array UNCHANGED (additive policy, → rules/schema-versioning-discipline.md).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -10,7 +10,7 @@
     "currency", "platform", "profiles", "paths", "gsc", "dataforseo"
   ],
   "properties": {
-    "schema_version": { "const": "1.0" },
+    "schema_version": { "const": "1.1" },
     "project_id": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]*$",
@@ -99,7 +99,7 @@
     "brand_identity": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Visual brand identity block consumed by the blog_render Tier 1 CSS injection (S11/SP4 Part 2). Opt-in — projects without this block render with per-profile neutral grey defaults. All fields optional; a populated subset overrides the corresponding render-time slots while the rest fall back to per-profile defaults.",
+      "description": "Visual brand identity block consumed by the blog_render Tier 1 CSS injection (S11/SP4 Part 2) + Phase 10 content rules (R-23 inline CSS, R-100 brand entity sameAs, R-71/R-72 image style). Opt-in — projects without this block render with per-profile neutral defaults. All fields optional; a populated subset overrides the corresponding render-time slots while the rest fall back to per-profile defaults. v1.1 additive (Phase 10): tone, hitap, anglicism_tolerance, font_heading, font_body (legacy alias retained), default_hero_url, same_as_urls, image_style.",
       "properties": {
         "logo_url":                { "type": "string", "format": "uri" },
         "primary_color":           { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
@@ -109,7 +109,37 @@
         "font_family_body":        { "type": "string" },
         "header_template_id":      { "enum": ["minimal", "classic", "ecom"] },
         "footer_template_id":      { "enum": ["minimal", "full"] },
-        "source_url_for_sampling": { "type": "string", "format": "uri" }
+        "source_url_for_sampling": { "type": "string", "format": "uri" },
+        "tone":                    { "enum": ["semi-pro", "conversational", "formal", "casual"], "description": "Phase 10 R-XX. Profile-aware tone (Principle 2 tablo): YMYL=semi-pro+siz, e-commerce=conversational+sen, b2b-saas=formal+siz." },
+        "hitap":                   { "enum": ["sen", "siz"], "description": "Phase 10. Türkçe hitap formu — Principle 2 profile-aware: e-commerce sen, YMYL/b2b-saas siz." },
+        "anglicism_tolerance":     { "enum": ["low", "medium", "high"], "default": "medium", "description": "Phase 10. Anglicism (e.g. 'feature', 'workflow', 'brief') tolerance — düşük = pür Türkçe, yüksek = mixed." },
+        "tone_phrases_blocklist":  { "type": "array", "items": { "type": "string" }, "description": "Phase 10 R-118. AI signature words humanize blocklist (e.g. 'Aslında', 'Sonuç olarak', 'Özetle')." },
+        "font_heading":            { "type": "string", "description": "Phase 10 alias for font_family_heading; new content_settings consumers use this short form." },
+        "font_body":               { "type": "string", "description": "Phase 10 alias for font_family_body; new content_settings consumers use this short form." },
+        "default_hero_url":        { "type": "string", "format": "uri", "description": "Phase 10 R-77. Fallback hero image URL when generate-images skill skipped or in flight." },
+        "same_as_urls":            { "type": "array", "items": { "type": "string", "format": "uri" }, "description": "Phase 10 R-100. Organization.sameAs schema array: Wikipedia, Wikidata, LinkedIn, sosyal medya brand entity binding." },
+        "image_style":             { "enum": ["clean-illustration", "product-photo", "diagram-screenshot", "location-photo", "esnek"], "description": "Phase 10 Principle 2 image style boyutu: YMYL=clean-illustration, e-commerce=product-photo, b2b-saas=diagram-screenshot, local-service=location-photo." }
+      }
+    },
+    "content_settings": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Phase 10 (v1.1 additive) — content rules engine settings consumed by Phase 11+ production skills (new-blog, revise-content, faq-optimization, content-remediation, generate-images). All fields optional; per-profile defaults apply when unset. Cross-link → rules/content-quality.md, content-html-discipline.md, content-seo-discipline.md, content-eeat-discipline.md, content-llm-discipline.md, content-update-discipline.md.",
+      "properties": {
+        "toc_strategy":            { "enum": ["none", "static", "sticky", "auto-generate"], "default": "none", "description": "R-31 TOC strategy. b2b-saas long-form sticky; e-commerce category none." },
+        "related_posts_strategy":  { "enum": ["none", "cluster", "tag-based", "manual"], "default": "cluster", "description": "Phase 10. Related posts widget kaynağı." },
+        "author_strategy":         { "enum": ["none", "byline-required", "byline-optional", "person-schema-only"], "default": "byline-optional", "description": "R-28 profile-aware author byline. YMYL byline-required, e-commerce none." },
+        "css_strategy":            { "enum": ["inline", "external-tier", "hybrid"], "default": "inline", "description": "R-60 CSS strategy. Default inline (R-23 reuse)." },
+        "indexnow_enabled":        { "type": "boolean", "default": false, "description": "Phase 10. Bing IndexNow API auto-submit yeni/revize content URL'leri." },
+        "ai_training_optin":       { "type": "boolean", "default": false, "description": "R-98. LLMs.txt opt-in. Default OFF, init-project kullanıcıya sorar." },
+        "video_integration":       { "enum": ["none", "youtube", "vimeo", "self-hosted"], "default": "none", "description": "Phase 10. Video schema markup + render strategy." },
+        "internal_data_sharing":   { "type": "boolean", "default": false, "description": "R-116. Internal data aggregate-only paylaşım izni. KVKK/GDPR." },
+        "external_uniqueness_check": { "type": "boolean", "default": false, "description": "R-117. Pre-publish content uniqueness check (paragraph shingling vs SERP top-10), threshold ≥ 70%." },
+        "original_research_database": { "type": "array", "items": { "type": "object", "properties": { "id": { "type": "string" }, "title": { "type": "string" }, "summary": { "type": "string" }, "method": { "type": "string" }, "date": { "type": "string", "format": "date" }, "data_url": { "type": "string", "format": "uri" } }, "required": ["id", "title"] }, "description": "R-114. Original research bank-driven. Skill bu array'den lookup; uydurma research yasak." },
+        "experience_database":     { "type": "array", "items": { "type": "object", "properties": { "id": { "type": "string" }, "context": { "type": "string" }, "outcome": { "type": "string" }, "date": { "type": "string", "format": "date" } }, "required": ["id", "context"] }, "description": "R-119, R-105. First-hand experience + expert quote bank-driven; skill bu array'den lookup." },
+        "video_database":          { "type": "array", "items": { "type": "object", "properties": { "id": { "type": "string" }, "title": { "type": "string" }, "url": { "type": "string", "format": "uri" }, "embed_url": { "type": "string", "format": "uri" }, "duration_iso8601": { "type": "string" }, "thumbnail_url": { "type": "string", "format": "uri" } }, "required": ["id", "title", "url"] }, "description": "Phase 10. VideoObject schema markup için video bankası." },
+        "disclaimer_templates":    { "type": "object", "additionalProperties": { "type": "string" }, "description": "R-51 profile-aware disclaimer template map (key=cluster_kind 'medical'|'legal'|'financial', value=HTML/markdown template). YMYL profile'ında zorunlu inject." },
+        "image_model":             { "type": "string", "default": "nano-banana", "description": "R-72. Default image generation model. Plugin agnostik (Higgsfield veya equivalent), per-project override." }
       }
     },
     "pillars": {

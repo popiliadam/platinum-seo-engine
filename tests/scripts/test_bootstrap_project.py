@@ -31,7 +31,7 @@ def test_dry_run_emits_valid_json() -> None:
     assert result.returncode == 0, result.stderr
     cfg = json.loads(result.stdout)
     assert cfg["project_id"] == "test-slug"
-    assert cfg["schema_version"] == "1.0"
+    assert cfg["schema_version"] == "1.1"
     assert "paths" in cfg and "gsc" in cfg and "dataforseo" in cfg
     assert cfg["profiles"] == ["local-service"]
 

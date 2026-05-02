@@ -1,22 +1,40 @@
 # Phase Status
 
-**Last Updated:** 2026-05-01T11:48:06Z
-**Active Phase:** Phase 10 — Content Rules Processing NEXT (3 rules: /content-quality + /content-html-discipline + /content-seo-discipline + 4 templates: new-blog.md/html + revision + faq-block + 9 Q-CR-02..10 user input + Phase 11 Production Suite zorunlu önkoşul)
+**Last Updated:** 2026-05-02T00:00:00Z
+**Active Phase:** Phase 11 — Production NEXT (5 skill: new-blog + revise-content + faq-optimization + content-remediation + generate-images; Phase 10 önkoşul satisfied — 6 rules dosyası + 5 template + project-config schema_version 1.0→1.1 additive bump + master-excel.schema.json new_content_plan +3 col + 3 foundational principles + 87 yeni rule R-27..R-122 production'a hazır)
 
 ## Previous Phase
-**Phase 9 — Reporting ✅ DONE 2026-05-01 (commit B placeholder, 8/8 reporting skill canlı, 69 yeni pytest 312→381 PASS, 0 ADR + 0 schema bump triage Q-CD-01 paterni reuse, brief disiplini lesson 8 success case 0 finding Wave 2)**
+**Phase 10 — Content Rules Processing ✅ DONE 2026-05-02 (1 atomic commit, 6 rules dosyası + 5 template + 2 schema bump + content-rules-input.md SUPERSEDED + 1 migration script + 1 transform extension + 3 test sync, 381/381 pytest PASS no regression, 0 ADR target preserved + multi-source documentation, brief disiplini lesson 8 paterni reuse — manager fresh state divergence catch (eski 3 rule scope → yeni 6 rule scope) Phase 9 W2 success case 2'inci uygulama)**
 
-### Phase 2 Tasks (hepsi closed)
-- [x] W-I — 5 disiplin (naming, single-source-of-truth, schema-first, append-only-state, excel-discipline) — done; 12975B toplam, 5/5 structure PASS, drift sıfır
-- [x] W-J — 5 disiplin (secrets-management, glossary-discipline, skill-description-discipline, schema-versioning-discipline, time-discipline) — done; 15582B toplam, ADR-013 ref ✓
-- [x] Q-WJ-01 mini-fix — secrets-management.md `scripts/hooks/check-secrets.sh` → `scripts/security/check_secrets.sh` (spec §8.7 authoritative)
-- [x] ADR-014 yazıldı — DECISIONS rotation eşiği <5KB primary, ADR sayısı flexible
-- [x] DECISIONS rotation — ADR-009..010 → ARCHIVE; DECISIONS.md 4 ADR active (011..014)
-- [x] rules/.gitkeep silindi (10 .md dosyası placeholder rolünü devraldı)
-- [x] Atomic Phase 2 commit (95e605d)
+### Phase 10 Tasks (hepsi closed)
+- [x] content-rules-input.md SUPERSEDED marker (audit trail kalır, authoritative rules `rules/content-*.md`)
+- [x] 6 rules dosyası generate (path doğru, status=Active, R-XX format, Foundational Principles section content-quality.md başta + diğer 5 dosyada referans özet)
+  - [x] rules/content-quality.md (master file, R-14/R-15/R-27/R-32/R-44/R-45/R-50..R-54/R-105/R-114/R-116..R-119, 3 foundational principle full text)
+  - [x] rules/content-html-discipline.md (R-20..R-24/R-31/R-35/R-39/R-43/R-57..R-65/R-71..R-77)
+  - [x] rules/content-seo-discipline.md (R-01..R-13/R-29/R-30/R-33/R-34/R-36/R-78..R-84/R-107..R-113)
+  - [x] rules/content-eeat-discipline.md (R-28/R-37/R-48/R-49/R-100/R-104/R-115)
+  - [x] rules/content-llm-discipline.md (R-98/R-99/R-101/R-102/R-103/R-106)
+  - [x] rules/content-update-discipline.md (R-25/R-85..R-91)
+- [x] 5 template dosyası generate (path doğru, R-XX referansı, Phase 11 worker consume edebilir)
+  - [x] templates/content/new-blog.template.md (markdown skeleton planlama)
+  - [x] templates/content/new-blog.template.html (HTML article fragment + JSON-LD @graph + inline CSS + brand_identity slot)
+  - [x] templates/content/revision.template.md (section-targeted diff + change_summary + R-88 anti-pattern check)
+  - [x] templates/content/faq-block.template.html (statik visible + FAQPage schema, accordion YASAK)
+  - [x] templates/content/upload-instructions.template.md (multi-skill collaborative output R-74)
+- [x] schemas/project-config.schema.json schema_version 1.0→1.1 additive bump (content_settings 14 field + brand_identity 9 yeni field, required[] UNCHANGED)
+- [x] schemas/master-excel.schema.json new_content_plan +3 col (image_prompt + alt_text + content_type enum 6-value, schema_version bump değil — additive, Q-IL-1+Q-W-C2-01 paterni reuse)
+- [x] scripts/migrations/0001_project_config_1.0_to_1.1.py migration script (idempotent, dry-run, .bak backup, smoke test 3/3 PASS)
+- [x] scripts/state/bootstrap_project.py SCHEMA_VERSION 1.0→1.1 sync
+- [x] scripts/planning/new_content_plan_transform.py NEW_CONTENT_PLAN_COLUMNS 11→14 + row-construction extension (image_prompt/alt_text/content_type empty defaults) + _CONTENT_TYPE_ENUM constant
+- [x] templates/master-excel.xlsx regenerate (schema-driven idempotent, 18 sheets, new_content_plan 11→14 col)
+- [x] tests sync — test_init_project.py schema_version "1.0"→"1.1" + test_new_content_plan.py column_tuple_11_exact → column_tuple_14_exact + content_type enum assertion eklendi
+- [x] pytest 381/381 PASS no regression (Phase 9 baseline preserved)
+- [x] PHASE_STATUS rewrite (eski 3-rule scope → yeni 6-rule scope, brief disiplini lesson 8 paterni: manager fresh state divergence catch + worker otoriter rewrite)
+- [x] CONTEXT_LEDGER append (Phase 10 closeout entry)
+- [x] Atomic Phase 10 commit
 
 ### Blockers
-- (none — Phase 2 closed, awaiting Süleyman git push for atomic commit)
+- (none — Phase 10 closed, awaiting Süleyman git push for atomic commit)
 
 ## Phase History
 | Phase | Status | Started | Ended | Commit |
@@ -30,10 +48,31 @@
 | Phase 6 | done | 2026-04-30 | 2026-05-01 | aa105d0 |
 | Phase 7 | done | 2026-05-01 | 2026-05-01 | 759cd20 |
 | Phase 8 | done | 2026-05-01 | 2026-05-01 | 05d7814 |
-| Phase 9 | done | 2026-05-01 | 2026-05-01 | (closeout commit B) |
+| Phase 9 | done | 2026-05-01 | 2026-05-01 | 49cbf69 |
+| Phase 10 | done | 2026-05-02 | 2026-05-02 | (atomic commit pending) |
 
 ## Next Phase Preview
-**Phase 10 — Content Rules Processing:** `docs/superpowers/specs/2026-04-30-content-rules-input.md` (15.1KB) → 3 rules dosyası (`rules/content-quality.md` + `rules/content-html-discipline.md` + `rules/content-seo-discipline.md`) + 4 template (`templates/content/new-blog.template.{md,html}` + `revision.template.md` + `faq-block.template.html`); 9 açık soru Q-CR-02..10 Süleyman'a sorulur (R-02 typo Phase 5'te kapatıldı). Phase 11 Production Skills'in zorunlu önkoşulu (5 production skill — new-blog/revise-content/generate-images/content-remediation/faq-optimization — Phase 10 çıktılarını consume eder). Dispatch: 1 worker dikkatli (production skill'lerini şekillendiriyor). ETA ~5 phase kalan (10-14 = v1 release). Fresh manager session ÖNERİLİR Phase 10 başında (CONTEXT_LEDGER ~40 entry phase boundary fresh wakeup verim).
+**Phase 11 — Production Suite NEXT (5 skill, Phase 10 önkoşul satisfied):**
+- `new-blog` skill — markdown brief + HTML article (R-01..R-13 + R-29 + R-30 + R-78..R-84 schema markup) + multi-step workflow (R-08 SERP analiz → R-15 site doğrulama → R-12 keyword set → R-29 H2 cevap-önce → R-09 FAQ + R-79 schema → R-26 CTA + R-102 AI summary footer + R-118 humanize pass + R-117 uniqueness check)
+- `revise-content` skill — section-targeted diff workflow (R-87 + R-88 freshness theater anti-pattern + R-89 canonical preserve + R-103 content version increment if major); change_summary log master.xlsx[completed_work] veya events.jsonl
+- `faq-optimization` skill — mevcut FAQ block re-render (R-09 cap + R-43 statik + R-79 schema refresh) + AIO citation pattern (R-109/R-110/R-111)
+- `content-remediation` skill — decay/sunset/prune execution (R-85..R-91); robots.txt + redirect_404 sheet patches; manual approve gate (R-86, R-90)
+- `generate-images` skill — 8K ultra realistic + nano-banana model (R-71/R-72) + manual upload reference (R-73/R-74); WebP/AVIF/JPG fallback (R-76); LCP optimization (R-75)
+
+Profile-aware enforcement (Principle 2) Phase 11 her skill'de branching: YMYL byline + counter-argument + disclaimer; e-commerce conversational + sen + product photo; b2b-saas formal + diagram. Foundational Principles 3 prensip Phase 11 acceptance gate'lerinde enforce.
+
+Dispatch: 1 worker per skill (5 worker, paralel veya sequential — manager karar verir Phase 11 başında); ETA ~3 phase kalan (11+12+13 = v1 release; Phase 14 governance polish + workspace+CI ayrı).
+
+Fresh manager session ÖNERİLİR Phase 11 başında — 5 production skill domain ayrı (Phase 10 rules domain'inden farklı), CONTEXT_LEDGER ~45 entry phase boundary, fresh wakeup spec §13.2 protokolü reuse.
+
+## Phase 2 Tasks (hepsi closed)
+- [x] W-I — 5 disiplin (naming, single-source-of-truth, schema-first, append-only-state, excel-discipline) — done; 12975B toplam, 5/5 structure PASS, drift sıfır
+- [x] W-J — 5 disiplin (secrets-management, glossary-discipline, skill-description-discipline, schema-versioning-discipline, time-discipline) — done; 15582B toplam, ADR-013 ref ✓
+- [x] Q-WJ-01 mini-fix — secrets-management.md `scripts/hooks/check-secrets.sh` → `scripts/security/check_secrets.sh` (spec §8.7 authoritative)
+- [x] ADR-014 yazıldı — DECISIONS rotation eşiği <5KB primary, ADR sayısı flexible
+- [x] DECISIONS rotation — ADR-009..010 → ARCHIVE; DECISIONS.md 4 ADR active (011..014)
+- [x] rules/.gitkeep silindi (10 .md dosyası placeholder rolünü devraldı)
+- [x] Atomic Phase 2 commit (95e605d)
 
 ## Phase 3 Tasks
 - [x] Phase 3.1 — Scripts taşıma + utility (W-K + W-M, 5 script + 5 test, 12/12 pytest PASS)
@@ -73,15 +112,16 @@
 - [x] Phase 9 prep (PHASE_STATUS Phase 8 hash 05d7814 + Phase 9 active set, commit 8b641ff)
 - [x] Wave 1 — 4 paralel reporting (W-E1 monthly-report + W-E2 weekly-summary + W-E3 portfolio-overview + W-E4 portfolio-weekly-brief, 35 yeni pytest, 347/347 PASS, 2 finding catch: gate #7 attribution + events.jsonl convention, Q-RP-01 OQ defer Phase 14, commit 2f681cc + closeout c9c3395)
 - [x] Wave 2 — 4 paralel reporting (W-E5 portfolio-monthly-roundup + W-E6 portfolio-task-heatmap + W-E7 portfolio-kpi-trend + W-E8 portfolio-heatmap, 34 yeni pytest, 381/381 PASS, lesson 8 proaktif uygulama 0 finding, +2 yeni gate #10 path convention + #11 assert_read_only_module helper, commit 14cd7ee + closeout f7009ca)
-- [x] W-E3 backport refactor — portfolio_overview path resolution W-E4 alignment (5/6 majority + W-E8 explicit tercih, ~3 line diff: docstring + line 188 portfolio_root.parent → portfolio_root, test fixture revize gereksiz çünkü tüm 8 test missing-master.xlsx senaryosu kullanıyor, smoke validate 3 case PASS, full repo 381/381 PASS regression sıfır, commit 27c22d0)
-- [x] Atomic Phase 9 closeout commit B (PHASE_STATUS Phase 9 row + Phase 10 active set + Previous Phase Phase 3→9 cosmetic fix + Phase 9 Tasks closure + Next Phase Preview Phase 10)
-- [x] CONTEXT_LEDGER append — 5 yeni section (Phase 9 CLOSEOUT 8 commit zinciri + Path Semantic Resolution Lesson W-E3 backport + Brief Disiplini Lesson 8 Process Doc Wave 1→Wave 2 meta-evrim + Q-RP-01 OQ Recap + Phase 10 NEXT Preview)
-- [ ] Push batch (8 commit cdb5317 → closeout commit B) — Süleyman explicit "push" komutu bekleniyor, pre-push 7-gate + post-push 4-gate manager protokolü hazır
+- [x] W-E3 backport refactor (commit 27c22d0)
+- [x] Atomic Phase 9 closeout (commit 49cbf69) + push (commit 49cbf69 origin/main)
+- [x] Push batch 8 commit (cdb5317 → 49cbf69) + post-push CONTEXT_LEDGER append (commit 68aaf44)
 
-## Outstanding Open Questions (Phase 7 closeout sonrası, Phase 8+ defer)
+## Outstanding Open Questions (Phase 10+ defer)
+- **Q-CR-02..10** — content-rules-input.md spec'in açık soruları; Phase 10 brief'de Süleyman 266 cevap matrix ile resolved (R-27..R-122 yeni rule'lara mapped). Phase 10 deliverable'larında zımnen cevaplandı; explicit OPEN_QUESTIONS Resolved index update Phase 11 başında opsiyonel.
 - **Q-W-A4-02 + Q-W-B4-02** — DFS htags shape variance + D-03 strict-join vs prefix-match cross-skill paterni divergence (Phase 8+ cross-skill ADR aday)
 - **Q-W-B3-01** — D-03 path-case clause explicit (cross-skill consistency lock'lu, future ADR aday)
 - **Phase 14+ CI test self-gate** — r-string regex literal exclude (D-010 Path B + .env.example precedent)
 - **Q-WN-01** — Plugin hook loader directory-merge (plugin.json explicit array ile çözüldü, resmi doc clarification opsiyonel)
 - **Q-016** — audit_action enum mapping (Phase 14+ governance refinement, non-blocking)
 - **Q-WO-02** — shared/active.json mutability semantics (future ADR aday)
+- **Q-RP-01** — events.jsonl reporting skill audit log convention (8/8 reporting skill no-write paterni compliant; Phase 14+ governance defer, 4 seçenek dokümante)

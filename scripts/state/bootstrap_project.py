@@ -28,7 +28,7 @@ import os
 import sys
 from pathlib import Path
 
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "1.1"
 
 DEFAULT_AI_BOTS = [
     "Googlebot", "Bingbot",
