@@ -1,0 +1,223 @@
+<!--
+  templates/content/new-blog.template.html
+  Phase 10 deliverable. Consumed by Phase 11 new-blog skill.
+
+  Rules consumed (cross-link → rules/content-*.md):
+  - R-20 HTML format, R-21 semantic HTML5, R-22 header/footer dokunulmazlık, R-57 fragment boundary
+  - R-23 inline CSS + brand_identity slots, R-60 css_strategy profile-aware
+  - R-61 pse- prefix BEM, R-62 image dimensions + lazy, R-63 mobile parity
+  - R-39 WCAG 2.1 AA (contrast, alt, heading linear)
+  - R-78..R-84 schema markup JSON-LD @graph
+  - R-29 H2 cevap-önce, R-101 self-contained intro, R-102 AI summary footer
+  - R-09 FAQ 10 statik visible (R-43 accordion yasak), R-79 FAQPage @graph
+  - R-26 CTA doğal akış, R-05 "Sonuç" başlığı yasak
+  - Principle 1 truth-verifiable + Principle 2 profile-aware + Principle 3 anti-cheap-content
+-->
+
+<article class="pse-blog-post" lang="{{CONTENT_LOCALE}}" itemscope itemtype="https://schema.org/Article">
+
+  <!-- ========================================================================
+       HEADER (article-scope, R-22 site header'a dokunmaz)
+       ======================================================================== -->
+  <header class="pse-post-header">
+    <h1 itemprop="headline">{{TITLE}}</h1>
+
+    <!-- R-01 AEO friendly intro (40-60 word, self-contained R-101, cevap-önce ilk 1-2 cümle) -->
+    <p class="pse-intro" itemprop="description">{{INTRO_PARAGRAPH_AEO_FRIENDLY}}</p>
+
+    <!-- R-28 EEAT updated date (zorunlu, tüm profile'larda) -->
+    <p class="pse-meta">
+      <time class="pse-date-modified" itemprop="dateModified" datetime="{{DATE_MODIFIED_ISO_8601}}">{{DATE_MODIFIED_HUMAN_TR}}</time>
+      <!-- {{!-- R-28 + R-82 author byline conditional: profiles ⊇ {ymyl} → render; else skip --}} -->
+      {{#IF_PROFILE_YMYL}}
+      <address class="pse-author" itemprop="author" itemscope itemtype="https://schema.org/Person">
+        <span itemprop="name">{{AUTHOR_NAME}}</span>,
+        <span itemprop="jobTitle">{{AUTHOR_TITLE}}</span>
+      </address>
+      {{/IF_PROFILE_YMYL}}
+    </p>
+
+    <!-- R-31 TOC strategy (project-config[content_settings.toc_strategy] enum) -->
+    {{#IF_TOC_ENABLED}}
+    <nav class="pse-toc" aria-label="İçindekiler">
+      <h2 class="pse-toc__title">İçindekiler</h2>
+      <ol class="pse-toc__list">{{TOC_ITEMS}}</ol>
+    </nav>
+    {{/IF_TOC_ENABLED}}
+  </header>
+
+  <!-- ========================================================================
+       BODY SECTIONS (per-H2 R-29 cevap-önce + R-30 H3 zorunluluk + R-07 list/table cap)
+       ======================================================================== -->
+  <section class="pse-body">
+    {{!-- BODY_SECTIONS slot — skill render time per-H2 inject:
+          <h2>{{H2_TITLE}}</h2>
+          <p class="pse-h2-answer">{{H2_CEVAP_ONCE}}</p>
+          <h3>...</h3> ...
+          <ul>...</ul>   (R-07 max 1 per H2)
+          <table>...</table>
+          <a href="..." class="pse-internal-link">...</a> (R-06)
+    --}}
+    {{BODY_SECTIONS}}
+  </section>
+
+  <!-- ========================================================================
+       COUNTER-ARGUMENT (R-50/R-115 YMYL profile zorunlu)
+       ======================================================================== -->
+  {{#IF_PROFILE_YMYL}}
+  <section class="pse-counter-argument" aria-label="Karşı Argümanlar">
+    <h2>Karşı Argümanlar</h2>
+    {{COUNTER_ARGUMENT_BODY}}
+  </section>
+  {{/IF_PROFILE_YMYL}}
+
+  <!-- ========================================================================
+       DISCLAIMER (R-51 YMYL medical/legal/financial)
+       ======================================================================== -->
+  {{#IF_DISCLAIMER_REQUIRED}}
+  <aside class="pse-disclaimer" role="note">
+    {{DISCLAIMER_TEMPLATE_RENDERED}}
+  </aside>
+  {{/IF_DISCLAIMER_REQUIRED}}
+
+  <!-- ========================================================================
+       FAQ (R-09 10 sabit / 3000+ word 15 cap, R-43 accordion YASAK statik visible)
+       ======================================================================== -->
+  <section class="pse-faq" aria-label="Sıkça Sorulan Sorular">
+    <h2>Sıkça Sorulan Sorular</h2>
+    {{!-- 10 (or 15 for 3000+ word) FAQ items, statik visible. Schema → JSON-LD @graph below.
+          Her FAQ template → templates/content/faq-block.template.html --}}
+    {{FAQ_BLOCK}}
+  </section>
+
+  <!-- ========================================================================
+       AI SUMMARY FOOTER (R-102 başlıksız bullet 3-5 maddesi, AIO citation candidate)
+       ======================================================================== -->
+  <aside class="pse-key-takeaways">
+    <ul>
+      {{KEY_TAKEAWAYS_3_5_BULLETS}}
+    </ul>
+  </aside>
+
+  <!-- ========================================================================
+       BIBLIOGRAPHY (R-45 YMYL zorunlu, diğer profile opsiyonel)
+       ======================================================================== -->
+  {{#IF_BIBLIOGRAPHY_REQUIRED}}
+  <aside class="pse-bibliography">
+    <h2>Kaynaklar</h2>
+    <ol>{{BIBLIOGRAPHY_ENTRIES}}</ol>
+  </aside>
+  {{/IF_BIBLIOGRAPHY_REQUIRED}}
+
+  <!-- ========================================================================
+       CTA (R-26 doğal akış, R-05 "Sonuç" başlığı YASAK — başlıksız paragraf)
+       ======================================================================== -->
+  <p class="pse-cta">{{CTA_PARAGRAPH}}</p>
+
+</article>
+
+<!-- ============================================================================
+     META TAGS (R-58 lifecycle robots + R-103 content version)
+     Note: skill output `<meta>` tag'ı `<head>` injection için ayrı slot.
+     Custom-block paste workflow'unda manuel head append (R-22 header dokunmaz).
+     ============================================================================ -->
+<!--
+<meta name="robots" content="{{ROBOTS_DIRECTIVE}}">  R-58 lifecycle map
+<meta name="content-version" content="v{{CONTENT_VERSION}}">  R-103 major revise
+<link rel="canonical" href="{{CANONICAL_URL}}">  R-89 immutable on revise
+-->
+
+<!-- ============================================================================
+     JSON-LD SCHEMA (R-83 @graph array tek script, R-78..R-82 + R-79 inline)
+     R-84 pre-publish Schema.org validate
+     ============================================================================ -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Article",
+      "@id": "{{CANONICAL_URL}}#article",
+      "headline": "{{TITLE}}",
+      "description": "{{META_DESCRIPTION}}",
+      "datePublished": "{{DATE_PUBLISHED_ISO}}",
+      "dateModified": "{{DATE_MODIFIED_ISO_8601}}",
+      "image": "{{HERO_IMAGE_URL_OR_PLACEHOLDER}}",
+      "author": {{AUTHOR_NODE_OR_PUBLISHER_FALLBACK}},
+      "publisher": { "@id": "{{CANONICAL_URL}}#organization" },
+      "mainEntityOfPage": "{{CANONICAL_URL}}",
+      "about": { "@id": "{{PRIMARY_ENTITY_WIKIDATA_QID}}" },
+      "mentions": {{SECONDARY_ENTITIES_ARRAY}}
+    },
+    {
+      "@type": "Organization",
+      "@id": "{{CANONICAL_URL}}#organization",
+      "name": "{{BRAND_NAME}}",
+      "url": "{{DOMAIN}}",
+      "logo": "{{LOGO_URL}}",
+      "sameAs": {{SAME_AS_URLS_ARRAY}}
+    },
+    {{#IF_PROFILE_YMYL}}
+    {
+      "@type": "Person",
+      "@id": "{{AUTHOR_URL}}#person",
+      "name": "{{AUTHOR_NAME}}",
+      "jobTitle": "{{AUTHOR_TITLE}}",
+      "url": "{{AUTHOR_URL}}",
+      "sameAs": {{AUTHOR_SAME_AS_ARRAY}}
+    },
+    {{/IF_PROFILE_YMYL}}
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": {{BREADCRUMB_ITEMS_ARRAY}}
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": {{FAQ_ITEMS_ARRAY}}
+    }
+  ]
+}
+</script>
+
+<!-- ============================================================================
+     INLINE CSS (R-23 + R-60 inline default; R-61 pse- prefix BEM; R-39 WCAG 2.1 AA;
+                 R-64 minify recommended pre-publish)
+     ============================================================================ -->
+<style>
+.pse-blog-post{font-family:{{FONT_BODY}};color:#222;line-height:1.7;max-width:760px;margin:0 auto;padding:0 1rem}
+.pse-blog-post h1,.pse-blog-post h2,.pse-blog-post h3,.pse-blog-post h4{font-family:{{FONT_HEADING}};color:{{PRIMARY_COLOR}};line-height:1.3}
+.pse-blog-post h1{font-size:2.25rem;margin:0 0 1rem}
+.pse-blog-post h2{font-size:1.6rem;margin:2.5rem 0 1rem;border-left:4px solid {{ACCENT_COLOR}};padding-left:.75rem}
+.pse-blog-post h3{font-size:1.2rem;margin:1.75rem 0 .75rem}
+.pse-blog-post p{margin:0 0 1rem}
+.pse-blog-post a{color:{{PRIMARY_COLOR}};text-decoration:underline;text-underline-offset:.15em}
+.pse-blog-post a:hover{color:{{SECONDARY_COLOR}}}
+.pse-blog-post a:focus-visible{outline:2px solid {{ACCENT_COLOR}};outline-offset:2px}
+.pse-blog-post ul,.pse-blog-post ol{margin:0 0 1.25rem;padding-left:1.5rem}
+.pse-blog-post li{margin-bottom:.4rem}
+.pse-blog-post table{width:100%;border-collapse:collapse;margin:1.25rem 0;font-size:.95rem}
+.pse-blog-post th,.pse-blog-post td{border:1px solid #ddd;padding:.6rem .75rem;text-align:left}
+.pse-blog-post th{background:#f6f6f6;font-weight:600}
+.pse-blog-post figure{margin:1.5rem 0}
+.pse-blog-post figcaption{font-size:.875rem;color:#555;margin-top:.4rem}
+.pse-blog-post blockquote{border-left:4px solid {{SECONDARY_COLOR}};padding:.5rem 1rem;color:#444;margin:1.25rem 0;font-style:italic}
+.pse-intro{font-size:1.125rem;color:#333;margin-bottom:1.5rem}
+.pse-meta{font-size:.875rem;color:#555;margin:0 0 2rem}
+.pse-author{font-style:normal;display:inline-block;margin-left:.75rem}
+.pse-toc{background:#f9f9f9;border:1px solid #eee;padding:1rem 1.25rem;border-radius:6px;margin:1.5rem 0}
+.pse-toc__title{font-size:1.05rem;margin:0 0 .5rem;color:#222}
+.pse-toc__list{margin:0;padding-left:1.25rem}
+.pse-h2-answer{font-weight:500;background:#fafafa;border-left:3px solid {{ACCENT_COLOR}};padding:.5rem .75rem;margin-bottom:1rem}
+.pse-tldr{background:#fff8e1;border:1px solid #f0e2a8;padding:1rem 1.25rem;border-radius:6px;margin:1.25rem 0}
+.pse-faq{margin:2.5rem 0}
+.pse-faq-item{border-top:1px solid #eee;padding:1.25rem 0}
+.pse-faq-item h3{margin:0 0 .5rem;font-size:1.05rem}
+.pse-key-takeaways{background:#f1f7ff;border:1px solid #c8dcfa;padding:1rem 1.25rem;border-radius:6px;margin:2rem 0}
+.pse-key-takeaways ul{margin:0;padding-left:1.25rem}
+.pse-disclaimer{background:#fff4f4;border:1px solid #f3c0c0;color:#511;padding:1rem 1.25rem;border-radius:6px;margin:1.5rem 0;font-size:.9rem}
+.pse-bibliography{margin:2rem 0;font-size:.9rem;color:#444}
+.pse-counter-argument{margin:2rem 0;background:#fafafa;padding:1rem 1.25rem;border-radius:6px}
+.pse-cta{background:{{ACCENT_COLOR}};color:#fff;padding:1.25rem;border-radius:6px;font-weight:500;margin:2.5rem 0 0}
+.pse-cta a{color:#fff;text-decoration:underline}
+@media (max-width:640px){.pse-blog-post{padding:0 .75rem}.pse-blog-post h1{font-size:1.85rem}.pse-blog-post h2{font-size:1.35rem}}
+</style>

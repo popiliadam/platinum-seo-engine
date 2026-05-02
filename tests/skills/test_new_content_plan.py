@@ -172,16 +172,19 @@ def test_new_content_plan_dfs_normalize_helper_imported() -> None:
 # Test 2 — Schema-first: new_content_plan column tuple matches master-excel
 # ---------------------------------------------------------------------------
 
-def test_new_content_plan_column_tuple_11_exact(
+def test_new_content_plan_column_tuple_14_exact(
     master_excel_schema: dict,
 ) -> None:
     """transform NEW_CONTENT_PLAN_COLUMNS == master-excel schema column tuple
-    in order. NOTE: worker brief said 10 cols; live schema declares 11
-    (lifecycle_status). Schema-first wins; brief drift surfaced upstream."""
+    in order. NOTE: Phase 8 worker brief said 10 cols; live schema declared 11
+    (lifecycle_status); Phase 10 additive bump pushes this to 14 (image_prompt
+    + alt_text + content_type — R-71/R-72/R-77 image discipline + content_type
+    enum widening, Q-IL-1 + Q-W-C2-01 paterni reuse). Schema-first wins; brief
+    drift surfaced upstream."""
     sheet_def = master_excel_schema["sheets"]["new_content_plan"]
     schema_col_names = tuple(c["name"] for c in sheet_def["required_columns"])
-    # 11 cols, exact order match.
-    assert len(schema_col_names) == 11
+    # 14 cols, exact order match.
+    assert len(schema_col_names) == 14
     assert schema_col_names == ncp.NEW_CONTENT_PLAN_COLUMNS, (
         f"transform NEW_CONTENT_PLAN_COLUMNS drift from master-excel schema: "
         f"transform={ncp.NEW_CONTENT_PLAN_COLUMNS} vs schema={schema_col_names}"
@@ -193,6 +196,13 @@ def test_new_content_plan_column_tuple_11_exact(
         c for c in sheet_def["required_columns"] if c["name"] == "lifecycle_status"
     )
     assert set(lifecycle_col["enum"]) == {"GREEN", "RED", "ON_HOLD", "REMOVED"}
+    # Phase 10 additive bump — content_type enum locked at schema level.
+    content_type_col = next(
+        c for c in sheet_def["required_columns"] if c["name"] == "content_type"
+    )
+    assert set(content_type_col["enum"]) == {
+        "listicle", "guide", "comparison", "research", "tutorial", "review",
+    }
 
 
 # ---------------------------------------------------------------------------

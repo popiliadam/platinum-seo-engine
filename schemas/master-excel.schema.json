@@ -109,6 +109,7 @@
     "new_content_plan": {
       "header_row": 3,
       "data_start_row": 4,
+      "description": "Phase 8 W-C3 sheet, Phase 10 (additive bump): +image_prompt + alt_text columns + content_type column with widened enum (Q-IL-1 + Q-W-C2-01 paterni reuse, schema_version bump değil — additive, ADR-018 paterni). content_type enum kapsamı: listicle/guide/comparison/research/tutorial/review.",
       "required_columns": [
         { "col": "A", "name": "id" },
         { "col": "B", "name": "title" },
@@ -120,7 +121,10 @@
         { "col": "H", "name": "priority" },
         { "col": "I", "name": "created_date",       "type": "date" },
         { "col": "J", "name": "tivl_tag",           "enum": ["T", "I", "V", "L"] },
-        { "col": "K", "name": "lifecycle_status",   "enum": ["GREEN", "RED", "ON_HOLD", "REMOVED"] }
+        { "col": "K", "name": "lifecycle_status",   "enum": ["GREEN", "RED", "ON_HOLD", "REMOVED"] },
+        { "col": "L", "name": "image_prompt" },
+        { "col": "M", "name": "alt_text" },
+        { "col": "N", "name": "content_type",       "enum": ["listicle", "guide", "comparison", "research", "tutorial", "review"] }
       ]
     },
     "content_improve": {

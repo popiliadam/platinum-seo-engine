@@ -1,8 +1,10 @@
 # Content Rules Input — v1.3 Production Skills İçin
 
+**STATUS:** SUPERSEDED 2026-05-02 by Phase 10 deliverables. Bu doc input olarak kalır (audit trail), ama authoritative rules artık `rules/content-*.md` dosyalarındadır (content-quality + content-html-discipline + content-seo-discipline + content-eeat-discipline + content-llm-discipline + content-update-discipline). R-01..R-26 mevcut + R-27..R-122 yeni (87 ek rule, Süleyman 266-cevap matrix) + 3 foundational principle (truth-verifiable + profile-aware + AI suistimal önlemi).
+
 **Tarih:** 2026-04-30
 **Kaynak:** Kullanıcı input (architecture brainstorming sırasında verildi)
-**Durum:** INPUT DOCUMENT — Phase 10 worker tarafından `rules/` ve `templates/`'e dönüştürülür
+**Durum:** SUPERSEDED — Phase 10 worker tarafından `rules/` ve `templates/`'e dönüştürüldü (bkz. yukarı).
 **Hedef Tüketim:** Phase 11 production skill'leri (new-blog, revise-content, faq-optimization, content-remediation, generate-images)
 
 ---
