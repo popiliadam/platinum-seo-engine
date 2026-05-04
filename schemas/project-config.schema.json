@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://platinum-seo-engine/schemas/project-config.schema.json",
-  "title": "Project Configuration Schema v1.1",
-  "description": "Per-project pack definition (projects/{slug}/config/project.config.json). See ARCHITECTURE.md §10. v1.1 (Phase 10): additive bump — content_settings + brand_identity extension fields. Required array UNCHANGED (additive policy, → rules/schema-versioning-discipline.md).",
+  "title": "Project Configuration Schema v1.2",
+  "description": "Per-project pack definition (projects/{slug}/config/project.config.json). See ARCHITECTURE.md §10. v1.1 (Phase 10): additive bump — content_settings + brand_identity extension fields. v1.2 (Phase 11 W-F1 cascade fix): additive bump — singular 'profile' field (Foundational Principle 2 enforcement field for production skills new-blog/revise-content). 'profiles' array (plural, v1.0) retained for sf-required-reports Tier elevation; singular 'profile' added for Phase 10 Principle 2 profile-aware skill behavior switch (tone, word count, citation density, disclaimer, image style, author byline, counter-argument). Required array UNCHANGED (additive policy, → rules/schema-versioning-discipline.md).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -10,7 +10,7 @@
     "currency", "platform", "profiles", "paths", "gsc", "dataforseo"
   ],
   "properties": {
-    "schema_version": { "const": "1.1" },
+    "schema_version": { "const": "1.2" },
     "project_id": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]*$",
@@ -44,6 +44,11 @@
       "items": { "enum": ["e-commerce", "ymyl", "local-service", "b2b-saas", "portfolio"] },
       "minItems": 1,
       "uniqueItems": true
+    },
+    "profile": {
+      "type": "string",
+      "enum": ["e-commerce", "ymyl", "local-service", "b2b-saas", "portfolio"],
+      "description": "Foundational Principle 2 — profile-aware enforcement primary field for Phase 11+ production skills (new-blog, revise-content, faq-optimization, content-remediation, generate-images). Phase 11 W-F1 cascade fix (Phase 10 EKSİĞİ closure). Skill behavior bu enum'a göre branch'lar: tone, word count, citation density, disclaimer, image style, author byline, counter-argument. Compose-time relation with 'profiles' array: when 'profile' is set, skills use it as the dominant Principle 2 switch; when omitted, skills derive a primary profile from 'profiles' (priority merge per content-quality.md Principle 2 tablo). Optional — additive only, required[] unchanged."
     },
     "paths": {
       "type": "object",
