@@ -1,13 +1,13 @@
 # Phase Status
 
-**Last Updated:** 2026-05-04T13:22:13Z
-**Active Phase:** Phase 13 — NEXT (Phase 12 DONE 2026-05-04 4476ca6 — 6 publishing/discovery/meta/reporting skill canlı [indexing-ping + brand-onboarding + aio-competitor-map + verify-indexing + mark-done + monitoring-weekly] + 546/546 pytest PASS no regression 4 commit boyunca [0ad76d4 + b537340 + 4476ca6 + closeout] + 15/15 Wave 1 + 15/15 Wave 2 acceptance gate PASS + worker schema-first override 6/6 100% convergent events.schema event_type WORK-only enum compliance lesson 31 production-ready + lesson 32 self-extending positive drift 5/6 worker üst sınır aştı + lesson 33 hibrit 2-wave 3+3 paralel dispatch 2 phase consecutive uygulama + lesson 8 v3 9-boyutlu cross-check 2'inci uygulama success + plugin agnostik MCP boundary F-16 intact 8 commit invariant + 8'inci ardışık Phase 14+ CI Rule 3 Gate 6 PASS production-ready 8-phase invariant + atomic phase paterni 7'inci kanıt complete + 0 yeni ADR DECISIONS.md byte unchanged 17 commit Q-CD-01 paterni 6'ıncı uygulama + 0 schema bump + 1 NEW template Phase 9 paterni reuse)
+**Last Updated:** 2026-05-04T17:24:04Z
+**Active Phase:** Phase 14 — NEXT (Phase 13 DONE 2026-05-04 2ed5531 — 3 governance skill canlı [schema-validate + glossary-audit + load-context] + 583/583 pytest PASS no regression 2 commit boyunca [2ed5531 + closeout] + 15/15 acceptance gate PASS + worker schema-first override 3/3 100% convergent cumulative 9/9 [Phase 12 6/6 + Phase 13 3/3] + lesson 29 self-extending 3/3 100% upper bound aşıldı 12+12+13=37 pytest brief 5-7/skill = 177% upper + lesson 8 v3 9-boyutlu cross-check 3'üncü uygulama F-13.1 cosmetic finding catch (19→18 schema runtime glob fix) + lesson 8 v4 candidate brief internal consistency Section 5 vs Section 3 DURUR count + plugin agnostik MCP boundary F-16 intact 9 commit invariant + 9'uncu ardışık Phase 14+ CI Rule 3 Gate 6 PASS production-ready 9-phase invariant + atomic phase paterni 8'inci kanıt complete 9 phase consecutive [Phase 7+8+9+10+11W1+11W2+12W1+12W2+13] + 0 yeni ADR DECISIONS.md byte unchanged 18 commit Q-CD-01 paterni 7'inci uygulama complete + 0 schema bump + 0 cascade fix)
 
 ## Previous Phase
-**Phase 12 — Publishing + Specialized ✅ DONE 2026-05-04 (hibrit 2-wave 3+3 paralel: Wave 1 = 3 paralel general-purpose [indexing-ping + brand-onboarding + aio-competitor-map, 0ad76d4 6 file +2623/-0] + Wave 2 = 3 paralel general-purpose [verify-indexing + mark-done + monitoring-weekly, 4476ca6 7 file +2911/-0]; 6 skill canlı, 546/546 pytest PASS no regression 4 commit, +95 yeni test, 15/15 Wave 1 + 15/15 Wave 2 acceptance gate PASS, worker schema-first override 6/6 100% convergent paterni production-ready, atomic phase paterni 7'inci kanıt complete [Phase 7+8+9+10+11W1+11W2+12W1+12W2], plugin agnostik MCP boundary F-16 intact 8 commit, 8'inci ardışık Phase 14+ CI Rule 3 Gate 6 PASS, 1 NEW template Phase 9 paterni reuse, lesson 31+32+33 surface confirmed + lesson 34 surface 6/6 schema-first override convergent + lesson 35 surface atomic 7'inci kanıt complete production-ready convention)**
+**Phase 13 — Governance Final ✅ DONE 2026-05-04 (atomic 1-worker dispatch general-purpose Agent: 3 governance skill canlı [schema-validate jsonschema Draft7 audit runtime glob + cross-sheet-invariants `rules` key 20 rules + 40→43 SKILL.md frontmatter compliance, glossary-audit GLOSSARY drift cross-ref REFERENCE_INDEX + spec §20 + reverse-lookup orphan/missing AMBER + defensive acronym whitelist 22-token false-positive guard, load-context spec §13.2 + SESSION_PROTOCOL.md §2 wakeup codify <15KB budget verify auto-detect phase_id], 2ed5531 8 file +2031/-0; 583/583 pytest PASS no regression 2 commit, +37 yeni test, 15/15 acceptance gate PASS, worker schema-first override 3/3 100% convergent cumulative 9/9 [Phase 12 6/6 + Phase 13 3/3] events audit kind allOf rule paterni production-ready, atomic phase paterni 8'inci kanıt complete [Phase 7+8+9+10+11W1+11W2+12W1+12W2+13], plugin agnostik MCP boundary F-16 intact 9 commit invariant 3 server unchanged + mcp_tools required+optional empty 3/3, 9'uncu ardışık Phase 14+ CI Rule 3 Gate 6 PASS, 0 schema bump + 0 cascade fix + 0 yeni ADR Q-CD-01 7'inci uygulama complete 18 commit DECISIONS unchanged, lesson 29 self-extending 3/3 100% upper bound aşıldı + lesson 8 v3 3'üncü uygulama F-13.1 catch + lesson 8 v4 candidate brief internal consistency + lesson 36 surface atomic 8'inci kanıt complete production-ready convention)**
 
 ## Older Phase
-**Phase 11 — Production Suite ✅ DONE 2026-05-04 (hibrit 2-wave paralel B seçeneği: Wave 1 = 2 paralel general-purpose [new-blog + revise-content + project-config schema 1.1→1.2 cascade fix Phase 10 EKSİĞİ closure, a3e1a6a 12 file +1674/-10] + Wave 2 = 3 paralel general-purpose [faq-optimization + content-remediation + generate-images, be33824 7 file +2209/-0]; 5 production skill canlı, 451/451 pytest PASS no regression 4 commit boyunca, 0 yeni ADR target preserved 14 commit byte-byte DECISIONS unchanged + multi-source documentation Q-CD-01 paterni 5'inci uygulama, 13/13 Wave 1 + 12/12 Wave 2 acceptance gate PASS, atomic phase paterni 6'ıncı kanıt onaylandı, plugin agnostik MCP boundary intact F-16 Süleyman Seçenek D, 6 yeni lesson kayıt edildi 22-27 + 2 Wave 2 lesson 28-29 candidate, 5'inci ardışık Phase 14+ CI Rule 3 Gate 6 PASS → 6'ıncı)**
+**Phase 12 — Publishing + Specialized ✅ DONE 2026-05-04 (hibrit 2-wave 3+3 paralel: Wave 1 = 3 paralel general-purpose [indexing-ping + brand-onboarding + aio-competitor-map, 0ad76d4 6 file +2623/-0] + Wave 2 = 3 paralel general-purpose [verify-indexing + mark-done + monitoring-weekly, 4476ca6 7 file +2911/-0]; 6 skill canlı, 546/546 pytest PASS no regression 4 commit, +95 yeni test, 15/15 Wave 1 + 15/15 Wave 2 acceptance gate PASS, worker schema-first override 6/6 100% convergent paterni production-ready, atomic phase paterni 7'inci kanıt complete [Phase 7+8+9+10+11W1+11W2+12W1+12W2], plugin agnostik MCP boundary F-16 intact 8 commit, 8'inci ardışık Phase 14+ CI Rule 3 Gate 6 PASS, 1 NEW template Phase 9 paterni reuse, lesson 31+32+33 surface confirmed + lesson 34 surface 6/6 schema-first override convergent + lesson 35 surface atomic 7'inci kanıt complete production-ready convention)**
 
 ### Phase 10 Tasks (hepsi closed)
 - [x] content-rules-input.md SUPERSEDED marker (audit trail kalır, authoritative rules `rules/content-*.md`)
@@ -37,19 +37,28 @@
 - [x] Atomic Phase 10 commit
 
 ### Blockers
-- (none — Phase 12 DONE 2026-05-04 4476ca6, Phase 13 dispatch awaiting fresh karar verici brief paste)
+- (none — Phase 13 DONE 2026-05-04 2ed5531, Phase 14 dispatch awaiting fresh karar verici brief paste)
+
+### Phase 13 Tasks (hepsi closed)
+- [x] Phase 12 PUSHED state verify (HEAD 3cc0b6c + working tree clean + 546/546 pytest baseline + .mcp.json 3 server F-16 8 commit invariant + 40 SKILL.md count + DECISIONS.md 5877B unchanged 17 commit) — 2026-05-04
+- [x] Schema cross-check 12+3 boyut (lesson 8 v3 9-boyutlu): skill-frontmatter inputs/outputs + events event_kind 4-value + event_type 10-value WORK-only kapalı + cross-sheet-invariants `rules` key authoritative (NOT "invariants" memory drift catch) + `rules` length 20 + master-excel 18 sheet + project-config 1.2 + .mcp.json 3 server + DECISIONS.md 5877B + skills/governance state + GLOSSARY.md 23 line + bonus schema count + category enum + allOf rules — **1 cosmetic finding F-13.1** (brief "19 schema" vs fiili 18 schema, runtime glob fix injected to worker)
+- [x] Atomic 1-worker dispatch general-purpose Agent (W-H1 = 3 governance skill batch: schema-validate + glossary-audit + load-context) — 2026-05-04, ~22-30 dk worker run (lesson 22+33 trigger: 3 skill convention sıkı bağlı + brief ~13KB <15KB sınır altı + Phase 10 paterni reuse, hibrit 2-wave reddedildi)
+- [x] Worker Output Package incele (SESSION_PROTOCOL §13.4 format, 8 file +2031L, 37 pytest +12 schema-validate + 12 glossary-audit + 13 load-context, lesson 29 self-extending 3/3 upper bound aşıldı 177% brief 5-7/skill)
+- [x] 15/15 acceptance gate PASS verify (3 SKILL.md frontmatter Draft7 + 9 DURUR toplam [3+3+2 W-H3 domain natural] + 37 yeni pytest + master.xlsx WRITE YASAK regex 0/0/0 hit + .mcp.json byte unchanged 469B + DECISIONS.md byte unchanged 5877B + Foundational Principles 3-layer + mcp_tools required+optional empty 3/3 + cross-sheet-invariants `rules` key compliant + worker schema-first override 3/3 convergent + self-extending test 3/3 + atomic envelope worker git'e dokunmadı + Worker Output Package format + CI Rule 3 Gate 6 EXIT_CODE=1)
+- [x] Atomic commit 2ed5531 (8 file, +2031/-0) + push (3cc0b6c..2ed5531, 2026-05-04T17:24:04Z, GitHub API confirmed `2ed553137dfb59782d6dc8885727b955b391552f`)
+- [x] Phase 13 closeout commit (CONTEXT_LEDGER append Phase 13 PUSHED entry + PHASE_STATUS Phase 13 done + Phase 14 active prep + lesson 29 self-extending 3/3 100% upper bound aşıldı production-ready + lesson 31+34 cumulative 9/9 + lesson 8 v3 3'üncü uygulama F-13.1 catch + lesson 36 surface atomic 8'inci kanıt complete 9 phase consecutive + lesson 8 v4 candidate brief internal consistency)
 
 ### Phase 12 Tasks (hepsi closed)
 - [x] Phase 11 PUSHED state verify (HEAD 30fe668 + working tree clean + 451/451 pytest baseline) — 2026-05-04
 - [x] Schema cross-check 9-boyutlu (skill-frontmatter + events + project-config 1.2 brand_identity 18 + content_settings 14 + profile enum 5-value + master-excel 18 sheet allowed_writers 4 entity protected_columns 7 + .mcp.json 3 server F-16 invariant + cross-sheet-invariants done_protocol — 0 finding)
 - [x] Wave 1 dispatch (3 paralel general-purpose: W-G1 indexing-ping + W-G2 brand-onboarding + W-G3 aio-competitor-map) — 2026-05-04, ~7-8 dk worker paralel
-- [x] Wave 1 15/15 acceptance gate PASS verify (3 SKILL.md frontmatter Draft7 + 3 test ≥5 DURUR + 50 yeni pytest + master.xlsx WRITE YOK + .mcp.json byte unchanged + Foundational Principles 3-layer)
-- [x] Wave 1 atomic commit 0ad76d4 (6 file, +2623/-0) + push (30fe668..0ad76d4, 2026-05-04T13:07:26Z)
+- [x] Wave 1 15/15 acceptance gate PASS verify
+- [x] Wave 1 atomic commit 0ad76d4 (6 file, +2623/-0) + push
 - [x] Wave 1 closeout commit b537340 (PHASE_STATUS + CONTEXT_LEDGER append) + push
-- [x] Wave 2 dispatch (3 paralel general-purpose: W-G4 verify-indexing + W-G5 mark-done + W-G6 monitoring-weekly) — 2026-05-04, ~6-7 dk worker paralel
-- [x] Wave 2 15/15 acceptance gate PASS verify (3 SKILL.md frontmatter Draft7 + 3 test ≥4 DURUR + 45 yeni pytest + W-G5 master.xlsx WRITE allowed_writers 4 entity gate + W-G4 + W-G6 master.xlsx READ-ONLY + .mcp.json byte unchanged + Foundational Principles 3-layer + done_protocol invariant compliance W-G5 + Phase 9 reporting paterni reuse W-G6)
-- [x] Wave 2 atomic commit 4476ca6 (7 file, +2911/-0) + push (b537340..4476ca6, 2026-05-04T13:22:13Z)
-- [x] Phase 12 closeout commit (CONTEXT_LEDGER + PHASE_STATUS Phase 12 done + Phase 13 active prep + lesson 31+32+33 final + lesson 34+35 surface + atomic 7'inci kanıt complete confirm)
+- [x] Wave 2 dispatch (3 paralel general-purpose: W-G4 verify-indexing + W-G5 mark-done + W-G6 monitoring-weekly)
+- [x] Wave 2 15/15 acceptance gate PASS verify
+- [x] Wave 2 atomic commit 4476ca6 (7 file, +2911/-0) + push
+- [x] Phase 12 closeout commit (atomic 7'inci kanıt complete confirm)
 
 ### Phase 11 Tasks (hepsi closed)
 - [x] Wave 1 dispatch (2 paralel general-purpose: new-blog + revise-content) — 2026-05-04, ~9-10 dk worker paralel
@@ -81,31 +90,32 @@
 | Phase 11 W2 | done | 2026-05-04 | 2026-05-04 | be33824 |
 | Phase 12 W1 | done | 2026-05-04 | 2026-05-04 | 0ad76d4 |
 | Phase 12 W2 | done | 2026-05-04 | 2026-05-04 | 4476ca6 |
-| Phase 13 | planned | — | — | — |
+| Phase 13 | done | 2026-05-04 | 2026-05-04 | 2ed5531 |
+| Phase 14 | planned | — | — | — |
 
 ## Next Phase Preview
-**Phase 13 — NEXT (Phase 12 PUSHED 4476ca6 önkoşul satisfied):**
-- Phase 13 scope karar verici tarafından belirlenecek (Phase 12 closeout sonrası fresh session)
-- Aday domain'ler: workflow orchestration meta-skill (init-project + brand-onboarding + load-context bütünleştirme), CI/governance polish, ya da v1 release prep (smoke test integration + production runbook)
-- Phase 12'den miras pattern'ler: hibrit 2-wave 3+3 paralel dispatch (lesson 33), worker schema-first override 6/6 convergent (lesson 31), self-extending positive drift (lesson 32), atomic phase paterni 7'inci kanıt complete (lesson 35)
+**Phase 14 — NEXT (Phase 13 PUSHED 2ed5531 önkoşul satisfied):**
+- Phase 14 = workspace + CI + pilot end-to-end (spec §17 v1 release closure):
+  * `platinum-seo-workspace/` repo açılır (yeni GitHub, ADR-005)
+  * `.github/workflows/ci.yml` (7 check: drift-check + schema-validate + glossary-audit + pytest + plugin-agnostik + secret-grep + frontmatter-compile)
+  * Pilot proje ({slug}=dentnotion ADR-003) end-to-end smoke test (init → ingest → discovery → planning → reporting → production → verify)
+  * §18 v1 acceptance criteria PASS verify
+- Phase 13'ten miras pattern'ler: atomic 1-worker dispatch (lesson 22+33), worker schema-first override 9/9 cumulative convergent (lesson 31+34), self-extending positive drift 3/3 100% (lesson 29), atomic phase paterni 8'inci kanıt complete (lesson 36), lesson 8 v3 9-boyutlu schema cross-check + v4 candidate brief internal consistency
+- Phase 14 worker dispatch karar: hibrit 2-wave (workspace + CI ayrı + pilot E2E ayrı) ya da atomic 1-worker (broader scope, lesson 22 üst sınır >15KB brief riski) — gait analysis Phase 14 dispatch öncesi
 
-**Phase 12 PUSHED skills (canlı, 6 skill toplam):**
-- Wave 1 (0ad76d4):
-  - `indexing-ping` — IndexNow + Google Indexing API submit + R-58 robots READ-ONLY + R-91 cascade enforce + 16 pytest
-  - `brand-onboarding` — proje bootstrap wizard, brand_identity 18 + content_settings 14 + profile enum 5-value + Süleyman onay gate, staging-only + 15 pytest
-  - `aio-competitor-map` — DFS SERP heavy + Scrapling tier-1 + R-109/R-110/R-111 AIO signal + 19 pytest
-- Wave 2 (4476ca6):
-  - `verify-indexing` — GSC index_inspect coverage report, audit event_kind + audit_action=accessed schema-first override + 14 pytest
-  - `mark-done` — master.xlsx[completed_work] append + master_task DONE update + done_protocol invariant + allowed_writers 4 entity gate + 15 pytest
-  - `monitoring-weekly` — weekly health check (events range filter + drift-check + GSC 5σ anomaly + budget burn rate) + cron monday 9 UTC report-only + 16 pytest + 1 NEW template
+**Phase 13 PUSHED skills (canlı, 3 governance skill, 43 toplam):**
+- Atomic (2ed5531):
+  - `schema-validate` — jsonschema Draft7 validation runtime glob (`schemas/*.schema.json`, hardcoded count YOK F-13.1 fix) + cross-sheet-invariants 20 rules (`rules` key authoritative test_cross_sheet_invariants_rules_key_compile, F-01..F-15+D-01..D-03+M-01..M-02) + 43 SKILL.md frontmatter compliance + master.xlsx READ-ONLY + 12 pytest
+  - `glossary-audit` — GLOSSARY.md drift cross-ref REFERENCE_INDEX + spec §20 + skills/**/SKILL.md reverse-lookup orphan/missing AMBER (Disiplin #8) + defensive acronym whitelist 22-token (JSON/URL/API/HTML/CSS/SEO/MCP/GSC/DFS/AIO/FAQ/JSON-LD/XML/HTTP/CSV/CLI/CI/ADR/UTC/SHA/UUID/REST/TLS) + R/F/D/M-XX rule ID prefix regex false-positive guard + 12 pytest
+  - `load-context` — spec §13.2 + SESSION_PROTOCOL.md §2 wakeup codify 7-file <15KB budget verify + auto-detect phase_id (F-13.1 paterni reuse hardcoded YOK) + 9-step workflow 2 DURUR domain natural (lesson 8 v4 candidate) + 13 pytest
 
-Profile-aware enforcement (Principle 2) Phase 12 publishing context delivered: ymyl/e-commerce/local-service/b2b-saas/portfolio 5-enum 6 skill body documented. Foundational Principles 3 prensip Phase 12 6/6 skill acceptance gate enforce.
+3 governance skill convergent paterni: `mcp_tools=[]` (pure stdlib, F-16 plugin agnostik 9 commit invariant) + `events.jsonl` audit kind (event_kind=audit + audit_action=accessed + audit_target+actor required triple, allOf rule compliance, F-8 WORK-only enum kapalı schema-first override) + `outputs/reports/{date}-<skill>.md` + master.xlsx READ-ONLY (transaction.* regex 0 hit per skill body) + Foundational Principles 3-layer enforce (truth-verifiable + profile-aware 5-enum + AI suistimal yasağı).
 
-Lesson 31 (3 worker convergent schema-first override) + Lesson 32 (self-extending positive drift 3/3 Wave 1 + 2/3 Wave 2) + Lesson 33 (hibrit 2-wave 3+3 production runbook) + Lesson 34 (Wave 1+2 toplam 6/6 schema-first override convergent paterni production-ready) + Lesson 35 (atomic phase paterni 7'inci kanıt complete [Phase 7+8+9+10+11W1+11W2+12W1+12W2]) Phase 13+ enforcement runbook.
+Lesson 29 (self-extending 3/3 100% upper bound 12+12+13=37 brief 5-7/skill 177%) + Lesson 31+34 (worker schema-first override cumulative 9/9 100% [Phase 12 6/6 + Phase 13 3/3]) + Lesson 33 (atomic 1-worker vs hibrit 2-wave karar matrisi <5 skill scope) + Lesson 36 (atomic phase paterni 8'inci kanıt complete 9 phase consecutive [Phase 7+8+9+10+11W1+11W2+12W1+12W2+13]) + Lesson 8 v3 3'üncü uygulama (F-13.1 cosmetic catch) + Lesson 8 v4 candidate (brief Section X vs Section Y internal consistency cross-check) Phase 14+ enforcement runbook.
 
-Fresh karar verici Phase 13 brief paste = explicit onay. Manager bu session'da continue eder veya retire (karar verici belirleyecek).
+Fresh karar verici Phase 14 brief paste = explicit onay. Manager bu session'da continue eder veya retire (karar verici belirleyecek).
 
-ETA: ~2 phase kalan (13 + 14 = v1 release; Phase 14 governance polish + workspace+CI ayrı).
+ETA: ~1 phase kalan (14 = v1 release closure; workspace + CI + pilot E2E §18 acceptance criteria).
 
 ## Phase 2 Tasks (hepsi closed)
 - [x] W-I — 5 disiplin (naming, single-source-of-truth, schema-first, append-only-state, excel-discipline) — done; 12975B toplam, 5/5 structure PASS, drift sıfır
