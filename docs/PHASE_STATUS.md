@@ -1,9 +1,12 @@
 # Phase Status
 
-**Last Updated:** 2026-05-04T09:05:19Z
-**Active Phase:** Phase 11 Wave 2 ACTIVE (3 skill: faq-optimization + content-remediation + generate-images; Wave 1 PUSHED 2026-05-04 a3e1a6a — 2 production skill new-blog + revise-content + project-config schema 1.1→1.2 cascade fix + 410/410 pytest PASS + 13/13 acceptance gate PASS + 5'inci atomic phase paterni kanıtı)
+**Last Updated:** 2026-05-04T11:12:49Z
+**Active Phase:** Phase 12 — Publishing + Specialized NEXT (6 skill: indexing-ping + verify-indexing + aio-competitor-map + brand-onboarding + mark-done + monitoring-weekly; Phase 11 DONE 2026-05-04 be33824 — 5 production skill canlı [new-blog + revise-content + faq-optimization + content-remediation + generate-images] + 451/451 pytest PASS + 12/12 Wave 2 acceptance gate PASS + atomic phase paterni 6'ıncı kanıt onaylandı + plugin agnostik MCP boundary intact F-16)
 
 ## Previous Phase
+**Phase 11 — Production Suite ✅ DONE 2026-05-04 (hibrit 2-wave paralel B seçeneği: Wave 1 = 2 paralel general-purpose [new-blog + revise-content + project-config schema 1.1→1.2 cascade fix Phase 10 EKSİĞİ closure, a3e1a6a 12 file +1674/-10] + Wave 2 = 3 paralel general-purpose [faq-optimization + content-remediation + generate-images, be33824 7 file +2209/-0]; 5 production skill canlı, 451/451 pytest PASS no regression 4 commit boyunca [a3e1a6a + 597c3f5 + be33824 + closeout], 0 yeni ADR target preserved 14 commit byte-byte DECISIONS unchanged + multi-source documentation Q-CD-01 paterni 5'inci uygulama, 13/13 Wave 1 + 12/12 Wave 2 acceptance gate PASS, atomic phase paterni 6'ıncı kanıt onaylandı [Phase 7+8+9+10+11W1+11W2], plugin agnostik MCP boundary intact F-16 Süleyman Seçenek D, 6 yeni lesson kayıt edildi 22-27 + 2 Wave 2 lesson 28-29 candidate, 5'inci ardışık Phase 14+ CI Rule 3 Gate 6 PASS → 6'ıncı)**
+
+## Older Phase
 **Phase 10 — Content Rules Processing ✅ DONE 2026-05-02 (1 atomic commit, 6 rules dosyası + 5 template + 2 schema bump + content-rules-input.md SUPERSEDED + 1 migration script + 1 transform extension + 3 test sync, 381/381 pytest PASS no regression, 0 ADR target preserved + multi-source documentation, brief disiplini lesson 8 paterni reuse — manager fresh state divergence catch (eski 3 rule scope → yeni 6 rule scope) Phase 9 W2 success case 2'inci uygulama)**
 
 ### Phase 10 Tasks (hepsi closed)
@@ -34,17 +37,19 @@
 - [x] Atomic Phase 10 commit
 
 ### Blockers
-- (none — Phase 11 Wave 1 PUSHED 2026-05-04 a3e1a6a, Wave 2 dispatch awaiting karar verici Wave 2 brief paste)
+- (none — Phase 11 PUSHED 2026-05-04 be33824, Phase 12 dispatch awaiting fresh karar verici brief paste)
 
-### Phase 11 Tasks
+### Phase 11 Tasks (hepsi closed)
 - [x] Wave 1 dispatch (2 paralel general-purpose: new-blog + revise-content) — 2026-05-04, ~9-10 dk worker paralel
 - [x] Wave 1 13/13 acceptance gate PASS verify (12 gate + EKSTRA cascade fix verify)
 - [x] Wave 1 atomic commit a3e1a6a (12 file, +1674/-10) + push (e4369ea..a3e1a6a, 2026-05-04T09:05:19Z, GitHub API confirmed)
-- [ ] Karar verici Wave 2 brief hazırlama (3 skill: faq-optimization + content-remediation + generate-images)
-- [ ] Wave 2 dispatch (3 paralel general-purpose)
-- [ ] Wave 2 acceptance gate PASS verify
-- [ ] Wave 2 atomic commit + push
-- [ ] Phase 11 closeout (CONTEXT_LEDGER + PHASE_STATUS rewrite, atomic phase paterni 6'ıncı kanıt hedef)
+- [x] Wave 1 closeout commit 597c3f5 (PHASE_STATUS + CONTEXT_LEDGER append) + push
+- [x] Karar verici Wave 2 brief revize v2 (F-16 Higgsfield manager spot-check catch + Süleyman Seçenek D plugin agnostik MCP boundary)
+- [x] Wave 2 dispatch (3 paralel general-purpose: faq-optimization + content-remediation + generate-images) — 2026-05-04, ~10-15 dk worker paralel
+- [x] Wave 2 acceptance gate verify (10/12 → 12/12 manager fix sonrası: W-F4 + W-F5 inputs.{X}.enum schema-first override mop-up, W-F3 D1 paterni reuse)
+- [x] Wave 2 atomic commit be33824 (7 file, +2209/-0) + push (597c3f5..be33824, 2026-05-04T11:12:49Z, GitHub API confirmed)
+- [x] Phase 11 closeout commit (CONTEXT_LEDGER + PHASE_STATUS rewrite + Phase 12 active prep)
+- [x] Atomic phase paterni 6'ıncı kanıt onaylandı (Phase 7+8+9+10+11W1+11W2)
 
 ## Phase History
 | Phase | Status | Started | Ended | Commit |
@@ -61,21 +66,25 @@
 | Phase 9 | done | 2026-05-01 | 2026-05-01 | 49cbf69 |
 | Phase 10 | done | 2026-05-02 | 2026-05-02 | e4369ea |
 | Phase 11 W1 | done | 2026-05-04 | 2026-05-04 | a3e1a6a |
-| Phase 11 W2 | active | 2026-05-04 | — | — |
+| Phase 11 W2 | done | 2026-05-04 | 2026-05-04 | be33824 |
+| Phase 12 | planned | — | — | — |
 
 ## Next Phase Preview
-**Phase 11 — Production Suite NEXT (5 skill, Phase 10 önkoşul satisfied):**
-- `new-blog` skill — markdown brief + HTML article (R-01..R-13 + R-29 + R-30 + R-78..R-84 schema markup) + multi-step workflow (R-08 SERP analiz → R-15 site doğrulama → R-12 keyword set → R-29 H2 cevap-önce → R-09 FAQ + R-79 schema → R-26 CTA + R-102 AI summary footer + R-118 humanize pass + R-117 uniqueness check)
-- `revise-content` skill — section-targeted diff workflow (R-87 + R-88 freshness theater anti-pattern + R-89 canonical preserve + R-103 content version increment if major); change_summary log master.xlsx[completed_work] veya events.jsonl
-- `faq-optimization` skill — mevcut FAQ block re-render (R-09 cap + R-43 statik + R-79 schema refresh) + AIO citation pattern (R-109/R-110/R-111)
-- `content-remediation` skill — decay/sunset/prune execution (R-85..R-91); robots.txt + redirect_404 sheet patches; manual approve gate (R-86, R-90)
-- `generate-images` skill — 8K ultra realistic + nano-banana model (R-71/R-72) + manual upload reference (R-73/R-74); WebP/AVIF/JPG fallback (R-76); LCP optimization (R-75)
+**Phase 12 — Publishing + Specialized NEXT (6 skill, Phase 11 önkoşul satisfied):**
+- `indexing-ping` skill — IndexNow + Google Indexing API submit (R-58 lifecycle robots map, R-91 redirect_404/410 cascade); content-remediation produces consume; events.jsonl event_type=`schema_fix` veya `redirect_deployed`
+- `verify-indexing` skill — GSC index_inspect + URL Inspection API (mcp__gsc__index_inspect) verify; coverage report; events.jsonl event_kind=`audit`
+- `aio-competitor-map` skill — SERP top-10 AIO citation pattern analiz (R-109/R-110/R-111) + competitor_pages.jsonl staging; DFS heavy + Scrapling tier-1
+- `brand-onboarding` skill — yeni proje bootstrap workflow (init-project + project-config wizard + brand_identity 18 field + content_settings 14 field + profile enum 5-value seç); Süleyman onayı zorunlu
+- `mark-done` skill — master.xlsx[completed_work] entry + master_task done_protocol gate (allowed_writers compliance); events.jsonl event_type=`manual` veya `quickwin_applied`
+- `monitoring-weekly` skill — weekly health check aggregator (drift-check + GSC anomaly + budget burn rate); reporting suite extension (Phase 9 paterni reuse)
 
-Profile-aware enforcement (Principle 2) Phase 11 her skill'de branching: YMYL byline + counter-argument + disclaimer; e-commerce conversational + sen + product photo; b2b-saas formal + diagram. Foundational Principles 3 prensip Phase 11 acceptance gate'lerinde enforce.
+Profile-aware enforcement (Principle 2) Phase 12 publishing context: YMYL legal compliance check + e-commerce schema markup product priority + b2b-saas API documentation depth. Foundational Principles 3 prensip Phase 12 acceptance gate'lerinde enforce.
 
-Dispatch: 1 worker per skill (5 worker, paralel veya sequential — manager karar verir Phase 11 başında); ETA ~3 phase kalan (11+12+13 = v1 release; Phase 14 governance polish + workspace+CI ayrı).
+Dispatch: hibrit 2-wave Phase 11 paterni reuse aday VEYA atomic 1-worker (Phase 10 paterni) — Phase 12 başında karar (gait analysis sonrası).
 
-Fresh manager session ÖNERİLİR Phase 11 başında — 5 production skill domain ayrı (Phase 10 rules domain'inden farklı), CONTEXT_LEDGER ~45 entry phase boundary, fresh wakeup spec §13.2 protokolü reuse.
+Fresh manager + fresh karar verici session ÖNERİLİR Phase 12 başında — 6 publishing skill domain ayrı (Phase 11 production domain'inden farklı), CONTEXT_LEDGER ~50 entry phase boundary, fresh wakeup spec §13.2 protokolü reuse + manager dosya seti yeniden okunur (<15KB ilk yükleme intact, Phase 11 PUSHED carryover entry intact).
+
+ETA: ~3 phase kalan (12 + 13 + 14 = v1 release; Phase 14 governance polish + workspace+CI ayrı).
 
 ## Phase 2 Tasks (hepsi closed)
 - [x] W-I — 5 disiplin (naming, single-source-of-truth, schema-first, append-only-state, excel-discipline) — done; 12975B toplam, 5/5 structure PASS, drift sıfır
