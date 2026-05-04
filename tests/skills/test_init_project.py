@@ -236,12 +236,26 @@ def test_config_schema_valid(tmp_path: Path, project_config_schema: dict) -> Non
     )
 
     # Required-field spot checks the schema enforces.
-    assert cfg["schema_version"] == "1.1"
+    assert cfg["schema_version"] == "1.2"
     assert cfg["domain"].startswith("https://")
     assert cfg["market"] == "TR"
     assert cfg["language"]["content_locale"] == "tr-TR"
     assert "local-service" in cfg["profiles"]
     assert cfg["gsc"]["site_url"]
+
+    # Phase 11 W-F1 cascade fix: schema v1.2 introduces optional singular
+    # `profile` field (Foundational Principle 2 primary enforcement switch).
+    # The schema must declare the enum even though bootstrap_project.py does
+    # not inject the field by default (additive policy — consumer skills
+    # lazy-read with profile-aware defaults when missing).
+    profile_decl = project_config_schema["properties"].get("profile")
+    assert profile_decl is not None, (
+        "schema v1.2 missing 'profile' field declaration "
+        "(F-3 cascade fix not applied)"
+    )
+    assert profile_decl.get("enum") == [
+        "e-commerce", "ymyl", "local-service", "b2b-saas", "portfolio"
+    ], "profile enum must list 5 Principle 2 values exactly"
 
 
 # ---------------------------------------------------------------------------
