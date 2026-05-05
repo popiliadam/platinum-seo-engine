@@ -116,6 +116,11 @@ def synthetic_raw() -> dict:
 # Test 1 — live MCP smoke (validates the captured raw payload)
 # ---------------------------------------------------------------------------
 
+@pytest.mark.skipif(
+    not WORKSPACE_STAGING.exists(),
+    reason="local-only fixture: WORKSPACE_STAGING path missing on CI runner "
+           "(Q-CI-W3-04 Phase 15 audit Wave 1 kategori #5 codify aday)"
+)
 def test_happy_path_gsc_live() -> None:
     """
     The W-P worker performed an at-rest live `mcp__gsc__detect_quick_wins`
@@ -161,6 +166,11 @@ def test_happy_path_gsc_live() -> None:
 # Test 2 — §16.5 step-3 raw JSON inbox path discipline
 # ---------------------------------------------------------------------------
 
+@pytest.mark.skipif(
+    not WORKSPACE_STAGING.exists(),
+    reason="local-only fixture: WORKSPACE_STAGING path missing on CI runner "
+           "(Q-CI-W3-04 Phase 15 audit Wave 1 kategori #5 codify aday)"
+)
 def test_inbox_raw_json_saved() -> None:
     """The raw payload must live at the canonical inbox path: every
     Phase 6+ MCP-ingestion skill copies this naming scheme verbatim."""
