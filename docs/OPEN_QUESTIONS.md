@@ -23,22 +23,27 @@
 **Owner:** karar verici agent (Phase 14+ pre-dispatch, pilot smoke test deneyimi sonrası)
 **Blocking Phase:** None (non-blocking, governance polish; Wave 2 + Phase 9 closeout aynı paterni reuse — defer kararı geçerli)
 
-### Q-CI-W2-01: Governance Skill Body Executability (standalone Python block refactor) — Phase 14 W3 ACTIVE SCOPE
-**Raised:** 2026-05-05 during Phase 14 W2 worker output (W-J1 surface, lesson 8 v5 boyut #6 katman 2)
-**Context:** Phase 14 W2 W-J1 helper script `scripts/ci/run_skill_python.py` markdown-aware Python block extraction çalışıyor (3 governance skill 8+7+7=22 Python block extract edildi). Ancak skill body Python blokları **standalone executable DEĞİL** — surrounding markdown prose'a referans veriyor (`schema_path`, `glossary_path` değişkenler tanımlanmamış, illustrative pseudo-code `...` literals + `dict` literal SyntaxError). Helper davranışı semantically correct (FAIL preservation), ama 3 governance skill smoke test:
-- `drift-check`: SyntaxError line 76 (`{"category": "...", ...}` illustrative pseudo-code dict literal)
-- `schema-validate`: NameError `schema_path` (surrounding prose context'e referans)
-- `glossary-audit`: NameError `Path` (ilk Python block missing import)
+### Q-CI-W3-01: skill-body-executability Convention Codify (sys.path.insert pattern rules/skills.md)
+**Raised:** 2026-05-05 during Phase 14 W3-W1 worker output (W-K1 surface, lesson 21 4'üncü uygulama)
+**Context:** Phase 14 W3-W1 worker proaktif decision: `sys.path.insert(0, os.getcwd())` 4 governance SKILL.md 1. Python block injection brief'te öngörülmemişti (helper subprocess tempfile cwd vs PYTHONPATH gap → `from scripts.state import events_writer` ModuleNotFoundError fix). Worker 4 skill identik convention uyguladı (drift-check + schema-validate + glossary-audit + load-context). Currently 4-skill local pattern, future skill authors re-discover edecek riski → cross-skill convention codify aday.
+**Options:**
+- a) `rules/skills.md` (yeni rule R-XX yeni dosya) — skill-body-executability convention single rule + Foundational Principles bağlantı (truth-verifiable üst-prensip alt-katmanı)
+- b) Mevcut `rules/skill-description-discipline.md`'e R-XX additive bump — skill body executability sub-section ek
+- c) `templates/skill-body-template.md` placeholder (her yeni skill başlangıçta convention scaffolding)
+- d) Phase 14 W3-W3 v1 release closure'a defer (mevcut 4-skill local pattern v1 release acceptable, post-v1 ADR-aday)
+**Owner:** karar verici agent (Phase 14 W3-W2 brief writing, pilot E2E sırasında yeni skill türetilmiyorsa W3-W3 defer aday)
+**Blocking Phase:** None (non-blocking, governance polish)
 
-**Decision (Phase 14 W2):** Süleyman Seçenek C onaylandı (defer Phase 14 W3, AMBER mode kabul). Initial report-only mode (`continue-on-error: true`) zaten AMBER mode kabul ediyor — pipeline FAIL etmez, sadece warning. Phase 14 W3 pilot E2E sırasında governance skill body refactor doğal scope (real workspace state üzerinde sentetik test değil). Atomic 10'uncu kanıt scope korunur (lesson 22 üst sınır brief riski önlenir).
-
-**Phase 14 W3 active scope:**
-- (a) Governance skill body refactor — 3 skill × 7-8 Python block standalone-executable, entrypoint variables + import statements + concat-friendly
-- (b) Helper multi-block isolation mode evrim — her Python bloğu ayrı subprocess (state izolasyonu) — DEĞERLENDİRİLDİ skill body intent (workflow step-by-step sequential state sharing) ile çelişir
-- (c) Strict mode geçiş Phase 14 W3+ closeout (continue-on-error: false 3 governance step)
-
-**Owner:** karar verici agent (Phase 14 W3 brief writing, pilot dentnotion E2E doğal scope)
-**Blocking Phase:** Phase 14 W3 (governance skill body refactor pilot E2E doğal scope)
+### Q-CI-W3-02: Helper Auto-Prepend sys.path.insert (Boilerplate Eliminate)
+**Raised:** 2026-05-05 during Phase 14 W3-W1 worker output (W-K1 surface, helper refactor scope)
+**Context:** Phase 14 W3-W1 sonrası 4 SKILL.md 1.blokta `import os; import sys; sys.path.insert(0, os.getcwd())` boilerplate. Eğer helper `scripts/ci/run_skill_python.py` concat öncesi otomatik prepend yaparsa skill author boilerplate yazmaz (DRY). Trade-off: helper karmaşık + sihirli prepend implicit behavior; skill body explicit sys.path.insert açık + reader-friendly + skill-author-aware.
+**Options:**
+- a) Helper auto-prepend (DRY, helper karmaşık, ~5 satır eklenir, magic prepend) — skill author boilerplate yazmaz
+- b) Skill body explicit korunur (mevcut state, 4 skill 5 satır toplam boilerplate) — magic-free, reader-friendly
+- c) Hibrit: helper auto-prepend + skill body opt-out flag (`# helper:no-auto-sys-path`) — esneklik
+- d) Phase 14 W3-W3 v1 release closure'a defer (mevcut state v1 release acceptable)
+**Owner:** karar verici agent (Phase 14 W3-W2/W3-W3 helper refactor scope)
+**Blocking Phase:** None (non-blocking, helper polish)
 
 ### Q-WS-02: README "Quick Start" engine plugin invocation convention (workspace → engine plugin nasıl invoke edilir?)
 **Raised:** 2026-05-04 during Phase 14 W1 worker output (W-I1 surface)
@@ -54,6 +59,7 @@
 
 
 ## Resolved (last 10 — moved to DECISIONS)
+- **Q-CI-W2-01 → atomic commit ed6a40d (Phase 14 W3-W1)** — Governance skill body executability defer scope RESOLVED. 4 SKILL.md body refactor standalone-executable (drift-check 8 + schema-validate 7 + glossary-audit 7 + load-context 8 = 30 Python block helper concat exec EXIT=0 4/4 skill). Lesson 21 4'üncü uygulama worker proaktif `sys.path.insert(0, os.getcwd())` cross-skill convention. GitHub Actions Run 4 14/14 step SUCCESS Phase 14 ilk %100 GREEN run (W2 Run 2/3 Step 1+2+3 AMBER continue-on-error masks → W3-W1 sonrası gerçek runtime PASS). Strict mode (`continue-on-error: false`) geçiş W3-W3 closeout artık kanıtlanmış zemin. Q-CI-W3-01 + Q-CI-W3-02 yeni surface (sys.path convention codify + helper auto-prepend) Phase 14 W3-W2/W3-W3 backlog.
 - **Q-CI-W2-06 → fix commit c522e9f** — Phase 14 W2 post-push CI runtime fix `requirements.txt` 4-line manifest (jsonschema + pytest + openpyxl + pyyaml). `actions/setup-python@v5 cache: pip` cache hash için manifest dosyası gerektirir. Lesson 8 v6 candidate doğum belgesi boyut #12 brief CI runtime requirements cross-check Phase 14 W3+ enforce 12-boyutlu.
 - **Q-015 → ADR-025** — scrapling-output-mapping pattern dependency → templates/scrapling/.gitkeep yaratıldı, schema pattern korundu, sub-schemas Phase 7+ skill'lerle.
 
