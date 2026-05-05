@@ -2,16 +2,38 @@
 
 ## Unresolved
 
-### Q-W3W2Cb-002: /gece-plagi-splint URL "URL is unknown to Google" mismatch despite gsc_performance 4720 imp/30d (canonical drift) [MEDIUM]
-**Raised:** 2026-05-05 during Phase 14 W3-W2-C-b worker output (W-O1 Step 6 verify-indexing GSC inspect surface)
-**Context:** GSC `index_inspect` returned coverageState="URL is unknown to Google" for `https://demo-dental.example/gece-plagi-splint/` despite `gsc_performance` sheet reporting 4720 impressions / 30 days for the same URL. Possible canonical drift (trailing slash variant in sitemap vs URL accessor) or canonical conflict. Worker Step 3 revise-content already produced a HIGH-severity decay revision plan for this URL (-29% click drop) — plan validity hinges on GSC indexability resolution.
+### Q-W3W3α-W1: test_ci_yaml.py rename W3-W3-β scope follow-up generalize [LOW]
+**Raised:** 2026-05-05 during Phase 14 W3-W3-α worker output (W-P1 proaktif fix Lesson 21 8'inci ardışık)
+**Context:** Phase 14 W3-W3-α brief minimum scope ÖTESİ worker proaktif `test_ci_yaml.py::test_continue_on_error_initial_report_only_mode` → `test_continue_on_error_strict_mode_governance_steps` rename (existing test ci.yml strict mode 3 governance step geçişini bloklayacaktı, 7-step report-only assertion). W3-W3-β scope: kalan 4 step strict mode geçişi sırasında bu test tekrar generalize edilmeli (3 strict + 4 report-only ayrımı kalkacak).
 **Options:**
-- a) Sitemap canonical audit — fetch demo-dental sitemap.xml + cross-check trailing slash convention vs URL submitter; if mismatch, regenerate sitemap with consistent canonical
-- b) URL canonical tag inspect via Scrapling fetch — verify `<link rel="canonical">` HTML tag matches GSC accessor URL
-- c) GSC `submit_sitemap` resubmit + 24-72 hour reindex window + index_inspect re-verify
-- d) Phase 14 W3-W3 audit Wave 1 layout normalize ADR aday (Q-W3W2Cb-001 RESOLVED paterni reuse — same-class GSC canonical investigation)
-**Owner:** karar verici agent (Phase 14 W3-W3 closure scope, v1.0.0 release closure öncesi resolve aday)
-**Blocking Phase:** None (non-blocking, revise-content plan can ship as remediation candidate; resolution post-launch acceptable)
+- a) W3-W3-β scope test rename'i `test_continue_on_error_all_strict_mode` (4 step strict mode geçişi sonrası genelleştirme)
+- b) Test parametrik refactor — `pytest.mark.parametrize` ile strict + report-only iki mod test (esnek)
+- c) Test silme — strict mode standard convention'a düşünce assertion gereksiz
+- d) Phase 15 audit defer (W3-W3-β scope follow-up acceptable, low priority)
+**Owner:** karar verici agent (Phase 14 W3-W3-β scope follow-up)
+**Blocking Phase:** None (non-blocking, low priority test infrastructure polish W3-W3-β)
+
+### Q-W3W3α-EVENTSCHEMA-01: events.schema audit_run 10-enum cross-check yapılmadı [MEDIUM]
+**Raised:** 2026-05-05 during Phase 14 W3-W3-α worker output (W-P1 rules/events-writer.md Section 4 monitoring-weekly satırı `audit_run` belirtti ama schema cross-check yapılmadı)
+**Context:** W-P1 worker rules/events-writer.md Section 4 branch matrix per skill 22 row codify (event_type 10-closed-enum). monitoring-weekly satırı `event_kind=audit + event_type=audit_run` belirtti AMA events.schema.json `event_type` enum'unda `audit_run` mevcut mu doğrulanmadı (worker self-disclosure). Schema'da yoksa worker schema-first override (manual + note paterni) reuse gerekir. Phase 15 audit Wave 1 schema cross-check kategori #2 scope.
+**Options:**
+- a) events.schema.json event_type enum cross-check yapılır + `audit_run` yoksa schema additive bump (audit_run + content_revise_minor + ...)
+- b) rules/events-writer.md Section 4 monitoring-weekly satırı `event_type=manual + note=[skill=monitoring-weekly event_type_intent=audit_run]` paterni reuse (worker schema-first override)
+- c) Phase 15 audit Wave 1 schema cross-check kategori #2 scope birleşik resolve (Q-W3W2Cb-003 + Q-W3W2C-A-LAYOUT-01 paterni reuse)
+- d) Phase 14 W3-W3-β closure scope schema patch ADR aday
+**Owner:** karar verici agent (Phase 15 audit Wave 1 kategori #2 schema cross-check core finding)
+**Blocking Phase:** None (non-blocking, schema cross-check medium priority Phase 15 audit scope)
+
+### Q-W3W3α-W2: events_writer.py::next_run_id helper module path doğrulanmadı [LOW]
+**Raised:** 2026-05-05 during Phase 14 W3-W3-α worker output (W-P1 rules/events-writer.md Section 2 next_run_id helper invocation doğrulanmadı)
+**Context:** W-P1 worker rules/events-writer.md Section 2 `scripts/state/events_writer.py::next_run_id(project_slug)` helper invocation codify etti ama module path doğrulanmadı (worker self-disclosure). Helper module workspace repo'da mevcut mı engine repo'da mı? Phase 14 W3-W3-β workspace scope verify aday — workspace `~/Documents/platinum-seo-workspace/scripts/state/events_writer.py` veya engine `scripts/state/events_writer.py` resolve gerek.
+**Options:**
+- a) workspace `~/Documents/platinum-seo-workspace/scripts/state/events_writer.py` mevcut mu verify + path doğru ise rules/events-writer.md korunur
+- b) engine `scripts/state/events_writer.py` mevcut mu verify + workspace'te yok ise plugin invocation pattern path expansion
+- c) Phase 14 W3-W3-β workspace scope smoke test (helper exec doğru module path resolve)
+- d) Phase 15 audit defer (low priority module path verification post-launch acceptable)
+**Owner:** karar verici agent (Phase 14 W3-W3-β workspace scope verify)
+**Blocking Phase:** None (non-blocking, low priority module path verification W3-W3-β workspace scope)
 
 ### Q-W3W2Cb-003: master_task task_id pattern (MT-W3W2B-001) does NOT match events.schema regex [LOW]
 **Raised:** 2026-05-05 during Phase 14 W3-W2-C-b worker output (W-O1 Step 7 mark-done schema-first override branch surface)
@@ -70,17 +92,6 @@
 **Blocking Phase:** None (non-blocking, drift-check verdict RED dikkat çekici ama mekanik değil real data drift bilinçli kabul append-only protected)
 
 
-### Q-W3W2B-EVENTTYPE-01: events.schema event_type 10-closed-enum vs 13 skill-named ihtiyaç [MEDIUM]
-**Raised:** 2026-05-05 during Phase 14 W3-W2-B manager pre-dispatch finding F-14W3W2B-1 + worker output (W-M1 schema-first override 11'inci uygulama)
-**Context:** Brief Section 3 Step 1-13 `event_kind=work + event_type=<skill_name>` literal yazılmıştı 13 farklı value (cannibalization → content_revise + tech_audit + on_page_audit + content_gaps + schema_audit + competitive_analysis + geo_analysis + cluster_map + topical_map + new_content_plan + internal_links + master_task_sync), AMA events.schema.json event_type 10-closed-enum (content_new + content_revise + content_improve + content_remove + template_apply + scrape_run + audit_run + budget_event + sync_run + manual). Manager pre-dispatch 14-boyutlu Section 8 boyut #5 enum kontrol etti master_task primary_source 10-enum + content_type 6-enum AMA events event_type 10-enum cross-check ATLANDI = lesson 28 v3 4'üncü kategori "manager self-failure catch" 2'inci uygulama. Worker schema-first override 11'inci uygulama: 14 work event `event_type=manual` + note=`[skill=X] event_type_intent=Y` + task_id auto-allocated `T-1001..T-1014` (`^T-[0-9]{4,}$` pattern). W3-W3 schema patch veya rules/events-writer.md codify Q-DC-RUNID-01 birleşik scope.
-**Options:**
-- a) events.schema event_type enum additive bump (+13 skill-named values: cannibalization + content_decay + tech_audit + on_page_audit + content_gaps + schema_audit + competitive_analysis + geo_analysis + cluster_map + topical_map + new_content_plan + internal_links + master_task_sync) — Phase 14 W3-W3 schema patch ADR, schema_version bump, mevcut 10 enum geri uyumlu
-- b) `rules/events-writer.md` (yeni rule R-XX yeni dosya) codify — `event_type=manual + note[skill=X] event_type_intent=Y` paterni mandatory skill-level work events için (W3-W2-B run paterni convention authority) + `next_run_id` helper Q-DC-RUNID-01 birleşik scope
-- c) Hybrid: schema event_type genişletme + rules/events-writer.md codify (her iki layer)
-- d) Phase 15 audit defer (W3-W2-B run paterni acceptable, post-v1 ADR aday)
-**Owner:** karar verici agent (Phase 14 W3-W3 closeout scope, Q-DC-RUNID-01 birleşik resolution)
-**Blocking Phase:** None (non-blocking, governance polish W3-W3 closure)
-
 ### Q-W3W2B-WRITER-01: non-master_task sheets writer registry codify [LOW]
 **Raised:** 2026-05-05 during Phase 14 W3-W2-B worker output (W-M1 transaction.update writer surface)
 **Context:** master_task.allowed_writers includes `master_task_sync` exact string — orchestrator passes `writer="master_task_sync"` correctly. Other sheets (cannibalization/content-decay/tech-audit/etc.) pass arbitrary writer strings which `transaction._check_writer_scope` ignores when `allowed_writers is None`. Cross-sheet-invariants 20 rule registry'de allowed_writers field ardından non-master_task sheets için writer registry tanımı eksik — convention kayboluyor. Phase 15 audit Wave 2 kategori #9 (workspace data integrity) writer registry codify aday.
@@ -91,29 +102,6 @@
 - d) Phase 15 audit defer (mevcut skill-name string'leri events.jsonl provenance trail'de kayıt ediliyor + W3-W2-B run paterni acceptable, low priority)
 **Owner:** karar verici agent (Phase 15 audit Wave 2 kategori #9)
 **Blocking Phase:** None (non-blocking, low priority writer registry)
-
-### Q-DFS-MCP-01: DataForSEO MCP wrapper `location_name` field reject (TR market gap, v1 release blocker aday) [HIGH]
-**Raised:** 2026-05-05 during Phase 14 W3-W2-A worker output (W-L1 surface, dfs-pull skill execution)
-**Context:** DataForSEO MCP wrapper `location_name` field reject `dataforseo_labs_google_keyword_ideas` + `dataforseo_labs_google_ranked_keywords` çağrılarında, schema declarative ama wrapper ihlali. Sonuç: keyword_ideas US default (English) döndü TR market keyword'ları gelmedi + ranked_keywords empty. Pilot demo-dental (TR-tr) için kritik data quality gap. Workaround: `location_code 2792` + `language_code "tr"` parametre kombinasyonu denendi ama wrapper consume etmedi. Phase 14 W3-W2-A 4 ingest skill arasında dfs-pull bu nedenle eksik TR market coverage ile shipped (cluster_keywords + opportunity 300+150 row populate ama TR specificity belirsiz).
-**Options:**
-- a) `schemas/` repo `dataforseo-mcp.schema.json` patch — `location_name` field schema declarative ama wrapper accept ediyor olduğunu validate, runtime test add
-- b) MCP wrapper kendisinde patch (engine'in kontrolünde değilse: paket-spec env naming convention veya GitHub issue raise upstream)
-- c) Skill `dfs-pull` body Python block `location_name` removal + `location_code 2792` + `language_code "tr"` zorunlu workaround
-- d) Phase 14 W3-W3 closure'da TR market keyword reset + dfs-pull re-run (W3-W2-A data partial valid kabul)
-**Owner:** karar verici agent (Phase 14 W3-W3 v1 release blocker triage, Süleyman onayı kritik)
-**Blocking Phase:** Phase 14 W3-W3 v1 release blocker aday (TR market data quality v1 release tag öncesi resolve)
-
-### Q-DC-RUNID-01: Manual events `run_id` field eksik convention codify
-**Raised:** 2026-05-05 during Phase 14 W3-W2-A worker output (W-L1 drift-check F-13 surface)
-**Context:** Phase 14 W3-W2-A 4 ingest skill execution sırasında 5 manual events.jsonl direct dict construction yapıldı, `run_id` integer field eksik bırakıldı. transaction.append auto-emit edilen event'lerde `run_id` mevcut (lesson 21 paterni), ama manuel events_writer çağrısında `next_run_id(project_slug)` helper kullanılmamış. Drift-check F-13 5 event run_id missing fail. Mop-up imkansız: events.jsonl mutate = R-XX append-only state Süleyman global feedback_hard_constraints ihlali (lesson 28 v3 5'inci kategori "append-only invariant protected drift defer" doğum belgesi). Convention codify gerekli future skill execution'larında prevention.
-**Options:**
-- a) `rules/events-writer.md` (yeni rule R-XX yeni dosya) — manual events `next_run_id` helper kullanımı zorunlu single rule + 4 event_kind (work/audit/provenance/workflow) için per-kind run_id semantic
-- b) Mevcut `rules/append-only-state.md`'ye R-XX additive bump — events run_id sub-section ek
-- c) `scripts/state/events_writer.py` API hardening — `append()` veya `add_event()` direct dict construction yerine helper-only path enforce (raises if run_id missing)
-- d) Phase 15 audit'a defer (mevcut 5 manual event drift kabul edilir, future skill writers convention discover edecek)
-**Owner:** karar verici agent (Phase 14 W3-W3 backlog non-blocking)
-**Blocking Phase:** None (non-blocking, drift-check F-13 sonuç bilinçli kabul)
-
 
 ### Q-DC-VERDICT-01: drift-check `aggregate_verdicts` UNKNOWN behavior when FAILs > 0 [LOW]
 **Raised:** 2026-05-05 during Phase 14 W3-W2-A worker output (W-L1 drift-check report inspect)
@@ -147,28 +135,6 @@
 **Owner:** karar verici agent (Phase 14+ pre-dispatch, pilot smoke test deneyimi sonrası)
 **Blocking Phase:** None (non-blocking, governance polish; Wave 2 + Phase 9 closeout aynı paterni reuse — defer kararı geçerli)
 
-### Q-CI-W3-01: skill-body-executability Convention Codify (sys.path.insert pattern rules/skills.md)
-**Raised:** 2026-05-05 during Phase 14 W3-W1 worker output (W-K1 surface, lesson 21 4'üncü uygulama)
-**Context:** Phase 14 W3-W1 worker proaktif decision: `sys.path.insert(0, os.getcwd())` 4 governance SKILL.md 1. Python block injection brief'te öngörülmemişti (helper subprocess tempfile cwd vs PYTHONPATH gap → `from scripts.state import events_writer` ModuleNotFoundError fix). Worker 4 skill identik convention uyguladı (drift-check + schema-validate + glossary-audit + load-context). Currently 4-skill local pattern, future skill authors re-discover edecek riski → cross-skill convention codify aday.
-**Options:**
-- a) `rules/skills.md` (yeni rule R-XX yeni dosya) — skill-body-executability convention single rule + Foundational Principles bağlantı (truth-verifiable üst-prensip alt-katmanı)
-- b) Mevcut `rules/skill-description-discipline.md`'e R-XX additive bump — skill body executability sub-section ek
-- c) `templates/skill-body-template.md` placeholder (her yeni skill başlangıçta convention scaffolding)
-- d) Phase 14 W3-W3 v1 release closure'a defer (mevcut 4-skill local pattern v1 release acceptable, post-v1 ADR-aday)
-**Owner:** karar verici agent (Phase 14 W3-W2 brief writing, pilot E2E sırasında yeni skill türetilmiyorsa W3-W3 defer aday)
-**Blocking Phase:** None (non-blocking, governance polish)
-
-### Q-CI-W3-02: Helper Auto-Prepend sys.path.insert (Boilerplate Eliminate)
-**Raised:** 2026-05-05 during Phase 14 W3-W1 worker output (W-K1 surface, helper refactor scope)
-**Context:** Phase 14 W3-W1 sonrası 4 SKILL.md 1.blokta `import os; import sys; sys.path.insert(0, os.getcwd())` boilerplate. Eğer helper `scripts/ci/run_skill_python.py` concat öncesi otomatik prepend yaparsa skill author boilerplate yazmaz (DRY). Trade-off: helper karmaşık + sihirli prepend implicit behavior; skill body explicit sys.path.insert açık + reader-friendly + skill-author-aware.
-**Options:**
-- a) Helper auto-prepend (DRY, helper karmaşık, ~5 satır eklenir, magic prepend) — skill author boilerplate yazmaz
-- b) Skill body explicit korunur (mevcut state, 4 skill 5 satır toplam boilerplate) — magic-free, reader-friendly
-- c) Hibrit: helper auto-prepend + skill body opt-out flag (`# helper:no-auto-sys-path`) — esneklik
-- d) Phase 14 W3-W3 v1 release closure'a defer (mevcut state v1 release acceptable)
-**Owner:** karar verici agent (Phase 14 W3-W2/W3-W3 helper refactor scope)
-**Blocking Phase:** None (non-blocking, helper polish)
-
 ### Q-WS-02: README "Quick Start" engine plugin invocation convention (workspace → engine plugin nasıl invoke edilir?)
 **Raised:** 2026-05-04 during Phase 14 W1 worker output (W-I1 surface)
 **Context:** Workspace repo `README.md` "Quick Start" bölümünde "Engine plugin skill çalıştır" yazıyor, ancak workspace → engine plugin invocation convention v1 release closure'da netleşecek. Workspace pwd'si `~/Documents/platinum-seo-workspace/projects/demo-dental/` iken engine plugin skill'leri (`~/Documents/platinum-seo-engine/skills/...`) nasıl çağrılır? Plugin path lookup, env var (`PLATINUM_SEO_ENGINE_ROOT`?), Claude Code plugin auto-discovery, manuel invocation pattern'leri arasında karar gerek.
@@ -183,6 +149,12 @@
 
 
 ## Resolved (last 10 — moved to DECISIONS)
+- **Q-DFS-MCP-01 HIGH → Phase 14 W3-W3-α RESOLVED via documentation engine `ba23eae` (schemas/dataforseo-endpoint-mapping.schema.json description note + dfs_pull.py 1073 satır INTACT live test 1835229 confirmed K3 minimal scope)** — TR market gap dataforseo-mcp-server@2.8.9 wrapper limitation kalıcı codify schema description note + workaround dfs_pull.py line 10 docstring + 331-347 detection logic + 412 retry + 470 _enforce_tr canonical paterni reference. schema_version 1.0 UNCHANGED additive text-only ADR-018 paterni reuse. dfs_pull.py 1073 satır INTACT regression riski 0.
+- **Q-DC-RUNID-01 + Q-W3W2B-EVENTTYPE-01 birleşik → Phase 14 W3-W3-α RESOLVED engine `ba23eae` (rules/events-writer.md NEW 143 satır 5 section + worked example JSON)** — append-only invariant R-XX hard constraint + next_run_id helper enforcement + event_kind 4-enum ADR-020 + event_type 10-closed-enum branch matrix per skill 22 row + workflow_action 8-enum lifecycle ADR-019. Worker schema-first override 11'inci uygulama paterni codified (event_type=manual + note=[skill=X event_type_intent=Y] enum-dışı skill için).
+- **Q-CI-W3-01 → Phase 14 W3-W3-α RESOLVED K1 engine `ba23eae` (rules/skills.md NEW 109 satır 4 section single-purpose lesson 21 4'üncü uygulama codify)** — Skill body 1. Python block ZORUNLU prefix paterni + standalone-executable convention helper run_skill_python.py concat exec compatibility + multi-line format spec KRİTİK semicolon-tek-satır kaçın substring-key detection respect + cross-references W3-W1 governance refactor 4 skill paterni reuse. Foundational Principles 3-layer bağlantı.
+- **Q-CI-W3-02 → Phase 14 W3-W3-α RESOLVED engine `ba23eae` (scripts/ci/run_skill_python.py extract_python_blocks +10 satır substring-key auto-prepend)** — sys_path_marker = "sys.path.insert(0, os.getcwd())" multi-line format respect F-14W3W3α-4 manager pre-dispatch catch + duplicate prevention. test_run_skill_python.py 4 yeni test (test_auto_prepend_skips_when_marker_exists + test_auto_prepend_when_marker_missing + test_auto_prepend_multi_line_format_respect + test_no_prepend_for_empty_skill comprehensive coverage 610 PASS).
+- **Q-CI-W3-03 → Phase 14 W3-W3-α SCOPE EXCLUDE arka plan resolved (W3-W2-A+B+Ca+Cb 4 phase boyunca runtime kanıt pytest -k "quick_wins or sf_import" → 16 passed 0 failed)** — Brief 4 pytest fail iddiası FROZEN ASSUMPTION manager pre-dispatch catch (lesson 28 v3 kategori 2 pre-emptive prevention 10'uncu uygulama). conftest.py skip GEREKSIZ scope exclude. Lesson 38 v2 5'inci ardışık enforcement reinforce frozen assumption YASAK runtime cross-check ZORUNLU.
+- **Q-W3W2Cb-002 → Phase 14 W3-W3-α RESOLVED via documentation K2 engine `ba23eae` (skills/production/content-remediation/SKILL.md +45 satır "Canonical Drift Resolution" section)** — URL canonical mismatch detection GSC index_inspect coverage state DUPLICATE_REDIRECT/MOVED_PERMANENTLY + resolution branch matrix a/b/c (a duplicate via canonical action=redirect_deployed target=canonical_url Q-W3W2Cb-001 W3-W2-C-b in-wave RESOLVED paterni reuse + b canonical drift redirect target=primary_url R-91 Senaryo 1+3 + c manual review improve_routing event_type=manual) + cross-skill convention revise-content + verify-indexing + content-remediation cooperative resolution intra-wave investigation paterni.
 - **Q-W3W2Cb-001 → Phase 14 W3-W2-C-b in-wave RESOLVED workspace 3bb7258 (Step 6 verify-indexing GSC inspect /main-page Google canonical = https://demo-dental.example/, page is duplicate redirect to homepage)** — Step 3 revise-content surfaced legitimacy question (-90% click drop /main-page), Step 6 verify-indexing index_inspect confirmed page is duplicate of homepage with Google-determined canonical = `/`. Step 3 revise-content plan rerouted to content-remediation skill next wave (action=redirect target=/). Lesson 21 7'inci ardışık production-ready cross-skill convention same-wave self-resolve positive drift paterni (intra-wave cross-skill investigation positive drift, 7 phase consecutive convergent invariant).
 - **Q-W3W2B-LAYOUT-01 → Phase 14 W3-W2-C-a fix engine 7c83d30 (drift-check helper schema authority dynamic header_row resolve)** — 4 mekanik header-parse FAIL eliminate (F-01+F-05+F-17+F-18). validate_invariants.py `_resolve_header_row()` helper schema authority compile + row 1 fallback. Master.xlsx layout normalize ayrı scope (Q-W3W2C-A-LAYOUT-01 paterni reuse, Phase 15 audit Wave 1 ADR aday).
 - **Q-DC-LAYOUT-01 → Phase 14 W3-W2-C-a fix engine 7c83d30 (drift-check helper schema authority dynamic + row 1 fallback)** — W3-W2-A surface + W3-W2-B reinforce + W3-W2-C-a resolve. drift-check skill body schema-aware production-ready. Layout normalize Phase 15 audit Wave 1 kategori #2 ayrı scope.
