@@ -2,6 +2,39 @@
 
 ## Unresolved
 
+### Q-W3W2B-LAYOUT-01: master.xlsx duplicate header rows + blank rows layout artefakt (drift-check 5 mekanik FAIL kaynağı) [HIGH]
+**Raised:** 2026-05-05 during Phase 14 W3-W2-B worker output (W-M1 drift-check post-discovery+planning RED 11/2/7 surface)
+**Context:** master.xlsx W3-W2-A ingest layout duplicate header rows + blank rows: gsc_performance row 1+4 + on_page_audit row 1+4 + opportunity row 1+4 + quick_wins row 1+4 + cluster_keywords row 1+3 + redirect_404 row 1+4 + tech_seo row 1+3. drift-check skill body `header_row=1` assumption ile literal header string'i data row olarak okuyor → 5 mekanik FAIL: F-01 master_task.status="status" header literal + F-05 2/17 sheets header count fail (W3-W2-A 9/17 → W3-W2-B 2/17 iyileşme robots_txt + dashboard W3-W2-C scope) + F-17 2/172 severity tech_seo.impact="impact" header literal + F-18 1/160 master_task.created_date="created_date" header literal. Q-DC-LAYOUT-01 (W3-W2-A surface) reinforce — Phase 14 W3-W2-C öncesi pre-flight zorunlu.
+**Options:**
+- a) `transaction.consolidate_headers(sheet)` helper (atomic write API) + master.xlsx normalize once-off (single header row 1 + data row 2+, F-01/F-05/F-17/F-18 mekanik FAIL eliminate, idempotent + .bak backup)
+- b) `scripts/state/normalize_master_xlsx.py` CLI tool (pre-W3-W2-C run) — schema-driven layout convention `header_row=1` + data row 2+ enforce
+- c) drift-check skill `header_row` parameter accept config-driven (master-excel.schema.json `header_row_index` field add, drift-check rule `header_row + 1` start) — Q-DC-LAYOUT-01 b paterni reuse
+- d) Phase 14 W3-W2-C pre-flight ADR + Phase 15 audit Wave 1 kategori #2 birleşik scope karar
+**Owner:** karar verici agent (Phase 14 W3-W2-C öncesi pre-flight ZORUNLU, Q-DC-LAYOUT-01 reinforce)
+**Blocking Phase:** Phase 14 W3-W2-C (drift-check post-W3-W2-C real regression detect için master.xlsx layout normalize ön-koşul)
+
+### Q-W3W2B-EVENTTYPE-01: events.schema event_type 10-closed-enum vs 13 skill-named ihtiyaç [MEDIUM]
+**Raised:** 2026-05-05 during Phase 14 W3-W2-B manager pre-dispatch finding F-14W3W2B-1 + worker output (W-M1 schema-first override 11'inci uygulama)
+**Context:** Brief Section 3 Step 1-13 `event_kind=work + event_type=<skill_name>` literal yazılmıştı 13 farklı value (cannibalization → content_revise + tech_audit + on_page_audit + content_gaps + schema_audit + competitive_analysis + geo_analysis + cluster_map + topical_map + new_content_plan + internal_links + master_task_sync), AMA events.schema.json event_type 10-closed-enum (content_new + content_revise + content_improve + content_remove + template_apply + scrape_run + audit_run + budget_event + sync_run + manual). Manager pre-dispatch 14-boyutlu Section 8 boyut #5 enum kontrol etti master_task primary_source 10-enum + content_type 6-enum AMA events event_type 10-enum cross-check ATLANDI = lesson 28 v3 4'üncü kategori "manager self-failure catch" 2'inci uygulama. Worker schema-first override 11'inci uygulama: 14 work event `event_type=manual` + note=`[skill=X] event_type_intent=Y` + task_id auto-allocated `T-1001..T-1014` (`^T-[0-9]{4,}$` pattern). W3-W3 schema patch veya rules/events-writer.md codify Q-DC-RUNID-01 birleşik scope.
+**Options:**
+- a) events.schema event_type enum additive bump (+13 skill-named values: cannibalization + content_decay + tech_audit + on_page_audit + content_gaps + schema_audit + competitive_analysis + geo_analysis + cluster_map + topical_map + new_content_plan + internal_links + master_task_sync) — Phase 14 W3-W3 schema patch ADR, schema_version bump, mevcut 10 enum geri uyumlu
+- b) `rules/events-writer.md` (yeni rule R-XX yeni dosya) codify — `event_type=manual + note[skill=X] event_type_intent=Y` paterni mandatory skill-level work events için (W3-W2-B run paterni convention authority) + `next_run_id` helper Q-DC-RUNID-01 birleşik scope
+- c) Hybrid: schema event_type genişletme + rules/events-writer.md codify (her iki layer)
+- d) Phase 15 audit defer (W3-W2-B run paterni acceptable, post-v1 ADR aday)
+**Owner:** karar verici agent (Phase 14 W3-W3 closeout scope, Q-DC-RUNID-01 birleşik resolution)
+**Blocking Phase:** None (non-blocking, governance polish W3-W3 closure)
+
+### Q-W3W2B-WRITER-01: non-master_task sheets writer registry codify [LOW]
+**Raised:** 2026-05-05 during Phase 14 W3-W2-B worker output (W-M1 transaction.update writer surface)
+**Context:** master_task.allowed_writers includes `master_task_sync` exact string — orchestrator passes `writer="master_task_sync"` correctly. Other sheets (cannibalization/content-decay/tech-audit/etc.) pass arbitrary writer strings which `transaction._check_writer_scope` ignores when `allowed_writers is None`. Cross-sheet-invariants 20 rule registry'de allowed_writers field ardından non-master_task sheets için writer registry tanımı eksik — convention kayboluyor. Phase 15 audit Wave 2 kategori #9 (workspace data integrity) writer registry codify aday.
+**Options:**
+- a) `master-excel.schema.json` her sheet için `allowed_writers` array additive bump (cannibalization, content_decay, tech_audit, etc. her biri kendi skill-name string'ini hold) — Phase 15 audit ADR
+- b) Mevcut `cross-sheet-invariants.json` `rules` array'a per-sheet writer registry rule additive bump
+- c) `transaction.update` API hardening: allowed_writers None'sa warning emit (skill writer convention discovery)
+- d) Phase 15 audit defer (mevcut skill-name string'leri events.jsonl provenance trail'de kayıt ediliyor + W3-W2-B run paterni acceptable, low priority)
+**Owner:** karar verici agent (Phase 15 audit Wave 2 kategori #9)
+**Blocking Phase:** None (non-blocking, low priority writer registry)
+
 ### Q-DFS-MCP-01: DataForSEO MCP wrapper `location_name` field reject (TR market gap, v1 release blocker aday) [HIGH]
 **Raised:** 2026-05-05 during Phase 14 W3-W2-A worker output (W-L1 surface, dfs-pull skill execution)
 **Context:** DataForSEO MCP wrapper `location_name` field reject `dataforseo_labs_google_keyword_ideas` + `dataforseo_labs_google_ranked_keywords` çağrılarında, schema declarative ama wrapper ihlali. Sonuç: keyword_ideas US default (English) döndü TR market keyword'ları gelmedi + ranked_keywords empty. Pilot dentnotion (TR-tr) için kritik data quality gap. Workaround: `location_code 2792` + `language_code "tr"` parametre kombinasyonu denendi ama wrapper consume etmedi. Phase 14 W3-W2-A 4 ingest skill arasında dfs-pull bu nedenle eksik TR market coverage ile shipped (cluster_keywords + opportunity 300+150 row populate ama TR specificity belirsiz).
