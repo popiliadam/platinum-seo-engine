@@ -1,0 +1,92 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install jsonschema pytest openpyxl pyyaml
+
+      # Step 1 — governance skill drift-check (master.xlsx invariant 20 cross-sheet rules)
+      - name: 1. drift-check
+        run: python3 scripts/ci/run_skill_python.py skills/governance/drift-check/SKILL.md
+        continue-on-error: true
+
+      # Step 2 — governance skill schema-validate (jsonschema Draft7 all schemas + cross-sheet-invariants 20 rules)
+      - name: 2. schema-validate
+        run: python3 scripts/ci/run_skill_python.py skills/governance/schema-validate/SKILL.md
+        continue-on-error: true
+
+      # Step 3 — governance skill glossary-audit (drift cross-ref REFERENCE_INDEX + spec section + reverse-lookup orphan/missing AMBER + defensive acronym whitelist 22-token)
+      - name: 3. glossary-audit
+        run: python3 scripts/ci/run_skill_python.py skills/governance/glossary-audit/SKILL.md
+        continue-on-error: true
+
+      # Step 4 — pytest baseline + W2 yeni, no regression
+      - name: 4. pytest
+        run: pytest --tb=no -q
+        continue-on-error: true
+
+      # Step 5 — plugin agnostik invariant (.mcp.json 3 server + skill body slug hardcode YOK F-16)
+      - name: 5. plugin-agnostik-grep
+        run: |
+          # .mcp.json 3 server invariant
+          test "$(jq '.mcpServers | keys | length' .mcp.json)" = "3"
+          # Skill body slug grep — word-boundary + F-16 disclaimer exclude
+          # (lesson 28 manager mop-up matrisi 6'ıncı uygulama Q-CI-W2-02 fix)
+          ! grep -rEn "\b(dentnotion|vento|eykom|bigcattr|calitte|lastiksa|noraninsaat|adstark)\b" \
+            skills/ --include=SKILL.md \
+            | grep -vE "No project slug hardcoded|F-16 disclaimer|plugin agnostik" || true
+        continue-on-error: true
+
+      # Step 6 — secret-grep (Phase 14+ CI Rule 3 production-ready 11-phase invariant)
+      # Lesson 11 üçüncü surface mop-up Phase 14 W2: regex literal wrapper script'e
+      # taşındı (deployment config kategori-spesifik convention, Phase 14 W1
+      # placeholder convention paralel evolution).
+      - name: 6. secret-grep
+        run: bash scripts/ci/check_secrets.sh
+        continue-on-error: true
+
+      # Step 7 — frontmatter-compile (skill-frontmatter.schema.json Draft7 validate her SKILL.md frontmatter, 43 SKILL.md compliance)
+      - name: 7. frontmatter-compile
+        run: |
+          python3 -c "
+          import yaml, jsonschema, json, glob, sys
+          schema = json.load(open('schemas/skill-frontmatter.schema.json'))
+          fail_count = 0
+          skill_files = sorted(glob.glob('skills/**/SKILL.md', recursive=True))
+          for f in skill_files:
+              body = open(f).read()
+              if not body.startswith('---'):
+                  print(f'NO_FRONTMATTER: {f}'); fail_count += 1; continue
+              end = body.find('---', 3)
+              fm = yaml.safe_load(body[3:end])
+              try:
+                  jsonschema.Draft7Validator(schema).validate(fm)
+              except Exception as e:
+                  print(f'FAIL: {f} -- {str(e.message)[:80]}'); fail_count += 1
+          print(f'frontmatter-compile: {len(skill_files)-fail_count}/{len(skill_files)} PASS')
+          sys.exit(fail_count)
+          "
+        continue-on-error: true

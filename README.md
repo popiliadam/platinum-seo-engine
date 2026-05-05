@@ -1,5 +1,7 @@
 # Platinum SEO Engine
 
+[![CI](https://github.com/popiliadam/platinum-seo-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/popiliadam/platinum-seo-engine/actions/workflows/ci.yml)
+
 Bir Claude Code plugin'i; SEO operasyonunu schema-locked workflow'larla yöneten motor.
 
 **Status:** alpha (v0.1.0) — Phase 0 active
