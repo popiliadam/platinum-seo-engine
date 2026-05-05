@@ -29,19 +29,22 @@ jobs:
           pip install jsonschema pytest openpyxl pyyaml
 
       # Step 1 — governance skill drift-check (master.xlsx invariant 20 cross-sheet rules)
+      # Phase 14 W3-W3-α strict mode (Q-CI-W3-03 RESOLVED runtime kanıt + 4 governance helper exec EXIT=0 4/4 zemin).
       - name: 1. drift-check
         run: python3 scripts/ci/run_skill_python.py skills/governance/drift-check/SKILL.md
-        continue-on-error: true
+        continue-on-error: false
 
       # Step 2 — governance skill schema-validate (jsonschema Draft7 all schemas + cross-sheet-invariants 20 rules)
+      # Phase 14 W3-W3-α strict mode.
       - name: 2. schema-validate
         run: python3 scripts/ci/run_skill_python.py skills/governance/schema-validate/SKILL.md
-        continue-on-error: true
+        continue-on-error: false
 
       # Step 3 — governance skill glossary-audit (drift cross-ref REFERENCE_INDEX + spec section + reverse-lookup orphan/missing AMBER + defensive acronym whitelist 22-token)
+      # Phase 14 W3-W3-α strict mode.
       - name: 3. glossary-audit
         run: python3 scripts/ci/run_skill_python.py skills/governance/glossary-audit/SKILL.md
-        continue-on-error: true
+        continue-on-error: false
 
       # Step 4 — pytest baseline + W2 yeni, no regression
       - name: 4. pytest

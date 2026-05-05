@@ -388,6 +388,48 @@ Output artifacts:
 
 - `_state/events.jsonl` (append, F-9 + F-14 enum).
 
+## Canonical Drift Resolution (Q-W3W2Cb-002 Doc)
+
+URL canonical mismatch detection + branch matrix paterni (cross-skill convention: revise-content + verify-indexing + content-remediation cooperative resolution, intra-wave investigation paterni Phase 14 W3-W2-C-b doğum belgesi Q-W3W2Cb-001 in-wave RESOLVED `/main-page` duplicate-canonical example).
+
+### Detection
+
+GSC `index_inspect` coverage state ile canonical drift surface edilir:
+
+- `coverageState == "DUPLICATE_REDIRECT"` veya `googleCanonical != userCanonical` → drift confirmed.
+- `coverageState == "MOVED_PERMANENTLY"` veya `googleCanonical points to different URL` → canonical drift implicit.
+- revise-content skill Step 3 reportu URL legitimacy soru olarak surface edebilir (Q-W3W2Cb-001 paterni: Step 3 surfaced legitimacy question, Step 6 verify-indexing GSC inspect resolved).
+
+### Resolution Branch Matrix
+
+**(a) Duplicate via canonical** — googleCanonical başka URL'ye işaret ediyor, kaynak URL duplicate:
+
+- `action == redirect_deployed` (R-91 Senaryo 3 paterni reuse).
+- `target = googleCanonical` (GSC authoritative source).
+- `event_type = redirect_deployed` (F-14 direct match), `note = "duplicate_via_canonical_GSC_inspect"`.
+- Q-W3W2Cb-001 W3-W2-C-b in-wave RESOLVED paterni: `/main-page` → `/` 301 deploy.
+
+**(b) Canonical drift** — userCanonical doğru ama site internal link/sitemap drift'i nedeniyle Google başka URL'yi tercih etmiş:
+
+- `action == redirect_deployed` + `target = primary_url` (R-91 Senaryo 1 + Senaryo 3 birleşim).
+- Internal link audit + sitemap regenerate (cross-skill: tech-audit + on-page-audit refer).
+- `event_type = redirect_deployed`, `note = "canonical_drift_primary_url_restored"`.
+
+**(c) Manual review** — drift surface ama düz redirect yetersiz (örn. content materially differs, cluster-level rerouting gerekli):
+
+- `action == manual_review` (skill spec event_type=manual + note explanation).
+- improve_routing event_type=manual + `note = "[skill=content-remediation event_type_intent=canonical_review explanation=...]"` (worker schema-first override paterni reuse, rules/events-writer.md Section 4 cross-ref).
+- Manager scope: revise-content tetikle veya cluster-map yeniden değerlendir.
+
+### Cross-Skill Convention
+
+İntra-wave cooperative resolution paterni:
+
+- **revise-content** (Step 3) drift soru olarak surface edebilir (URL legitimacy challenge).
+- **verify-indexing** (Step 6) GSC `index_inspect` ile drift confirm/refute (authoritative source).
+- **content-remediation** (Step 4 R-91) branch matrix uygula + redirect_404 sheet write.
+- 3 skill cooperative aynı wave içinde (Phase 14 W3-W2-C-b kanıt: Q-W3W2Cb-001 same-wave self-resolve positive drift).
+
 ## Plugin-Agnostik Disiplin
 
 Skill content'inde proje slug hardcode YASAK. Tüm proje referansları
