@@ -2,16 +2,36 @@
 
 ## Unresolved
 
-### Q-W3W3α-W1: test_ci_yaml.py rename W3-W3-β scope follow-up generalize [LOW]
-**Raised:** 2026-05-05 during Phase 14 W3-W3-α worker output (W-P1 proaktif fix Lesson 21 8'inci ardışık)
-**Context:** Phase 14 W3-W3-α brief minimum scope ÖTESİ worker proaktif `test_ci_yaml.py::test_continue_on_error_initial_report_only_mode` → `test_continue_on_error_strict_mode_governance_steps` rename (existing test ci.yml strict mode 3 governance step geçişini bloklayacaktı, 7-step report-only assertion). W3-W3-β scope: kalan 4 step strict mode geçişi sırasında bu test tekrar generalize edilmeli (3 strict + 4 report-only ayrımı kalkacak).
+### Q-W3W3β-TEST-01: test_ci_yaml.py semantic update vs name rename ayrımı [LOW]
+**Raised:** 2026-05-05 during Phase 14 W3-W3-β W-Q1 worker output
+**Context:** W-Q1 cascade fix `test_ci_yaml.py::test_continue_on_error_strict_mode_governance_steps` testi 3 strict+4 report-only logic'inden 7 strict logic'ine semantic update yaptı (set comparison defensive), AMA test ismi "governance_steps" suffix'i ile kaldı (artık tüm 7 step için geçerli, sadece governance değil). Diff surgical scope tutuldu. Phase 15 audit Wave 4 follow-up: rename `test_continue_on_error_all_steps_strict_mode` veya benzer.
 **Options:**
-- a) W3-W3-β scope test rename'i `test_continue_on_error_all_strict_mode` (4 step strict mode geçişi sonrası genelleştirme)
-- b) Test parametrik refactor — `pytest.mark.parametrize` ile strict + report-only iki mod test (esnek)
-- c) Test silme — strict mode standard convention'a düşünce assertion gereksiz
-- d) Phase 15 audit defer (W3-W3-β scope follow-up acceptable, low priority)
-**Owner:** karar verici agent (Phase 14 W3-W3-β scope follow-up)
-**Blocking Phase:** None (non-blocking, low priority test infrastructure polish W3-W3-β)
+- a) Phase 15 audit Wave 4 mop-up commit rename
+- b) Defer indefinitely (semantic intent docstring'de açık, isim cosmetic)
+- c) v1.1 polish scope
+**Owner:** karar verici agent (Phase 15 audit Wave 4)
+**Blocking Phase:** None (cosmetic naming, non-blocking)
+
+### Q-W3W3β-CIHOOK-01: GitHub Actions security advisory hook false positive [LOW]
+**Raised:** 2026-05-05 during Phase 14 W3-W3-β W-Q1 worker output
+**Context:** W-Q1 ilk ci.yml line 52 edit denemesinde GitHub Actions security advisory hook (komut injection uyarısı) false positive olarak fired. Daha küçük context retry ile başarılı. Substring-pattern based trigger, gerçek injection riski yoktu. Phase 15 audit Wave 1 hooks/CI cross-check scope.
+**Options:**
+- a) Phase 15 audit Wave 1 hook trigger pattern audit (false positive minimize)
+- b) Hook disable workflow (Süleyman tercihine göre)
+- c) Defer (advisory only, blocking değil)
+**Owner:** karar verici agent (Phase 15 audit Wave 1)
+**Blocking Phase:** None (advisory only)
+
+### Q-CI-W3-04: pytest local-only fixture marker convention codify [MEDIUM]
+**Raised:** 2026-05-05 during Phase 14 W3-W3-β cascade fix (F-14W3W3β-4 manager self-failure catch transparency mode)
+**Context:** Phase 14 W3-W3-β CI Run 12 Step 4 pytest 4 test fail (`test_quick_wins.py::test_happy_path_gsc_live` + `test_inbox_raw_json_saved` + `test_sf_import.py::test_tier1_14_validates` + `test_tier2_search_console_all_amber`). Root cause: testler LOCAL-ONLY fixture (workspace-staging path lokalde MEVCUT, CI ubuntu-latest YOK = environment divergence). Süleyman K3 Seçenek B onayı: `@pytest.mark.skipif(not WORKSPACE_STAGING.exists(), reason="...")` cascade fix uygulandı 4 test'e. Q-CI-W3-04 NEW: pytest local-only fixture marker convention uzun vade migration scope (Seçenek C: conftest.py 'local_only' marker register + ci.yml '-m "not local_only"' pattern, daha temiz mimari).
+**Options:**
+- a) Phase 15 audit Wave 1 kategori #5 test infrastructure scope codify rules/pytest-markers.md veya rules/skills.md ek section
+- b) conftest.py `local_only` marker pytest.ini convention + ci.yml `-m "not local_only"` flag
+- c) v1.1 polish scope (current skipif marker workable, codify ertelenir)
+- d) Mevcut skipif marker pattern documentation only (no migration)
+**Owner:** karar verici agent (Phase 15 audit Wave 1 kategori #5)
+**Blocking Phase:** None (current skipif marker production-ready 7/7 GREEN, codify ertelenebilir)
 
 ### Q-W3W3α-EVENTSCHEMA-01: events.schema audit_run 10-enum cross-check yapılmadı [MEDIUM]
 **Raised:** 2026-05-05 during Phase 14 W3-W3-α worker output (W-P1 rules/events-writer.md Section 4 monitoring-weekly satırı `audit_run` belirtti ama schema cross-check yapılmadı)
@@ -149,6 +169,7 @@
 
 
 ## Resolved (last 10 — moved to DECISIONS)
+- **Q-W3W3α-W1 LOW → Phase 14 W3-W3-β in-wave RESOLVED via W-Q1 worker proaktif cascade (engine `568f9bb`)** — `tests/ci/test_ci_yaml.py::test_continue_on_error_strict_mode_governance_steps` 3 strict+4 report-only conditional logic → 7 strict set comparison defensive logic redesign. Lesson 21 9'uncu ardışık production-ready cross-skill convention worker proaktif scope expansion (brief minimum scope ÖTESİ Q-W3W3α-W1 pre-authorize'dan yararlanan cascade). Test ismi semantic update yapıldı, name rename ertelenir Q-W3W3β-TEST-01 LOW (Phase 15 audit Wave 4 follow-up).
 - **Q-DFS-MCP-01 HIGH → Phase 14 W3-W3-α RESOLVED via documentation engine `ba23eae` (schemas/dataforseo-endpoint-mapping.schema.json description note + dfs_pull.py 1073 satır INTACT live test 1835229 confirmed K3 minimal scope)** — TR market gap dataforseo-mcp-server@2.8.9 wrapper limitation kalıcı codify schema description note + workaround dfs_pull.py line 10 docstring + 331-347 detection logic + 412 retry + 470 _enforce_tr canonical paterni reference. schema_version 1.0 UNCHANGED additive text-only ADR-018 paterni reuse. dfs_pull.py 1073 satır INTACT regression riski 0.
 - **Q-DC-RUNID-01 + Q-W3W2B-EVENTTYPE-01 birleşik → Phase 14 W3-W3-α RESOLVED engine `ba23eae` (rules/events-writer.md NEW 143 satır 5 section + worked example JSON)** — append-only invariant R-XX hard constraint + next_run_id helper enforcement + event_kind 4-enum ADR-020 + event_type 10-closed-enum branch matrix per skill 22 row + workflow_action 8-enum lifecycle ADR-019. Worker schema-first override 11'inci uygulama paterni codified (event_type=manual + note=[skill=X event_type_intent=Y] enum-dışı skill için).
 - **Q-CI-W3-01 → Phase 14 W3-W3-α RESOLVED K1 engine `ba23eae` (rules/skills.md NEW 109 satır 4 section single-purpose lesson 21 4'üncü uygulama codify)** — Skill body 1. Python block ZORUNLU prefix paterni + standalone-executable convention helper run_skill_python.py concat exec compatibility + multi-line format spec KRİTİK semicolon-tek-satır kaçın substring-key detection respect + cross-references W3-W1 governance refactor 4 skill paterni reuse. Foundational Principles 3-layer bağlantı.
