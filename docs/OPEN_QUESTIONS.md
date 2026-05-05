@@ -2,6 +2,50 @@
 
 ## Unresolved
 
+### Q-DFS-MCP-01: DataForSEO MCP wrapper `location_name` field reject (TR market gap, v1 release blocker aday) [HIGH]
+**Raised:** 2026-05-05 during Phase 14 W3-W2-A worker output (W-L1 surface, dfs-pull skill execution)
+**Context:** DataForSEO MCP wrapper `location_name` field reject `dataforseo_labs_google_keyword_ideas` + `dataforseo_labs_google_ranked_keywords` çağrılarında, schema declarative ama wrapper ihlali. Sonuç: keyword_ideas US default (English) döndü TR market keyword'ları gelmedi + ranked_keywords empty. Pilot dentnotion (TR-tr) için kritik data quality gap. Workaround: `location_code 2792` + `language_code "tr"` parametre kombinasyonu denendi ama wrapper consume etmedi. Phase 14 W3-W2-A 4 ingest skill arasında dfs-pull bu nedenle eksik TR market coverage ile shipped (cluster_keywords + opportunity 300+150 row populate ama TR specificity belirsiz).
+**Options:**
+- a) `schemas/` repo `dataforseo-mcp.schema.json` patch — `location_name` field schema declarative ama wrapper accept ediyor olduğunu validate, runtime test add
+- b) MCP wrapper kendisinde patch (engine'in kontrolünde değilse: paket-spec env naming convention veya GitHub issue raise upstream)
+- c) Skill `dfs-pull` body Python block `location_name` removal + `location_code 2792` + `language_code "tr"` zorunlu workaround
+- d) Phase 14 W3-W3 closure'da TR market keyword reset + dfs-pull re-run (W3-W2-A data partial valid kabul)
+**Owner:** karar verici agent (Phase 14 W3-W3 v1 release blocker triage, Süleyman onayı kritik)
+**Blocking Phase:** Phase 14 W3-W3 v1 release blocker aday (TR market data quality v1 release tag öncesi resolve)
+
+### Q-DC-RUNID-01: Manual events `run_id` field eksik convention codify
+**Raised:** 2026-05-05 during Phase 14 W3-W2-A worker output (W-L1 drift-check F-13 surface)
+**Context:** Phase 14 W3-W2-A 4 ingest skill execution sırasında 5 manual events.jsonl direct dict construction yapıldı, `run_id` integer field eksik bırakıldı. transaction.append auto-emit edilen event'lerde `run_id` mevcut (lesson 21 paterni), ama manuel events_writer çağrısında `next_run_id(project_slug)` helper kullanılmamış. Drift-check F-13 5 event run_id missing fail. Mop-up imkansız: events.jsonl mutate = R-XX append-only state Süleyman global feedback_hard_constraints ihlali (lesson 28 v3 5'inci kategori "append-only invariant protected drift defer" doğum belgesi). Convention codify gerekli future skill execution'larında prevention.
+**Options:**
+- a) `rules/events-writer.md` (yeni rule R-XX yeni dosya) — manual events `next_run_id` helper kullanımı zorunlu single rule + 4 event_kind (work/audit/provenance/workflow) için per-kind run_id semantic
+- b) Mevcut `rules/append-only-state.md`'ye R-XX additive bump — events run_id sub-section ek
+- c) `scripts/state/events_writer.py` API hardening — `append()` veya `add_event()` direct dict construction yerine helper-only path enforce (raises if run_id missing)
+- d) Phase 15 audit'a defer (mevcut 5 manual event drift kabul edilir, future skill writers convention discover edecek)
+**Owner:** karar verici agent (Phase 14 W3-W3 backlog non-blocking)
+**Blocking Phase:** None (non-blocking, drift-check F-13 sonuç bilinçli kabul)
+
+### Q-DC-LAYOUT-01: master.xlsx bootstrap layout vs drift-check rule incompatibility (header_row offset)
+**Raised:** 2026-05-05 during Phase 14 W3-W2-A worker output (W-L1 drift-check F-05 surface)
+**Context:** Phase 14 W3-W2-A drift-check post-ingest 9/17 sheet F-05 schema_validation FAIL: header has 0 cols vs schema requires N. Root cause: master.xlsx W1 bootstrap layout convention `rows 1-3 blank + row 4 = header + row 5+ = data` (Phase 9+10 templates/master-excel.xlsx generate paterni reuse, formula_policy=values_only). Drift-check Phase 14 W3-W1 production-ready skill body row 1 read assumption — 0 cols header sayar. Skill rule ile bootstrap layout convention divergence. Phase 15 audit Wave 1 kategori #2 schema cross-check core finding aday.
+**Options:**
+- a) `scripts/bootstrap_excel.py` layout convention change — header row 1, data row 2+ (W1 seed migration gerekli, dentnotion master.xlsx mevcut data row shift)
+- b) drift-check skill `header_row` parameter accept — config-driven (master-excel.schema.json `header_row_index` field add, drift-check rule `header_row + 1` start)
+- c) `cross-sheet-invariants.json` rule `rules` content header_row offset codify (rule-bazlı nuance)
+- d) Phase 15 audit ADR aday — formal decision Süleyman + karar verici W1 seed migration vs skill flexibility tradeoff
+**Owner:** karar verici agent (Phase 15 audit Wave 1 kategori #2)
+**Blocking Phase:** None (non-blocking, drift-check F-05 sonuç bilinçli kabul, Phase 15 audit ADR scope)
+
+### Q-DC-VERDICT-01: drift-check `aggregate_verdicts` UNKNOWN behavior when FAILs > 0 [LOW]
+**Raised:** 2026-05-05 during Phase 14 W3-W2-A worker output (W-L1 drift-check report inspect)
+**Context:** drift-check skill `aggregate_verdicts` overall_verdict=UNKNOWN when FAILs > 0 (Phase 14 W3-W2-A consistency-report.json verdict field=RED but aggregate UNKNOWN). Implementation behavior question: UNKNOWN when AMBER mix vs FAIL when any critical FAIL? Phase 14 W3-W1 governance skill body refactor production-ready ama bu specific behavior dokümante değil. Phase 15 audit implementation question.
+**Options:**
+- a) drift-check skill `aggregate_verdicts` logic change — FAILs > 0 → overall_verdict=FAIL (strict)
+- b) UNKNOWN korunur — domain natural ("incomplete picture" semantik, partial PASS mix kabul)
+- c) Verdict enum bump — `aggregate_unknown` separate value
+- d) Phase 15 audit document — implementation existing behavior + rationale codify (no code change)
+**Owner:** karar verici agent (Phase 15 audit implementation question)
+**Blocking Phase:** None (non-blocking, low priority semantic)
+
 ### Q-016: audit_action enum mapping (Edit/Write/Bash → modified/accessed)
 **Raised:** 2026-04-30 during Phase 4 W-N (post-tool-use.json hook)
 **Context:** events.schema audit_action enum 6 değer (created, modified, deleted, accessed, permission_changed, config_changed). post-tool-use hook tüm tool'larda (Edit/Write/Bash) `accessed` flatten ediyor — semantik kayıp (Edit/Write → `modified` olmalı). One-liner sıkışıklığı tradeoff.
