@@ -23,6 +23,23 @@
 **Owner:** karar verici agent (Phase 14+ pre-dispatch, pilot smoke test deneyimi sonrası)
 **Blocking Phase:** None (non-blocking, governance polish; Wave 2 + Phase 9 closeout aynı paterni reuse — defer kararı geçerli)
 
+### Q-CI-W2-01: Governance Skill Body Executability (standalone Python block refactor) — Phase 14 W3 ACTIVE SCOPE
+**Raised:** 2026-05-05 during Phase 14 W2 worker output (W-J1 surface, lesson 8 v5 boyut #6 katman 2)
+**Context:** Phase 14 W2 W-J1 helper script `scripts/ci/run_skill_python.py` markdown-aware Python block extraction çalışıyor (3 governance skill 8+7+7=22 Python block extract edildi). Ancak skill body Python blokları **standalone executable DEĞİL** — surrounding markdown prose'a referans veriyor (`schema_path`, `glossary_path` değişkenler tanımlanmamış, illustrative pseudo-code `...` literals + `dict` literal SyntaxError). Helper davranışı semantically correct (FAIL preservation), ama 3 governance skill smoke test:
+- `drift-check`: SyntaxError line 76 (`{"category": "...", ...}` illustrative pseudo-code dict literal)
+- `schema-validate`: NameError `schema_path` (surrounding prose context'e referans)
+- `glossary-audit`: NameError `Path` (ilk Python block missing import)
+
+**Decision (Phase 14 W2):** Süleyman Seçenek C onaylandı (defer Phase 14 W3, AMBER mode kabul). Initial report-only mode (`continue-on-error: true`) zaten AMBER mode kabul ediyor — pipeline FAIL etmez, sadece warning. Phase 14 W3 pilot E2E sırasında governance skill body refactor doğal scope (real workspace state üzerinde sentetik test değil). Atomic 10'uncu kanıt scope korunur (lesson 22 üst sınır brief riski önlenir).
+
+**Phase 14 W3 active scope:**
+- (a) Governance skill body refactor — 3 skill × 7-8 Python block standalone-executable, entrypoint variables + import statements + concat-friendly
+- (b) Helper multi-block isolation mode evrim — her Python bloğu ayrı subprocess (state izolasyonu) — DEĞERLENDİRİLDİ skill body intent (workflow step-by-step sequential state sharing) ile çelişir
+- (c) Strict mode geçiş Phase 14 W3+ closeout (continue-on-error: false 3 governance step)
+
+**Owner:** karar verici agent (Phase 14 W3 brief writing, pilot demo-dental E2E doğal scope)
+**Blocking Phase:** Phase 14 W3 (governance skill body refactor pilot E2E doğal scope)
+
 ### Q-WS-02: README "Quick Start" engine plugin invocation convention (workspace → engine plugin nasıl invoke edilir?)
 **Raised:** 2026-05-04 during Phase 14 W1 worker output (W-I1 surface)
 **Context:** Workspace repo `README.md` "Quick Start" bölümünde "Engine plugin skill çalıştır" yazıyor, ancak workspace → engine plugin invocation convention v1 release closure'da netleşecek. Workspace pwd'si `~/Documents/platinum-seo-workspace/projects/demo-dental/` iken engine plugin skill'leri (`~/Documents/platinum-seo-engine/skills/...`) nasıl çağrılır? Plugin path lookup, env var (`PLATINUM_SEO_ENGINE_ROOT`?), Claude Code plugin auto-discovery, manuel invocation pattern'leri arasında karar gerek.
@@ -37,6 +54,7 @@
 
 
 ## Resolved (last 10 — moved to DECISIONS)
+- **Q-CI-W2-06 → fix commit c522e9f** — Phase 14 W2 post-push CI runtime fix `requirements.txt` 4-line manifest (jsonschema + pytest + openpyxl + pyyaml). `actions/setup-python@v5 cache: pip` cache hash için manifest dosyası gerektirir. Lesson 8 v6 candidate doğum belgesi boyut #12 brief CI runtime requirements cross-check Phase 14 W3+ enforce 12-boyutlu.
 - **Q-015 → ADR-025** — scrapling-output-mapping pattern dependency → templates/scrapling/.gitkeep yaratıldı, schema pattern korundu, sub-schemas Phase 7+ skill'lerle.
 
 - **Q-001 → ADR-001** — Plugin repo yeri → `~/Documents/platinum-seo-engine/` rename.
