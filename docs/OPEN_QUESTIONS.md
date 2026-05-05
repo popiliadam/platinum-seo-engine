@@ -275,6 +275,35 @@
 **Owner:** karar verici agent (Phase 15 W5 tooling audit)
 **Blocking Phase:** None (LOW, false positive only, no real security risk)
 
+### Q-PHASE15-CTXLEDGER-01: CONTEXT_LEDGER.md 288KB — compression/archiving strategy [LOW]
+**Raised:** 2026-05-05 during Phase 15 W4 performance audit (W-D3 worker output; cat25-performance-regression.md)
+**Context:** `docs/CONTEXT_LEDGER.md` has grown to 288,134 bytes (281KB) — 7× the 40KB signal threshold. Growth is by-design append-only (each phase close appends dense summary). No structural integrity issue (file is append-only log), but git history of the file is large and reading it is slow. Session start reads only relevant sections.
+**Options:**
+- a) Archive older phase summaries to `CONTEXT_LEDGER_ARCHIVE.md` (keep last 5-7 phases hot)
+- b) Create `CONTEXT_LEDGER_v1.md` frozen file + start `CONTEXT_LEDGER_v2.md` for post-v1 phases
+- c) Accept current size (no compression needed — sessions read selectively, not linearly)
+- d) Phase 15 W5 strategic audit scope: decide v1.1 CONTEXT_LEDGER policy
+**Owner:** karar verici agent (Phase 15 W5 or v1.1 planning)
+**Blocking Phase:** None (LOW, by-design growth, no functional impact)
+
+### Q-PHASE15-W4-LESSON28-01: Lesson 28 v3 description stale — "17 vaka" vs body table "18" [LOW]
+**Raised:** 2026-05-05 during Phase 15 W4 convention enforcement audit (W-D1 worker output; cat21-convention-enforcement.md)
+**Context:** `memory/project_phase_lessons.md` Lesson 28 v3 YAML `description` field says "17 vaka" but the body table shows 18 rows (3+10+1+3+1=18). Body is authoritative. Description is a cached summary that wasn't updated after the 18th vaka was added. Not a functional issue but a documentation inconsistency.
+**Options:**
+- a) Update description field: "17 vaka" → "18+ vaka"
+- b) Accept as cosmetic (body table is authoritative, description is summary hint only)
+**Owner:** karar verici agent (Phase 15 W5 cleanup or inline fix)
+**Blocking Phase:** None (LOW, cosmetic only)
+
+### Q-PHASE15-W4-SCRIPTPATH-01: validate_invariants.py + validate_schema.py at scripts/validation/ not scripts/ci/ [LOW]
+**Raised:** 2026-05-05 during Phase 15 W4 performance audit (W-D3 worker output; cat25-performance-regression.md; schema-first overrides #1+#2)
+**Context:** Phase 15 W4 brief assumed `scripts/ci/validate_invariants.py` and `scripts/ci/validate_schema.py` — actual paths are `scripts/validation/validate_invariants.py` and `scripts/validation/validate_schema.py`. Brief template for helper paths used incorrect subdirectory. ci.yml references the correct paths. Lesson 38 v2 frozen assumption documented. Fix brief templates for W5.
+**Options:**
+- a) Update Phase 15 W5 brief template to use `scripts/validation/` path
+- b) Add script-path cross-check to lesson 8 v8 Section 11 (brief infrastructure convention)
+**Owner:** karar verici agent (Phase 15 W5 brief writing)
+**Blocking Phase:** None (LOW, helpers ran correctly, override documented)
+
 
 ## Resolved (last 10 — moved to DECISIONS)
 - **Q-W3W3α-W1 LOW → Phase 14 W3-W3-β in-wave RESOLVED via W-Q1 worker proaktif cascade (engine `568f9bb`)** — `tests/ci/test_ci_yaml.py::test_continue_on_error_strict_mode_governance_steps` 3 strict+4 report-only conditional logic → 7 strict set comparison defensive logic redesign. Lesson 21 9'uncu ardışık production-ready cross-skill convention worker proaktif scope expansion (brief minimum scope ÖTESİ Q-W3W3α-W1 pre-authorize'dan yararlanan cascade). Test ismi semantic update yapıldı, name rename ertelenir Q-W3W3β-TEST-01 LOW (Phase 15 audit Wave 4 follow-up).
