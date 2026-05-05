@@ -49,31 +49,46 @@ def test_pip_cache_enabled():
 
 
 def test_continue_on_error_strict_mode_governance_steps():
-    """Phase 14 W3-W3-α strict mode: 3 governance steps (drift-check + schema-
-    validate + glossary-audit) `continue-on-error: false` (Q-CI-W3-03 RESOLVED
-    runtime kanıt + 4 governance helper exec EXIT=0 4/4 zemin).
-    Remaining 4 steps (pytest + plugin-agnostik-grep + secret-grep + frontmatter-
-    compile) stay report-only `continue-on-error: true` (W3-W3-β scope deferred
-    için).
+    """Phase 14 W3-W3-β strict mode FINAL: tüm 7 step `continue-on-error: false`.
+
+    W3-W3-α'da 3 governance step (drift-check + schema-validate + glossary-audit)
+    strict mode'a geçti (Q-CI-W3-03 RESOLVED runtime kanıt + 4 governance helper
+    exec EXIT=0 4/4 zemin). W3-W3-β v1.0.0 release closure ile kalan 4 step
+    (pytest + plugin-agnostik-grep + secret-grep + frontmatter-compile) strict
+    mode'a alındı (CI Run 10 mask removed actual exit code surface kanıtı +
+    pytest 610 PASS + plugin-agnostik-grep 0 hit since W2 + secret-grep 0 hit
+    [4 exclude path: .env.example, docs/superpowers/specs/, docs/CONTEXT_LEDGER.md,
+    scripts/ci/check_secrets.sh] + frontmatter-compile 43 SKILL.md Draft7 verified).
+
+    Lesson 21 cross-skill convention worker proaktif scope expansion 8 ardışık
+    production-ready: bu test W3-W3-β closure ile ci.yml flip aynı wave'de
+    update edildi (positive drift 610 PASS instead of regression).
     """
     cfg = yaml.safe_load(CI_YAML.read_text())
     check_steps = [
         s for s in cfg["jobs"]["ci"]["steps"]
         if s.get("name", "").startswith(tuple("1234567"))
     ]
-    strict_step_names = {"1. drift-check", "2. schema-validate", "3. glossary-audit"}
+    expected_strict_step_names = {
+        "1. drift-check",
+        "2. schema-validate",
+        "3. glossary-audit",
+        "4. pytest",
+        "5. plugin-agnostik-grep",
+        "6. secret-grep",
+        "7. frontmatter-compile",
+    }
+    seen = set()
     for step in check_steps:
         name = step.get("name", "")
-        expected_strict = name in strict_step_names
+        seen.add(name)
         actual = step.get("continue-on-error")
-        if expected_strict:
-            assert actual is False, (
-                f"Step {name} expected strict mode (continue-on-error: false), got {actual}"
-            )
-        else:
-            assert actual is True, (
-                f"Step {name} expected report-only mode (continue-on-error: true), got {actual}"
-            )
+        assert actual is False, (
+            f"Step {name} expected strict mode (continue-on-error: false), got {actual}"
+        )
+    assert seen == expected_strict_step_names, (
+        f"Missing or extra steps. Expected {expected_strict_step_names}, got {seen}"
+    )
 
 
 def test_secret_grep_via_wrapper_script():

@@ -49,7 +49,7 @@ jobs:
       # Step 4 — pytest baseline + W2 yeni, no regression
       - name: 4. pytest
         run: pytest --tb=no -q
-        continue-on-error: true
+        continue-on-error: false
 
       # Step 5 — plugin agnostik invariant (.mcp.json 3 server + skill body slug hardcode YOK F-16)
       - name: 5. plugin-agnostik-grep
@@ -61,7 +61,7 @@ jobs:
           ! grep -rEn "\b(demo-dental|demo-furniture|demo-hvac|demo-petcare|demo-shop|demo-tires|demo-construction|demo-agency)\b" \
             skills/ --include=SKILL.md \
             | grep -vE "No project slug hardcoded|F-16 disclaimer|plugin agnostik" || true
-        continue-on-error: true
+        continue-on-error: false
 
       # Step 6 — secret-grep (Phase 14+ CI Rule 3 production-ready 11-phase invariant)
       # Lesson 11 üçüncü surface mop-up Phase 14 W2: regex literal wrapper script'e
@@ -69,7 +69,7 @@ jobs:
       # placeholder convention paralel evolution).
       - name: 6. secret-grep
         run: bash scripts/ci/check_secrets.sh
-        continue-on-error: true
+        continue-on-error: false
 
       # Step 7 — frontmatter-compile (skill-frontmatter.schema.json Draft7 validate her SKILL.md frontmatter, 43 SKILL.md compliance)
       - name: 7. frontmatter-compile
@@ -92,4 +92,4 @@ jobs:
           print(f'frontmatter-compile: {len(skill_files)-fail_count}/{len(skill_files)} PASS')
           sys.exit(fail_count)
           "
-        continue-on-error: true
+        continue-on-error: false
