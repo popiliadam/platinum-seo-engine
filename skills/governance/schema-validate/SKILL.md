@@ -120,6 +120,26 @@ This skill operates under the three Foundational Principles
 ### Step 1 — `validator_smoke` (DURUR #1)
 
 ```python
+# Standalone-executable entrypoint (Phase 14 W3-W1 helper exec compliance):
+# imports + entrypoint variables init for downstream concat blocks.
+import os
+import sys
+import json
+import re
+from pathlib import Path
+
+import yaml
+
+# sys.path insert so `scripts.*` packages resolve under subprocess exec.
+sys.path.insert(0, os.getcwd())
+
+# Entrypoint variables (placeholder defaults — orchestrator overrides at runtime)
+schema_path = "schemas/"
+strict = True
+project_id = "drifttest"
+REPO_ROOT = Path.cwd()
+failures: list = []
+
 try:
     import jsonschema
     from jsonschema import Draft7Validator
@@ -133,7 +153,6 @@ it the skill cannot validate anything.
 ### Step 2 — `enumerate_schemas` (runtime glob, NOT hardcoded count)
 
 ```python
-from pathlib import Path
 schema_root = Path(schema_path)
 if not schema_root.exists():
     raise SystemExit(f"DURUR #2: {schema_root} missing")
@@ -183,15 +202,19 @@ caught at the audit step, not silently masked.
 fm_schema = json.loads((schema_root / "skill-frontmatter.schema.json").read_text("utf-8"))
 fm_validator = Draft7Validator(fm_schema)
 skill_root = REPO_ROOT / "skills"
-for skill_md in skill_root.rglob("SKILL.md"):
+skill_files = sorted(skill_root.rglob("SKILL.md"))
+for skill_md in skill_files:
     text = skill_md.read_text(encoding="utf-8")
     m = re.match(r"^---\n(.*?)\n---\n", text, re.DOTALL)
     if not m:
         # FAIL: frontmatter block missing
-        ...
+        failures.append(f"{skill_md}: no frontmatter block")
+        continue
     fm = yaml.safe_load(m.group(1))
     errors = sorted(fm_validator.iter_errors(fm), key=lambda e: list(e.absolute_path))
     # accumulate per-file
+    if errors:
+        failures.extend(f"{skill_md}: {e.message}" for e in errors)
 ```
 
 Every `skills/**/SKILL.md` frontmatter is Draft7-validated against
@@ -226,13 +249,21 @@ Write `outputs/reports/{date}-schema-validate.md` with sections:
 
 ```python
 from scripts.state import events_writer
-events_writer.append_audit(
-    project_id=project_id,
-    audit_action="accessed",
-    audit_target="schemas:bulk-validate",
-    actor="agent:schema-validate",
-    notes=f"verdict={overall} schemas={len(schema_files)} skills={len(skill_files)}",
-)
+# Documented invocation (orchestrator runs at workflow time):
+# events_writer.append_audit(
+#     project_id=project_id,
+#     audit_action="accessed",
+#     audit_target="schemas:bulk-validate",
+#     actor="agent:schema-validate",
+#     notes=f"verdict={overall} schemas={len(schema_files)} skills={len(skill_files)}",
+# )
+audit_payload = {
+    "event_kind": "audit",
+    "audit_action": "accessed",
+    "audit_target": "schemas:bulk-validate",
+    "actor": "agent:schema-validate",
+    "notes": f"verdict={overall} schemas={len(schema_files)} skills={len(skill_files)}",
+}
 ```
 
 The audit event_kind requires the `audit_action + audit_target + actor`

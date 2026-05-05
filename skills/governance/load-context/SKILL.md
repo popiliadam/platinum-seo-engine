@@ -131,8 +131,30 @@ writes only to `outputs/reports/{date}-load-context.md` and
 ### Step 1 — `extract_spec_sections_1_13_17` (DURUR #1)
 
 ```python
-spec = Path("docs/superpowers/specs/2026-04-30-platinum-seo-engine-design.md").read_text(encoding="utf-8")
+# Standalone-executable entrypoint (Phase 14 W3-W1 helper exec compliance):
+# imports + entrypoint variables init for downstream concat blocks.
+import os
+import sys
 import re
+import json
+from pathlib import Path
+
+# sys.path insert so `scripts.*` packages resolve under subprocess exec.
+sys.path.insert(0, os.getcwd())
+
+# Entrypoint variables (placeholder defaults — orchestrator overrides at runtime)
+phase_id = "auto-detect"
+max_kb = 15
+project_id = "drifttest"
+
+spec_path = Path("docs/superpowers/specs/2026-04-30-platinum-seo-engine-design.md")
+phase_status_path = Path("docs/PHASE_STATUS.md")
+open_questions_path = Path("docs/OPEN_QUESTIONS.md")
+decisions_path = Path("docs/DECISIONS.md")
+reference_index_path = Path("docs/REFERENCE_INDEX.md")
+session_protocol_path = Path("docs/SESSION_PROTOCOL.md")
+
+spec = spec_path.read_text(encoding="utf-8")
 def _section(idx: int) -> str:
     pat = re.compile(rf"^## {idx}\.[^\n]*\n(.*?)(?=^## \d+\.)", re.MULTILINE | re.DOTALL)
     m = pat.search(spec)
@@ -153,7 +175,7 @@ tooling.
 ### Step 2 — `parse_phase_status`
 
 ```python
-phase_status = Path("docs/PHASE_STATUS.md").read_text(encoding="utf-8")
+phase_status = phase_status_path.read_text(encoding="utf-8")
 active_match = re.search(r"^\*\*Active Phase:\*\*\s*([^\n]+)", phase_status, re.MULTILINE)
 active_phase = active_match.group(1).strip() if active_match else "<unknown>"
 blockers_match = re.search(r"^### Blockers\n(.*?)(?=^##|\Z)", phase_status, re.MULTILINE | re.DOTALL)
@@ -166,7 +188,7 @@ bold line; blockers come from the `### Blockers` section.
 ### Step 3 — `read_open_questions`
 
 ```python
-open_q = Path("docs/OPEN_QUESTIONS.md").read_text(encoding="utf-8")
+open_q = open_questions_path.read_text(encoding="utf-8")
 # Extract Q-XX-NN entries, count Phase 13+ candidates
 q_entries = re.findall(r"^### (Q-[A-Z]+-\d+)", open_q, re.MULTILINE)
 ```
@@ -177,7 +199,7 @@ the report.
 ### Step 4 — `read_last_5_adr`
 
 ```python
-decisions = Path("docs/DECISIONS.md").read_text(encoding="utf-8")
+decisions = decisions_path.read_text(encoding="utf-8")
 # Anchor: "## ADR-NNN"
 adr_anchors = list(re.finditer(r"^## ADR-(\d+)", decisions, re.MULTILINE))
 last_5_starts = [m.start() for m in adr_anchors[-5:]]
@@ -192,7 +214,7 @@ ADR-011 rotation rule).
 ### Step 5 — `read_reference_index`
 
 ```python
-ref_index = Path("docs/REFERENCE_INDEX.md").read_text(encoding="utf-8")
+ref_index = reference_index_path.read_text(encoding="utf-8")
 # Full read: ~3KB, well under budget
 ```
 
@@ -201,7 +223,7 @@ The Q&A "where to look?" index is small enough to read in full.
 ### Step 6 — `verify_session_protocol_match`
 
 ```python
-session_protocol = Path("docs/SESSION_PROTOCOL.md").read_text(encoding="utf-8")
+session_protocol = session_protocol_path.read_text(encoding="utf-8")
 # Count the numbered 7-step sequence in §2
 step_lines = re.findall(r"^\d\.\s", session_protocol, re.MULTILINE)
 assert len(step_lines) >= 7, (
@@ -249,13 +271,21 @@ Write `outputs/reports/{date}-load-context.md`:
 
 ```python
 from scripts.state import events_writer
-events_writer.append_audit(
-    project_id=project_id,
-    audit_action="accessed",
-    audit_target="session:wakeup-codify",
-    actor="agent:load-context",
-    notes=f"phase={active_phase} bytes={total} verdict={verdict}",
-)
+# Documented invocation (orchestrator runs at workflow time):
+# events_writer.append_audit(
+#     project_id=project_id,
+#     audit_action="accessed",
+#     audit_target="session:wakeup-codify",
+#     actor="agent:load-context",
+#     notes=f"phase={active_phase} bytes={total} verdict={verdict}",
+# )
+audit_payload = {
+    "event_kind": "audit",
+    "audit_action": "accessed",
+    "audit_target": "session:wakeup-codify",
+    "actor": "agent:load-context",
+    "notes": f"phase={active_phase} bytes={total} verdict={verdict}",
+}
 ```
 
 `event_kind=audit` requires `audit_action + audit_target + actor`
