@@ -1,10 +1,11 @@
 # Platinum SEO Engine
 
 [![CI](https://github.com/popiliadam/platinum-seo-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/popiliadam/platinum-seo-engine/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/popiliadam/platinum-seo-engine?label=release)](https://github.com/popiliadam/platinum-seo-engine/releases/tag/v1.0.0)
 
 Bir Claude Code plugin'i; SEO operasyonunu schema-locked workflow'larla yöneten motor.
 
-**Status:** alpha (v0.1.0) — Phase 0 active
+**Status:** v1.0.0 — Phase 14 complete (2026-05-05) — [Release Notes](docs/RELEASE_NOTES_v1.0.0.md)
 
 ---
 
@@ -38,5 +39,5 @@ MIT (see `LICENSE`).
 
 ## Contact / Repo
 
-- GitHub repo: TBD (Phase 0 sonu user-created — ADR-002)
-- Workspace repo: TBD (Phase 14 user-created — ADR-005)
+- GitHub repo: https://github.com/popiliadam/platinum-seo-engine (PRIVATE)
+- Workspace repo: https://github.com/popiliadam/platinum-seo-workspace (PRIVATE)
