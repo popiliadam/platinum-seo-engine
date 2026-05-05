@@ -48,16 +48,32 @@ def test_pip_cache_enabled():
     assert setup_step["with"]["cache"] == "pip"
 
 
-def test_continue_on_error_initial_report_only_mode():
+def test_continue_on_error_strict_mode_governance_steps():
+    """Phase 14 W3-W3-α strict mode: 3 governance steps (drift-check + schema-
+    validate + glossary-audit) `continue-on-error: false` (Q-CI-W3-03 RESOLVED
+    runtime kanıt + 4 governance helper exec EXIT=0 4/4 zemin).
+    Remaining 4 steps (pytest + plugin-agnostik-grep + secret-grep + frontmatter-
+    compile) stay report-only `continue-on-error: true` (W3-W3-β scope deferred
+    için).
+    """
     cfg = yaml.safe_load(CI_YAML.read_text())
     check_steps = [
         s for s in cfg["jobs"]["ci"]["steps"]
         if s.get("name", "").startswith(tuple("1234567"))
     ]
+    strict_step_names = {"1. drift-check", "2. schema-validate", "3. glossary-audit"}
     for step in check_steps:
-        assert step.get("continue-on-error") is True, (
-            f"Step {step['name']} report-only mode initial expected"
-        )
+        name = step.get("name", "")
+        expected_strict = name in strict_step_names
+        actual = step.get("continue-on-error")
+        if expected_strict:
+            assert actual is False, (
+                f"Step {name} expected strict mode (continue-on-error: false), got {actual}"
+            )
+        else:
+            assert actual is True, (
+                f"Step {name} expected report-only mode (continue-on-error: true), got {actual}"
+            )
 
 
 def test_secret_grep_via_wrapper_script():

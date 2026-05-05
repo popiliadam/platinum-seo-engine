@@ -27,8 +27,19 @@ PYTHON_BLOCK_RE = re.compile(
 
 
 def extract_python_blocks(skill_md_text: str) -> list[str]:
-    """Extract all ```python ... ``` code blocks from SKILL.md body, in order."""
-    return [match.group(1).rstrip() for match in PYTHON_BLOCK_RE.finditer(skill_md_text)]
+    """Extract all ```python ... ``` code blocks from SKILL.md body, in order.
+
+    Q-CI-W3-02 auto-prepend: if no block contains the sys.path.insert(0, os.getcwd())
+    marker, prepend a multi-line setup block so concat exec resolves scripts.* package
+    imports. F-14W3W3α-4 catch: substring-key detection respects multi-line format
+    (semicolon-tek-satır format kaçın — see rules/skills.md Section 3).
+    """
+    blocks = [match.group(1).rstrip() for match in PYTHON_BLOCK_RE.finditer(skill_md_text)]
+    if blocks:
+        sys_path_marker = "sys.path.insert(0, os.getcwd())"
+        if not any(sys_path_marker in b for b in blocks):
+            blocks.insert(0, "import os, sys\nsys.path.insert(0, os.getcwd())")
+    return blocks
 
 
 def run_skill_python(skill_md_path: Path) -> int:
