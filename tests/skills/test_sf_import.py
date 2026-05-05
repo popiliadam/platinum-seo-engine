@@ -180,6 +180,11 @@ def match_tiers(
 # Test 1 — Tier 1 14/14 PASS path (live pilot SF batch)
 # ---------------------------------------------------------------------------
 
+@pytest.mark.skipif(
+    not WORKSPACE_STAGING.exists(),
+    reason="local-only fixture: WORKSPACE_STAGING path missing on CI runner "
+           "(Q-CI-W3-04 Phase 15 audit Wave 1 kategori #5 codify aday)"
+)
 def test_tier1_14_validates(tier_canonical_names: tuple[set[str], set[str]]) -> None:
     """All 14 §7.1 REQUIRED reports must resolve from the pilot raw dir.
 
@@ -204,6 +209,11 @@ def test_tier1_14_validates(tier_canonical_names: tuple[set[str], set[str]]) -> 
 # Test 2 — Tier 2 search_console_all is AMBER (warn, NOT fail)
 # ---------------------------------------------------------------------------
 
+@pytest.mark.skipif(
+    not WORKSPACE_STAGING.exists(),
+    reason="local-only fixture: WORKSPACE_STAGING path missing on CI runner "
+           "(Q-CI-W3-04 Phase 15 audit Wave 1 kategori #5 codify aday)"
+)
 def test_tier2_search_console_all_amber(
     tier_canonical_names: tuple[set[str], set[str]],
 ) -> None:
