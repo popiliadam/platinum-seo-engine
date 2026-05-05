@@ -2,6 +2,39 @@
 
 ## Unresolved
 
+### Q-W3W2Cb-002: /gece-plagi-splint URL "URL is unknown to Google" mismatch despite gsc_performance 4720 imp/30d (canonical drift) [MEDIUM]
+**Raised:** 2026-05-05 during Phase 14 W3-W2-C-b worker output (W-O1 Step 6 verify-indexing GSC inspect surface)
+**Context:** GSC `index_inspect` returned coverageState="URL is unknown to Google" for `https://demo-dental.example/gece-plagi-splint/` despite `gsc_performance` sheet reporting 4720 impressions / 30 days for the same URL. Possible canonical drift (trailing slash variant in sitemap vs URL accessor) or canonical conflict. Worker Step 3 revise-content already produced a HIGH-severity decay revision plan for this URL (-29% click drop) — plan validity hinges on GSC indexability resolution.
+**Options:**
+- a) Sitemap canonical audit — fetch demo-dental sitemap.xml + cross-check trailing slash convention vs URL submitter; if mismatch, regenerate sitemap with consistent canonical
+- b) URL canonical tag inspect via Scrapling fetch — verify `<link rel="canonical">` HTML tag matches GSC accessor URL
+- c) GSC `submit_sitemap` resubmit + 24-72 hour reindex window + index_inspect re-verify
+- d) Phase 14 W3-W3 audit Wave 1 layout normalize ADR aday (Q-W3W2Cb-001 RESOLVED paterni reuse — same-class GSC canonical investigation)
+**Owner:** karar verici agent (Phase 14 W3-W3 closure scope, v1.0.0 release closure öncesi resolve aday)
+**Blocking Phase:** None (non-blocking, revise-content plan can ship as remediation candidate; resolution post-launch acceptable)
+
+### Q-W3W2Cb-003: master_task task_id pattern (MT-W3W2B-001) does NOT match events.schema regex [LOW]
+**Raised:** 2026-05-05 during Phase 14 W3-W2-C-b worker output (W-O1 Step 7 mark-done schema-first override branch surface)
+**Context:** Existing master_task task_id values (e.g. `MT-W3W2B-001`, `MT-W3W2B-002`) created during Phase 14 W3-W2-B do NOT match the events.schema `^T-[0-9]{4,}$` regex pattern that mark-done expects. Worker created new task_id values `T-10001..T-10004` matching the schema, but pre-existing W3-W2-B drift remains. Convention codify aday: rules/master-task-id.md or master-excel.schema task_id pattern reference.
+**Options:**
+- a) `rules/master-task-id.md` (yeni rule R-XX yeni dosya) — task_id pattern convention codify single rule + master-excel.schema task_id field reference
+- b) Mevcut `master-excel.schema.json` master_task.task_id "pattern" field additive (additive bump, schema_version) — `^T-[0-9]{4,}$|^MT-[A-Z0-9]+-[0-9]{3,}$` 2-pattern union (transitional)
+- c) Bulk migration script — `MT-W3W2B-XXX` task_ids → `T-NNNNN` rename (master_task + master_task_sync history events.jsonl reference cascade fix)
+- d) Phase 15 audit Wave 1 layout normalize ADR aday (cumulative pre-existing drift catch)
+**Owner:** karar verici agent (Phase 15 audit Wave 1 kategori #2 schema cross-check)
+**Blocking Phase:** None (non-blocking, low priority pre-existing drift)
+
+### Q-W3W2Cb-004: drift-check F-17 regression — redirect_404.action='301' value not in severityEnum 4-value (rule scope collision) [LOW]
+**Raised:** 2026-05-05 during Phase 14 W3-W2-C-b worker output (W-O1 Step 9 drift-check post-W3-W2-C-b verify surface)
+**Context:** drift-check post-W3-W2-C-b verdict regressed from RED 15/2/3 → RED 14/2/4 (Δ -1 PASS, +1 FAIL F-17 mechanical regression). F-17 rule scans `severity` columns for 4-value enum (LOW/MEDIUM/HIGH/CRITICAL), but `redirect_404.action` column was scanned (value '301' fails enum check). Schema authority cross-check needed: F-17 rule scope is per-sheet specific or generic-column-name? Rule scope kolizyonu, gerçek data drift değil — mekanik regression.
+**Options:**
+- a) `validate_invariants.py` F-17 rule scope tightening — per-sheet `severity` column allow-list (cannibalization.severity + on_page_audit.severity + redirect_404 EXCLUDED) — rule scope explicit
+- b) `cross-sheet-invariants.json` F-17 rule clarification — schema authority `severity` column reference list explicit (master-excel.schema.json severityEnum referans sheets only)
+- c) `redirect_404` schema rename action column → `http_status` (semantik doğru, action confusing) — schema_version bump
+- d) Phase 15 audit Wave 1 implementation question codify (drift-check rule scope semantic codify aday)
+**Owner:** karar verici agent (Phase 15 audit Wave 1 kategori #5 schema cross-check + drift-check implementation)
+**Blocking Phase:** None (non-blocking, mekanik regression bilinçli kabul, gerçek data drift değil)
+
 ### Q-W3W2C-A-LAYOUT-01: master.xlsx duplicate header row Workspace W1 bootstrap (Q-W3W2B-LAYOUT-01 paterni reuse) [MEDIUM]
 **Raised:** 2026-05-05 during Phase 14 W3-W2-C-a worker output (W-N1 drift-check post-W3-W2-C-a verify, drift-check helper schema authority dynamic + row 1 fallback ile layout'la yaşıyor)
 **Context:** Workspace W1 bootstrap master.xlsx duplicate header row (row 1 + row 3/4/5 both header). W3-W2-C-a fix `validate_invariants.py` `_resolve_header_row()` helper schema authority dynamic + row 1 fallback (probe match yoksa) ile layout'la birlikte yaşıyor. 4 mekanik header-parse FAIL eliminate (F-01+F-05+F-17+F-18). Q-W3W2B-LAYOUT-01 + Q-DC-LAYOUT-01 paterni reuse — duplicate header row layout normalize ayrı scope.
@@ -150,6 +183,7 @@
 
 
 ## Resolved (last 10 — moved to DECISIONS)
+- **Q-W3W2Cb-001 → Phase 14 W3-W2-C-b in-wave RESOLVED workspace 3bb7258 (Step 6 verify-indexing GSC inspect /main-page Google canonical = https://demo-dental.example/, page is duplicate redirect to homepage)** — Step 3 revise-content surfaced legitimacy question (-90% click drop /main-page), Step 6 verify-indexing index_inspect confirmed page is duplicate of homepage with Google-determined canonical = `/`. Step 3 revise-content plan rerouted to content-remediation skill next wave (action=redirect target=/). Lesson 21 7'inci ardışık production-ready cross-skill convention same-wave self-resolve positive drift paterni (intra-wave cross-skill investigation positive drift, 7 phase consecutive convergent invariant).
 - **Q-W3W2B-LAYOUT-01 → Phase 14 W3-W2-C-a fix engine 7c83d30 (drift-check helper schema authority dynamic header_row resolve)** — 4 mekanik header-parse FAIL eliminate (F-01+F-05+F-17+F-18). validate_invariants.py `_resolve_header_row()` helper schema authority compile + row 1 fallback. Master.xlsx layout normalize ayrı scope (Q-W3W2C-A-LAYOUT-01 paterni reuse, Phase 15 audit Wave 1 ADR aday).
 - **Q-DC-LAYOUT-01 → Phase 14 W3-W2-C-a fix engine 7c83d30 (drift-check helper schema authority dynamic + row 1 fallback)** — W3-W2-A surface + W3-W2-B reinforce + W3-W2-C-a resolve. drift-check skill body schema-aware production-ready. Layout normalize Phase 15 audit Wave 1 kategori #2 ayrı scope.
 - **Q-CI-W2-01 → atomic commit ed6a40d (Phase 14 W3-W1)** — Governance skill body executability defer scope RESOLVED. 4 SKILL.md body refactor standalone-executable (drift-check 8 + schema-validate 7 + glossary-audit 7 + load-context 8 = 30 Python block helper concat exec EXIT=0 4/4 skill). Lesson 21 4'üncü uygulama worker proaktif `sys.path.insert(0, os.getcwd())` cross-skill convention. GitHub Actions Run 4 14/14 step SUCCESS Phase 14 ilk %100 GREEN run (W2 Run 2/3 Step 1+2+3 AMBER continue-on-error masks → W3-W1 sonrası gerçek runtime PASS). Strict mode (`continue-on-error: false`) geçiş W3-W3 closeout artık kanıtlanmış zemin. Q-CI-W3-01 + Q-CI-W3-02 yeni surface (sys.path convention codify + helper auto-prepend) Phase 14 W3-W2/W3-W3 backlog.
