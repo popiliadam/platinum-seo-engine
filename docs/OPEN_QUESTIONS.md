@@ -304,6 +304,54 @@
 **Owner:** karar verici agent (Phase 15 W5 brief writing)
 **Blocking Phase:** None (LOW, helpers ran correctly, override documented)
 
+### Q-PHASE15-PLUGIN-JSON-01: plugin.json absent — does Claude Code /plugin add require it? [MEDIUM]
+**Raised:** 2026-05-05 during Phase 15 W5 UX smoke test (W-E1 worker output; cat27-ux-smoke.md)
+**Context:** Engine root has no `plugin.json` manifest. `.claude/settings.local.json` exists. Phase 4 baseline schema mentioned `plugin.json` as a convention but it was never formally verified whether Claude Code's plugin auto-discovery or `/plugin add` workflow requires a `plugin.json` manifest file. If required, engine cannot be loaded as a plugin. If not required (skills loaded via path), then no action needed.
+**Options:**
+- a) Verify Claude Code plugin discovery mechanism: check if `plugin.json` is required for `/plugin add` or if skills/ directory alone suffices
+- b) Create minimal `plugin.json` with engine metadata (name, version, skills path)
+- c) Accept current state if Claude Code auto-discovers skills without manifest
+**Owner:** karar verici agent (v1.1 UX investigation)
+**Blocking Phase:** None currently (engine works without plugin.json), but blocks formal plugin distribution
+
+### Q-PHASE15-BRAND-CONFIG-01: brand_identity config uses non-canonical keys (hitap/tone vs pronoun_preference/formality) [MEDIUM]
+**Raised:** 2026-05-05 during Phase 15 W5 i18n audit (W-E2 worker output; cat28-i18n.md)
+**Context:** `projects/dentnotion/config/project.config.json` stores brand tone as `brand_identity.hitap: "siz"` and `brand_identity.tone: "semi-pro"`. Skills reading canonical keys `pronoun_preference` and `formality` will get null. The schema may have both old and new key conventions. Risk: skill execution uses wrong keys → tone enforcement gap.
+**Options:**
+- a) Update dentnotion project.config.json to use canonical keys: `pronoun_preference: "siz"`, `formality: "formal"`
+- b) Update skills to read both canonical and legacy keys (backwards-compatible)
+- c) Schema additive: add both old + new keys as aliases in project.config.schema.json
+**Owner:** karar verici agent (v1.1 schema/config normalization)
+**Blocking Phase:** None (produces null reads, not crash), but affects tone enforcement in content skills
+
+### Q-PHASE15-INSTALL-STALE-01: INSTALL.md shows alpha v0.1.0/Phase 0 — needs v1.0.0 update [MEDIUM]
+**Raised:** 2026-05-05 during Phase 15 W5 UX smoke test (W-E1 worker output; cat27-ux-smoke.md)
+**Context:** Engine `docs/INSTALL.md` still shows `alpha (v0.1.0) / Phase 0 active` status. Engine shipped v1.0.0 on 2026-05-05. Missing content: pip install step, real MCP server setup procedure, Python/Node pinned versions. INSTALL.md is the first document a new user reads — stale version creates false impression of incomplete system.
+**Options:**
+- a) v1.1 doc sprint: update INSTALL.md to v1.0.0 with full pip+MCP+env setup
+- b) Combined README+INSTALL+CONTRIBUTING doc update in single v1.1 commit
+**Owner:** karar verici agent (v1.1 documentation sprint)
+**Blocking Phase:** None (functional gap, not technical; existing users unaffected)
+
+### Q-PHASE15-ENV-MISSING-01: .env.example missing PSE_WORKSPACE_PATH + Higgsfield credential [LOW]
+**Raised:** 2026-05-05 during Phase 15 W5 UX smoke test (W-E1 worker output; cat27-ux-smoke.md)
+**Context:** Engine `.env.example` has 4 vars (GOOGLE_APPLICATION_CREDENTIALS, DATAFORSEO_USERNAME, DATAFORSEO_PASSWORD, SCRAPLING_BIN). Missing: `PSE_WORKSPACE_PATH` (referenced in INSTALL.md as workspace env var) and any Higgsfield credential (if Higgsfield MCP requires API key in .env). Not security risk (no real credentials exposed), but new users won't know to set these.
+**Options:**
+- a) Add PSE_WORKSPACE_PATH + HIGGSFIELD_API_KEY (with placeholder values) to .env.example
+- b) Accept current 4-var state (PSE_WORKSPACE_PATH set separately, Higgsfield via .claude settings)
+**Owner:** karar verici agent (v1.1 documentation sprint)
+**Blocking Phase:** None (LOW, new user onboarding gap only)
+
+### Q-PHASE15-AIO-COMPETITOR-01: aio-competitor-map skill has no matching transform script — LLM-native undocumented [LOW]
+**Raised:** 2026-05-05 during Phase 15 W5 atıl alan audit (W-E1 worker output; cat26-atil-alan.md)
+**Context:** `skills/discovery/aio-competitor-map/` skill has no corresponding `scripts/discovery/aio_competitor_map_transform.py`. The skill is LLM-native (no Python transform needed). However, the architectural decision "this skill is intentionally script-less" is not documented in the SKILL.md or any rule file. Risk: future audits may flag this as an orphan without context.
+**Options:**
+- a) Add `# LLM-native: no transform script` note to aio-competitor-map/SKILL.md frontmatter
+- b) Codify in rules/skills.md: "discovery skills without DataForSEO endpoints may be LLM-native"
+- c) Accept as-is (low risk, only affects future audit clarity)
+**Owner:** karar verici agent (v1.1 documentation polish)
+**Blocking Phase:** None (LOW, clarity only)
+
 
 ## Resolved (last 10 — moved to DECISIONS)
 - **Q-W3W3α-W1 LOW → Phase 14 W3-W3-β in-wave RESOLVED via W-Q1 worker proaktif cascade (engine `568f9bb`)** — `tests/ci/test_ci_yaml.py::test_continue_on_error_strict_mode_governance_steps` 3 strict+4 report-only conditional logic → 7 strict set comparison defensive logic redesign. Lesson 21 9'uncu ardışık production-ready cross-skill convention worker proaktif scope expansion (brief minimum scope ÖTESİ Q-W3W3α-W1 pre-authorize'dan yararlanan cascade). Test ismi semantic update yapıldı, name rename ertelenir Q-W3W3β-TEST-01 LOW (Phase 15 audit Wave 4 follow-up).
