@@ -2,16 +2,40 @@
 
 ## Unresolved
 
-### Q-W3W2B-LAYOUT-01: master.xlsx duplicate header rows + blank rows layout artefakt (drift-check 5 mekanik FAIL kaynağı) [HIGH]
-**Raised:** 2026-05-05 during Phase 14 W3-W2-B worker output (W-M1 drift-check post-discovery+planning RED 11/2/7 surface)
-**Context:** master.xlsx W3-W2-A ingest layout duplicate header rows + blank rows: gsc_performance row 1+4 + on_page_audit row 1+4 + opportunity row 1+4 + quick_wins row 1+4 + cluster_keywords row 1+3 + redirect_404 row 1+4 + tech_seo row 1+3. drift-check skill body `header_row=1` assumption ile literal header string'i data row olarak okuyor → 5 mekanik FAIL: F-01 master_task.status="status" header literal + F-05 2/17 sheets header count fail (W3-W2-A 9/17 → W3-W2-B 2/17 iyileşme robots_txt + dashboard W3-W2-C scope) + F-17 2/172 severity tech_seo.impact="impact" header literal + F-18 1/160 master_task.created_date="created_date" header literal. Q-DC-LAYOUT-01 (W3-W2-A surface) reinforce — Phase 14 W3-W2-C öncesi pre-flight zorunlu.
+### Q-W3W2C-A-LAYOUT-01: master.xlsx duplicate header row Workspace W1 bootstrap (Q-W3W2B-LAYOUT-01 paterni reuse) [MEDIUM]
+**Raised:** 2026-05-05 during Phase 14 W3-W2-C-a worker output (W-N1 drift-check post-W3-W2-C-a verify, drift-check helper schema authority dynamic + row 1 fallback ile layout'la yaşıyor)
+**Context:** Workspace W1 bootstrap master.xlsx duplicate header row (row 1 + row 3/4/5 both header). W3-W2-C-a fix `validate_invariants.py` `_resolve_header_row()` helper schema authority dynamic + row 1 fallback (probe match yoksa) ile layout'la birlikte yaşıyor. 4 mekanik header-parse FAIL eliminate (F-01+F-05+F-17+F-18). Q-W3W2B-LAYOUT-01 + Q-DC-LAYOUT-01 paterni reuse — duplicate header row layout normalize ayrı scope.
 **Options:**
-- a) `transaction.consolidate_headers(sheet)` helper (atomic write API) + master.xlsx normalize once-off (single header row 1 + data row 2+, F-01/F-05/F-17/F-18 mekanik FAIL eliminate, idempotent + .bak backup)
-- b) `scripts/state/normalize_master_xlsx.py` CLI tool (pre-W3-W2-C run) — schema-driven layout convention `header_row=1` + data row 2+ enforce
-- c) drift-check skill `header_row` parameter accept config-driven (master-excel.schema.json `header_row_index` field add, drift-check rule `header_row + 1` start) — Q-DC-LAYOUT-01 b paterni reuse
-- d) Phase 14 W3-W2-C pre-flight ADR + Phase 15 audit Wave 1 kategori #2 birleşik scope karar
-**Owner:** karar verici agent (Phase 14 W3-W2-C öncesi pre-flight ZORUNLU, Q-DC-LAYOUT-01 reinforce)
-**Blocking Phase:** Phase 14 W3-W2-C (drift-check post-W3-W2-C real regression detect için master.xlsx layout normalize ön-koşul)
+- a) `transaction.consolidate_headers(sheet)` helper + master.xlsx normalize once-off (single header row schema metadata değer + data row +1, idempotent + .bak backup)
+- b) `scripts/state/normalize_master_xlsx.py` CLI tool (Phase 15 audit run) — schema-driven layout convention enforce
+- c) Mevcut layout kabul + helper logic invariant (W3-W2-C-a fix paterni production-ready, helper schema authority dynamic + row 1 fallback)
+- d) Phase 15 audit Wave 1 layout normalize ADR aday formal decision Süleyman + karar verici layout migration vs helper flexibility tradeoff
+**Owner:** karar verici agent (Phase 15 audit Wave 1 kategori #2 schema cross-check core finding)
+**Blocking Phase:** None (non-blocking, drift-check helper schema-aware production-ready, layout normalize Phase 15 audit scope)
+
+### Q-W3W2C-A-DICTNAME-01: required_columns dict access patterni rules/schema-validation.md codify [LOW]
+**Raised:** 2026-05-05 during Phase 14 W3-W2-C-a worker output (W-N1 Step 0 fix surface)
+**Context:** master-excel.schema.json `required_columns` array entries dict objects (`{col, name, ref, enum}`) — string değil. Eski F-05'te `len(required)` çalışıyordu ama header set comparison kırıktı (`str(c)` literal dict string set'e giriyordu, probe match imkansızdı). W3-W2-C-a fix `_col_name()` extract ile düzeltildi → schema authority dynamic ÇALIŞIR. Future schema validators rules codify aday: schema validators'ın `required_columns` dict access patterni standart convention.
+**Options:**
+- a) `rules/schema-validation.md` (yeni rule R-XX yeni dosya) — schema validators dict access patterni convention single rule + Foundational Principles bağlantı
+- b) Mevcut `rules/skill-description-discipline.md`'e R-XX additive bump — schema validation sub-section ek
+- c) `templates/schema-validator-template.md` placeholder (her yeni schema validator başlangıçta convention scaffolding)
+- d) Phase 15 audit defer (mevcut W3-W2-C-a `_col_name()` extract local pattern v1 release acceptable, post-v1 ADR aday)
+**Owner:** karar verici agent (Phase 15 audit Wave 1 kategori #2 schema cross-check)
+**Blocking Phase:** None (non-blocking, governance polish W3-W3 closure veya Phase 15 audit scope)
+
+### Q-W3W2C-A-F13F16-01: F-13 historical non-int run_id + F-16 quick_wins URL coverage gap gerçek data drift [MEDIUM]
+**Raised:** 2026-05-05 during Phase 14 W3-W2-C-a worker output (W-N1 drift-check post-W3-W2-C-a verify RED 15/2/3, hala RED F-13+F-16 non-mekanik)
+**Context:** drift-check post-W3-W2-C-a fix verdict RED 15/2/3 (4 mekanik header-parse FAIL eliminate F-01+F-05+F-17+F-18 ✓), hala RED çünkü: F-13 (5 historical non-int run_id, baseline carry-forward W3-W2-A append-only protected mop-up imkansız lesson 47 5'inci kategori) + F-16 (36 quick_wins URL not in opportunity, gerçek data drift mekanik değil). Bunlar W3-W2-C-a scope dışı — F-13 historical events.jsonl repair migration; F-16 opportunity sheet expansion (quick_wins URL coverage). Phase 14 W3-W2-C-b veya Phase 15'te addressed.
+**Options:**
+- a) F-13 historical events.jsonl repair migration script (`scripts/migrations/0003_events_run_id_repair.py`) — 5 manual events run_id integer field backfill, append-only YASAK (R-XX hard constraint) → migration semantik dışı, defer
+- b) F-13 events.schema run_id nullable additive bump — historical state acceptable, schema_version bump (1.x patch)
+- c) F-16 opportunity sheet expansion W3-W2-C-b production scope (yeni opportunity row'lar ile quick_wins URL coverage)
+- d) F-16 cross-sheet-invariants F-16 rule "by-design URL divergence" exception flag (kabul markırı, drift-check F-16 status PASS yerine WAIVE)
+- e) Phase 15 audit Wave 1 kategori #2 birleşik scope karar (Q-W3W2B-LAYOUT-01 + Q-DC-LAYOUT-01 + F-13/F-16 layout + data drift hepsi paralel ADR)
+**Owner:** karar verici agent (Phase 14 W3-W2-C-b production scope veya Phase 15 audit Wave 1)
+**Blocking Phase:** None (non-blocking, drift-check verdict RED dikkat çekici ama mekanik değil real data drift bilinçli kabul append-only protected)
+
 
 ### Q-W3W2B-EVENTTYPE-01: events.schema event_type 10-closed-enum vs 13 skill-named ihtiyaç [MEDIUM]
 **Raised:** 2026-05-05 during Phase 14 W3-W2-B manager pre-dispatch finding F-14W3W2B-1 + worker output (W-M1 schema-first override 11'inci uygulama)
@@ -57,16 +81,6 @@
 **Owner:** karar verici agent (Phase 14 W3-W3 backlog non-blocking)
 **Blocking Phase:** None (non-blocking, drift-check F-13 sonuç bilinçli kabul)
 
-### Q-DC-LAYOUT-01: master.xlsx bootstrap layout vs drift-check rule incompatibility (header_row offset)
-**Raised:** 2026-05-05 during Phase 14 W3-W2-A worker output (W-L1 drift-check F-05 surface)
-**Context:** Phase 14 W3-W2-A drift-check post-ingest 9/17 sheet F-05 schema_validation FAIL: header has 0 cols vs schema requires N. Root cause: master.xlsx W1 bootstrap layout convention `rows 1-3 blank + row 4 = header + row 5+ = data` (Phase 9+10 templates/master-excel.xlsx generate paterni reuse, formula_policy=values_only). Drift-check Phase 14 W3-W1 production-ready skill body row 1 read assumption — 0 cols header sayar. Skill rule ile bootstrap layout convention divergence. Phase 15 audit Wave 1 kategori #2 schema cross-check core finding aday.
-**Options:**
-- a) `scripts/bootstrap_excel.py` layout convention change — header row 1, data row 2+ (W1 seed migration gerekli, demo-dental master.xlsx mevcut data row shift)
-- b) drift-check skill `header_row` parameter accept — config-driven (master-excel.schema.json `header_row_index` field add, drift-check rule `header_row + 1` start)
-- c) `cross-sheet-invariants.json` rule `rules` content header_row offset codify (rule-bazlı nuance)
-- d) Phase 15 audit ADR aday — formal decision Süleyman + karar verici W1 seed migration vs skill flexibility tradeoff
-**Owner:** karar verici agent (Phase 15 audit Wave 1 kategori #2)
-**Blocking Phase:** None (non-blocking, drift-check F-05 sonuç bilinçli kabul, Phase 15 audit ADR scope)
 
 ### Q-DC-VERDICT-01: drift-check `aggregate_verdicts` UNKNOWN behavior when FAILs > 0 [LOW]
 **Raised:** 2026-05-05 during Phase 14 W3-W2-A worker output (W-L1 drift-check report inspect)
@@ -136,6 +150,8 @@
 
 
 ## Resolved (last 10 — moved to DECISIONS)
+- **Q-W3W2B-LAYOUT-01 → Phase 14 W3-W2-C-a fix engine 7c83d30 (drift-check helper schema authority dynamic header_row resolve)** — 4 mekanik header-parse FAIL eliminate (F-01+F-05+F-17+F-18). validate_invariants.py `_resolve_header_row()` helper schema authority compile + row 1 fallback. Master.xlsx layout normalize ayrı scope (Q-W3W2C-A-LAYOUT-01 paterni reuse, Phase 15 audit Wave 1 ADR aday).
+- **Q-DC-LAYOUT-01 → Phase 14 W3-W2-C-a fix engine 7c83d30 (drift-check helper schema authority dynamic + row 1 fallback)** — W3-W2-A surface + W3-W2-B reinforce + W3-W2-C-a resolve. drift-check skill body schema-aware production-ready. Layout normalize Phase 15 audit Wave 1 kategori #2 ayrı scope.
 - **Q-CI-W2-01 → atomic commit ed6a40d (Phase 14 W3-W1)** — Governance skill body executability defer scope RESOLVED. 4 SKILL.md body refactor standalone-executable (drift-check 8 + schema-validate 7 + glossary-audit 7 + load-context 8 = 30 Python block helper concat exec EXIT=0 4/4 skill). Lesson 21 4'üncü uygulama worker proaktif `sys.path.insert(0, os.getcwd())` cross-skill convention. GitHub Actions Run 4 14/14 step SUCCESS Phase 14 ilk %100 GREEN run (W2 Run 2/3 Step 1+2+3 AMBER continue-on-error masks → W3-W1 sonrası gerçek runtime PASS). Strict mode (`continue-on-error: false`) geçiş W3-W3 closeout artık kanıtlanmış zemin. Q-CI-W3-01 + Q-CI-W3-02 yeni surface (sys.path convention codify + helper auto-prepend) Phase 14 W3-W2/W3-W3 backlog.
 - **Q-CI-W2-06 → fix commit c522e9f** — Phase 14 W2 post-push CI runtime fix `requirements.txt` 4-line manifest (jsonschema + pytest + openpyxl + pyyaml). `actions/setup-python@v5 cache: pip` cache hash için manifest dosyası gerektirir. Lesson 8 v6 candidate doğum belgesi boyut #12 brief CI runtime requirements cross-check Phase 14 W3+ enforce 12-boyutlu.
 - **Q-015 → ADR-025** — scrapling-output-mapping pattern dependency → templates/scrapling/.gitkeep yaratıldı, schema pattern korundu, sub-schemas Phase 7+ skill'lerle.
