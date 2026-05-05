@@ -166,6 +166,114 @@
 **Owner:** karar verici agent (Phase 14 W2 brief writing, CI yaml convention paralel)
 **Blocking Phase:** Phase 14 W2 (CI pipeline) + Phase 14 W3 (pilot E2E smoke test) — non-blocking W1 deliverable, defer W2-W3 resolve
 
+### Q-PHASE15-RXX-COUNT-01: R-XX invariant sayısı events.jsonl run_id kaç olmalı? [LOW]
+**Raised:** 2026-05-05 during Phase 15 W1 engine audit (W-R worker output)
+**Context:** events.jsonl run_id sequence currently at 64. No spec document defines expected R-XX hard constraint count as of v1.0.0. Brief assumed a specific count that worker had to override via schema-first approach. Phase 15 W4 discipline audit Wave 4 scope: codify expected R-XX count vs actual divergence.
+**Options:**
+- a) Phase 15 W4 audit: codify "R-XX count must match CONTEXT_LEDGER phase count" rule
+- b) Defer to v1.1 planning (non-blocking)
+- c) Accept current count as baseline, document in DECISIONS.md
+**Owner:** karar verici agent (Phase 15 W4 discipline audit)
+**Blocking Phase:** None (LOW, non-blocking)
+
+### Q-PHASE15-EVENTENUM-BRIEF-01: event_type enum brief template yanlış jq path [MEDIUM]
+**Raised:** 2026-05-05 during Phase 15 W1 engine audit (W-R worker output; schema-first override #16)
+**Context:** Phase 15 W1 brief expected jq `.definitions.event_type.enum` — actual path is `.properties.event_type.enum`. Same issue appeared in W2 (`.definitions.audit_action.enum` → `.properties.audit_action.enum`). Brief template pattern for schema enum checks consistently uses wrong jq path. Worker must do Python fallback each time. Codify correct jq path pattern in audit brief templates (rules/skills.md or lesson 8 v8 Section update).
+**Options:**
+- a) Phase 15 W4: add jq path verification step to audit brief template (Section 8 cross-check)
+- b) Add new lesson 8 sub-dimension: "jq path pre-verify before brief dispatch"
+- c) Codify correct `.properties.<field>.enum` pattern in rules/skills.md
+**Owner:** karar verici agent (Phase 15 W4 lesson 8 evolution audit)
+**Blocking Phase:** None (MEDIUM, non-blocking but causing schema-first overrides)
+
+### Q-PHASE15-EVENTSCHEMA-AUDIT-BRIEF-01: audit_run enum presence cross-check brief instruction ambiguity [LOW]
+**Raised:** 2026-05-05 during Phase 15 W1 engine audit (W-R worker)
+**Context:** Brief instructed to verify `audit_run` in `event_type` enum but `event_kind=audit` events MUST NOT carry `event_type` per ADR-020 + rules/events-writer.md. The brief instruction was contradictory — audit events use `event_kind=audit` not `event_type=audit_run`. Worker (Q-W3W3α-EVENTSCHEMA-01 resolution) clarified: SKILL.md lines 96-103 correctly documents `event_kind=audit` must NOT carry `event_type`. Brief template improvement needed.
+**Options:**
+- a) Update Phase 15 W4 audit brief template to not ask event_type cross-check for audit events
+- b) Add clarification note in rules/events-writer.md Section 5 (event_kind=audit vs event_type disambiguation)
+**Owner:** karar verici agent (Phase 15 W4 audit)
+**Blocking Phase:** None (LOW, cosmetic brief template improvement)
+
+### Q-PHASE15-DOC-STALE-01: WORKFLOWS.md skill status column tümü 'planned' — stale since Phase 0 [MEDIUM]
+**Raised:** 2026-05-05 during Phase 15 W2 workspace audit (W-S3 worker output)
+**Context:** `docs/WORKFLOWS.md` has a status column for all 43 skills showing `planned` since Phase 0 bootstrap. Current state: all 43 skills are production-ready and deployed. The stale status column creates false impression of incomplete implementation. Phase 15 W5 strategic audit scope (UX + docs category).
+**Options:**
+- a) Phase 15 W5: update WORKFLOWS.md status column for all 43 skills to `active`
+- b) Remove status column entirely (avoid future staleness — YAGNI)
+- c) Add "last_updated" timestamp to WORKFLOWS.md header only
+**Owner:** karar verici agent (Phase 15 W5 docs audit)
+**Blocking Phase:** None (MEDIUM, docs staleness, non-blocking)
+
+### Q-PHASE15-ARCHIVE-INTEG-01: archive skill integration cross-check — 43 skills reference archive correctly? [MEDIUM]
+**Raised:** 2026-05-05 during Phase 15 W2 workspace audit (W-S3 worker output)
+**Context:** `archive` command exists in workspace `.claude/commands/`. Skills that produce final outputs (monthly-report, competitive-analysis, etc.) should reference archive workflow. W-S3 noted that not all skills explicitly document the archive step. Phase 15 W5 UX completeness audit scope.
+**Options:**
+- a) Phase 15 W5: audit all 43 SKILL.md files for archive step reference
+- b) Add archive reference to rules/skills.md as convention (output-producing skills must reference archive)
+- c) Defer to v1.1 (UX polish)
+**Owner:** karar verici agent (Phase 15 W5 UX audit)
+**Blocking Phase:** None (MEDIUM, UX completeness, non-blocking)
+
+### Q-PHASE15-ADR-CLOSURE-01: ADR-004 + ADR-005 formal closure after soak window [LOW]
+**Raised:** 2026-05-05 during Phase 15 W1 engine audit (W-R worker)
+**Context:** ADR-004 (old repo deletion after v1 acceptance + 1 week soak) and ADR-005 (workspace repo timing) both have soak window conditions. ADR-004 soak window: 2026-05-05..2026-05-12. After 2026-05-12, Süleyman confirms old repo deletion → ADR-004 formally CLOSED. ADR-005 workspace created Phase 14 → condition met → ADR-005 CLOSED pending formal closeout commit.
+**Options:**
+- a) 2026-05-12+: engine closeout commit marking ADR-004 + ADR-005 CLOSED in DECISIONS.md
+- b) Combined Phase 15 closeout commit post-W5 audit complete
+**Owner:** karar verici agent (2026-05-12 soak window expiry)
+**Blocking Phase:** None (LOW, administrative closure, non-blocking)
+
+### Q-PHASE15-NODEJS-01: GitHub Actions Node.js 20 deprecation — forced migration by 2026-06-02 [MEDIUM]
+**Raised:** 2026-05-05 during Phase 15 W3 CI pipeline audit (W-C3 worker output; cat18-ci-pipeline.md)
+**Context:** GitHub Actions will force Node.js 24 as default from 2026-06-02 (28 days from today). Affects `actions/checkout@v4` and `actions/setup-python@v5` which run Node.js 20 internally. Currently not breaking but will require action before deadline. Verify if `@v4`/`@v5` already support Node.js 24 or upgrade to `@v5`/`@v6`.
+**Options:**
+- a) Verify `actions/checkout@v4` + `actions/setup-python@v5` Node.js 24 support (may already work)
+- b) Upgrade to `actions/checkout@v5` + `actions/setup-python@v6` before 2026-06-02
+- c) Pin SHA to specific Node.js 24 compatible tag
+**Owner:** karar verici agent (before 2026-06-02 — hard deadline)
+**Blocking Phase:** None currently, but becomes blocking after 2026-06-02
+
+### Q-PHASE15-NPMPIN-01: npx -y MCP server commands unpinned — silent breaking change risk [LOW]
+**Raised:** 2026-05-05 during Phase 15 W3 external dependency audit (W-C2 worker output; cat17-external-dependency.md)
+**Context:** `.mcp.json` gsc server: `npx -y mcp-server-gsc` and dataforseo server: `npx -y dataforseo-mcp-server` both fetch latest npm package on every invocation. Silent breaking changes possible if package authors push a major update. ScraplingServer uses local binary (not affected).
+**Options:**
+- a) Pin to specific versions: `npx -y mcp-server-gsc@1.x.x` and `npx -y dataforseo-mcp-server@2.8.9`
+- b) Defer (current packages stable, low risk for now)
+- c) Add npm version pin audit to Phase 15 W5 maintenance checklist
+**Owner:** karar verici agent (Phase 15 W5 or v1.1 maintenance)
+**Blocking Phase:** None (LOW, latent risk only)
+
+### Q-PHASE15-LOCKFILE-01: requirements.txt soft pins (>=) — no lock file for reproducible installs [LOW]
+**Raised:** 2026-05-05 during Phase 15 W3 external dependency audit (W-C2 worker output; cat17-external-dependency.md)
+**Context:** `requirements.txt` uses `>=` lower bounds only (jsonschema>=4.0, pytest>=7.0, openpyxl>=3.1, pyyaml>=6.0). No `requirements-lock.txt` or `pip freeze` snapshot exists. Latent risk: silent breaking changes on fresh installs if major versions released. Currently: all 4 packages installed and functional (pytest 9.0.3 vs >=7.0 floor = fine).
+**Options:**
+- a) Add `requirements-lock.txt` via `pip freeze > requirements-lock.txt` for reproducible CI installs
+- b) Keep soft pins (current working, acceptable for this project's risk profile)
+- c) Switch to `pyproject.toml` with dependency groups (over-engineering for current scope)
+**Owner:** karar verici agent (v1.1 maintenance or Phase 15 W5)
+**Blocking Phase:** None (LOW, quality improvement only)
+
+### Q-PHASE15-BUDGET-COST-01: check_budget.py reads cost.credits but dfs_pull.py never populates it [MEDIUM]
+**Raised:** 2026-05-05 during Phase 15 W3 cost+budget audit (W-C4 worker output; cat20-cost-budget.md)
+**Context:** `check_budget.py` reads `cost.credits` per events.schema.json ADR-017 definition. But `dfs_pull.py` provenance event writer never populates the `cost` field — credits are written only to `source.credits_used`. Result: `check_budget.py` always reports `used_24h=0` regardless of actual DFS spend. Budget guard is structurally sound but not active in practice. Fix: dfs_pull.py should write `cost: {"provider": "dataforseo", "credits": source.credits_used}` when writing provenance events.
+**Options:**
+- a) Fix dfs_pull.py to populate `cost.credits` from `source.credits_used` in provenance event writer
+- b) Update check_budget.py to also check `source.credits_used` as fallback (dual-field approach)
+- c) Defer (current DFS usage minimal, no over-spend risk yet)
+**Owner:** karar verici agent (Phase 15 W5 or v1.1 — medium priority, no immediate risk)
+**Blocking Phase:** None (MEDIUM, budget guard inactive but usage minimal)
+
+### Q-PHASE15-SECRETS-FP-01: check_secrets.sh false positives on test fixtures — exits FAIL [LOW]
+**Raised:** 2026-05-05 during Phase 15 W3 security audit (W-C2 worker output; cat16-security-kvkk.md)
+**Context:** `check_secrets.sh` exits FAIL (3 findings) but all 3 are false positives: (1) synthetic `ghp_abcdefghijklmnopqrstuvwxyz0123456789` token in `tests/scripts/test_events_writer.py:195` is a test fixture for redaction verification; (2) `DATAFORSEO_PASSWORD=` pattern in `tests/ci/test_ci_yaml.py:117,129` is a negative-assertion security test; (3) `.env` file warning (correctly gitignored). No real credentials exposed.
+**Options:**
+- a) Add `# nosec` annotations to known-good test lines (tool-standard approach)
+- b) Add check_secrets.sh allowlist entries for test fixture paths
+- c) Accept FAIL exit as expected (document known false positives, no fix needed)
+- d) Rewrite check_secrets.sh with context-aware pattern matching
+**Owner:** karar verici agent (Phase 15 W5 tooling audit)
+**Blocking Phase:** None (LOW, false positive only, no real security risk)
 
 
 ## Resolved (last 10 — moved to DECISIONS)
