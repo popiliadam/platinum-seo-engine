@@ -125,9 +125,25 @@ only to `outputs/reports/{date}-glossary-audit.md` and
 ### Step 1 — `parse_glossary` (DURUR #1)
 
 ```python
-glossary_text = Path(glossary_path).read_text(encoding="utf-8")
-# Pattern: "- **TermName** — definition"
+# Standalone-executable entrypoint (Phase 14 W3-W1 helper exec compliance):
+# imports + entrypoint variables init for downstream concat blocks.
+import os
+import sys
 import re
+from pathlib import Path
+
+# sys.path insert so `scripts.*` packages resolve under subprocess exec.
+sys.path.insert(0, os.getcwd())
+
+# Entrypoint variables (placeholder defaults — orchestrator overrides at runtime)
+glossary_path = Path("docs/GLOSSARY.md")
+spec_path = Path("docs/superpowers/specs/2026-04-30-platinum-seo-engine-design.md")
+reference_index_path = Path("docs/REFERENCE_INDEX.md")
+project_id = "drifttest"
+REPO_ROOT = Path.cwd()
+
+glossary_text = glossary_path.read_text(encoding="utf-8")
+# Pattern: "- **TermName** — definition"
 term_pattern = re.compile(r"^- \*\*([^\*]+)\*\*", re.MULTILINE)
 glossary_terms = set(term_pattern.findall(glossary_text))
 if not glossary_terms:
@@ -141,7 +157,7 @@ Disiplin #8. The skill counts ~20 terms typical (manager kanıt #12 =
 ### Step 2 — `extract_spec_section_20`
 
 ```python
-spec_text = Path(spec_path).read_text(encoding="utf-8")
+spec_text = spec_path.read_text(encoding="utf-8")
 # Find "## 20." section bounded by next "## " header
 section_re = re.compile(r"^## 20\.[^\n]*\n(.*?)(?=^## \d+\.)", re.MULTILINE | re.DOTALL)
 m = section_re.search(spec_text)
@@ -156,7 +172,7 @@ superset (Phase 0 bootstrap added some + Phase 5+ adds more).
 ### Step 3 — `verify_reference_index_anchor`
 
 ```python
-ref_index_text = (Path("docs") / "REFERENCE_INDEX.md").read_text(encoding="utf-8")
+ref_index_text = reference_index_path.read_text(encoding="utf-8")
 # Heading-link integrity: REFERENCE_INDEX should mention "GLOSSARY.md"
 assert "GLOSSARY.md" in ref_index_text, (
     "REFERENCE_INDEX missing glossary anchor"
@@ -169,7 +185,7 @@ glossary anchor MUST be present (link integrity).
 ### Step 4 — `scan_skill_bodies_for_terms`
 
 ```python
-skill_terms_used: dict[str, list[Path]] = {}
+skill_terms_used: dict = {}
 for skill_md in (REPO_ROOT / "skills").rglob("SKILL.md"):
     text = skill_md.read_text(encoding="utf-8")
     # Strip frontmatter to focus on body prose
@@ -237,13 +253,21 @@ Write `outputs/reports/{date}-glossary-audit.md`:
 
 ```python
 from scripts.state import events_writer
-events_writer.append_audit(
-    project_id=project_id,
-    audit_action="accessed",
-    audit_target="docs:glossary-audit",
-    actor="agent:glossary-audit",
-    notes=f"orphans={len(orphan_terms)} missing={len(missing_terms)}",
-)
+# Documented invocation (orchestrator runs at workflow time):
+# events_writer.append_audit(
+#     project_id=project_id,
+#     audit_action="accessed",
+#     audit_target="docs:glossary-audit",
+#     actor="agent:glossary-audit",
+#     notes=f"orphans={len(orphan_terms)} missing={len(missing_terms)}",
+# )
+audit_payload = {
+    "event_kind": "audit",
+    "audit_action": "accessed",
+    "audit_target": "docs:glossary-audit",
+    "actor": "agent:glossary-audit",
+    "notes": f"orphans={len(orphan_terms)} missing={len(missing_terms)}",
+}
 ```
 
 `event_kind=audit` requires the `audit_action + audit_target + actor`
