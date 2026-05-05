@@ -123,23 +123,80 @@ def _has_sheet(workbook: Any, name: str) -> bool:
         return False
 
 
+def _resolve_header_row(workbook: Any, sheet: str) -> int:
+    """Phase 14 W3-W2-C-a: resolve the effective header row for `sheet` by
+    consulting `schemas/master-excel.schema.json` first, falling back to row 1.
+
+    Logic:
+      1. If schema declares `sheets[sheet].header_row` as an int and the
+         workbook's row at that index has at least one non-None cell whose
+         text matches one of the schema's `required_columns`, trust schema.
+      2. Otherwise (legacy / synthetic test workbook with header at row 1),
+         return 1.
+
+    This keeps existing tests (header at row 1) PASS while enabling W1
+    bootstrap workbooks (header at row 3/4/5 per schema) to validate
+    without 4 mechanical header-parse FAILs (F-01/F-05/F-17/F-18).
+    """
+    try:
+        schema = _load_master_excel_schema()
+    except Exception:
+        return 1
+    sdef = schema.get("sheets", {}).get(sheet) or {}
+    hr = sdef.get("header_row")
+    if not isinstance(hr, int) or hr <= 0:
+        return 1
+    required = sdef.get("required_columns") or []
+    if not required:
+        return 1
+    if not _has_sheet(workbook, sheet):
+        return 1
+    ws = workbook[sheet]
+    try:
+        # Probe the schema-declared header row using openpyxl's read-only
+        # iter_rows (min_row/max_row inclusive, 1-indexed).
+        probe = next(ws.iter_rows(min_row=hr, max_row=hr, values_only=True))
+    except (StopIteration, Exception):
+        return 1
+    if probe is None:
+        return 1
+    # required_columns entries are dicts ({"col","name",...}); extract name.
+    def _col_name(c: Any) -> str:
+        if isinstance(c, dict):
+            return str(c.get("name") or "").strip()
+        return str(c).strip()
+
+    required_set = {n for n in (_col_name(c) for c in required) if n}
+    probe_set = {str(c).strip() for c in probe if c is not None}
+    # Require at least 50% header match to trust schema header_row.
+    if required_set and probe_set:
+        overlap = len(required_set & probe_set)
+        if overlap >= max(1, len(required_set) // 2):
+            return hr
+    return 1
+
+
 def _iter_rows_as_dicts(workbook: Any, sheet: str) -> list[dict]:
     """Read sheet header row + data rows; return list of dicts keyed
     by header column name. Returns [] if sheet missing or has 0 data rows.
-    Read-only friendly (uses iter_rows + values_only=True)."""
+    Read-only friendly (uses iter_rows + values_only=True).
+
+    Phase 14 W3-W2-C-a: header row is resolved via `_resolve_header_row`
+    (schema authority dynamic, fallback to row 1)."""
     if not _has_sheet(workbook, sheet):
         return []
     ws = workbook[sheet]
-    rows_iter = ws.iter_rows(values_only=True)
+    header_row_idx = _resolve_header_row(workbook, sheet)
     try:
-        header = next(rows_iter)
+        header_tuple = next(ws.iter_rows(
+            min_row=header_row_idx, max_row=header_row_idx, values_only=True))
     except StopIteration:
         return []
-    if header is None:
+    if header_tuple is None:
         return []
-    headers = [str(h) if h is not None else "" for h in header]
+    headers = [str(h) if h is not None else "" for h in header_tuple]
     out: list[dict] = []
-    for row in rows_iter:
+    for row in ws.iter_rows(min_row=header_row_idx + 1, values_only=True):
         if row is None:
             continue
         if all(c is None for c in row):
@@ -339,7 +396,13 @@ def check_F_04(workbook: Any, project_slug: str, **_) -> dict:
 def check_F_05(workbook: Any, project_slug: str, **_) -> dict:
     """schema_version field per-sheet present: every present sheet has a
     header row whose column count matches the master-excel schema's
-    required_columns."""
+    required_columns.
+
+    Phase 14 W3-W2-C-a: header row index resolved via schema authority
+    (`_resolve_header_row`) — fallback to row 1 for legacy/synthetic
+    workbooks. Eliminates the 4 mechanical header-parse FAILs
+    (F-01/F-05/F-17/F-18) seen on W1 bootstrap workspace master.xlsx where
+    sheets use header_row=3/4/5 per schema."""
     rule = "every sheet present in workbook matches its master-excel.schema header column count"
     schema = _load_master_excel_schema()
     sheets_def = schema.get("sheets", {})
@@ -353,15 +416,21 @@ def check_F_05(workbook: Any, project_slug: str, **_) -> dict:
         if not required:
             continue  # dashboard uses required_cells, not required_columns
         ws = workbook[sheet_name]
+        header_row_idx = _resolve_header_row(workbook, sheet_name)
         try:
-            header = next(ws.iter_rows(values_only=True))
+            header = next(ws.iter_rows(
+                min_row=header_row_idx, max_row=header_row_idx,
+                values_only=True))
         except StopIteration:
-            bad.append(f"{sheet_name}: no header row")
+            bad.append(f"{sheet_name}: no header row at row {header_row_idx}")
+            continue
+        if header is None:
+            bad.append(f"{sheet_name}: no header row at row {header_row_idx}")
             continue
         n_header = sum(1 for h in header if h is not None)
         if n_header != len(required):
-            bad.append(f"{sheet_name}: header has {n_header} cols, "
-                       f"schema requires {len(required)}")
+            bad.append(f"{sheet_name}: header at row {header_row_idx} has "
+                       f"{n_header} cols, schema requires {len(required)}")
         checked += 1
     if checked == 0:
         return _make_result(

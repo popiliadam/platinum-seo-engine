@@ -289,7 +289,7 @@ def check_F_XX(workbook, project_slug) -> dict:
 | F-02  | dashboard formula `=COUNTIF(...)` drift check (sheet missing → AMBER skip) |
 | F-03  | dashboard formula `=SUMIF(...)` drift check                           |
 | F-04  | dashboard formula `=AVERAGEIF(...)` drift check                       |
-| F-05  | schema_version field per-sheet present (every schema-known sheet has a header row matching schema column count) |
+| F-05  | schema_version field per-sheet present (every schema-known sheet has a header row matching schema column count; header row resolved via schema authority `sheets[sheet].header_row` with row-1 fallback — Phase 14 W3-W2-C-a) |
 
 ### HIGH (10)
 
