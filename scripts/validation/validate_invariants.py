@@ -963,11 +963,20 @@ def check_F_18(workbook: Any, project_slug: str, **_) -> dict:
 
 def check_F_19(workbook: Any, project_slug: str, *,
                workspace_root: Path | None = None, **_) -> dict:
-    """Optional field default present: project.config.json carries
-    locale + market keys (so downstream skills don't drop into None
-    branches). Defaults are dotted: defaults.locale / defaults.market
-    OR root-level locale / market."""
-    rule = "project.config.json declares locale + market (root or defaults.*)"
+    """project.config.json carries the canonical locale + market keys per
+    schema 1.3 (ADR-030 / Migration 0003 / project-config.schema.json):
+    nested ``language.content_locale`` (IETF BCP 47) + root ``market``.
+
+    Wave 2 fix (Q-WAVE1-F19-VALIDATOR-01): pre-2026-05-06 implementation
+    read root-level ``locale``/``defaults.locale`` (schema 1.2 paths);
+    schema 1.3 made root ``locale`` forbidden via
+    ``additionalProperties: false`` and moved the value to
+    ``language.content_locale``. Only the 1.3 canonical path is read.
+    """
+    rule = (
+        "project.config.json declares language.content_locale (nested) "
+        "+ market (root) per schema 1.3"
+    )
     pdir = _project_dir(project_slug, workspace_root)
     cfg_path = pdir / "project.config.json"
     if not cfg_path.exists():
@@ -984,11 +993,14 @@ def check_F_19(workbook: Any, project_slug: str, *,
             evidence=f"project.config.json unparseable: {exc}",
             rule=rule, category="schema_validation",
         )
-    defaults = cfg.get("defaults") or {}
-    has_locale = bool(cfg.get("locale") or defaults.get("locale"))
-    has_market = bool(cfg.get("market") or defaults.get("market"))
+    language = cfg.get("language") or {}
+    has_locale = bool(language.get("content_locale"))
+    has_market = bool(cfg.get("market"))
     missing = [
-        k for k, ok in (("locale", has_locale), ("market", has_market))
+        k for k, ok in (
+            ("language.content_locale", has_locale),
+            ("market", has_market),
+        )
         if not ok
     ]
     if missing:
@@ -1000,7 +1012,9 @@ def check_F_19(workbook: Any, project_slug: str, *,
         )
     return _make_result(
         id_="F-19", severity="MEDIUM", verdict="PASS",
-        evidence="project.config.json declares both locale and market",
+        evidence=(
+            "project.config.json declares language.content_locale + market"
+        ),
         rule=rule, category="schema_validation",
     )
 
