@@ -195,7 +195,7 @@
 **Owner:** karar verici agent (Phase 15 W4 audit)
 **Blocking Phase:** None (LOW, cosmetic brief template improvement)
 
-### Q-PHASE15-DOC-STALE-01: WORKFLOWS.md skill status column tümü 'planned' — stale since Phase 0 [MEDIUM]
+### Q-PHASE15-DOC-STALE-01: WORKFLOWS.md skill status column tümü 'planned' — stale since Phase 0 [MEDIUM] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 15 W2 workspace audit (W-S3 worker output)
 **Context:** `docs/WORKFLOWS.md` has a status column for all 43 skills showing `planned` since Phase 0 bootstrap. Current state: all 43 skills are production-ready and deployed. The stale status column creates false impression of incomplete implementation. Phase 15 W5 strategic audit scope (UX + docs category).
 **Options:**
@@ -204,6 +204,7 @@
 - c) Add "last_updated" timestamp to WORKFLOWS.md header only
 **Owner:** karar verici agent (Phase 15 W5 docs audit)
 **Blocking Phase:** None (MEDIUM, docs staleness, non-blocking)
+**→ RESOLVED 2026-05-06 engine `92ece0e`:** Option a applied. All 43 skill entries `planned` → `active`, header updated to reflect v1.0.0 release status.
 
 ### Q-PHASE15-ARCHIVE-INTEG-01: archive skill integration cross-check — 43 skills reference archive correctly? [MEDIUM]
 **Raised:** 2026-05-05 during Phase 15 W2 workspace audit (W-S3 worker output)
@@ -224,17 +225,18 @@
 **Owner:** karar verici agent (2026-05-12 soak window expiry)
 **Blocking Phase:** None (LOW, administrative closure, non-blocking)
 
-### Q-PHASE15-NODEJS-01: GitHub Actions Node.js 20 deprecation — forced migration by 2026-06-02 [MEDIUM]
+### Q-PHASE15-NODEJS-01: GitHub Actions Node.js 20 deprecation — forced migration by 2026-06-02 [MEDIUM] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 15 W3 CI pipeline audit (W-C3 worker output; cat18-ci-pipeline.md)
 **Context:** GitHub Actions will force Node.js 24 as default from 2026-06-02 (28 days from today). Affects `actions/checkout@v4` and `actions/setup-python@v5` which run Node.js 20 internally. Currently not breaking but will require action before deadline. Verify if `@v4`/`@v5` already support Node.js 24 or upgrade to `@v5`/`@v6`.
 **Options:**
 - a) Verify `actions/checkout@v4` + `actions/setup-python@v5` Node.js 24 support (may already work)
-- b) Upgrade to `actions/checkout@v5` + `actions/setup-python@v6` before 2026-06-02
+- b) Upgrade to `actions/checkout@v5` + `actions/setup-python@v6` before 2026-06-02 ← **APPLIED**
 - c) Pin SHA to specific Node.js 24 compatible tag
 **Owner:** karar verici agent (before 2026-06-02 — hard deadline)
 **Blocking Phase:** None currently, but becomes blocking after 2026-06-02
+**→ RESOLVED 2026-05-06 engine `bc9391c`:** Option b applied. ci.yml: `actions/checkout@v4` → `@v5`, `actions/setup-python@v5` → `@v6`. 610 tests PASS.
 
-### Q-PHASE15-NPMPIN-01: npx -y MCP server commands unpinned — silent breaking change risk [LOW]
+### Q-PHASE15-NPMPIN-01: npx -y MCP server commands unpinned — silent breaking change risk [LOW] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 15 W3 external dependency audit (W-C2 worker output; cat17-external-dependency.md)
 **Context:** `.mcp.json` gsc server: `npx -y mcp-server-gsc` and dataforseo server: `npx -y dataforseo-mcp-server` both fetch latest npm package on every invocation. Silent breaking changes possible if package authors push a major update. ScraplingServer uses local binary (not affected).
 **Options:**
@@ -243,6 +245,7 @@
 - c) Add npm version pin audit to Phase 15 W5 maintenance checklist
 **Owner:** karar verici agent (Phase 15 W5 or v1.1 maintenance)
 **Blocking Phase:** None (LOW, latent risk only)
+**→ RESOLVED 2026-05-06 engine `bc9391c`:** Option a applied. `.mcp.json` pinned: `mcp-server-gsc@0.3.0`, `dataforseo-mcp-server@2.8.10`. F-16 baseline updated 469→482B.
 
 ### Q-PHASE15-LOCKFILE-01: requirements.txt soft pins (>=) — no lock file for reproducible installs [LOW]
 **Raised:** 2026-05-05 during Phase 15 W3 external dependency audit (W-C2 worker output; cat17-external-dependency.md)
@@ -254,7 +257,7 @@
 **Owner:** karar verici agent (v1.1 maintenance or Phase 15 W5)
 **Blocking Phase:** None (LOW, quality improvement only)
 
-### Q-PHASE15-BUDGET-COST-01: check_budget.py reads cost.credits but dfs_pull.py never populates it [MEDIUM]
+### Q-PHASE15-BUDGET-COST-01: check_budget.py reads cost.credits but dfs_pull.py never populates it [MEDIUM] ℹ️ SELF-RESOLVED (code correct)
 **Raised:** 2026-05-05 during Phase 15 W3 cost+budget audit (W-C4 worker output; cat20-cost-budget.md)
 **Context:** `check_budget.py` reads `cost.credits` per events.schema.json ADR-017 definition. But `dfs_pull.py` provenance event writer never populates the `cost` field — credits are written only to `source.credits_used`. Result: `check_budget.py` always reports `used_24h=0` regardless of actual DFS spend. Budget guard is structurally sound but not active in practice. Fix: dfs_pull.py should write `cost: {"provider": "dataforseo", "credits": source.credits_used}` when writing provenance events.
 **Options:**
@@ -263,8 +266,9 @@
 - c) Defer (current DFS usage minimal, no over-spend risk yet)
 **Owner:** karar verici agent (Phase 15 W5 or v1.1 — medium priority, no immediate risk)
 **Blocking Phase:** None (MEDIUM, budget guard inactive but usage minimal)
+**→ NOTE 2026-05-06:** Audit finding was inaccurate. `skills/ingestion/dfs-pull/SKILL.md` Step 9 already calls `events_writer.append_provenance(..., cost={"provider":"dataforseo","credits":float(estimate),...})`. `check_budget.py._extract_credits()` correctly reads this. Old events (run_id=null, pre-Phase 14 enforcement) had cost=null — historical only. New runs populate correctly. Estimate used (not actual API credits), acceptable for budget tracking. No code fix needed.
 
-### Q-PHASE15-SECRETS-FP-01: check_secrets.sh false positives on test fixtures — exits FAIL [LOW]
+### Q-PHASE15-SECRETS-FP-01: check_secrets.sh false positives on test fixtures — exits FAIL [LOW] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 15 W3 security audit (W-C2 worker output; cat16-security-kvkk.md)
 **Context:** `check_secrets.sh` exits FAIL (3 findings) but all 3 are false positives: (1) synthetic `ghp_abcdefghijklmnopqrstuvwxyz0123456789` token in `tests/scripts/test_events_writer.py:195` is a test fixture for redaction verification; (2) `DATAFORSEO_PASSWORD=` pattern in `tests/ci/test_ci_yaml.py:117,129` is a negative-assertion security test; (3) `.env` file warning (correctly gitignored). No real credentials exposed.
 **Options:**
@@ -274,6 +278,7 @@
 - d) Rewrite check_secrets.sh with context-aware pattern matching
 **Owner:** karar verici agent (Phase 15 W5 tooling audit)
 **Blocking Phase:** None (LOW, false positive only, no real security risk)
+**→ RESOLVED 2026-05-06 engine `bc9391c`:** Option b applied. Added `ghp_[a-zA-Z0-9]{36}` to pattern + exclusions for `tests/scripts/test_events_writer.py`, `tests/ci/test_ci_yaml.py`, `docs/OPEN_QUESTIONS.md`. check_secrets.sh EXIT 0 verified.
 
 ### Q-PHASE15-CTXLEDGER-01: CONTEXT_LEDGER.md 288KB — compression/archiving strategy [LOW]
 **Raised:** 2026-05-05 during Phase 15 W4 performance audit (W-D3 worker output; cat25-performance-regression.md)
@@ -314,7 +319,7 @@
 **Owner:** karar verici agent (v1.1 UX investigation)
 **Blocking Phase:** None currently (engine works without plugin.json), but blocks formal plugin distribution
 
-### Q-PHASE15-BRAND-CONFIG-01: brand_identity config uses non-canonical keys (hitap/tone vs pronoun_preference/formality) [MEDIUM]
+### Q-PHASE15-BRAND-CONFIG-01: brand_identity config uses non-canonical keys (hitap/tone vs pronoun_preference/formality) [MEDIUM] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 15 W5 i18n audit (W-E2 worker output; cat28-i18n.md)
 **Context:** `projects/demo-dental/config/project.config.json` stores brand tone as `brand_identity.hitap: "siz"` and `brand_identity.tone: "semi-pro"`. Skills reading canonical keys `pronoun_preference` and `formality` will get null. The schema may have both old and new key conventions. Risk: skill execution uses wrong keys → tone enforcement gap.
 **Options:**
@@ -323,8 +328,9 @@
 - c) Schema additive: add both old + new keys as aliases in project.config.schema.json
 **Owner:** karar verici agent (v1.1 schema/config normalization)
 **Blocking Phase:** None (produces null reads, not crash), but affects tone enforcement in content skills
+**→ RESOLVED 2026-05-06 workspace `eca13c5`:** Option a applied. demo-dental `project.config.json` `hitap` → `pronoun_preference`, `tone` → `formality`. Skills reading canonical keys now get correct values.
 
-### Q-PHASE15-INSTALL-STALE-01: INSTALL.md shows alpha v0.1.0/Phase 0 — needs v1.0.0 update [MEDIUM]
+### Q-PHASE15-INSTALL-STALE-01: INSTALL.md shows alpha v0.1.0/Phase 0 — needs v1.0.0 update [MEDIUM] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 15 W5 UX smoke test (W-E1 worker output; cat27-ux-smoke.md)
 **Context:** Engine `docs/INSTALL.md` still shows `alpha (v0.1.0) / Phase 0 active` status. Engine shipped v1.0.0 on 2026-05-05. Missing content: pip install step, real MCP server setup procedure, Python/Node pinned versions. INSTALL.md is the first document a new user reads — stale version creates false impression of incomplete system.
 **Options:**
@@ -332,8 +338,9 @@
 - b) Combined README+INSTALL+CONTRIBUTING doc update in single v1.1 commit
 **Owner:** karar verici agent (v1.1 documentation sprint)
 **Blocking Phase:** None (functional gap, not technical; existing users unaffected)
+**→ RESOLVED 2026-05-06 engine `92ece0e`:** Full v1.0.0 rewrite applied. Alpha/Phase-0 content removed. Real setup flow, credential table, troubleshooting section added.
 
-### Q-PHASE15-ENV-MISSING-01: .env.example missing PSE_WORKSPACE_PATH + Higgsfield credential [LOW]
+### Q-PHASE15-ENV-MISSING-01: .env.example missing PSE_WORKSPACE_PATH + Higgsfield credential [LOW] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 15 W5 UX smoke test (W-E1 worker output; cat27-ux-smoke.md)
 **Context:** Engine `.env.example` has 4 vars (GOOGLE_APPLICATION_CREDENTIALS, DATAFORSEO_USERNAME, DATAFORSEO_PASSWORD, SCRAPLING_BIN). Missing: `PSE_WORKSPACE_PATH` (referenced in INSTALL.md as workspace env var) and any Higgsfield credential (if Higgsfield MCP requires API key in .env). Not security risk (no real credentials exposed), but new users won't know to set these.
 **Options:**
@@ -341,6 +348,7 @@
 - b) Accept current 4-var state (PSE_WORKSPACE_PATH set separately, Higgsfield via .claude settings)
 **Owner:** karar verici agent (v1.1 documentation sprint)
 **Blocking Phase:** None (LOW, new user onboarding gap only)
+**→ RESOLVED 2026-05-06 engine `bc9391c`:** Option a applied. `PSE_WORKSPACE_PATH` + `HIGGSFIELD_API_KEY` placeholder entries added to `.env.example`.
 
 ### Q-PHASE15-AIO-COMPETITOR-01: aio-competitor-map skill has no matching transform script — LLM-native undocumented [LOW]
 **Raised:** 2026-05-05 during Phase 15 W5 atıl alan audit (W-E1 worker output; cat26-atil-alan.md)
