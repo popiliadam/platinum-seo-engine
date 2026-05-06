@@ -2,7 +2,19 @@
 
 ## Unresolved
 
-### Q-WAVE2-DATA-HYGIENE-01: F-16 quick_wins URL coverage + F-17 severity cells (Wave 3 scope) [MEDIUM]
+### Q-V1.2-OPP-COVERAGE-01: F-16 quick_wins URL coverage in opportunity sheet [HIGH]
+**Raised:** 2026-05-06 during v1.1-FIX-WAVE-3 Task 3.4 (Q-WAVE2-DATA-HYGIENE-01 split-out).
+**Context:** Validator-true F-16 finding: 36 `quick_wins.url` values are not present in `opportunity.assigned_url_action` URL set. The opportunity sheet has 211 distinct URLs but they are a disjoint set from the 36 quick_wins URLs — opportunity is keyed on `(query, opportunity_score, ..., assigned_url_action)` so each row encodes a search query + the URL recommended to optimize for it. Adding 36 placeholder rows would require generating realistic `query`/`opportunity_score`/`current_position` values per URL — that is **SEO domain knowledge**, not a mechanical script. Code-driven hygiene cannot resolve without data engineering input.
+**Options:**
+- a) Re-run `quick-wins` skill against current GSC data — opportunity sheet should populate naturally if the underlying ingestion produced the same URL set
+- b) Run a scoped DataForSEO `keyword_overview` for each of the 36 URLs to back-fill query + score columns, then append to opportunity via `transaction.append`
+- c) Accept divergence as by-design; relax F-16 invariant in `cross-sheet-invariants.json` with a documented exception (similar to Phase 16 Q-W3W2C-A-F13F16-01 pattern)
+- d) Manual SEO triage by Süleyman (which queries map to which URLs?) → CSV → ingest via `transaction.append`
+**Owner:** karar verici agent (v1.2 SEO data engineering scope)
+**Blocking Phase:** None (drift-check AMBER acceptable for v1.1; Q-WAVE2-DATA-HYGIENE-01 supersede candidate after v1.2 closure)
+
+### Q-WAVE2-DATA-HYGIENE-01: F-16 quick_wins URL coverage + F-17 severity cells [MEDIUM] ✅ PARTIAL RESOLVED 2026-05-06
+**→ PARTIAL RESOLVED 2026-05-06 v1.1-FIX-WAVE-3 Task 3.4 (engine ADR-037 + workspace data fix):** F-17 RESOLVED via `scripts/maintenance/data_hygiene_master_xlsx.py` priority code mapping (P1→HIGH, P2→MEDIUM, P3→LOW per severityEnum 4-value canonical) — 4 cells normalized via `transaction.update`, audit trail at `outputs/reports/{date}-data-hygiene-master-apply.md`. F-16 36-URL coverage SPLIT OUT to **Q-V1.2-OPP-COVERAGE-01 [HIGH]** (SEO domain question, v1.2 scope). Validator-true counts (`_resolve_header_row` Phase 14 W3-W2-C-a authority): F-16=36 + F-17=4 (matches Wave 2 brief). Header echo defense regression-locked via `tests/scripts/test_header_echo_defense.py`.
 **Raised:** 2026-05-06 during v1.1-FIX-WAVE-2 P1 closeout (drift-check post Task 2.5 F-19 fix re-run).
 **Context:** Wave 2 closure transitioned drift-check verdict RED → AMBER. F-13 + F-19 PASS now (Wave 1 archive + Wave 2 validator fix). Remaining 2 FAILs are workspace data hygiene:
 - F-16: 36 quick_wins URLs not present in opportunity sheet (URL set divergence; Phase 15 Q-W3W2C-A-F13F16-01 followup, Phase 16 by-design exception flag option d previously accepted but Wave 3 may sync)

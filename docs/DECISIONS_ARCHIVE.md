@@ -23,6 +23,7 @@ ADR-011 rotation kararıyla `DECISIONS.md`'den taşınmış eski kararlar. Appen
 - ADR-031..032 (v1.1 P1 Wave 2 Task 2.2, 2026-05-06 — onyedinci rotation cycle, ADR-034 ekleme ile DECISIONS.md 7367B tetiklemesi sonrası 2 en eski active cut; events.jsonl legacy archive detayı workspace commit `f8d8663` + active.json canonical detayı engine commit `3bec210` body'sinde de korunur)
 - ADR-033 (v1.1 P1 Wave 2 Task 2.3, 2026-05-06 — onsekizinci rotation cycle, ADR-035 ekleme ile DECISIONS.md 7078B tetiklemesi sonrası en eski active cut; project.config.json canonical path detayı engine commit `5d01d59` + workspace commit `e85407f` body'sinde de korunur; 3-active floor 1 cycle altında — ADR-034+035 active)
 - ADR-034 (v1.1 P2+P3 Wave 3 Task 3.3, 2026-05-06 — ondokuzuncu rotation cycle, ADR-036 version sync invariant ekleme ile DECISIONS.md 6562B tetiklemesi sonrası en eski active cut; check_secrets.sh policy detayı `tests/ci/test_check_secrets_sh.py` body'sinde de korunur)
+- ADR-035 (v1.1 P2+P3 Wave 3 Task 3.4, 2026-05-06 — yirminci rotation cycle, ADR-037 data hygiene policy ekleme ile DECISIONS.md 6799B tetiklemesi sonrası en eski active cut; PSEO_WORKSPACE_ROOT canonical detayı `scripts/state/env.py` + `tests/scripts/test_env_vars.py` body'sinde de korunur, 1y shim deadline 2027-05-06 unchanged)
 
 **Active ADR'ler için:** [DECISIONS.md](DECISIONS.md)
 
@@ -325,3 +326,12 @@ ADR-011 rotation kararıyla `DECISIONS.md`'den taşınmış eski kararlar. Appen
 **Context:** v1.1 polish (`bc9391c`) gave `scripts/ci/check_secrets.sh` 7 exclude paths + 4 patterns as code comment, no policy authority. FP risk surfaced via test-fixture tokens, negative-assertion CI tests, doc placeholders.
 **Decision:** Patterns + exclude paths are policy. New entries require ADR-034 amendment. `tests/ci/test_check_secrets_sh.py` locks the round trip: clean EXIT 0 + 7-path policy assertion + 4-pattern policy assertion.
 **Consequences:** Test fixtures with secret-shaped values must live in the 2 whitelisted files; new test files with credentials extend the exclude list via amendment.
+
+---
+
+## ADR-035 — Workspace Env Var: PSEO_WORKSPACE_ROOT Canonical (1-Year Shim)
+**Date:** 2026-05-06
+**Status:** accepted
+**Context:** `PSEO_WORKSPACE_ROOT` used by 20+ scripts/hooks/tests since Phase 14; `PSE_WORKSPACE_PATH` lived in `.env.example`+INSTALL+README+ARCHITECTURE. Asymmetry → onboarding confusion.
+**Decision:** Canonical = `PSEO_WORKSPACE_ROOT`. `PSE_WORKSPACE_PATH` deprecated alias, 1-year shim (removal 2027-05-06, mirrors ADR-030). `scripts/state/env.py::get_workspace_root()` reads canonical first, falls back with `DeprecationWarning`. Docs aligned. Existing 20+ scripts that read canonical directly stay unchanged (no risky sweep).
+**Consequences:** New users set canonical only. Legacy `.env` works via helper until deadline. `tests/scripts/test_env_vars.py` locks the contract. v2.0 removes alias.
