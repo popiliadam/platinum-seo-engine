@@ -12,16 +12,16 @@ Bu template **planlama amaçlı** markdown skeleton. Asıl yayın HTML (`new-blo
 ## Frontmatter (Skill Output Header)
 
 ```yaml
-project_id: {{PROJECT_ID}}                     # project-config.json[project_id], R-XX naming
+project_id: {{PROJECT_ID}}                     # project.config.json[project_id], R-XX naming
 slug: {{URL_SLUG}}                              # master.xlsx[new_content_plan].url_slug
 target_word_count: {{TARGET_WORD_COUNT}}        # master.xlsx[new_content_plan].target_word_count, R-12
 intent: {{INTENT}}                              # master.xlsx[cluster_keywords].intent, R-10
 page_type: {{PAGE_TYPE}}                        # master.xlsx[topical_map].page_type (pillar/cluster/supporting), R-11
 brand_style:
-  primary_color: {{PRIMARY_COLOR}}              # project-config.json[brand_identity.primary_color], R-23
+  primary_color: {{PRIMARY_COLOR}}              # project.config.json[brand_identity.primary_color], R-23
   font_heading: {{FONT_HEADING}}                # brand_identity.font_family_heading
   font_body: {{FONT_BODY}}                      # brand_identity.font_family_body
-profiles: {{PROFILES_ARRAY}}                    # project-config.json[profiles], Principle 2
+profiles: {{PROFILES_ARRAY}}                    # project.config.json[profiles], Principle 2
 primary_keyword: {{PRIMARY_KEYWORD}}            # cluster_keywords primary, R-12
 secondary_keywords: {{SECONDARY_KEYWORDS_3_7}}  # cluster_keywords secondary 3-7, R-12
 ```
@@ -52,7 +52,7 @@ H2: Karşı Argümanlar                                                    # R-5
   counter-argument paragraph + balanced view
 
 [YMYL medical/legal/financial profile only:]
-disclaimer block (project-config.json[content_settings.disclaimer_templates], R-51)
+disclaimer block (project.config.json[content_settings.disclaimer_templates], R-51)
 
 H2: Sıkça Sorulan Sorular (FAQ)                                         # R-09: 10 standart, 3000+ word 15 cap
   10 Q&A (snippet-friendly, statik visible R-43)                        # FAQPage schema R-79
@@ -94,9 +94,9 @@ citations:
     source_name: "{{NAME}}"
     claim_anchor: "{{CLAIM}}"            # R-44: claim cite edilen sayfada literal mevcut
     domain_authority: {{DA_SCORE}}       # R-37 profile-aware threshold
-original_research:                        # R-114 bank-driven, project-config.json[content_settings.original_research_database]
+original_research:                        # R-114 bank-driven, project.config.json[content_settings.original_research_database]
   - {{RESEARCH_REF}}
-expert_quotes:                            # R-105 bank-driven, project-config.json[content_settings.experience_database]
+expert_quotes:                            # R-105 bank-driven, project.config.json[content_settings.experience_database]
   - {{QUOTE_REF}}
 ```
 

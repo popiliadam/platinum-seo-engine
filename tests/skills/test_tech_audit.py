@@ -379,7 +379,7 @@ def test_preflight_budget_exit_1_raises(tmp_path: Path) -> None:
     pre-flight raises BudgetExceededError. The skill is then expected to
     route the workflow to awaiting_approval per ADR-016."""
 
-    cfg_path = tmp_path / "project-config.json"
+    cfg_path = tmp_path / "project.config.json"
     cfg_path.write_text(json.dumps({
         "dataforseo": {"budget_credits_per_day": 10},
     }))
@@ -402,7 +402,7 @@ def test_preflight_budget_exit_1_raises(tmp_path: Path) -> None:
 
 def test_preflight_budget_pass_returns_envelope(tmp_path: Path) -> None:
     """Happy path: 1 URL × 13 credits, budget 500 → envelope, no raise."""
-    cfg_path = tmp_path / "project-config.json"
+    cfg_path = tmp_path / "project.config.json"
     cfg_path.write_text(json.dumps({
         "dataforseo": {"budget_credits_per_day": 500},
     }))
@@ -427,7 +427,7 @@ def test_preflight_budget_subprocess_mocked_exit_1(tmp_path: Path) -> None:
     """Direct subprocess mock — guarantees DURUR #1 fires when the script
     returns exit code 1 with `exceeded=true` envelope (the canonical
     over-budget shape)."""
-    cfg_path = tmp_path / "project-config.json"
+    cfg_path = tmp_path / "project.config.json"
     cfg_path.write_text("{}")  # content irrelevant — mock intercepts
     events_path = tmp_path / "events.jsonl"
 

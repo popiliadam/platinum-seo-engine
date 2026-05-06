@@ -57,9 +57,9 @@ outputs:
   - "_state/events.jsonl"
 consumes:
   - "init-project:projects/{slug}/master.xlsx#new_content_plan"
-  - "init-project:projects/{slug}/project-config.json#content_settings.image_model"
-  - "init-project:projects/{slug}/project-config.json#brand_identity.image_style"
-  - "init-project:projects/{slug}/project-config.json#brand_identity.default_hero_url"
+  - "init-project:projects/{slug}/project.config.json#content_settings.image_model"
+  - "init-project:projects/{slug}/project.config.json#brand_identity.image_style"
+  - "init-project:projects/{slug}/project.config.json#brand_identity.default_hero_url"
   - "rules:rules/content-quality.md"
   - "rules:rules/content-html-discipline.md"
   - "rules:rules/content-seo-discipline.md"
@@ -164,7 +164,7 @@ photo değil).
 
 ### Principle 2 — Profile-Aware Enforcement
 
-**Statement.** Skill behavior `project-config.json[profile]` enum'una
+**Statement.** Skill behavior `project.config.json[profile]` enum'una
 göre değişir; image_style boyutu profile-driven (F-13 schema enum
 5-value).
 

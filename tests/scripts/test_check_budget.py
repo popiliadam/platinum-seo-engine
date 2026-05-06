@@ -14,7 +14,7 @@ SCRIPT = REPO / "scripts" / "budget" / "check_budget.py"
 
 def _write_config(tmp_path: Path, budget: int) -> Path:
     cfg = {"dataforseo": {"budget_credits_per_day": budget}}
-    p = tmp_path / "project-config.json"
+    p = tmp_path / "project.config.json"
     p.write_text(json.dumps(cfg), encoding="utf-8")
     return p
 

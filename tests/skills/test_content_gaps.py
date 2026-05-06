@@ -399,7 +399,7 @@ def test_budget_preflight_exit_1_raises(tmp_path: Path) -> None:
     with mock.patch.object(subprocess, "run", return_value=fake_completed):
         with pytest.raises(cgt.BudgetExceededError) as ei:
             cgt.preflight_budget(
-                project_config_path=tmp_path / "project-config.json",
+                project_config_path=tmp_path / "project.config.json",
                 events_path=tmp_path / "events.jsonl",
             )
         assert "budget pre-flight FAIL" in str(ei.value)
@@ -412,7 +412,7 @@ def test_budget_preflight_exit_1_raises(tmp_path: Path) -> None:
     fake_ok.stderr = ""
     with mock.patch.object(subprocess, "run", return_value=fake_ok):
         env = cgt.preflight_budget(
-            project_config_path=tmp_path / "project-config.json",
+            project_config_path=tmp_path / "project.config.json",
             events_path=tmp_path / "events.jsonl",
         )
         assert env["exceeded"] is False

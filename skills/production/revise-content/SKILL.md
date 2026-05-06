@@ -46,7 +46,7 @@ outputs:
 consumes:
   - "init-project:projects/{slug}/master.xlsx#content_decay"
   - "master-task-sync:master.xlsx#master_task"
-  - "init-project:projects/{slug}/project-config.json"
+  - "init-project:projects/{slug}/project.config.json"
   - "rules:rules/content-quality.md"
   - "rules:rules/content-html-discipline.md"
   - "rules:rules/content-seo-discipline.md"
@@ -109,7 +109,7 @@ yasak. Revise context'inde:
 
 ### Principle 2 — Profile-Aware Enforcement (project-config[profile])
 
-Skill behavior project-config.json[profile] enum'una göre değişir.
+Skill behavior project.config.json[profile] enum'una göre değişir.
 Enum 5-value: `e-commerce` | `ymyl` | `local-service` | `b2b-saas` |
 `portfolio`.
 
@@ -189,7 +189,7 @@ gereksiz, master_task sync close request emit (READ-ONLY contract
 
 ### Step 3: project-config Read (Profile-Aware Switch — Principle 2)
 
-`projects/{slug}/project-config.json` parse → `profile` field read
+`projects/{slug}/project.config.json` parse → `profile` field read
 (W-F1 schema 1.2 enum 5-value varsayımı). `content_settings` 14
 field consume (toc_strategy, ai_training_optin, byline_policy, vs.).
 

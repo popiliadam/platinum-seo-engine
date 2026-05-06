@@ -24,7 +24,7 @@ inputs:
   project_slug:
     type: string
     required: true
-    description: "Slug; resolves projects/{slug}/master.xlsx + project-config.json."
+    description: "Slug; resolves projects/{slug}/master.xlsx + project.config.json."
   queries:
     type: array
     required: true
@@ -125,7 +125,7 @@ so the operator triages the most actionable gaps in the report.
 `workspace_root` is resolved via `PSEO_WORKSPACE_ROOT` env or explicit
 test override (mirrors workflow_runner / events_writer).
 
-`project_name` is resolved from `projects/{slug}/project-config.json`
+`project_name` is resolved from `projects/{slug}/project.config.json`
 `display_name` field. The transform raises `ProjectNameMissingError`
 (DURUR #10) when this field is empty/missing — `our_brand_mentioned`
 substring matching cannot run without it.
@@ -215,7 +215,7 @@ workflow_runner.start_step(handle.run_id, 0, project_slug=project_slug)
 estimate = ga.estimate_credits(len(queries))
 envelope = ga.preflight_budget(
     estimated_credits=estimate,
-    project_config_path=project_root / "project-config.json",
+    project_config_path=project_root / "project.config.json",
     events_path=project_root / "_state" / "events.jsonl",
 )
 workflow_runner.finish_step(handle.run_id, 0, project_slug=project_slug,

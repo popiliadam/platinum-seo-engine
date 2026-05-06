@@ -458,7 +458,7 @@ def test_cluster_map_budget_preflight_blocks_when_exceeded(
     with mock.patch.object(subprocess, "run", return_value=fake_completed):
         with pytest.raises(cmt.BudgetExceededError) as ei:
             cmt.preflight_budget(
-                project_config_path=tmp_path / "project-config.json",
+                project_config_path=tmp_path / "project.config.json",
                 events_path=tmp_path / "events.jsonl",
             )
         assert "budget pre-flight FAIL" in str(ei.value)
@@ -471,7 +471,7 @@ def test_cluster_map_budget_preflight_blocks_when_exceeded(
     fake_ok.stderr = ""
     with mock.patch.object(subprocess, "run", return_value=fake_ok):
         env = cmt.preflight_budget(
-            project_config_path=tmp_path / "project-config.json",
+            project_config_path=tmp_path / "project.config.json",
             events_path=tmp_path / "events.jsonl",
         )
         assert env["exceeded"] is False

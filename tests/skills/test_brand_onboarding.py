@@ -241,7 +241,7 @@ def test_durur_4_profile_enum_six_value_reject(project_config_schema: dict) -> N
 def test_durur_5_staging_only_mode() -> None:
     """DURUR #5 sentinel: pre-Phase-14 the engine repo has no projects/
     dir. Skill must run in STAGING-ONLY mode, NEVER writing
-    projects/{slug}/config/project.config.json. Staging output goes to
+    projects/{slug}/project.config.json. Staging output goes to
     outputs/onboarding/{slug}-staging-config.json."""
     text = _skill_text()
     assert "DURUR #5" in text, "DURUR #5 missing"
@@ -257,7 +257,7 @@ def test_durur_5_staging_only_mode() -> None:
     # outputs[] strictly — that is the machine-readable contract.)
     fm = _parse_frontmatter(SKILL_PATH)
     for out in fm["outputs"]:
-        assert "projects/{slug}/config/project.config.json" not in out, \
+        assert "projects/{slug}/project.config.json" not in out, \
             f"frontmatter outputs leaks canonical config path: {out!r}"
         assert "project.config.json" not in out, (
             f"frontmatter outputs writes project.config.json — STAGING-ONLY "

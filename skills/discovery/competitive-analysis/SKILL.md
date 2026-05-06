@@ -24,7 +24,7 @@ inputs:
   project_slug:
     type: string
     required: true
-    description: "Slug; resolves projects/{slug}/master.xlsx + project-config.json + _state/staging/."
+    description: "Slug; resolves projects/{slug}/master.xlsx + project.config.json + _state/staging/."
   target_domain:
     type: string
     required: true
@@ -194,7 +194,7 @@ handle = workflow_runner.create_run(
 # §16.8 budget pre-flight — DURUR #2 on FAIL.
 ca.preflight_budget(
     estimated_credits=ca.estimate_credits(1),     # competitors_domain ~5 credits
-    project_config_path=str(workspace_root / "projects" / project_slug / "project-config.json"),
+    project_config_path=str(workspace_root / "projects" / project_slug / "project.config.json"),
     events_path=str(workspace_root / "projects" / project_slug / "_state" / "events.jsonl"),
 )
 ```

@@ -23,7 +23,7 @@ inputs:
   project_slug:
     type: string
     required: true
-    description: "Slug; resolves projects/{slug}/master.xlsx + project-config.json."
+    description: "Slug; resolves projects/{slug}/master.xlsx + project.config.json."
   urls:
     type: array
     required: true
@@ -139,7 +139,7 @@ from scripts.discovery import tech_audit_transform
 estimate = tech_audit_transform.estimate_credits(len(urls))
 envelope = tech_audit_transform.preflight_budget(
     estimated_credits=estimate,
-    project_config_path=project_root / "project-config.json",
+    project_config_path=project_root / "project.config.json",
     events_path=project_root / "_state" / "events.jsonl",
 )
 ```

@@ -18,6 +18,7 @@ ADR-011 rotation kararıyla `DECISIONS.md`'den taşınmış eski kararlar. Appen
 - ADR-024 (Phase 7 closeout, 2026-05-01 — onikinci rotation cycle, ADR-027 transform size policy ekleme sonrası en eski active cut)
 - ADR-025 (Phase 7 closeout, 2026-05-01 — onüçüncü rotation cycle, ADR-028+ADR-029 ekleme sonrası en eski active cut; templates/scrapling/S1_competitor_snapshot.schema.json W-B3 yarattı, ADR-025 implementation realize)
 - ADR-026..028 (v1.1 P0 Wave 1, 2026-05-06 — ondördüncü rotation cycle, ADR-030..033 ekleme ile DECISIONS.md hard cap tetiklenmesi sonrası 3 en eski active cut; ADR-026 cap-only supersede entry korunur byte-byte)
+- ADR-029 (v1.1 P0 Wave 1 Task 1.2, 2026-05-06 — onbeşinci rotation cycle, ADR-033 ekleme ile DECISIONS.md 6549B tetiklemesi sonrası en eski active cut)
 
 **Active ADR'ler için:** [DECISIONS.md](DECISIONS.md)
 
@@ -266,3 +267,12 @@ ADR-011 rotation kararıyla `DECISIONS.md`'den taşınmış eski kararlar. Appen
 **Context:** Q-W-A3-01 (FID deprecated 2024+, INP modern) + Q-W-A3-02 (a11y category eksik) W-A3 surfaced. Brief drift Q-CO-01: tech_seo metric_name field yok (6 col); issue_category constraint'siz.
 **Decision:** sheets.tech_seo additive: (1) issue_category enum ["Performance","Layout Stability","Meta Tags","Structured Data","Accessibility"]; (2) description "Web Vitals 2024: INP supersedes FID, transform-owned thresholds". ADR-018 paterni; schema_version YOK.
 **Consequences:** tech-audit output validate; future enum ADR-018. Q-W-A3-01 transform domain (INP Phase 7+).
+
+---
+
+## ADR-029 — Budget Convention: per-run estimated_credits (Phase 7+)
+**Date:** 2026-05-01
+**Status:** accepted
+**Context:** Q-W-A3-03: Phase 7 paid skill budget.estimated_credits convention belirsiz (per-URL×count vs per-run total?). schema sadece estimated_credits (number ≥0).
+**Decision:** Phase 7+ standart: budget.estimated_credits = per-run total tahmin (skill run credit). Per-URL skill internal logic; expose tek değer per-run. ADR-016 events.jsonl cost.credits SSoT compatible.
+**Consequences:** Paid skill pre-flight tek değerle check_budget query. Phase 14 budget reporting per-skill granularity.

@@ -20,7 +20,7 @@ inputs:
   project_slug:
     type: string
     required: true
-    description: "Slug; resolves projects/{slug}/master.xlsx + project-config.json."
+    description: "Slug; resolves projects/{slug}/master.xlsx + project.config.json."
   days_back:
     type: integer
     required: false
@@ -211,7 +211,7 @@ total.
 ```python
 from scripts.budget import check_budget
 budget_envelope = check_budget.preflight(
-    project_config_path=project_root / "project-config.json",
+    project_config_path=project_root / "project.config.json",
     events_path=project_root / "_state" / "events.jsonl",
     estimated_credits=1,    # one DFS historical_rank_overview call
 )

@@ -35,7 +35,7 @@ Bu 3 prensip Phase 10 content rules setinin **üst-prensibidir**. Hiçbir alt-ru
 
 ### Principle 2 — Profile-Aware Enforcement
 
-**Statement.** Skill behavior `project-config.json[profiles]` array'ine göre değişir. Profile types: `e-commerce` / `ymyl` / `local-service` / `b2b-saas` / `portfolio`.
+**Statement.** Skill behavior `project.config.json[profiles]` array'ine göre değişir. Profile types: `e-commerce` / `ymyl` / `local-service` / `b2b-saas` / `portfolio`.
 
 **Rationale.** Aynı rule (örn. author byline) profile'a göre **zıt** sonuç gerektirir — YMYL'da medical/legal/financial yazılarda byline plugin/zorunlu (E-E-A-T + trust signal), e-commerce'te admin sırıtmasın (kullanıcıyla psikolojik mesafe). Tek sabit rule iki profile'da da yanlış sonuç verir.
 
@@ -52,7 +52,7 @@ Bu 3 prensip Phase 10 content rules setinin **üst-prensibidir**. Hiçbir alt-ru
 | Image style | Clean illustration | Product photo | Diagram + screenshot | Lokasyon foto | Esnek |
 | Stats density (R-104) | min/500w + max cap | min/800w + max cap | min/600w + max cap | esnek | esnek |
 
-**Enforcement.** Phase 11 worker `project-config.json[profiles]` array'ini her skill başında okur; `union + dedup + priority merge` resolution (project-config.schema.json `profiles` field semantik korundu); behavior boyutları yukarıdaki tabloya göre seçilir.
+**Enforcement.** Phase 11 worker `project.config.json[profiles]` array'ini her skill başında okur; `union + dedup + priority merge` resolution (project-config.schema.json `profiles` field semantik korundu); behavior boyutları yukarıdaki tabloya göre seçilir.
 
 **Failure mode.** AMBER — yanlış profile resolution worker raporlar; RED yalnızca `profiles=[]` (boş array — schema `minItems:1` ihlali).
 
@@ -153,7 +153,7 @@ Bu 3 prensip Phase 10 content rules setinin **üst-prensibidir**. Hiçbir alt-ru
 
 ### R-51: Disclaimer Template (Per-Project)
 
-**Statement.** YMYL profile'ında medical/legal/financial sub-domain'lerde profile-aware disclaimer template content sonuna eklenir. Template `project-config.json[content_settings.disclaimer_templates]` map'inde tutulur.
+**Statement.** YMYL profile'ında medical/legal/financial sub-domain'lerde profile-aware disclaimer template content sonuna eklenir. Template `project.config.json[content_settings.disclaimer_templates]` map'inde tutulur.
 
 **Rationale.** Principle 2 + legal exposure. Medical bilgiyi "doktor değiştirme" tavsiyesi olmadan vermek hukuki risk.
 
@@ -193,7 +193,7 @@ Bu 3 prensip Phase 10 content rules setinin **üst-prensibidir**. Hiçbir alt-ru
 
 ### R-105: Expert Quote Uydurma Yasak
 
-**Statement.** Uzman alıntısı ("Dr. X şöyle dedi...") **gerçek** olmak zorunda. Uydurma quote yasak. Bank-driven (`project-config.json[content_settings.experience_database]` veya `original_research_database`).
+**Statement.** Uzman alıntısı ("Dr. X şöyle dedi...") **gerçek** olmak zorunda. Uydurma quote yasak. Bank-driven (`project.config.json[content_settings.experience_database]` veya `original_research_database`).
 
 **Rationale.** Principle 1. Uydurma quote `Authoritativeness` ve `Trustworthiness` ikisini birden kırar.
 
@@ -203,7 +203,7 @@ Bu 3 prensip Phase 10 content rules setinin **üst-prensibidir**. Hiçbir alt-ru
 
 ### R-114: Original Research (Bank-Driven)
 
-**Statement.** Original research claim'i (anket, vaka analizi, ölçüm) **bank-driven** — `project-config.json[content_settings.original_research_database]` array'inde tanımlı olacak. Skill yeni research uydurmaz.
+**Statement.** Original research claim'i (anket, vaka analizi, ölçüm) **bank-driven** — `project.config.json[content_settings.original_research_database]` array'inde tanımlı olacak. Skill yeni research uydurmaz.
 
 **Rationale.** Principle 1. Original research güçlü EEAT sinyali ama uydurma research domain'i yakar.
 
@@ -217,7 +217,7 @@ Bu 3 prensip Phase 10 content rules setinin **üst-prensibidir**. Hiçbir alt-ru
 
 **Rationale.** KVKK/GDPR compliance + iş gizliliği. "Geçen ay 1247 sipariş" OK; "İstanbul'dan Ali Y. 3 kez sipariş verdi" yasak.
 
-**Enforcement.** `project-config.json[content_settings.internal_data_sharing]` boolean ON ise aggregate format zorunlu; OFF ise hiç paylaşılmaz.
+**Enforcement.** `project.config.json[content_settings.internal_data_sharing]` boolean ON ise aggregate format zorunlu; OFF ise hiç paylaşılmaz.
 
 **Failure mode.** RED (KVKK exposure).
 
@@ -229,7 +229,7 @@ Bu 3 prensip Phase 10 content rules setinin **üst-prensibidir**. Hiçbir alt-ru
 
 **Rationale.** Principle 3. Generic AI çıktısı SERP top-10 ile %50+ overlap üretir; uniqueness check Helpful Content Update sinyali.
 
-**Enforcement.** `project-config.json[content_settings.external_uniqueness_check]` boolean ON ise pre-publish check; threshold altı AMBER.
+**Enforcement.** `project.config.json[content_settings.external_uniqueness_check]` boolean ON ise pre-publish check; threshold altı AMBER.
 
 **Failure mode.** AMBER → 2x AMBER → RED.
 
@@ -245,7 +245,7 @@ Bu 3 prensip Phase 10 content rules setinin **üst-prensibidir**. Hiçbir alt-ru
 
 ### R-119: First-Hand Experience (Bank-Driven)
 
-**Statement.** "Birinci el deneyim" claim'i (kullandım, denedim, ölçtüm) → bank-driven (`project-config.json[content_settings.experience_database]`). Skill kendi adına first-hand iddia etmez.
+**Statement.** "Birinci el deneyim" claim'i (kullandım, denedim, ölçtüm) → bank-driven (`project.config.json[content_settings.experience_database]`). Skill kendi adına first-hand iddia etmez.
 
 **Rationale.** Principle 1 + EEAT (Experience). Uydurma deneyim "uzmanlık tiyatrosu" — Helpful Content Update penalty.
 

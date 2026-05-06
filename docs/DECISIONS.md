@@ -3,7 +3,7 @@
 Platinum SEO Engine plugin için mimari kararların kaydı.
 Append-only — superseded entry'ler işaretlenir, silinmez.
 
-> **Rotation:** ADR-001..028 archive'da (gap: 015) → [DECISIONS_ARCHIVE.md](DECISIONS_ARCHIVE.md). ADR-026: hard cap 6144B primary (ADR-022 cap-only supersede), 3 active floor (ADR-014 rotation pattern, archive).
+> **Rotation:** ADR-001..029 archive'da (gap: 015) → [DECISIONS_ARCHIVE.md](DECISIONS_ARCHIVE.md). ADR-026: hard cap 6144B primary (ADR-022 cap-only supersede), 3 active floor (ADR-014 rotation pattern, archive).
 
 ## Summary Table
 
@@ -36,23 +36,24 @@ Append-only — superseded entry'ler işaretlenir, silinmez.
 | ADR-026 | DECISIONS Hard Cap: 5120→6144B (ADR-022 Cap-Only Supersede) | accepted | DECISIONS_ARCHIVE.md |
 | ADR-027 | Phase 7 Transform Size Policy: <1500L Hedef | accepted | DECISIONS_ARCHIVE.md |
 | ADR-028 | Tech Audit Schema: issue_category Enum + Web Vitals 2024 Note | accepted | DECISIONS_ARCHIVE.md |
-| ADR-029 | Budget Convention: per-run estimated_credits (Phase 7+) | accepted | (below) |
+| ADR-029 | Budget Convention: per-run estimated_credits (Phase 7+) | accepted | DECISIONS_ARCHIVE.md |
 | ADR-032 | active.json Field Naming: `active_project` Canonical (Hook Contract Fix) | accepted | (below) |
+| ADR-033 | project.config.json Canonical Path: `projects/{slug}/project.config.json` | accepted | (below) |
 
 ---
 
-## ADR-029 — Budget Convention: per-run estimated_credits (Phase 7+)
-**Date:** 2026-05-01
-**Status:** accepted
-**Context:** Q-W-A3-03: Phase 7 paid skill budget.estimated_credits convention belirsiz (per-URL×count vs per-run total?). schema sadece estimated_credits (number ≥0).
-**Decision:** Phase 7+ standart: budget.estimated_credits = per-run total tahmin (skill run credit). Per-URL skill internal logic; expose tek değer per-run. ADR-016 events.jsonl cost.credits SSoT compatible.
-**Consequences:** Paid skill pre-flight tek değerle check_budget query. Phase 14 budget reporting per-skill granularity.
-
----
-
-## ADR-032 — active.json Field Naming: `active_project` Canonical (Hook Contract Fix)
+## ADR-032 — `shared/active.json` Field Naming: `active_project` Canonical
 **Date:** 2026-05-06
 **Status:** accepted
-**Context:** Workspace `shared/active.json` is the cross-session marker for the bound project. `commands/pseo-active.md` writes it as `{"active_project": "<slug>"}` and `commands/pseo-driftcheck.md:34` reads `.active_project` via `jq`. The two Python hooks that consume the marker (`hooks/post-tool-use.json` for audit append, `hooks/user-prompt-submit.json` for the context banner) were reading `(active or {}).get("project_id")` — a field that nothing writes. Result: silent no-op. F-19 audit-event coverage invariant could SKIP without surfacing the contract break.
-**Decision:** Canonical field name on `shared/active.json` is `active_project` (slug string). Both Python hooks updated to `(active or {}).get("active_project")`. Workspace data is immutable under append-only-state; the fix lives entirely in plugin hook code. The other two hooks (`pre-tool-use.json`, `session-start.json`) do not depend on the field naming and are unchanged.
-**Consequences:** Audit append fires for every PostToolUse Edit/Write/Bash when a workspace is bound (F-19 enforced live). Contract is now lockable via `tests/hooks/test_active_project_contract.py` — both hook commands must reference `active_project` and must not reference legacy `project_id`. Future writers (init-project skill, pseo-active command) MUST emit `active_project` only; any new consumer reads the same key. Backwards compatibility shim is intentionally NOT added — there is no on-disk legacy `project_id` data to support.
+**Context:** `pseo-active.md` writes `{"active_project": "<slug>"}` and `pseo-driftcheck.md:34` reads `.active_project`. Python hooks `post-tool-use.json` + `user-prompt-submit.json` were reading `.project_id` — never written. Audit append + context banner silently no-op'd; F-19 coverage could SKIP unnoticed.
+**Decision:** Canonical field on `shared/active.json` is `active_project` (slug). Both Python hooks updated; `pre-tool-use.json` + `session-start.json` don't read the field. No backward-compat shim — no on-disk legacy `project_id` data exists.
+**Consequences:** F-19 audit append fires live. Contract locked by `tests/hooks/test_active_project_contract.py` (both hooks must read `active_project`, must not read `project_id`). Future writers (init-project skill) MUST emit `active_project`.
+
+---
+
+## ADR-033 — project.config.json Canonical Path: `projects/{slug}/project.config.json`
+**Date:** 2026-05-06
+**Status:** accepted
+**Context:** Three competing path forms: (a) `projects/{slug}/project.config.json` — written by `bootstrap_project.py:170`, read by `pseo-init.md`/`pseo-driftcheck.md`/`pseo-active.md`/`validate_invariants.py:972`/migrations 0001+0002; (b) `projects/{slug}/config/project.config.json` — workspace demo-dental pilot landed there; (c) `project/project-config.json` — `check_budget.py` default + 40 SKILL.md + test files used the hyphenated form. Drift surface = pre-flight skill load.
+**Decision:** Canonical = `projects/{slug}/project.config.json` (no `config/` subfolder, no hyphenated variant). Engine sweep: `check_budget.py` default + `internal_links_transform.py` help-text + 40 files containing `project-config.json` → `project.config.json` + 9 files containing `projects/{slug}/config/project.config.json` → `projects/{slug}/project.config.json`. `excel.config.json` + `excel-source-manifest.json` remain in `projects/{slug}/config/` (separate per-project config files, distinct decision).
+**Consequences:** `tests/scripts/test_path_canonical.py` regex-greps the tree — both forbidden patterns (hyphenated + `config/` subfolder for project.config.json) fail the suite. Workspace data move (`mv projects/demo-dental/config/project.config.json projects/demo-dental/`) requires Süleyman approval; engine code is now consistent regardless.
