@@ -2,6 +2,32 @@
 
 ## Unresolved
 
+### Q-WAVE1-DRIFT-DEFER-01: F-13 + F-16 + F-17 + F-19 real data/validator drift (Wave 2 P1 scope) [MEDIUM]
+**Raised:** 2026-05-06 during v1.1-FIX-WAVE-1 P0 closure (drift-check skill manuel run, workspace-bound, post-events-archive)
+**Context:** Wave 1 P0 events.jsonl legacy archive tamamlandıktan sonra drift-check verdict hâlâ RED — ama artık 4 FAIL **mekanik gürültü değil**, gerçek katman drift'i (Codex'in 4 P0 finding'inin doğrulanmış halleri):
+- F-13: 5/27 provenance event run_id integer DEĞİL (string olarak yazılmış legacy yazım)
+- F-16: 36 quick_wins URL opportunity sheet'inde yok (URL set divergence)
+- F-17: 4/174 severity cell {LOW,MEDIUM,HIGH,CRITICAL} 4-enum dışında
+- F-19: validate_invariants.check_F_19 root-level `locale` veya `defaults.locale` arıyor; schema 1.3 canonical alan `language.content_locale` (validator-vs-schema field-name gap)
+**Options:**
+- a) Wave 2 P1 brief'inde tek dispatch ile 4 fix paralel (F-13 events writer enforcement + F-16 opportunity table sync + F-17 severity remediate + F-19 validator code update)
+- b) Per-FAIL ayrı atomic dispatch (4 sequential brief, daha güvenli ama yavaş)
+- c) Bir kısmı v1.2 (F-16 opportunity sync veri görevi olabilir, code değil)
+**Owner:** karar verici agent (Wave 2 P1 plan)
+**Blocking Phase:** None for Wave 1; Wave 2 P1 entry-point.
+
+### Q-WAVE1-F19-VALIDATOR-01: validate_invariants.check_F_19 schema field-name mismatch [MEDIUM]
+**Raised:** 2026-05-06 during Wave 1 P0 closeout drift-check (post mv + post bump)
+**Context:** `scripts/validation/validate_invariants.py` line 988-989 root-level `locale` veya `defaults.locale` field arıyor. project-config.schema.json v1.3 canonical alan `language.content_locale` (nested object, IETF BCP 47). Workspace demo-dental `language.content_locale: "tr-TR"` ama F-19 buna bakmıyor — root `locale` yok diye FAIL döndürüyor. Wave 1 mv öncesi F-19 SKIP idi (file missing); mv sonrası file bulundu ama field-name validator gap yüzeye çıktı. Pre-existing bug, Wave 1 surfaced.
+**Options:**
+- a) check_F_19 update: schema v1.3 ile uyumlu olarak `language.content_locale` (nested) + `market` (root) check (kanonik path)
+- b) Schema v1.4 additive: `locale` alias root-level alan (ek field rename, cascade riski)
+- c) Defer Wave 2 P1 ile birlikte (Q-WAVE1-DRIFT-DEFER-01 paterni)
+**Owner:** karar verici agent (Wave 2 P1 plan)
+**Blocking Phase:** None (semantic gap visible, F-19 result misleading until fixed)
+
+
+
 ### Q-W3W3β-TEST-01: test_ci_yaml.py semantic update vs name rename ayrımı [LOW] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 14 W3-W3-β W-Q1 worker output
 **Context:** W-Q1 cascade fix `test_ci_yaml.py::test_continue_on_error_strict_mode_governance_steps` testi 3 strict+4 report-only logic'inden 7 strict logic'ine semantic update yaptı (set comparison defensive), AMA test ismi "governance_steps" suffix'i ile kaldı (artık tüm 7 step için geçerli, sadece governance değil). Diff surgical scope tutuldu. Phase 15 audit Wave 4 follow-up: rename `test_continue_on_error_all_steps_strict_mode` veya benzer.
@@ -353,6 +379,8 @@
 **Owner:** karar verici agent (v1.1 schema/config normalization)
 **Blocking Phase:** None (produces null reads, not crash), but affects tone enforcement in content skills
 **→ RESOLVED 2026-05-06 workspace `eca13c5`:** Option a applied. demo-dental `project.config.json` `hitap` → `pronoun_preference`, `tone` → `formality`. Skills reading canonical keys now get correct values.
+
+**→ FOLLOW-UP RESOLVED 2026-05-06 v1.1-FIX-WAVE-1 P0 (engine `7dc67ba` + workspace `aacbb2c`):** Original closeout was premature — engine schema 1.2 still had `additionalProperties: false` with only legacy `hitap`/`tone` keys, so workspace eca13c5 actually FAILED `validate_schema` ("Additional properties are not allowed (formality, pronoun_preference)"). ADR-030 + Migration 0003 closed the gap: schema 1.2→1.3 additive (canonical fields added, legacy deprecated 1-yr alias), workspace project.config.json schema_version 1.2→1.3 bump, validate_schema EXIT 0 verified. Test coverage `tests/scripts/test_migration_0003.py` 8 cases.
 
 ### Q-PHASE15-INSTALL-STALE-01: INSTALL.md shows alpha v0.1.0/Phase 0 — needs v1.0.0 update [MEDIUM] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 15 W5 UX smoke test (W-E1 worker output; cat27-ux-smoke.md)
