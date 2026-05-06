@@ -2,7 +2,30 @@
 
 ## Unresolved
 
-### Q-WAVE1-DRIFT-DEFER-01: F-13 + F-16 + F-17 + F-19 real data/validator drift (Wave 2 P1 scope) [MEDIUM]
+### Q-WAVE2-DATA-HYGIENE-01: F-16 quick_wins URL coverage + F-17 severity cells (Wave 3 scope) [MEDIUM]
+**Raised:** 2026-05-06 during v1.1-FIX-WAVE-2 P1 closeout (drift-check post Task 2.5 F-19 fix re-run).
+**Context:** Wave 2 closure transitioned drift-check verdict RED → AMBER. F-13 + F-19 PASS now (Wave 1 archive + Wave 2 validator fix). Remaining 2 FAILs are workspace data hygiene:
+- F-16: 36 quick_wins URLs not present in opportunity sheet (URL set divergence; Phase 15 Q-W3W2C-A-F13F16-01 followup, Phase 16 by-design exception flag option d previously accepted but Wave 3 may sync)
+- F-17: 4/174 severity cells outside {LOW,MEDIUM,HIGH,CRITICAL} 4-enum (cell-level data correction needed)
+Both are workspace-side data tasks, not engine code drift. Wave 3 scope after v1.2 P3 backlog clarification.
+**Options:**
+- a) Wave 3 dedicated data hygiene sprint (workspace edits + drift-check verify)
+- b) Phase 16 layout normalize ADR with F-16 by-design exception (Q-W3W2C-A-F13F16-01 paterni reuse)
+- c) Defer indefinitely (drift-check AMBER acceptable for v1.x lifecycle)
+**Owner:** karar verici agent (Wave 3 plan or v1.2 milestone close)
+**Blocking Phase:** None (AMBER verdict acceptable; data hygiene non-blocking)
+
+### Q-WAVE2-DFS-OP-STAGING-01: dfs-pull SKILL.md operation="staging" outside enum [LOW]
+**Raised:** 2026-05-06 during v1.1-FIX-WAVE-2 P1 Task 2.4 (e2e test discovery).
+**Context:** `skills/ingestion/dfs-pull/SKILL.md` Step 9 line 299 documents `operation="staging"` but `events.schema.json` operation enum is `[ingest, normalize, project_excel, validate, cascade_done]`. Wave 2 e2e test used `"ingest"` (valid) to mirror flow. SKILL.md docstring needs update OR schema enum additive bump for "staging" if Phase 6 D-003 staging-only routing semantics warrant a dedicated value.
+**Options:**
+- a) SKILL.md update operation="ingest" (most accurate: dfs raw-inventory ingestion stage)
+- b) events.schema operation enum additive bump "staging" (semantic precision; schema_version bump; ADR aday)
+- c) Defer Wave 3+ (low priority cosmetic, runtime not affected since orchestrator practitioners pick valid value)
+**Owner:** karar verici agent (Wave 3 OR v1.2 SKILL.md polish batch)
+**Blocking Phase:** None (LOW, doc-vs-schema gap only)
+
+### Q-WAVE1-DRIFT-DEFER-01: F-13 + F-16 + F-17 + F-19 real data/validator drift (Wave 2 P1 scope) [MEDIUM] ✅ PARTIAL RESOLVED 2026-05-06
 **Raised:** 2026-05-06 during v1.1-FIX-WAVE-1 P0 closure (drift-check skill manuel run, workspace-bound, post-events-archive)
 **Context:** Wave 1 P0 events.jsonl legacy archive tamamlandıktan sonra drift-check verdict hâlâ RED — ama artık 4 FAIL **mekanik gürültü değil**, gerçek katman drift'i (Codex'in 4 P0 finding'inin doğrulanmış halleri):
 - F-13: 5/27 provenance event run_id integer DEĞİL (string olarak yazılmış legacy yazım)
@@ -15,8 +38,9 @@
 - c) Bir kısmı v1.2 (F-16 opportunity sync veri görevi olabilir, code değil)
 **Owner:** karar verici agent (Wave 2 P1 plan)
 **Blocking Phase:** None for Wave 1; Wave 2 P1 entry-point.
+**→ PARTIAL RESOLVED 2026-05-06 v1.1-FIX-WAVE-2:** F-13 PASS confirmed (Wave 1 archive resolution — 22/22 provenance int run_id; ADR-031 emsali codified rules/append-only-state.md). F-19 PASS via Task 2.5 validator fix (schema 1.3 canonical language.content_locale). F-16 + F-17 → Q-WAVE2-DATA-HYGIENE-01 Wave 3 scope.
 
-### Q-WAVE1-F19-VALIDATOR-01: validate_invariants.check_F_19 schema field-name mismatch [MEDIUM]
+### Q-WAVE1-F19-VALIDATOR-01: validate_invariants.check_F_19 schema field-name mismatch [MEDIUM] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-06 during Wave 1 P0 closeout drift-check (post mv + post bump)
 **Context:** `scripts/validation/validate_invariants.py` line 988-989 root-level `locale` veya `defaults.locale` field arıyor. project-config.schema.json v1.3 canonical alan `language.content_locale` (nested object, IETF BCP 47). Workspace demo-dental `language.content_locale: "tr-TR"` ama F-19 buna bakmıyor — root `locale` yok diye FAIL döndürüyor. Wave 1 mv öncesi F-19 SKIP idi (file missing); mv sonrası file bulundu ama field-name validator gap yüzeye çıktı. Pre-existing bug, Wave 1 surfaced.
 **Options:**
@@ -25,6 +49,7 @@
 - c) Defer Wave 2 P1 ile birlikte (Q-WAVE1-DRIFT-DEFER-01 paterni)
 **Owner:** karar verici agent (Wave 2 P1 plan)
 **Blocking Phase:** None (semantic gap visible, F-19 result misleading until fixed)
+**→ RESOLVED 2026-05-06 engine `2318166` (Wave 2 Task 2.5):** Option a applied. `check_F_19` schema 1.3 canonical only: nested `language.content_locale` + root `market`. Pre-Wave-2 root/defaults paths removed. 6 contract tests (`tests/scripts/test_validate_invariants_F19.py`). Drift-check F-19 verdict transition: FAIL → PASS for demo-dental pilot.
 
 
 
@@ -303,7 +328,7 @@
 **Blocking Phase:** None (LOW, quality improvement only)
 **→ RESOLVED 2026-05-06 engine (v1.1 polish batch):** Option a applied. `requirements-lock.txt` created: attrs==26.1.0, iniconfig==2.3.0, jsonschema==4.26.0, openpyxl==3.1.5, packaging==26.1, pluggy==1.6.0, pytest==9.0.3, PyYAML==6.0.3, requests==2.33.1.
 
-### Q-PHASE15-BUDGET-COST-01: check_budget.py reads cost.credits but dfs_pull.py never populates it [MEDIUM] ℹ️ SELF-RESOLVED (code correct)
+### Q-PHASE15-BUDGET-COST-01: check_budget.py reads cost.credits but dfs_pull.py never populates it [MEDIUM] ✅ SELF-RESOLVED 2026-05-06 (code correct + e2e test added)
 **Raised:** 2026-05-05 during Phase 15 W3 cost+budget audit (W-C4 worker output; cat20-cost-budget.md)
 **Context:** `check_budget.py` reads `cost.credits` per events.schema.json ADR-017 definition. But `dfs_pull.py` provenance event writer never populates the `cost` field — credits are written only to `source.credits_used`. Result: `check_budget.py` always reports `used_24h=0` regardless of actual DFS spend. Budget guard is structurally sound but not active in practice. Fix: dfs_pull.py should write `cost: {"provider": "dataforseo", "credits": source.credits_used}` when writing provenance events.
 **Options:**
@@ -313,6 +338,8 @@
 **Owner:** karar verici agent (Phase 15 W5 or v1.1 — medium priority, no immediate risk)
 **Blocking Phase:** None (MEDIUM, budget guard inactive but usage minimal)
 **→ NOTE 2026-05-06:** Audit finding was inaccurate. `skills/ingestion/dfs-pull/SKILL.md` Step 9 already calls `events_writer.append_provenance(..., cost={"provider":"dataforseo","credits":float(estimate),...})`. `check_budget.py._extract_credits()` correctly reads this. Old events (run_id=null, pre-Phase 14 enforcement) had cost=null — historical only. New runs populate correctly. Estimate used (not actual API credits), acceptable for budget tracking. No code fix needed.
+
+**→ FOLLOW-UP RESOLVED 2026-05-06 v1.1-FIX-WAVE-2 Task 2.4 (engine `a4fafb6`):** Audit divergence root cause = module role confusion (`dfs_pull.py` is pure transform per Phase 6 D-003 split, NOT the orchestrator). E2E regression test `tests/budget/test_budget_accounting.py` locks the writer→reader contract (events_writer.append_provenance → check_budget.py round-trip; 2 cases used_24h=1.5 + aggregate 40.5). `rules/budget-events.md` NEW codifies discipline (R-budget-1..4: orchestrator writes / cost shape / per-run estimate / round-trip locked). Discovery: SKILL.md `operation="staging"` enum-dışı → Q-WAVE2-DFS-OP-STAGING-01 Wave 3 scope.
 
 ### Q-PHASE15-SECRETS-FP-01: check_secrets.sh false positives on test fixtures — exits FAIL [LOW] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 15 W3 security audit (W-C2 worker output; cat16-security-kvkk.md)
