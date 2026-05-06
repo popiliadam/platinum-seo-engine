@@ -42,6 +42,10 @@ EXEMPT_RELATIVE_PATHS = {
     Path("docs/OPEN_QUESTIONS.md"),
     Path("tests/scripts/test_template_refs.py"),
 }
+# Historical release notes describe past drift fixes by name; bare aliases
+# show up as historical narrative, not active references.  Same exclusion
+# pattern as CONTEXT_LEDGER / PHASE_STATUS.
+EXEMPT_GLOB_RELATIVE = ("docs/RELEASE_NOTES_v*.md",)
 EXEMPT_PREFIXES = (
     Path("docs/superpowers"),
     Path("templates"),
@@ -62,6 +66,8 @@ def _iter_text_files() -> list[Path]:
         if rel in EXEMPT_RELATIVE_PATHS:
             continue
         if any(rel.is_relative_to(prefix) for prefix in EXEMPT_PREFIXES):
+            continue
+        if any(rel.match(pat) for pat in EXEMPT_GLOB_RELATIVE):
             continue
         files.append(path)
     return files

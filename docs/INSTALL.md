@@ -1,6 +1,6 @@
 # Installation
 
-> Status: **v1.0.0** — 43 skills, production-ready.
+> Status: **v1.1.0** — 43 skills, production-ready (schema-data aligned + drift-check GREEN).
 
 ## Requirements
 
