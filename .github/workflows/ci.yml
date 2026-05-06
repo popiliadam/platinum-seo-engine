@@ -51,6 +51,21 @@ jobs:
         run: pytest --tb=no -q
         continue-on-error: false
 
+      # Step 4a — events.schema sanity (ADR-031: ensure schema is loadable; the
+      # full per-row validation runs in tests/state/test_events_schema_compliance.py
+      # which skips cleanly when PSEO_WORKSPACE_ROOT is unbound — this engine CI
+      # does NOT have a workspace, so the strict per-row gate fires only in
+      # workspace-bound contexts. The sanity check keeps the contract visible.)
+      - name: 4a. events-schema-sanity
+        run: |
+          python3 -c "
+          import json, jsonschema
+          schema = json.load(open('schemas/events.schema.json'))
+          jsonschema.Draft7Validator.check_schema(schema)
+          print('events.schema.json: Draft7 valid')
+          "
+        continue-on-error: false
+
       # Step 5 — plugin agnostik invariant (.mcp.json 3 server + skill body slug hardcode YOK F-16)
       - name: 5. plugin-agnostik-grep
         run: |
