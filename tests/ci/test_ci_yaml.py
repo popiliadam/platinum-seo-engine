@@ -152,3 +152,50 @@ def test_plugin_agnostik_grep_word_boundary_and_disclaimer_exclude():
     assert "\\b(dentnotion|" in step5["run"]
     assert "No project slug hardcoded" in step5["run"]
     assert "F-16 disclaimer" in step5["run"]
+
+
+def test_plugin_agnostik_step5_no_or_true_mask():
+    """Wave 2 strict mode invariant: step 5 plugin-agnostik-grep MUST NOT
+    contain `|| true` mask. Real exit code must surface so legitimate
+    hardcode regressions fail the build.
+
+    Pre-Wave-2 state used `|| true` to swallow false positives from F-16
+    disclaimer multi-line slug enumerations. Wave 2 fix: expand grep -vE
+    filter with adjacent-slug-pair patterns (real hardcode = 1 slug;
+    disclaimer enumerates 8 slugs across 2-3 lines, so pairs are unique
+    to disclaimer context).
+    """
+    body = CI_YAML.read_text()
+    step5 = next(
+        s for s in yaml.safe_load(body)["jobs"]["ci"]["steps"]
+        if s.get("name", "") == "5. plugin-agnostik-grep"
+    )
+    assert "|| true" not in step5["run"], (
+        "Wave 2 strict mode regression: step 5 must not mask exit code with `|| true`"
+    )
+
+
+def test_plugin_agnostik_step5_adjacent_pair_filter_present():
+    """Wave 2 fix codification: adjacent-slug-pair patterns in grep -vE
+    catch F-16 disclaimer multi-line continuation lines without false
+    positives on real hardcodes (which would mention 1 slug only).
+
+    7 adjacent pairs cover the 8-slug enumeration:
+    dentnotion-vento, vento-eykom, eykom-bigcattr, bigcattr-calitte,
+    calitte-lastiksa, lastiksa-noraninsaat, noraninsaat-adstark.
+    """
+    body = CI_YAML.read_text()
+    step5 = next(
+        s for s in yaml.safe_load(body)["jobs"]["ci"]["steps"]
+        if s.get("name", "") == "5. plugin-agnostik-grep"
+    )
+    pairs = [
+        "dentnotion.*vento",
+        "eykom.*bigcattr",
+        "calitte.*lastiksa",
+        "noraninsaat.*adstark",
+    ]
+    for pair in pairs:
+        assert pair in step5["run"], (
+            f"Wave 2 adjacent-pair filter missing: {pair} (disclaimer false positive risk)"
+        )
