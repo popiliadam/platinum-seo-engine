@@ -120,3 +120,6 @@ state/runs/
 *.orig
 *.rej
 .cache/
+
+# ─── External tool configs (out-of-scope, F-16 plugin agnostik) ───
+.codex/
