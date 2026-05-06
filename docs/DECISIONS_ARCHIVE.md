@@ -20,6 +20,7 @@ ADR-011 rotation kararıyla `DECISIONS.md`'den taşınmış eski kararlar. Appen
 - ADR-026..028 (v1.1 P0 Wave 1, 2026-05-06 — ondördüncü rotation cycle, ADR-030..033 ekleme ile DECISIONS.md hard cap tetiklenmesi sonrası 3 en eski active cut; ADR-026 cap-only supersede entry korunur byte-byte)
 - ADR-029 (v1.1 P0 Wave 1 Task 1.2, 2026-05-06 — onbeşinci rotation cycle, ADR-033 ekleme ile DECISIONS.md 6549B tetiklemesi sonrası en eski active cut)
 - ADR-030 (v1.1 P0 Wave 1 Task 1.4, 2026-05-06 — onaltıncı rotation cycle, ADR-031 ekleme ile DECISIONS.md 6968B tetiklemesi sonrası en eski active cut; brand_identity rename detayı engine commit `7dc67ba` body'sinde de korunur)
+- ADR-031..032 (v1.1 P1 Wave 2 Task 2.2, 2026-05-06 — onyedinci rotation cycle, ADR-034 ekleme ile DECISIONS.md 7367B tetiklemesi sonrası 2 en eski active cut; events.jsonl legacy archive detayı workspace commit `f8d8663` + active.json canonical detayı engine commit `3bec210` body'sinde de korunur)
 
 **Active ADR'ler için:** [DECISIONS.md](DECISIONS.md)
 
@@ -286,3 +287,21 @@ ADR-011 rotation kararıyla `DECISIONS.md`'den taşınmış eski kararlar. Appen
 **Context:** Workspace `eca13c5` renamed `brand_identity.hitap`→`pronoun_preference`, `tone`→`formality` (canonical Principle 2 vocab). Schema 1.2 had `additionalProperties: false` + only legacy keys → workspace failed `validate_schema`. Q-PHASE15-BRAND-CONFIG-01 was prematurely closed without engine fix.
 **Decision:** Schema 1.2→1.3 additive. Add `pronoun_preference` enum `["sen","siz"]` + `formality` enum `["semi-pro","conversational","formal","casual"]`. Legacy `hitap`+`tone` retained as deprecated aliases (1-yr shim). Migration 0003 = pure key rename, values KORUNUR (no remap). brand-onboarding 18→20 fields; required[] unchanged.
 **Consequences:** Workspace validates EXIT 0 post-migrate. Skills can still read legacy keys until v2.0. Idempotency: 8 cases in `test_migration_0003.py`. Legacy removal scheduled v2.0.
+
+---
+
+## ADR-031 — events.jsonl Legacy Archive
+**Date:** 2026-05-06
+**Status:** accepted
+**Context:** Workspace demo-dental events.jsonl (88 rows) had 15 schema violations: skill names used as `event_type` (gsc_pull/dfs_pull/etc) instead of 10-enum; audit events missing `event_id`; extra fields (`credits_used`/`fail_count`). Append-only-state forbids in-place edit; F-13/15/16/17 couldn't surface real drift.
+**Decision:** Two-file split. `events.jsonl` — strict, schema-PASS (CI gate). `events.jsonl.legacy` — READ-ONLY archive. `scripts/state/migrate_legacy_events.py` atomic-partitions (`.tmp` rename pair), idempotent, emits `outputs/reports/{date}-events-archive.md` audit trail. Future writers MUST produce strict rows; `tests/state/test_events_schema_compliance.py` enforces.
+**Consequences:** Workspace 88 → 73 strict + 15 legacy. F-13/15/16/17 re-eval clears mechanical noise. CI Step 4a keeps schema validity visible; per-row gate fires in workspace-bound runs.
+
+---
+
+## ADR-032 — `shared/active.json` Field: `active_project` Canonical
+**Date:** 2026-05-06
+**Status:** accepted
+**Context:** `pseo-active.md` writes `{"active_project": "<slug>"}`; `pseo-driftcheck.md:34` reads `.active_project`. Python hooks `post-tool-use.json`+`user-prompt-submit.json` were reading `.project_id` — never written. Audit append + context banner silently no-op; F-19 SKIP unnoticed.
+**Decision:** Canonical = `active_project`. Both hooks fixed. No backward-compat shim (no legacy data on disk).
+**Consequences:** F-19 audit fires live. Contract locked by `tests/hooks/test_active_project_contract.py`. Future writers MUST emit `active_project`.
