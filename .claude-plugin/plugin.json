@@ -2,7 +2,10 @@
   "name": "platinum-seo-engine",
   "version": "1.1.0",
   "description": "SEO operasyonunu VS Code + Claude Code üzerinden yöneten plugin sistemi — schema-locked, Excel+JSONL state, drift-checked, ~43 skill, 14 phase roadmap.",
-  "author": "Platinum SEO Engine Contributors",
+  "author": {
+    "name": "Suleyman Capar",
+    "email": "suleymanncapar@gmail.com"
+  },
   "license": "MIT",
   "skills": "./skills",
   "commands": "./commands",
