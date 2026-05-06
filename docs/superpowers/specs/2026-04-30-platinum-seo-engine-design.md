@@ -536,14 +536,16 @@ v1 release **tüm skill setini** kapsar (eski sistem 28 skill + bizim ekledikler
 
 ### 11.1 Tam Skill Listesi (Kategori Bazında)
 
-#### Meta (5)
+#### Meta (4)
 | Skill | Trigger | Phase |
 |---|---|---|
 | init-project | "yeni proje", `/pseo-init` | 5 |
 | whats-next | "ne yapmalıyım", "bugün" | 5 |
-| load-context | (hook tetikli) | 13 |
 | brand-onboarding | "marka onboard" | 12 |
 | mark-done | "tamamlandı" | 12 |
+
+<!-- v1.1 Integration Audit Wave 1 (2026-05-06): load-context moved to Governance (skills/governance/load-context/) per Phase 13+ refactor; was originally drafted under Meta. Q-V1.2-DESIGN-CATEGORY-DRIFT-01 P2 inline resolution. -->
+
 
 #### Ingestion (4)
 | Skill | Trigger | Phase |
@@ -576,17 +578,21 @@ v1 release **tüm skill setini** kapsar (eski sistem 28 skill + bizim ekledikler
 | internal-links | "iç link planı" | 8 |
 | master-task-sync | "task sync" | 8 |
 
-#### Reporting (8)
+#### Reporting (9)
 | Skill | Trigger | Phase |
 |---|---|---|
 | monthly-report | "aylık rapor", `/pseo-monthly` | 9 |
 | weekly-summary | "haftalık özet" | 9 |
+| monitoring-weekly | "haftalık izleme" | 12 |
 | portfolio-overview | "portföy özet" | 9 |
 | portfolio-weekly-brief | "portföy haftalık" | 9 |
 | portfolio-monthly-roundup | "portföy aylık" | 9 |
 | portfolio-task-heatmap | "task heatmap" | 9 |
 | portfolio-kpi-trend | "kpi trend" | 9 |
 | portfolio-heatmap | "heatmap genel" | 9 |
+
+<!-- v1.1 Integration Audit Wave 1 (2026-05-06): monitoring-weekly moved here from Governance (skills/reporting/monitoring-weekly/) — semantic match with reporting-cron pattern; was originally listed under Governance. Q-V1.2-DESIGN-CATEGORY-DRIFT-01 P2 inline resolution. -->
+
 
 #### Production (5)
 | Skill | Trigger | Phase |
@@ -609,7 +615,10 @@ v1 release **tüm skill setini** kapsar (eski sistem 28 skill + bizim ekledikler
 | drift-check | "drift kontrol", `/pseo-driftcheck` | 5 |
 | schema-validate | "schema validate" | 13 |
 | glossary-audit | "glossary kontrol" | 13 |
-| monitoring-weekly | "haftalık izleme" | 12 |
+| load-context | (hook tetikli) | 13 |
+
+<!-- v1.1 Integration Audit Wave 1 (2026-05-06): load-context moved here from Meta (skills/governance/load-context/) — semantic match with governance pattern (audit/load context for hook-driven invocation). monitoring-weekly moved out to Reporting per category drift fix. Net category total unchanged (4). Q-V1.2-DESIGN-CATEGORY-DRIFT-01 P2 inline resolution. -->
+
 
 **Toplam: 43 skill**, 8 kategori, 9 phase üzerine yayılmış.
 
