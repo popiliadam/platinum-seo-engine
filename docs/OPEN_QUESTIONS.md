@@ -37,7 +37,8 @@ Both are workspace-side data tasks, not engine code drift. Wave 3 scope after v1
 **Owner:** karar verici agent (Wave 3 plan or v1.2 milestone close)
 **Blocking Phase:** None (AMBER verdict acceptable; data hygiene non-blocking)
 
-### Q-WAVE2-DFS-OP-STAGING-01: dfs-pull SKILL.md operation="staging" outside enum [LOW]
+### Q-WAVE2-DFS-OP-STAGING-01: dfs-pull SKILL.md operation="staging" outside enum [LOW] ✅ RESOLVED 2026-05-06
+**→ RESOLVED 2026-05-06 v1.1-FIX-WAVE-3 Task 3.5 (engine schema additive bump):** Option b accepted. `events.schema.json` operation enum bumped 5→6 values: `[ingest, normalize, project_excel, validate, cascade_done, "staging"]`. Schema additive (ADR-018 paterni — schema_version unchanged, description note added explaining 'staging' = Phase 6 D-003 pre-Excel staging routing). `tests/schemas/test_events_schema_operation.py` NEW, 10 cases (enum closure + each-value provenance validation + dfs-pull SKILL.md sync).
 **Raised:** 2026-05-06 during v1.1-FIX-WAVE-2 P1 Task 2.4 (e2e test discovery).
 **Context:** `skills/ingestion/dfs-pull/SKILL.md` Step 9 line 299 documents `operation="staging"` but `events.schema.json` operation enum is `[ingest, normalize, project_excel, validate, cascade_done]`. Wave 2 e2e test used `"ingest"` (valid) to mirror flow. SKILL.md docstring needs update OR schema enum additive bump for "staging" if Phase 6 D-003 staging-only routing semantics warrant a dedicated value.
 **Options:**
