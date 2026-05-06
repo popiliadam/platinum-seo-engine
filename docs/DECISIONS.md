@@ -12,8 +12,8 @@ Append-only — superseded entry'ler işaretlenir, silinmez.
 | ADR-001 | Plugin Repo Yeri: platinum-seo-engine olarak Rename | accepted | DECISIONS_ARCHIVE.md |
 | ADR-002 | GitHub Repo Timing: Phase 0 Sonu, User-Created | accepted | DECISIONS_ARCHIVE.md |
 | ADR-003 | Pilot Proje: dentnotion | accepted | DECISIONS_ARCHIVE.md |
-| ADR-004 | Eski Repo Silme: v1 Acceptance + 1 Hafta Soak | accepted | DECISIONS_ARCHIVE.md |
-| ADR-005 | Workspace Repo Timing: Phase 14, User-Created | accepted | DECISIONS_ARCHIVE.md |
+| ADR-004 | Eski Repo Silme: v1 Acceptance + 1 Hafta Soak | closed (2026-05-06, post-soak; 2 eski repo silindi ~1.6GB) | DECISIONS_ARCHIVE.md |
+| ADR-005 | Workspace Repo Timing: Phase 14, User-Created | closed (2026-05-06, Phase 14 condition met) | DECISIONS_ARCHIVE.md |
 | ADR-006 | LICENSE: MIT | accepted | DECISIONS_ARCHIVE.md |
 | ADR-007 | plugin.json Baseline Schema, Optional Alanlar Phase 4'te Validate | accepted | DECISIONS_ARCHIVE.md |
 | ADR-008 | state/outputs/inbox Plugin Repo'da YOK | accepted | DECISIONS_ARCHIVE.md |
