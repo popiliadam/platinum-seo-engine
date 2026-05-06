@@ -171,6 +171,44 @@ Stop and flag the manager — do not patch, do not fall back.
 8. **MonthlyReportError** (base) — invalid `period_end`, openpyxl
    missing, etc. Always surfaced with a descriptive message.
 
+## Audit Event Emit (Q-RP-01 RESOLVED 2026-05-06 Phase B post-closeout)
+
+Schema-first override Section 4c paterni reuse (drift-check Phase 5
+doğum belgesi). `event_kind=audit` row append per `rules/events-writer.md`
+Section 4c — `event_type` field YASAK per Section 6 disambiguation.
+
+```python
+import os
+import sys
+from pathlib import Path
+
+sys.path.insert(0, os.getcwd())
+
+# Q-RP-01 RESOLVED: reporting skill audit event emit (read-only access trail)
+project_slug = os.environ.get("PSEO_PROJECT_ID")
+if not project_slug:
+    print("PSEO_PROJECT_ID not set — audit event skip")
+    sys.exit(0)
+period_end = os.environ.get("REPORT_PERIOD_END", "2026-05-06")
+
+workspace_root_env = os.environ.get("PSEO_WORKSPACE_ROOT")
+workspace_root = (
+    Path(workspace_root_env) if workspace_root_env
+    else Path.home() / "Documents" / "platinum-seo-workspace"
+)
+
+from scripts.state import events_writer
+
+events_writer.append_audit(
+    project_id=project_slug,
+    audit_action="accessed",
+    audit_target=f"reports:monthly:{period_end}",
+    actor="agent:monthly-report",
+    workspace_root=workspace_root,
+    notes=f"local_aggregation report-only (monthly-report; period_end={period_end})",
+)
+```
+
 ## Cross-references
 
 - Schemas: `schemas/monthly-report.schema.json` (10 required sections +
