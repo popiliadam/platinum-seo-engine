@@ -163,7 +163,10 @@ Paralel processing OK — her URL bağımsız Scrapling fetch + transform.
 
 ### Step 3 — Each URL Scrapling fetch (tier-1 fallback Apify v1.2+)
 
-```python
+```text
+# Pseudocode (LLM-native skill per Q-PHASE15-AIO-COMPETITOR-01;
+# fence intentionally `text` not `python` per Q-V1.2-AIO-COMPETITOR-FENCE-01
+# resolution — bare identifier `5xx_marker` is documentation placeholder).
 fetched = []
 for url in organic_urls:
     try:

@@ -2,7 +2,8 @@
 
 ## Unresolved
 
-### Q-V1.2-LOAD-CONTEXT-ORPHAN-DIR-01: skills/meta/load-context/ orphan empty directory [P1]
+### Q-V1.2-LOAD-CONTEXT-ORPHAN-DIR-01: skills/meta/load-context/ orphan empty directory [P1] ✅ RESOLVED 2026-05-06
+**→ RESOLVED 2026-05-06 audit-followup Phase A:** Option a applied. `git rm skills/meta/load-context/.gitkeep` + `rmdir skills/meta/load-context`. design.md §11.1 updated (load-context moved Meta→Governance category in spec; Q-V1.2-DESIGN-CATEGORY-DRIFT P2 inline resolved batch). Trivial cleanup batch ~30 dk Phase A (4 audit findings). Verified `ls skills/meta/` returns 4 dirs (brand-onboarding + init-project + mark-done + whats-next); Meta(5)→Meta(4) consistent with reality.
 **Raised:** 2026-05-06 during v1.1 Integration Audit Wave 1 (filesystem inventory cross-check).
 **Context:** `skills/meta/load-context/` directory exists on disk but contains NO `SKILL.md`. The actual load-context skill lives at `skills/governance/load-context/SKILL.md` (correct location post-Phase 13+ governance refactor). The orphan empty `meta/load-context/` is residual from category move that never deleted the source directory. Empty dir doesn't affect runtime (Claude Code skill loader skips dirs without SKILL.md silently) but creates governance drift + design.md §11.1 docs ambiguity.
 **Options:**
@@ -12,7 +13,8 @@
 **Owner:** karar verici agent (v1.2 doc-pass cleanup batch)
 **Blocking Phase:** None for v1.1.0 (no runtime impact); v1.2 cleanup candidate.
 
-### Q-V1.2-AIO-COMPETITOR-FENCE-01: aio-competitor-map block 2 AST FAIL bare identifier [P1]
+### Q-V1.2-AIO-COMPETITOR-FENCE-01: aio-competitor-map block 2 AST FAIL bare identifier [P1] ✅ RESOLVED 2026-05-06
+**→ RESOLVED 2026-05-06 audit-followup Phase A:** Option a applied. ` ```python ` fence changed to ` ```text ` for the pseudocode-bearing block (skills/discovery/aio-competitor-map/SKILL.md:166). Block content preserved verbatim (5xx_marker bare identifier remains as documentation placeholder). Comment block prepended explaining fence rationale (Q-PHASE15-AIO-COMPETITOR-01 + Q-V1.2-AIO-COMPETITOR-FENCE-01 cross-reference). Verified post-fix: 5 `python` blocks (was 6 — 1 moved to `text`), all 5 AST PASS. `python3 scripts/ci/run_skill_python.py skills/discovery/aio-competitor-map/SKILL.md` exits 0 — helper exec strict mode now safe.
 **Raised:** 2026-05-06 during v1.1 Integration Audit Wave 1 (Python AST parse) + Wave 4 (executability scorecard re-confirm).
 **Context:** `skills/discovery/aio-competitor-map/SKILL.md` block 2 line 9 contains pseudocode `"status": 5xx_marker` where `5xx_marker` is a bare identifier (Python 3 SyntaxError: identifier cannot start with digit, "invalid decimal literal"). Skill body has `# llm_native: true` (Q-PHASE15-AIO-COMPETITOR-01 codified) so executability is intentionally not required, but ` ```python ` fence sets that expectation for `scripts/ci/run_skill_python.py` helper. AST parse fails on this pseudocode block.
 **Options:**
