@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://platinum-seo-engine/schemas/project-config.schema.json",
-  "title": "Project Configuration Schema v1.2",
-  "description": "Per-project pack definition (projects/{slug}/project.config.json). See ARCHITECTURE.md §10. v1.1 (Phase 10): additive bump — content_settings + brand_identity extension fields. v1.2 (Phase 11 W-F1 cascade fix): additive bump — singular 'profile' field (Foundational Principle 2 enforcement field for production skills new-blog/revise-content). 'profiles' array (plural, v1.0) retained for sf-required-reports Tier elevation; singular 'profile' added for Phase 10 Principle 2 profile-aware skill behavior switch (tone, word count, citation density, disclaimer, image style, author byline, counter-argument). Required array UNCHANGED (additive policy, → rules/schema-versioning-discipline.md).",
+  "title": "Project Configuration Schema v1.3",
+  "description": "Per-project pack definition (projects/{slug}/project.config.json). See ARCHITECTURE.md §10. v1.1 (Phase 10): additive bump — content_settings + brand_identity extension fields. v1.2 (Phase 11 W-F1 cascade fix): additive bump — singular 'profile' field (Foundational Principle 2 enforcement field for production skills new-blog/revise-content). v1.3 (v1.1 P0 ADR-030, Migration 0003): brand_identity additive rename — `pronoun_preference` (canonical, replaces deprecated `hitap`) and `formality` (canonical, replaces deprecated `tone`). Old keys retained as deprecated aliases under additionalProperties: false during 1-year shim window. 'profiles' array (plural, v1.0) retained for sf-required-reports Tier elevation; singular 'profile' added for Phase 10 Principle 2 profile-aware skill behavior switch. Required array UNCHANGED (additive policy, → rules/schema-versioning-discipline.md).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -10,7 +10,7 @@
     "currency", "platform", "profiles", "paths", "gsc", "dataforseo"
   ],
   "properties": {
-    "schema_version": { "const": "1.2" },
+    "schema_version": { "const": "1.3" },
     "project_id": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]*$",
@@ -104,7 +104,7 @@
     "brand_identity": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Visual brand identity block consumed by the blog_render Tier 1 CSS injection (S11/SP4 Part 2) + Phase 10 content rules (R-23 inline CSS, R-100 brand entity sameAs, R-71/R-72 image style). Opt-in — projects without this block render with per-profile neutral defaults. All fields optional; a populated subset overrides the corresponding render-time slots while the rest fall back to per-profile defaults. v1.1 additive (Phase 10): tone, hitap, anglicism_tolerance, font_heading, font_body (legacy alias retained), default_hero_url, same_as_urls, image_style.",
+      "description": "Visual brand identity block consumed by the blog_render Tier 1 CSS injection (S11/SP4 Part 2) + Phase 10 content rules (R-23 inline CSS, R-100 brand entity sameAs, R-71/R-72 image style). Opt-in — projects without this block render with per-profile neutral defaults. All fields optional; a populated subset overrides the corresponding render-time slots while the rest fall back to per-profile defaults. v1.1 additive (Phase 10): tone, hitap, anglicism_tolerance, font_heading, font_body (legacy alias retained), default_hero_url, same_as_urls, image_style. v1.3 additive (ADR-030, Migration 0003): pronoun_preference (canonical, replaces deprecated hitap), formality (canonical, replaces deprecated tone) — old keys retained as deprecated aliases for 1-year shim.",
       "properties": {
         "logo_url":                { "type": "string", "format": "uri" },
         "primary_color":           { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
@@ -115,8 +115,10 @@
         "header_template_id":      { "enum": ["minimal", "classic", "ecom"] },
         "footer_template_id":      { "enum": ["minimal", "full"] },
         "source_url_for_sampling": { "type": "string", "format": "uri" },
-        "tone":                    { "enum": ["semi-pro", "conversational", "formal", "casual"], "description": "Phase 10 R-XX. Profile-aware tone (Principle 2 tablo): YMYL=semi-pro+siz, e-commerce=conversational+sen, b2b-saas=formal+siz." },
-        "hitap":                   { "enum": ["sen", "siz"], "description": "Phase 10. Türkçe hitap formu — Principle 2 profile-aware: e-commerce sen, YMYL/b2b-saas siz." },
+        "tone":                    { "enum": ["semi-pro", "conversational", "formal", "casual"], "description": "DEPRECATED v1.3 — use formality (Migration 0003, ADR-030). 1-year alias retain. Phase 10 legacy: profile-aware tone — YMYL=semi-pro+siz, e-commerce=conversational+sen, b2b-saas=formal+siz." },
+        "formality":               { "enum": ["semi-pro", "conversational", "formal", "casual"], "description": "v1.3 canonical (replaces deprecated tone). Profile-aware formality (Principle 2 tablo). Migration 0003 copies legacy tone value verbatim — values preserved (workspace KORUNUR)." },
+        "hitap":                   { "enum": ["sen", "siz"], "description": "DEPRECATED v1.3 — use pronoun_preference (Migration 0003, ADR-030). 1-year alias retain. Phase 10 legacy: Türkçe hitap formu — e-commerce sen, YMYL/b2b-saas siz." },
+        "pronoun_preference":      { "enum": ["sen", "siz"], "description": "v1.3 canonical (replaces deprecated hitap). Türkçe pronoun preference — Principle 2 profile-aware. Migration 0003 copies legacy hitap value verbatim — values preserved (workspace KORUNUR)." },
         "anglicism_tolerance":     { "enum": ["low", "medium", "high"], "default": "medium", "description": "Phase 10. Anglicism (e.g. 'feature', 'workflow', 'brief') tolerance — düşük = pür Türkçe, yüksek = mixed." },
         "tone_phrases_blocklist":  { "type": "array", "items": { "type": "string" }, "description": "Phase 10 R-118. AI signature words humanize blocklist (e.g. 'Aslında', 'Sonuç olarak', 'Özetle')." },
         "font_heading":            { "type": "string", "description": "Phase 10 alias for font_family_heading; new content_settings consumers use this short form." },

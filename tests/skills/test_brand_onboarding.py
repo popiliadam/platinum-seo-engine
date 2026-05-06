@@ -360,15 +360,17 @@ def test_domain_dns_validation_socket_documented() -> None:
 def test_brand_identity_18_and_content_settings_14_enumerated(
     project_config_schema: dict,
 ) -> None:
-    """The wizard must surface every brand_identity property (18) and
+    """The wizard must surface every brand_identity property (20 after
+    ADR-030 v1.3 added pronoun_preference + formality canonical) and
     every content_settings property (14) so Süleyman is prompted for
     each. Counting drift here is a direct schema invariant violation."""
     text = _skill_text()
 
     bi_props = project_config_schema["properties"]["brand_identity"]["properties"]
     cs_props = project_config_schema["properties"]["content_settings"]["properties"]
-    assert len(bi_props) == 18, (
-        f"brand_identity drifted from 18 fields: got {len(bi_props)}"
+    assert len(bi_props) == 20, (
+        f"brand_identity drifted from 20 fields (18 + ADR-030 v1.3 "
+        f"pronoun_preference/formality): got {len(bi_props)}"
     )
     assert len(cs_props) == 14, (
         f"content_settings drifted from 14 fields: got {len(cs_props)}"
@@ -398,12 +400,12 @@ def test_staging_output_schema_conformance(
     contract that outputs/onboarding/{slug}-staging-config.json
     candidates the skill emits round-trip cleanly into init-project at
     Phase 14."""
-    # schema v1.2 is asserted by the const constraint.
-    assert project_config_schema["properties"]["schema_version"]["const"] == "1.2"
+    # schema v1.3 is asserted by the const constraint (ADR-030).
+    assert project_config_schema["properties"]["schema_version"]["const"] == "1.3"
 
     # Minimal-required staging artifact derived from schema.required.
     staging = {
-        "schema_version": "1.2",
+        "schema_version": "1.3",
         "project_id": "dentnotion",
         "domain": "https://example.com/",
         "market": "TR",

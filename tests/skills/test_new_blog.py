@@ -305,12 +305,14 @@ def test_wcag_referenced() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test 13 — Cascade fix W-F1: schema v1.2 + profile enum 5-value
+# Test 13 — Cascade fix W-F1 (schema v1.2 profile enum) + ADR-030 v1.3 bump
 # ---------------------------------------------------------------------------
 
 def test_cascade_fix_schema_1_2() -> None:
-    """W-F1 cascade fix: project-config.schema.json bumped to "1.2"
-    and declares the singular `profile` field with the 5-enum."""
+    """W-F1 cascade fix: project-config.schema.json declares the singular
+    `profile` field with the 5-enum.  The const schema_version tracks the
+    current spec version (v1.2 was W-F1 introduction, v1.3 is ADR-030
+    brand_identity field rename — pronoun_preference + formality)."""
     schema_path = SCHEMAS / "project-config.schema.json"
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
 
@@ -319,9 +321,9 @@ def test_cascade_fix_schema_1_2() -> None:
               .get("schema_version", {})
               .get("const")
     )
-    assert schema_version == "1.2", (
-        f"schema_version not bumped to 1.2 (got {schema_version!r}); "
-        f"cascade fix W-F1 incomplete"
+    assert schema_version == "1.3", (
+        f"schema_version not bumped to 1.3 (got {schema_version!r}); "
+        f"ADR-030 v1.1 P0 brand_identity rename incomplete"
     )
 
     profile = schema.get("properties", {}).get("profile")
@@ -390,19 +392,20 @@ def test_migration_0002_pure_function_idempotent() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test 15 — bootstrap_project.SCHEMA_VERSION sync to "1.2"
+# Test 15 — bootstrap_project.SCHEMA_VERSION sync to current schema const
 # ---------------------------------------------------------------------------
 
 def test_bootstrap_schema_version_sync() -> None:
-    """bootstrap_project.py SCHEMA_VERSION constant must equal "1.2"
-    so newly bootstrapped projects emit schema-valid configs."""
+    """bootstrap_project.py SCHEMA_VERSION constant must equal the current
+    project-config.schema.json const ("1.3" after ADR-030) so newly
+    bootstrapped projects emit schema-valid configs."""
     bootstrap_path = REPO_ROOT / "scripts" / "state" / "bootstrap_project.py"
     text = bootstrap_path.read_text(encoding="utf-8")
     assert (
-        'SCHEMA_VERSION = "1.2"' in text
-        or "SCHEMA_VERSION='1.2'" in text
-        or 'SCHEMA_VERSION="1.2"' in text
-    ), "SCHEMA_VERSION constant not synced to 1.2"
+        'SCHEMA_VERSION = "1.3"' in text
+        or "SCHEMA_VERSION='1.3'" in text
+        or 'SCHEMA_VERSION="1.3"' in text
+    ), "SCHEMA_VERSION constant not synced to 1.3"
 
 
 # ---------------------------------------------------------------------------

@@ -125,10 +125,12 @@ Süleyman onaylarsa devam, aksi halde ABORT.
 Heuristic önerisini Süleyman'a göster, "Bu mu? [y/N + alternatif
 seç]" prompt. Son kararı **Süleyman** verir.
 
-### Step 4 — Brand identity 18-field interactive prompt
+### Step 4 — Brand identity 20-field interactive prompt
 
 Her alan ayrı prompt; default YOK (AI suistimal yasağı). Skip
-edilen alan AMBER + iterate (DURUR #3). 18 alan sırası:
+edilen alan AMBER + iterate (DURUR #3). 20 alan sırası (v1.3
+ADR-030 ile 18 → 20: `pronoun_preference` + `formality` canonical
+eklendi; eski `hitap` + `tone` 1-yıl deprecated alias):
 
 1. `logo_url` — URI
 2. `primary_color` — `^#[0-9a-fA-F]{6}$`
@@ -139,15 +141,17 @@ edilen alan AMBER + iterate (DURUR #3). 18 alan sırası:
 7. `header_template_id` — enum [`minimal`, `classic`, `ecom`]
 8. `footer_template_id` — enum [`minimal`, `full`]
 9. `source_url_for_sampling` — URI
-10. `tone` — enum [`semi-pro`, `conversational`, `formal`, `casual`]
-11. `hitap` — enum [`sen`, `siz`]
-12. `anglicism_tolerance` — enum [`low`, `medium`, `high`]
-13. `tone_phrases_blocklist` — array<string>
-14. `font_heading` — string (alias of #5)
-15. `font_body` — string (alias of #6)
-16. `default_hero_url` — URI
-17. `same_as_urls` — array<URI>
-18. `image_style` — enum [`clean-illustration`, `product-photo`,
+10. `tone` — enum [`semi-pro`, `conversational`, `formal`, `casual`] — DEPRECATED v1.3 (use `formality`)
+11. `formality` — enum [`semi-pro`, `conversational`, `formal`, `casual`] — v1.3 canonical
+12. `hitap` — enum [`sen`, `siz`] — DEPRECATED v1.3 (use `pronoun_preference`)
+13. `pronoun_preference` — enum [`sen`, `siz`] — v1.3 canonical
+14. `anglicism_tolerance` — enum [`low`, `medium`, `high`]
+15. `tone_phrases_blocklist` — array<string>
+16. `font_heading` — string (alias of #5)
+17. `font_body` — string (alias of #6)
+18. `default_hero_url` — URI
+19. `same_as_urls` — array<URI>
+20. `image_style` — enum [`clean-illustration`, `product-photo`,
     `diagram-screenshot`, `location-photo`, `esnek`]
 
 ### Step 5 — Content settings 14-field interactive prompt

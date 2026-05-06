@@ -37,23 +37,33 @@ Append-only — superseded entry'ler işaretlenir, silinmez.
 | ADR-027 | Phase 7 Transform Size Policy: <1500L Hedef | accepted | DECISIONS_ARCHIVE.md |
 | ADR-028 | Tech Audit Schema: issue_category Enum + Web Vitals 2024 Note | accepted | DECISIONS_ARCHIVE.md |
 | ADR-029 | Budget Convention: per-run estimated_credits (Phase 7+) | accepted | DECISIONS_ARCHIVE.md |
-| ADR-032 | active.json Field Naming: `active_project` Canonical (Hook Contract Fix) | accepted | (below) |
-| ADR-033 | project.config.json Canonical Path: `projects/{slug}/project.config.json` | accepted | (below) |
+| ADR-032 | active.json Field: `active_project` Canonical (Hook Contract Fix) | accepted | (below) |
+| ADR-030 | brand_identity Rename: pronoun_preference + formality (Migration 0003) | accepted | (below) |
+| ADR-033 | project.config.json Canonical Path | accepted | (below) |
 
 ---
 
-## ADR-032 — `shared/active.json` Field Naming: `active_project` Canonical
+## ADR-030 — brand_identity Rename: pronoun_preference + formality (Migration 0003)
 **Date:** 2026-05-06
 **Status:** accepted
-**Context:** `pseo-active.md` writes `{"active_project": "<slug>"}` and `pseo-driftcheck.md:34` reads `.active_project`. Python hooks `post-tool-use.json` + `user-prompt-submit.json` were reading `.project_id` — never written. Audit append + context banner silently no-op'd; F-19 coverage could SKIP unnoticed.
-**Decision:** Canonical field on `shared/active.json` is `active_project` (slug). Both Python hooks updated; `pre-tool-use.json` + `session-start.json` don't read the field. No backward-compat shim — no on-disk legacy `project_id` data exists.
-**Consequences:** F-19 audit append fires live. Contract locked by `tests/hooks/test_active_project_contract.py` (both hooks must read `active_project`, must not read `project_id`). Future writers (init-project skill) MUST emit `active_project`.
+**Context:** Workspace `eca13c5` renamed `brand_identity.hitap`→`pronoun_preference`, `tone`→`formality` (canonical Principle 2 vocab). Schema 1.2 had `additionalProperties: false` + only legacy keys → workspace failed `validate_schema`. Q-PHASE15-BRAND-CONFIG-01 was prematurely closed without engine fix.
+**Decision:** Schema 1.2→1.3 additive. Add `pronoun_preference` enum `["sen","siz"]` + `formality` enum `["semi-pro","conversational","formal","casual"]`. Legacy `hitap`+`tone` retained as deprecated aliases (1-yr shim). Migration 0003 = pure key rename, values KORUNUR (no remap). brand-onboarding 18→20 fields; required[] unchanged.
+**Consequences:** Workspace validates EXIT 0 post-migrate. Skills can still read legacy keys until v2.0. Idempotency: 8 cases in `test_migration_0003.py`. Legacy removal scheduled v2.0.
 
 ---
 
-## ADR-033 — project.config.json Canonical Path: `projects/{slug}/project.config.json`
+## ADR-032 — `shared/active.json` Field: `active_project` Canonical
 **Date:** 2026-05-06
 **Status:** accepted
-**Context:** Three competing path forms: (a) `projects/{slug}/project.config.json` — written by `bootstrap_project.py:170`, read by `pseo-init.md`/`pseo-driftcheck.md`/`pseo-active.md`/`validate_invariants.py:972`/migrations 0001+0002; (b) `projects/{slug}/config/project.config.json` — workspace dentnotion pilot landed there; (c) `project/project-config.json` — `check_budget.py` default + 40 SKILL.md + test files used the hyphenated form. Drift surface = pre-flight skill load.
-**Decision:** Canonical = `projects/{slug}/project.config.json` (no `config/` subfolder, no hyphenated variant). Engine sweep: `check_budget.py` default + `internal_links_transform.py` help-text + 40 files containing `project-config.json` → `project.config.json` + 9 files containing `projects/{slug}/config/project.config.json` → `projects/{slug}/project.config.json`. `excel.config.json` + `excel-source-manifest.json` remain in `projects/{slug}/config/` (separate per-project config files, distinct decision).
-**Consequences:** `tests/scripts/test_path_canonical.py` regex-greps the tree — both forbidden patterns (hyphenated + `config/` subfolder for project.config.json) fail the suite. Workspace data move (`mv projects/dentnotion/config/project.config.json projects/dentnotion/`) requires Süleyman approval; engine code is now consistent regardless.
+**Context:** `pseo-active.md` writes `{"active_project": "<slug>"}`; `pseo-driftcheck.md:34` reads `.active_project`. Python hooks `post-tool-use.json`+`user-prompt-submit.json` were reading `.project_id` — never written. Audit append + context banner silently no-op; F-19 SKIP unnoticed.
+**Decision:** Canonical = `active_project`. Both hooks fixed. No backward-compat shim (no legacy data on disk).
+**Consequences:** F-19 audit fires live. Contract locked by `tests/hooks/test_active_project_contract.py`. Future writers MUST emit `active_project`.
+
+---
+
+## ADR-033 — project.config.json Canonical Path
+**Date:** 2026-05-06
+**Status:** accepted
+**Context:** Three competing forms: (a) `projects/{slug}/project.config.json` (engine canon); (b) `projects/{slug}/config/...` (workspace pilot); (c) hyphenated `project-config.json` (check_budget + 40 SKILL.md).
+**Decision:** Canonical = `projects/{slug}/project.config.json`. Engine sweep: 40 hyphen→dot + 9 strip `config/` + check_budget/internal_links defaults. `excel.config.json`/`excel-source-manifest.json` stay in `config/` (separate).
+**Consequences:** `test_path_canonical.py` regex-guards both forbidden forms. Workspace mv applied (`e85407f`). Aligned.

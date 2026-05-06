@@ -236,7 +236,7 @@ def test_config_schema_valid(tmp_path: Path, project_config_schema: dict) -> Non
     )
 
     # Required-field spot checks the schema enforces.
-    assert cfg["schema_version"] == "1.2"
+    assert cfg["schema_version"] == "1.3"
     assert cfg["domain"].startswith("https://")
     assert cfg["market"] == "TR"
     assert cfg["language"]["content_locale"] == "tr-TR"
