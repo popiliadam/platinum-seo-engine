@@ -59,6 +59,6 @@ Status grupları:
 
 Hiç run yoksa: `whats-next` skill'inin önereceği başlangıç noktasını sun (Phase 5'te `skills/meta/whats-next` yazılana kadar manuel öneri: SF crawl mı, GSC pull mı, quick-win mı).
 
-## 4. Sonraki adım önerisi (Phase 5+ stub)
+## 4. Sonraki adım önerisi (whats-next skill chain)
 
-`skills/meta/whats-next/SKILL.md` Phase 5'te yazılacak. Mevcut durumda komut yalnızca run listesini sunup heuristic bir öneri verir; otomatik routing Phase 5 sonrası aktiftir.
+Hiç run yoksa veya kullanıcı "şimdi ne yapayım" sorduğunda `skills/meta/whats-next/SKILL.md` (Phase 5, aktif) `scripts/meta/whats_next.py` üzerinden T-9NNNN router band ile Top-3 ranking üretir. Bu komut listeyi sunduktan sonra whats-next çıktısını yorumlamak için doğrudan skill'i çağırabilir.

@@ -8,9 +8,10 @@ allowed-tools: Bash(python3:*), Bash(jq:*), Bash(date:*), Read
 model: sonnet
 ---
 
-# /pseo-monthly — Aylık Rapor Üretimi (Phase 9 STUB)
+# /pseo-monthly — Aylık Rapor Üretimi
 
-> **Phase dependency:** Bu komut `skills/reporting/monthly-report/SKILL.md` (Phase 9) yazıldıktan sonra tam çalışır. Şu an STUB — yalnızca template render edebilir, master.xlsx aggregation'ı Phase 9'da gelir.
+> **Skill:** `skills/reporting/monthly-report/SKILL.md` (Phase 9, aktif).
+> master.xlsx ay-bazlı aggregation + `monthly-report.schema.json` JSON + markdown render.
 
 ## 1. Argüman normalizasyonu
 
@@ -20,34 +21,28 @@ model: sonnet
 
 `PROJECT` boşsa: kullanıcıdan slug iste veya `/pseo-active <slug>` öner; aşağıdaki adımları atla.
 
-## 2. Phase 9 plan (skill yazıldığında)
+## 2. Skill chain
 
-`skills/reporting/monthly-report/SKILL.md` şu adımları koşacak:
+`skills/reporting/monthly-report/SKILL.md` şu adımları koşar:
 
 1. master.xlsx'ten ay boyunca toplanan logical sheet'leri oku (gsc_landing_query, content_decay, quick_wins, master_task)
 2. `monthly-report.schema.json` formatında JSON data objesi üret (`{workspace}/projects/{slug}/_state/reports/{month}-monthly.json`)
-3. `templates/reports/monthly.template.md` + bu JSON'u `scripts/reporting/render_template.py` ile birleştir
+3. `templates/reports/monthly-report.template.md` + bu JSON'u `scripts/reporting/render_template.py` ile birleştir
 4. Çıktıyı `{workspace}/projects/{slug}/outputs/reports/{month}-monthly.md` olarak yaz
 5. `events.jsonl` → `report_generated` event'i
 
-## 3. STUB davranış (template render)
+## 3. Manuel template render (helper)
 
-Phase 9'a kadar manuel test için: data JSON elde mevcutsa `render_template.py` doğrudan çağrılabilir.
-
-CLI imzası: `render_template.py <template.md> <data.json>` (stdout'a render eder; `$key` / `${key}` yerine geçirir).
-
-Manuel önizleme örneği (data hazırlandıktan sonra):
+Hazır JSON data ile `render_template.py` doğrudan çağrılabilir. CLI imzası: `render_template.py <template.md> <data.json>` (stdout'a render eder; `$key` / `${key}` yerine geçirir).
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/reporting/render_template.py" \
-  "${CLAUDE_PLUGIN_ROOT}/templates/reports/monthly.template.md" \
+  "${CLAUDE_PLUGIN_ROOT}/templates/reports/monthly-report.template.md" \
   "${PSEO_WORKSPACE_ROOT}/projects/<slug>/_state/reports/<YYYY-MM>-monthly.json"
 ```
 
-Şu an `templates/reports/monthly.template.md` boş (Phase 9'da yazılır); STUB sırasında komut yalnızca planı sunar.
+## 4. Bağımlılıklar
 
-## 4. Açık bağımlılıklar
-
-- `skills/reporting/monthly-report/SKILL.md` — Phase 9
-- `templates/reports/monthly.template.md` — Phase 9
+- `skills/reporting/monthly-report/SKILL.md` — aktif (Phase 9)
+- `templates/reports/monthly-report.template.md` — aktif
 - master.xlsx ay-bazlı aggregation skill'leri (gsc-pull, content-decay) — Phase 6/7

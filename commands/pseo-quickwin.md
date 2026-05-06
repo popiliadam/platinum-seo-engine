@@ -8,9 +8,9 @@ allowed-tools: Bash(jq:*), Read
 model: sonnet
 ---
 
-# /pseo-quickwin — GSC Quick-Wins Chain (Phase 5 STUB)
+# /pseo-quickwin — GSC Quick-Wins Chain
 
-> **Phase dependency:** Bu komut `skills/discovery/quick-wins/SKILL.md` ve `skills/ingestion/gsc-pull/SKILL.md` yazıldıktan sonra (Phase 5 + Phase 6) tam çalışır. Şu an STUB modunda — yalnızca routing önerisi üretir, skill'leri otomatik tetiklemez.
+> **Skill chain:** `skills/ingestion/gsc-pull/SKILL.md` (Phase 6) → `skills/discovery/quick-wins/SKILL.md` (Phase 5). Aktif. GSC son 90 gün → ortalama pozisyon 8–20 bandı → `master.xlsx#quick_wins` + onay gate + `outputs/reports/{date}-quick-wins.md`.
 
 ## 1. Aktif projeyi çöz
 
@@ -18,30 +18,30 @@ model: sonnet
 
 !`if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş"; else PROJECT="${1:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/active.json" 2>/dev/null)}"; if [ -z "$PROJECT" ]; then echo "NO_ACTIVE_PROJECT — once /pseo-active <slug>"; else echo "active=$PROJECT"; fi; fi`
 
-## 2. Plan (Phase 5+ chain'i)
+## 2. Skill chain
 
-Phase 5/6 tamamlandığında bu komut şu zinciri tetikler:
+Bu komut şu sırayı tetikler:
 
-1. **`gsc-pull`** (Phase 6 — `skills/ingestion/gsc-pull/SKILL.md`)
+1. **`gsc-pull`** (`skills/ingestion/gsc-pull/SKILL.md`)
    - Son 90 gün GSC `searchAnalytics.query` verisini çek
    - master.xlsx `gsc_landing_query` logical sheet'ine `transaction.py` ile yaz
-   - `events.jsonl`'e `gsc_pulled` event'i düş
+   - `events.jsonl`'e `data_ingested` event'i (source.kind=gsc_mcp)
 
-2. **`quick-wins`** (Phase 5 — `skills/discovery/quick-wins/SKILL.md`)
+2. **`quick-wins`** (`skills/discovery/quick-wins/SKILL.md`)
    - GSC verisinden ortalama pozisyon 8–20 bandındaki sorguları filtrele
    - Impressions ≥ minimum eşik, CTR < benchmark
    - master.xlsx `quick_wins` logical sheet'ine yaz
    - Onay gate: `awaiting_approval` (workflow-run.schema)
-   - Onay sonrası `outputs/reports/{date}-quick-wins.md` üret
+   - Onay sonrası `outputs/reports/{date}-quick-wins.md` üret (`templates/reports/quickwin.template.md`)
 
-## 3. STUB davranışı
+## 3. Çalıştırma notları
 
-Şu an: kullanıcıya yukarıdaki planı sun, "Phase 5/6 yazıldıktan sonra otomatik koşacak" not düş. Aktif projedeki master.xlsx'in `gsc_landing_query` sheet'inde veri var mı diye Read tool ile manuel kontrol önerilebilir.
+- Aktif `gsc_landing_query` sheet'i boşsa: zincir `gsc-pull` ile başlar; data var ise `quick-wins` skill'i doğrudan koşar.
+- Manuel pre-flight: master.xlsx'in `gsc_landing_query` sheet'i Read tool ile incelenebilir; yoksa `/pseo-gsc-pull` ile ingestion ayrı çalıştırılabilir.
 
-## 4. Açık bağımlılıklar
+## 4. Bağımlılıklar
 
-- `skills/discovery/quick-wins/SKILL.md` — Phase 5
-- `skills/ingestion/gsc-pull/SKILL.md` — Phase 6
-- `mcp-tool-registry` GSC tool'ları (Phase 6)
-
-Skill'ler yazıldığında bu komut body'si gerçek skill çağrılarıyla güncellenir; frontmatter (description, argument-hint) sabit kalır.
+- `skills/discovery/quick-wins/SKILL.md` — aktif (Phase 5)
+- `skills/ingestion/gsc-pull/SKILL.md` — aktif (Phase 6)
+- `mcp__gsc__*` GSC MCP tools (`.mcp.json` bash wrapper, `.env` auto-source)
+- `project.config.gsc.site_url` — required input
