@@ -77,71 +77,138 @@ Schema `events.schema.json` `event_kind` field 4 closed enum:
 
 Worker schema-first override paterni: schema'da olmayan kind kullanmak YASAK. Yeni kind ekleme schema bump v1.0 → v1.1 ZORUNLU (schema-versioning-discipline cross-ref).
 
-## Section 4 — `event_type` 10-closed-enum + Branch Matrix per Skill (Q-W3W2B-EVENTTYPE-01)
+## Section 4 — `event_kind` × Skill Branch Matrix (3 sub-tables, 100% coverage — Q-V1.2-EVENTS-WRITER-MATRIX-COVERAGE-01 + Q-W3W2B-EVENTTYPE-01)
+
+43/43 mevcut SKILL.md per-skill matrix (filesystem SoT cross-check Phase B Wave 2 2026-05-06; pre-fix coverage 47% = 20/43 brief-true; post-fix 100% = 43/43 filesystem-true). 3 sub-table `event_kind` 4-enum (Section 3) ayrımına göre:
+
+- **Section 4a** — `event_kind=work` events (`event_type` 10-enum, content/task lifecycle)
+- **Section 4b** — `event_kind=provenance` events (`operation` 6-enum, data ingestion lifecycle)
+- **Section 4c** — `event_kind=audit` events (`audit_action` 6-enum, no `event_type` per Section 6)
+
+### Worker Schema-First Override Paterni (Phase 14 W3-W2-B doğum belgesi, 16'ıncı uygulama Phase B Wave 1 generate-images)
+
+- Skill spec'inde literal `event_type=skill_name` (örn `event_type=faq_optimization`) talep edilse bile schema'da YOKsa, worker `event_type=manual` + `note=[skill=faq-optimization event_type_intent=faq_optimization]` yazar.
+- Direct match olan skill'lerde override gerekmez (örn `new-blog` → `content_new` schema'da var; ancak URL-context yoksa override).
+- URL-bearing work event constraints (events.schema allOf): `content_new`, `content_revise`, `content_remove`, `redirect_deployed`, `tech_fix`, `schema_fix`, `pillar_launch`, `quickwin_applied` → `url + url_normalized` REQUIRED; standalone scope'unda satisfy edilemiyorsa schema-first override `manual + note`.
+- Branch matrix per skill SKILL.md'de codify edilir (skill-spec authority + schema-first override = brief revize 7 madde paterni).
+
+### Section 4a — Work Events (event_kind=work, 9 unique base + 4 sub-branches = 13 row)
 
 `event_type` 10 closed enum (events.schema.json):
 
 `content_new`, `content_revise`, `content_remove`, `redirect_deployed`, `tech_fix`, `schema_fix`, `pillar_launch`, `quickwin_applied`, `manual`, `backlink_outreach`.
 
-13 production + 8 verify/governance skill için branch matrix:
+| Skill | event_type (schema) | event_type_intent (note field) | Status / Notes |
+|---|---|---|---|
+| whats-next | manual | routing_recommendation | ✅ Active — synthetic task_id mint paterni |
+| generate-images | manual | image_generated | ✅ Active — schema-first override 16 (Phase B W1); content_new URL+pillar yok |
+| new-blog | content_new | (direct) | ⏳ Future — + url+url_normalized+after.pageSnapshot+pillar mandatory |
+| revise-content | content_revise | (direct) | ⏳ Future — + before+after schema-required |
+| faq-optimization | manual | faq_optimization | ⏳ Future — schema-first override (no URL-context) |
+| content-remediation (improve) | manual | content_remediation_improve | ⏳ Future |
+| content-remediation (delete) | content_remove | (direct) | ⏳ Future — + note required |
+| content-remediation (redirect) | redirect_deployed | (direct) | ⏳ Future — + url+url_normalized+note required |
+| mark-done (quickwin) | quickwin_applied | (direct) | ⏳ Future — + cluster+before+after |
+| mark-done (manual) | manual | task_completed | ⏳ Future — + note required |
+| indexing-ping | manual | indexing_ping | ⏳ Future — GSC API ping log |
+| verify-indexing | manual | verify_indexing | ⏳ Future — GSC inspect log |
+| backlink-outreach (post-v1) | backlink_outreach | (direct) | 📋 Placeholder — SKILL.md henüz yok |
 
-| Skill | event_type (schema) | event_type_intent (note field) |
-|---|---|---|
-| new-blog | content_new | (direct) |
-| revise-content | content_revise | (direct) |
-| faq-optimization | content_revise | faq_optimization |
-| content-remediation (improve) | content_revise | content_remediation_improve |
-| content-remediation (delete) | content_remove | (direct) |
-| content-remediation (redirect) | redirect_deployed | (direct) |
-| tech-audit | tech_fix | (direct) |
-| on-page-audit | tech_fix | on_page_fix |
-| content-gaps | manual | content_gaps |
-| schema-audit | schema_fix | (direct) |
-| schema-validate | schema_fix | schema_validate |
-| competitive-analysis | manual | competitive_analysis |
-| geo-analysis | manual | geo_analysis |
-| cluster-map | manual | cluster_map |
-| topical-map | pillar_launch | topical_map |
-| new-content-plan | manual | new_content_plan |
-| internal-links | manual | internal_links |
-| master-task-sync | manual | master_task_sync |
-| mark-done (quickwin) | quickwin_applied | (direct) |
-| mark-done (manual) | manual | task_completed |
-| backlink-outreach (post-v1) | backlink_outreach | (direct) |
-| generate-images | content_new | image_generated |
-| verify-indexing | manual | verify_indexing |
-| monitoring-weekly | (none — `event_kind=audit`, `event_type` YASAK) | weekly_monitoring |
+### Section 4b — Provenance Events (event_kind=provenance, 20 skill — append_provenance ✅ active)
 
-Worker schema-first override paterni (Phase 14 W3-W2-B doğum belgesi, 11'inci uygulama):
+`operation` 6 closed enum (events.schema.json — ADR-038 Wave 3 additive bump `staging`):
 
-- Skill spec'inde literal `event_type=skill_name` (örn `event_type=faq_optimization`) talep edilse bile schema'da YOKsa, worker `event_type=manual` + `note=[skill=faq-optimization event_type_intent=faq_optimization]` yazar.
-- Direct match olan skill'lerde override gerekmez (örn `new-blog` → `content_new` schema'da var).
-- Branch matrix per skill SKILL.md'de codify edilir (skill-spec authority + schema-first override = brief revize 7 madde paterni).
+`ingest`, `normalize`, `project_excel`, `validate`, `cascade_done`, `staging`.
+
+| Skill | operation | source.kind | Notes |
+|---|---|---|---|
+| dfs-pull | ingest, staging | dfs_mcp | DataForSEO raw + Phase 6 D-003 staging routing |
+| gsc-pull | ingest | gsc_mcp | GSC search_analytics ingestion |
+| scrapling-ops | ingest | scrapling | Stealthy fetch raw inventory |
+| sf-import | normalize, project_excel | local_xlsx | Screaming Frog Excel transform |
+| init-project | cascade_done | local_template | Project bootstrap cascade close |
+| aio-competitor-map | ingest | scrapling | Competitor pages staging (LLM-native) |
+| cannibalization | ingest | gsc_mcp | Raw GSC pivot 5000-row query×page |
+| competitive-analysis | ingest | scrapling+dfs | Multi-source competitor matrix |
+| content-decay | ingest | gsc_mcp | GSC trend regression detection |
+| content-gaps | ingest | gsc+dfs | Multi-source gap surfacing |
+| geo-analysis | ingest | gsc_mcp | Geo-focused query partition |
+| on-page-audit | ingest | scrapling | URL on-page tech fetch |
+| quick-wins | ingest, normalize | gsc_mcp | Mixed (raw GSC + opportunity calc) |
+| schema-audit | ingest | scrapling | JSON-LD schema markup fetch |
+| tech-audit | ingest | scrapling | Tech SEO crawl fetch |
+| cluster-map | ingest | local_xlsx | Cluster aggregation |
+| internal-links | ingest | local_xlsx | Internal link matrix |
+| master-task-sync | ingest | local_xlsx | Task primary_source consolidation |
+| new-content-plan | ingest | local_xlsx | Content plan generation |
+| topical-map | ingest | local_xlsx | Topical authority map |
+
+### Section 4c — Audit-Only Events (event_kind=audit, 14 skill — `event_type` YASAK Section 6)
+
+`audit_action` 6 closed enum (events.schema.json):
+
+`created`, `modified`, `deleted`, `accessed`, `permission_changed`, `config_changed`.
+
+| Skill | audit_action | audit_target | Status / Notes |
+|---|---|---|---|
+| drift-check | accessed | `invariants:20` | ✅ Active — Phase 5 audit kind doğum belgesi |
+| schema-validate | accessed | `schemas:bulk-validate` | ✅ Active — Phase 13 governance read-only |
+| glossary-audit | accessed | `glossary:terms` | ✅ Active — Term drift audit |
+| load-context | accessed | `session:wakeup-codify` | ✅ Active — Hook-driven session start |
+| monitoring-weekly | accessed | `reports:monitoring-weekly:{week_start}_{week_end}` | ⏳ Phase B Wave 3 inline orchestration adds call |
+| brand-onboarding | accessed | `brand:onboarding` | ⏳ Future — One-shot brand scrape audit |
+| monthly-report | accessed | `reports:monthly:{period_end}` | 🚧 Q-RP-01 defer (Phase 14+ governance refinement) |
+| weekly-summary | accessed | `reports:weekly:{week_end}` | 🚧 Q-RP-01 defer |
+| portfolio-overview | accessed | `reports:portfolio-overview:{date}` | 🚧 Q-RP-01 defer |
+| portfolio-heatmap | accessed | `reports:portfolio-heatmap:{date}` | 🚧 Q-RP-01 defer |
+| portfolio-kpi-trend | accessed | `reports:portfolio-kpi-trend:{date}` | 🚧 Q-RP-01 defer |
+| portfolio-monthly-roundup | accessed | `reports:portfolio-monthly-roundup:{date}` | 🚧 Q-RP-01 defer |
+| portfolio-task-heatmap | accessed | `reports:portfolio-task-heatmap:{date}` | 🚧 Q-RP-01 defer |
+| portfolio-weekly-brief | accessed | `reports:portfolio-weekly-brief:{date}` | 🚧 Q-RP-01 defer |
+
+**Q-RP-01 defer note:** 8 reporting skill (monthly-report, weekly-summary, portfolio-* 6) henüz `events_writer.append_audit` invoke etmiyor — Phase 14+ governance refinement scope. SKILL.md'de "NO `events_writer.append_*` calls anywhere (Q-RP-01 defer)" markered. Audit-event invocation eklenirse 4c row template ready.
+
+### Coverage Audit Summary (post-Phase-B-Wave-2)
+
+| Kategori | Sub-table | Skill count | Active call | Future/Defer |
+|---|---|---|---|---|
+| Work events | 4a | 9 base + 4 sub | 2 (whats-next + generate-images) | 7 (production+publishing+meta) |
+| Provenance events | 4b | 20 | 20 | 0 |
+| Audit-only events | 4c | 14 | 4 (governance) | 10 (1 Wave 3 + 1 brand-onboarding + 8 Q-RP-01) |
+| **Total** | — | **43** | **26 active** | **17 future** |
+
+Coverage 47% → 100% (43/43 SKILL.md mapped per filesystem SoT).
 
 ### Cross-Skill Convention Examples
 
 Production new-blog dispatch (NCP-001 P1 T tier 1850 vol):
 
 ```json
-{"run_id": 47, "ts": "2026-05-05T10:00:00Z", "event_kind": "work", "event_type": "content_new", "skill": "new-blog", "task_id": "T-10001", "url_normalized": "https://demo-dental.example/blog/izmir-implant-tedavisi-fiyatlari-2026", "after": {"pageSnapshot": {"word_count": 4250, "h1_count": 1, "schema_types": ["FAQPage", "Article"]}}}
+{"run_id": 47, "timestamp": "2026-05-05T10:00:00Z", "event_kind": "work", "event_type": "content_new", "task_id": "T-10001", "project_id": "demo-dental", "actor": "agent:new-blog", "url": "https://demo-dental.example/blog/izmir-implant-tedavisi-fiyatlari-2026", "url_normalized": "https://demo-dental.example/blog/izmir-implant-tedavisi-fiyatlari-2026", "pillar": "P1_implant_authority", "after": {"pageSnapshot": {"word_count": 4250, "h1_count": 1, "schema_types": ["FAQPage", "Article"]}}}
 ```
 
-faq-optimization (10 Q&A snippet-friendly) — schema-first override:
+faq-optimization (10 Q&A snippet-friendly) — schema-first override 4a paterni:
 
 ```json
-{"run_id": 48, "ts": "2026-05-05T11:00:00Z", "event_kind": "work", "event_type": "manual", "skill": "faq-optimization", "task_id": "T-10003", "note": "[skill=faq-optimization event_type_intent=faq_optimization]", "after": {"faq_count": 10}}
+{"timestamp": "2026-05-05T11:00:00Z", "event_kind": "work", "event_type": "manual", "task_id": "T-10003", "project_id": "demo-dental", "actor": "agent:faq-optimization", "note": "[skill=faq-optimization event_type_intent=faq_optimization faq_count=10]"}
 ```
 
 content-remediation redirect (Q-W3W2Cb-001 in-wave RESOLVED `/main-page` duplicate-canonical):
 
 ```json
-{"run_id": 49, "ts": "2026-05-05T11:30:00Z", "event_kind": "work", "event_type": "redirect_deployed", "skill": "content-remediation", "url_normalized": "https://demo-dental.example/main-page", "redirect_target": "https://demo-dental.example/", "redirect_status": 301, "reason": "duplicate_via_canonical_GSC_inspect"}
+{"timestamp": "2026-05-05T11:30:00Z", "event_kind": "work", "event_type": "redirect_deployed", "task_id": "T-10005", "project_id": "demo-dental", "actor": "agent:content-remediation", "url": "https://demo-dental.example/main-page", "url_normalized": "https://demo-dental.example/main-page", "note": "duplicate_via_canonical_GSC_inspect; redirect_target=https://demo-dental.example/ status=301"}
 ```
 
-monitoring-weekly audit-run (`event_kind=audit` — `event_type` field YASAK):
+monitoring-weekly audit-run (Section 4c paterni — `event_type` field YASAK):
 
 ```json
-{"run_id": 50, "ts": "2026-05-05T12:00:00Z", "event_kind": "audit", "skill": "monitoring-weekly", "note": "weekly_monitoring", "metrics_snapshot": {"red_count": 14, "amber_count": 2, "green_count": 4}}
+{"timestamp": "2026-05-05T12:00:00Z", "event_kind": "audit", "audit_action": "accessed", "audit_target": "reports:monitoring-weekly:2026-04-29_2026-05-05", "actor": "agent:monitoring-weekly", "project_id": "demo-dental", "notes": "weekly_monitoring red=14 amber=2 green=4"}
+```
+
+dfs-pull provenance-staging (Section 4b paterni — operation `staging` ADR-038):
+
+```json
+{"run_id": 12, "timestamp": "2026-05-05T08:30:00Z", "event_kind": "provenance", "operation": "staging", "project_id": "demo-dental", "source": {"kind": "dfs_mcp", "mcp_server": "dataforseo", "mcp_tool": "keywords_data_google_ads_search_volume"}, "rows_written": 142}
 ```
 
 ## Section 5 — `workflow_action` 8-enum Lifecycle (ADR-019)
