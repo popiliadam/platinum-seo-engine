@@ -1522,3 +1522,63 @@ Single manager session ~115dk audit of v1.1.0 RELEASED engine plugin. Brief: `do
 2. v1.2 brief authoring (separate session) — 5 P1 + 4 P2 + 2 P3 finding'leri fix scope'a dönüştür
 3. v1.2 fix wave'leri (separate sessions) — atomic per-finding fix dispatch
 4. ADR-004 + ADR-005 closure 2026-05-12 soak window (engine + workspace eski repo silme onayı)
+
+---
+
+## v1.2 Phase B Audit Followup Closeout (2026-05-06)
+
+**Manager session methodology:** Fresh session brief paste → wakeup sequence (12 file) → Lesson 38 v2 manager pre-dispatch full-file inspect (events_writer API drift catch, brief code snippet runtime-incompatible) → 4 pre-dispatch sorusu Süleyman karar (a + b + b + closeout-tek-push) → 3 wave atomic dispatch + 1 closeout commit. ~155 dk total (35 dk brief premise revize + 120 dk implementation).
+
+**3 atomic wave commits + 1 closeout:**
+- `b1c64dc` — Wave 1: 3 fix combined (generate-images events_writer.append_work + schema-validate cite + rules canonical example fix)
+- `64c7177` — Wave 2: events-writer Section 4 expand 47% → 100% coverage (3 sub-table 4a+4b+4c, 43/43 filesystem-true)
+- `6ba6aaa` — Wave 3: monitoring-weekly inline orchestration audit-event (3 Python block, append_audit, plugin agnostik)
+- (this commit) — closeout: 3 OQ RESOLVED markers + ledger + status banner advance
+
+**Lesson 38 v2 catch (manager pre-dispatch full-file inspect, 10'uncu ardışık production-ready):**
+- Brief Fix #1 + #4 `from scripts.state.events_writer import next_run_id, append` + bare `append(event)` paterni mevcut codebase'de YOK — 4 convenience wrapper (`append_work` + `append_provenance` + `append_audit` + `append_workflow`) kullanılır.
+- Brief schema fields: `ts` field → schema `timestamp`; `project_id` field eksik (REQUIRED top-level); Fix #1 `task_id` eksik (event_kind=work allOf required).
+- rules/events-writer.md Section 2 canonical example AYNI YANLIŞ paterni dokumante ediyor (~22 ay drift) — 5'inci finding discovery, Wave 1 atomic combined fix scope'a eklendi.
+- Brief premise tahmin önemli ölçüde yanlış (Section 4a/4b/4c distribution: `on-page-audit + tech-audit + schema-audit + 11 başka skill` aslında `append_provenance` çağırıyor / 4b kapsamı, brief 4a'ya yerleştirmişti).
+
+**4 P1+P2 audit findings RESOLVED:**
+1. **F-W4-GENERATE-IMAGES-NO-EVENTS-WRITER (P2)** — Wave 1 Fix #1 — generate-images SKILL.md Step 7 `events_writer.append_work` invocation eklendi (schema-first override 16'ıncı uygulama: `manual + note=image_generated` paterni; content_new schema'da url+url_normalized+after+pillar mandatory satisfy edilemiyor)
+2. **Q-V1.2-SCHEMA-VALIDATE-MISSING-RULE-01 (P1)** — Wave 1 Fix #2 — broken cite `rules/foundational-principles.md` → 3-rule authority chain (schema-first + single-source-of-truth + append-only-state)
+3. **Q-V1.2-EVENTS-WRITER-MATRIX-COVERAGE-01 (P1)** — Wave 2 — Section 4 47% → 100% (43/43 filesystem SoT)
+4. **Q-V1.2-MONITORING-WEEKLY-MISSING-SCRIPT-01 (P1)** — Wave 3 — inline orchestration 3 Python block + append_audit emit + markdown sample generated
+
+**+1 yeni discovery (rules drift) RESOLVED inline (Wave 1 atomic combined):**
+- `rules/events-writer.md` Section 2 canonical example fix — `from ... import next_run_id, append` + bare `append(event)` → 4 convenience wrapper paterni (`append_work` + `append_provenance` + `append_audit` + `append_workflow` schema-aware envelope auto-populate)
+
+**Lessons captured:**
+- Lesson 38 v2 enforce 10'uncu ardışık production-ready (manager pre-dispatch runtime kanıt cross-check brief premise revize) — 9 phase consecutive convergent invariant intact
+- Lesson 67 enforcement Phase B Wave 3 stacked application (workspace_root kwarg eksiklik catch + plugin agnostik slug literal catch via test failure) — 2 iteration self-correction documented; runtime kanıt > worker output paterni
+- Schema-first override paterni 16'ıncı uygulama (Phase 14 W3-W2-B doğum belgesi reuse) — generate-images event_type=manual + note=image_generated; 9 phase consecutive convergent invariant intact
+- Atomic phase paterni 28'inci kanıt (Phase 7..15 + v1.1-Wave-1+Wave-2+Wave-3 + v1.1-Integration-Audit + v1.1-Audit-Followup-Phase-A + v1.2-Phase-B = 30 phase consecutive atomic dispatch invariant intact)
+- Section 4c first active row promoted (drift-check Phase 5 doğum belgesi paterni reuse): monitoring-weekly artık event_kind=audit row yazıyor (Wave 2 matrix "⏳ Phase B Wave 3 inline orchestration adds call" yorumu kanıtlandı)
+- Süleyman feedback Phase B 2026-05-06 confirm: "sen kendi için cross check yap sürekli" — sürekli runtime cross-check + Lesson 38 v2 + Lesson 67 her wave enforce default
+
+**Acceptance criteria status (per Brief Section 8):**
+1. ✅ 4 P1+P2 OQ markered RESOLVED in OPEN_QUESTIONS.md (3 P1 + 1 P2 ledger inline)
+2. ✅ pytest 673+ PASS no regression (Wave 1+2+3 boyunca 673 PASS + 3 skip stable)
+3. ✅ Each wave atomic commit (3 wave commits + 1 closeout = 4 commits total)
+4. ✅ Helper exec EXIT 0 for 3 modified skills (generate-images + schema-validate + monitoring-weekly)
+5. ✅ events-writer.md Section 4 coverage 47% → 100% (post-restructure 4a+4b+4c 43/43 filesystem-true)
+6. ✅ CONTEXT_LEDGER + PHASE_STATUS append entries (this commit)
+7. ⏳ Push final after Süleyman onay (closeout-tek-push paterni Phase A reuse)
+8. ✅ Workspace dentnotion outputs/reports/ monitoring-weekly markdown sample generated (Wave 3 verify, 1747 bytes)
+
+**Drift state:**
+- pytest 673 PASS + 3 skip (no regression)
+- helper exec 4 governance + generate-images + monitoring-weekly EXIT 0
+- DECISIONS.md 6027B unchanged (no new ADR — events-writer Section 4 restructure governance polish, schema_version unchanged)
+- .mcp.json 469B byte-byte korundu (F-16 invariant 22+ commit cumulative)
+- Drift-check verdict AMBER unchanged (data hygiene scope, code drift Phase B fix)
+
+**Audit closure:** v1.1 Integration Audit (28 raw findings 26 unique, 5 P1 OQ filed) Phase A (5/11 RESOLVED 2026-05-06 commit `6497ef4`) + Phase B (4/11 + 1 yeni discovery RESOLVED 2026-05-06 commits `b1c64dc` + `64c7177` + `6ba6aaa`) = **10/11 audit findings RESOLVED**. 2/11 deferred (P3 catalog heuristic Phase 16+ + Q-RP-01 8 reporting audit event coverage Phase 14+).
+
+**Push timing:** Closeout-tek-push Phase A paterni reuse (Süleyman 4. soru cevabı). Süleyman onayı sonrası `git push origin main` (engine repo HEAD `6497ef4` → `<closeout commit>` 4 commit advance).
+
+**Next agenda (next session):**
+- v1.2 SEO domain milestone (Q-V1.2-OPP-COVERAGE-01 [HIGH] + Q-V1.2-MASTER-TASK-PRIMARY-SOURCE-01 [HIGH]) — separate session, ayrı agenda
+- ADR-004 + ADR-005 closure 2026-05-12 soak window (engine + workspace eski repo silme onayı)
