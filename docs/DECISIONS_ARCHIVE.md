@@ -24,6 +24,7 @@ ADR-011 rotation kararıyla `DECISIONS.md`'den taşınmış eski kararlar. Appen
 - ADR-033 (v1.1 P1 Wave 2 Task 2.3, 2026-05-06 — onsekizinci rotation cycle, ADR-035 ekleme ile DECISIONS.md 7078B tetiklemesi sonrası en eski active cut; project.config.json canonical path detayı engine commit `5d01d59` + workspace commit `e85407f` body'sinde de korunur; 3-active floor 1 cycle altında — ADR-034+035 active)
 - ADR-034 (v1.1 P2+P3 Wave 3 Task 3.3, 2026-05-06 — ondokuzuncu rotation cycle, ADR-036 version sync invariant ekleme ile DECISIONS.md 6562B tetiklemesi sonrası en eski active cut; check_secrets.sh policy detayı `tests/ci/test_check_secrets_sh.py` body'sinde de korunur)
 - ADR-035 (v1.1 P2+P3 Wave 3 Task 3.4, 2026-05-06 — yirminci rotation cycle, ADR-037 data hygiene policy ekleme ile DECISIONS.md 6799B tetiklemesi sonrası en eski active cut; PSEO_WORKSPACE_ROOT canonical detayı `scripts/state/env.py` + `tests/scripts/test_env_vars.py` body'sinde de korunur, 1y shim deadline 2027-05-06 unchanged)
+- ADR-036 (v1.1 P2+P3 Wave 3 Task 3.6, 2026-05-06 — yirmibirinci rotation cycle, ADR-038 R-XX numbering policy ekleme ile DECISIONS.md 6895B tetiklemesi sonrası en eski active cut; version sync invariant detayı `tests/ci/test_version_sync.py` + RELEASE_NOTES_v1.1.0.md body'sinde de korunur)
 
 **Active ADR'ler için:** [DECISIONS.md](DECISIONS.md)
 
@@ -335,3 +336,12 @@ ADR-011 rotation kararıyla `DECISIONS.md`'den taşınmış eski kararlar. Appen
 **Context:** `PSEO_WORKSPACE_ROOT` used by 20+ scripts/hooks/tests since Phase 14; `PSE_WORKSPACE_PATH` lived in `.env.example`+INSTALL+README+ARCHITECTURE. Asymmetry → onboarding confusion.
 **Decision:** Canonical = `PSEO_WORKSPACE_ROOT`. `PSE_WORKSPACE_PATH` deprecated alias, 1-year shim (removal 2027-05-06, mirrors ADR-030). `scripts/state/env.py::get_workspace_root()` reads canonical first, falls back with `DeprecationWarning`. Docs aligned. Existing 20+ scripts that read canonical directly stay unchanged (no risky sweep).
 **Consequences:** New users set canonical only. Legacy `.env` works via helper until deadline. `tests/scripts/test_env_vars.py` locks the contract. v2.0 removes alias.
+
+---
+
+## ADR-036 — Version Sync Invariant
+**Date:** 2026-05-06
+**Status:** accepted
+**Context:** v1.0.0 release left `.claude-plugin/plugin.json` at `0.1.0-alpha`; README banner read `v1.0.0`; git tag was `v1.0.0`. Three-way drift risks "which one is canonical" confusion at install time and breaks Claude Code's `/plugin add` discovery surface.
+**Decision:** plugin.json `version`, README banner semver, latest `docs/RELEASE_NOTES_v*.md` filename, and the most recent annotated git tag MUST agree exactly. v1.1.0 release synchronizes all four. `tests/ci/test_version_sync.py` enforces three-way parity (plugin.json + README + RELEASE_NOTES file presence); git-tag parity asserted at release time only (CI skip when tag absent).
+**Consequences:** Future bumps require coordinated edit + matching RELEASE_NOTES file + tag. Pre-release tags (e.g., `1.2.0-rc1`) must follow the same trio.
