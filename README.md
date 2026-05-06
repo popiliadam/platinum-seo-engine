@@ -9,6 +9,28 @@ Bir Claude Code plugin'i; SEO operasyonunu schema-locked workflow'larla yöneten
 
 ---
 
+## Quick Start
+
+```bash
+# 1. Install plugin
+git clone https://github.com/popiliadam/platinum-seo-engine ~/Documents/platinum-seo-engine
+claude /plugin add ~/Documents/platinum-seo-engine
+
+# 2. Configure credentials
+cp ~/Documents/platinum-seo-engine/.env.example ~/Documents/platinum-seo-engine/.env
+# edit .env: GOOGLE_APPLICATION_CREDENTIALS + DATAFORSEO_USERNAME/PASSWORD + PSE_WORKSPACE_PATH
+
+# 3. Initialize a project (prompts for domain + brand)
+/pseo-init
+
+# 4. Run first analysis
+/pseo-quickwin
+```
+
+Full setup: [docs/INSTALL.md](docs/INSTALL.md)
+
+---
+
 ## Overview
 
 `platinum-seo-engine` SEO operasyonunu VS Code + Claude Code üzerinden yöneten bir plugin sistemidir. Skills/commands/hooks ile orkestre edilen, JSON schema'larla kilitli, markdown ile insan-okunur, Excel + JSONL ile state tutan, her workflow'u resume/retry/approval gate'leriyle yöneten, drift-check ile kendini denetleyen, **proje-agnostik** bir SEO motoru.

@@ -1,8 +1,8 @@
 # Workflow Catalog (v1 Skills)
 
-> v1 release **~43 skill** kapsar. Bu katalog skill'ler landed olarak güncellenir. Şu anki status: **planned** (Phase 0'da hiçbiri implement edilmedi). Eski sistemden taşınan 28 skill + governance/ingestion/planning eklemeleri toplam ~43.
+> v1.0.0 release **43 skill** — tüm skill'ler implement edildi ve production-ready (Phase 5–13). Status: **active** (2026-05-05).
 
-Skill'ler **batch'ler halinde** (Phase 5–13) inşa edilir; foundation phase'leri (0–4) tamamlandıktan sonra her batch paralel worker'larla yazılır. Sıralı değildir.
+Phase 5–13 boyunca parallel worker batch'lerle inşa edildi; pilot dentnotion E2E PASS.
 
 ---
 
@@ -10,11 +10,11 @@ Skill'ler **batch'ler halinde** (Phase 5–13) inşa edilir; foundation phase'le
 
 | Skill | Trigger | Status |
 |---|---|---|
-| `init-project` | "yeni proje", `/pseo-init` | planned |
-| `sf-import` | "SF crawl yükle" | planned |
-| `quick-wins` | "quick win", `/pseo-quickwin` | planned |
-| `drift-check` | "drift kontrol", `/pseo-driftcheck` | planned |
-| `whats-next` | "ne yapmalıyım", "bugün" | planned |
+| `init-project` | "yeni proje", `/pseo-init` | active |
+| `sf-import` | "SF crawl yükle" | active |
+| `quick-wins` | "quick win", `/pseo-quickwin` | active |
+| `drift-check` | "drift kontrol", `/pseo-driftcheck` | active |
+| `whats-next` | "ne yapmalıyım", "bugün" | active |
 
 > Phase 5 gateway: pilot proje (dentnotion) end-to-end smoke test PASS + events.jsonl tutarlı + drift-check GREEN. Geçemezse foundation'a dön.
 
@@ -24,9 +24,9 @@ Skill'ler **batch'ler halinde** (Phase 5–13) inşa edilir; foundation phase'le
 
 | Skill | Trigger | Status |
 |---|---|---|
-| `gsc-pull` | "GSC veri çek" | planned |
-| `dfs-pull` | "DataForSEO veri çek" | planned |
-| `scrapling-ops` | "site scrape" | planned |
+| `gsc-pull` | "GSC veri çek" | active |
+| `dfs-pull` | "DataForSEO veri çek" | active |
+| `scrapling-ops` | "site scrape" | active |
 
 > Constraint: §16.5 MCP integration pattern + §16.8 budget disiplini.
 
@@ -36,14 +36,14 @@ Skill'ler **batch'ler halinde** (Phase 5–13) inşa edilir; foundation phase'le
 
 | Skill | Trigger | Status |
 |---|---|---|
-| `cannibalization` | "cannibalization", "yamyamlık" | planned |
-| `content-decay` | "content decay", "düşen içerik" | planned |
-| `tech-audit` | "tech audit" | planned |
-| `on-page-audit` | "on-page audit" | planned |
-| `content-gaps` | "content gap" | planned |
-| `schema-audit` | "schema audit" | planned |
-| `competitive-analysis` | "rakip analizi" | planned |
-| `geo-analysis` | "GEO analiz" | planned |
+| `cannibalization` | "cannibalization", "yamyamlık" | active |
+| `content-decay` | "content decay", "düşen içerik" | active |
+| `tech-audit` | "tech audit" | active |
+| `on-page-audit` | "on-page audit" | active |
+| `content-gaps` | "content gap" | active |
+| `schema-audit` | "schema audit" | active |
+| `competitive-analysis` | "rakip analizi" | active |
+| `geo-analysis` | "GEO analiz" | active |
 
 > Not: `aio-competitor-map` discovery doğasında olmasına rağmen Phase 12'de ele alınır.
 
@@ -53,11 +53,11 @@ Skill'ler **batch'ler halinde** (Phase 5–13) inşa edilir; foundation phase'le
 
 | Skill | Trigger | Status |
 |---|---|---|
-| `cluster-map` | "cluster map" | planned |
-| `topical-map` | "topical map" | planned |
-| `new-content-plan` | "yeni içerik planı" | planned |
-| `internal-links` | "iç link planı" | planned |
-| `master-task-sync` | "task sync" | planned |
+| `cluster-map` | "cluster map" | active |
+| `topical-map` | "topical map" | active |
+| `new-content-plan` | "yeni içerik planı" | active |
+| `internal-links` | "iç link planı" | active |
+| `master-task-sync` | "task sync" | active |
 
 ---
 
@@ -65,14 +65,14 @@ Skill'ler **batch'ler halinde** (Phase 5–13) inşa edilir; foundation phase'le
 
 | Skill | Trigger | Status |
 |---|---|---|
-| `monthly-report` | "aylık rapor", `/pseo-monthly` | planned |
-| `weekly-summary` | "haftalık özet" | planned |
-| `portfolio-overview` | "portföy özet" | planned |
-| `portfolio-weekly-brief` | "portföy haftalık" | planned |
-| `portfolio-monthly-roundup` | "portföy aylık" | planned |
-| `portfolio-task-heatmap` | "task heatmap" | planned |
-| `portfolio-kpi-trend` | "kpi trend" | planned |
-| `portfolio-heatmap` | "heatmap genel" | planned |
+| `monthly-report` | "aylık rapor", `/pseo-monthly` | active |
+| `weekly-summary` | "haftalık özet" | active |
+| `portfolio-overview` | "portföy özet" | active |
+| `portfolio-weekly-brief` | "portföy haftalık" | active |
+| `portfolio-monthly-roundup` | "portföy aylık" | active |
+| `portfolio-task-heatmap` | "task heatmap" | active |
+| `portfolio-kpi-trend` | "kpi trend" | active |
+| `portfolio-heatmap` | "heatmap genel" | active |
 
 ---
 
@@ -80,11 +80,11 @@ Skill'ler **batch'ler halinde** (Phase 5–13) inşa edilir; foundation phase'le
 
 | Skill | Trigger | Status |
 |---|---|---|
-| `new-blog` | "yeni blog yaz" | planned |
-| `revise-content` | "içerik revize" | planned |
-| `generate-images` | "görsel üret" | planned |
-| `content-remediation` | "içerik düzeltme" | planned |
-| `faq-optimization` | "FAQ optimize" | planned |
+| `new-blog` | "yeni blog yaz" | active |
+| `revise-content` | "içerik revize" | active |
+| `generate-images` | "görsel üret" | active |
+| `content-remediation` | "içerik düzeltme" | active |
+| `faq-optimization` | "FAQ optimize" | active |
 
 > Constraint: Phase 10 content rules çıktılarını (`rules/content-*.md`, `templates/content/*`) consume eder.
 
@@ -94,12 +94,12 @@ Skill'ler **batch'ler halinde** (Phase 5–13) inşa edilir; foundation phase'le
 
 | Skill | Trigger | Status |
 |---|---|---|
-| `indexing-ping` | "indexlenmesi" | planned |
-| `verify-indexing` | "index kontrol" | planned |
-| `aio-competitor-map` | "AIO competitor" | planned |
-| `brand-onboarding` | "marka onboard" | planned |
-| `mark-done` | "tamamlandı" | planned |
-| `monitoring-weekly` | "haftalık izleme" | planned |
+| `indexing-ping` | "indexlenmesi" | active |
+| `verify-indexing` | "index kontrol" | active |
+| `aio-competitor-map` | "AIO competitor" | active |
+| `brand-onboarding` | "marka onboard" | active |
+| `mark-done` | "tamamlandı" | active |
+| `monitoring-weekly` | "haftalık izleme" | active |
 
 ---
 
@@ -107,9 +107,9 @@ Skill'ler **batch'ler halinde** (Phase 5–13) inşa edilir; foundation phase'le
 
 | Skill | Trigger | Status |
 |---|---|---|
-| `schema-validate` | "schema validate" | planned |
-| `glossary-audit` | "glossary kontrol" | planned |
-| `load-context` | (hook tetikli) | planned |
+| `schema-validate` | "schema validate" | active |
+| `glossary-audit` | "glossary kontrol" | active |
+| `load-context` | (hook tetikli) | active |
 
 > CI pipeline'da bu üç skill'in karşılığı tek komutla koşturulur (drift-check + schema-validate + glossary-audit zinciri).
 
