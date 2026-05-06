@@ -4,14 +4,14 @@
       "command": "bash",
       "args": [
         "-c",
-        "set -a; [ -f .env ] && source .env; set +a; exec npx -y mcp-server-gsc"
+        "set -a; [ -f .env ] && source .env; set +a; exec npx -y mcp-server-gsc@0.3.0"
       ]
     },
     "dataforseo": {
       "command": "bash",
       "args": [
         "-c",
-        "set -a; [ -f .env ] && source .env; set +a; exec npx -y dataforseo-mcp-server"
+        "set -a; [ -f .env ] && source .env; set +a; exec npx -y dataforseo-mcp-server@2.8.10"
       ]
     },
     "ScraplingServer": {

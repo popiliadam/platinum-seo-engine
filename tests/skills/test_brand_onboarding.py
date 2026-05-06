@@ -25,8 +25,8 @@ Discipline:
     (Lesson 7+23 worker override).
   - STAGING-ONLY contract: skill never references projects/{slug}/config/
     project.config.json as a write target.
-  - .mcp.json byte sentinel pinned at 469 bytes / md5
-    7561df4c98b109fc6da9a23a6aa422bd at SKILL creation time.
+  - .mcp.json byte sentinel pinned at 482 bytes / md5
+    906183032322a97254579f453705c182 (v1.1: npm packages pinned to semver).
 """
 
 from __future__ import annotations
@@ -48,8 +48,8 @@ MCP_JSON = REPO_ROOT / ".mcp.json"
 # Baseline .mcp.json bytes captured at SKILL creation time (W-G2).
 # Any drift from this hash means the skill — or unrelated plugin work —
 # touched the MCP boundary, which the F-16 invariant forbids.
-MCP_JSON_MD5_BASELINE = "7561df4c98b109fc6da9a23a6aa422bd"
-MCP_JSON_BYTES_BASELINE = 469
+MCP_JSON_MD5_BASELINE = "906183032322a97254579f453705c182"
+MCP_JSON_BYTES_BASELINE = 482
 
 
 def _parse_frontmatter(skill_path: Path) -> dict:
