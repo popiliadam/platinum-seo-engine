@@ -1,0 +1,19 @@
+{
+  "name": "platinum-seo-marketplace",
+  "owner": {
+    "name": "Suleyman Capar",
+    "email": "suleymanncapar@gmail.com"
+  },
+  "metadata": {
+    "description": "Platinum SEO Engine — autonomous SEO operations plugin. Two-repo architecture (engine logic + workspace data). Schema-locked, drift-checked, Excel+JSONL state.",
+    "version": "1.1.0",
+    "repository": "https://github.com/popiliadam/platinum-seo-engine"
+  },
+  "plugins": [
+    {
+      "name": "platinum-seo-engine",
+      "source": "./",
+      "description": "v1.1.0 — 43 skills, 19 schemas, 18 rules, 9 commands, 4 hooks, 3 MCP servers (gsc + dataforseo + ScraplingServer). Production-ready (drift-check AMBER, pytest 673 PASS, 9 ADR codified)."
+    }
+  ]
+}
