@@ -1,54 +1,96 @@
 # Installation
 
-> Status: **alpha (v0.1.0)** — Phase 0 active. Plugin fonksiyonel değil; kurulum talimatları placeholder.
+> Status: **v1.0.0** — 43 skills, production-ready.
 
 ## Requirements
 
-- Claude Code CLI (en güncel sürüm önerilir; minimum sürüm TBD)
-- Python 3.10+ (script'ler için; exact minimum spec'te belirtilmemiş — TBD Phase 3)
-- Node 18+ (claude code runtime için TBD; spec exact pin koymuyor)
+- [Claude Code CLI](https://claude.ai/code) (latest)
+- Python 3.10+
+- Node.js 18+ (for MCP servers via npx)
+- Git
 
-## Plugin Install
+## Install Plugin
 
 ```bash
-git clone <repo-url> ~/Documents/platinum-seo-engine
+git clone https://github.com/popiliadam/platinum-seo-engine ~/Documents/platinum-seo-engine
 claude /plugin add ~/Documents/platinum-seo-engine
 ```
 
-> Not: GitHub repo henüz açılmadı (ADR-002). Phase 0 sonu local `git init` + initial commit yapılır; user repo'yu manuel açar. Gerçek `claude /plugin add` komut sözdizimi kullanılan Claude Code sürümüne göre değişebilir — install komutu test edilince doğrulanacak (open question).
+Restart Claude Code after adding the plugin.
 
-## Workspace Setup
+## Configure Credentials
 
-Workspace repo (`platinum-seo-workspace`) **Phase 14**'te yaratılır (ADR-005). O zamana kadar:
+Copy `.env.example` to `.env` in the plugin root and fill in your credentials:
 
-- `~/Documents/platinum-premium-seo/` mevcut workspace olarak **READ-ONLY** kullanılır.
-- Path detection bu dizini gösterir.
-
-Phase 14 sonrası: yeni workspace path'ine taşınır.
-
-## Configuration
-
-`.env` dosyası gerekli (template `.env.example` — Phase 4 deliverable):
-
-```
-PSE_WORKSPACE_PATH=~/Documents/platinum-premium-seo
-# MCP credentials (Phase 5+ requirement):
-# GSC_*=...
-# DATAFORSEO_*=...
+```bash
+cp ~/Documents/platinum-seo-engine/.env.example ~/Documents/platinum-seo-engine/.env
 ```
 
-Secrets disiplini için `docs/CONTRIBUTING.md` ve `rules/secrets-management.md`.
+Required for full functionality:
+
+| Variable | Source |
+|---|---|
+| `GOOGLE_APPLICATION_CREDENTIALS` | Google Cloud Console → IAM → Service Accounts |
+| `DATAFORSEO_USERNAME` | [app.dataforseo.com](https://app.dataforseo.com) → API tab |
+| `DATAFORSEO_PASSWORD` | Same |
+| `PSE_WORKSPACE_PATH` | Local path to your workspace repo (e.g. `~/Documents/platinum-seo-workspace`) |
+
+Optional (for image generation):
+
+| Variable | Source |
+|---|---|
+| `HIGGSFIELD_API_KEY` | [app.higgsfield.ai](https://app.higgsfield.ai) → Settings → API Keys |
+| `SCRAPLING_BIN` | `pip install scrapling[fetchers] && scrapling install` |
+
+## Create Workspace
+
+```bash
+git clone https://github.com/popiliadam/platinum-seo-workspace ~/Documents/platinum-seo-workspace
+```
+
+Or create a new workspace for a fresh project:
+
+```bash
+mkdir -p ~/Documents/platinum-seo-workspace
+cd ~/Documents/platinum-seo-workspace
+git init
+```
+
+## Initialize a Project
+
+```
+/pseo-init
+```
+
+Claude will prompt for project slug, domain, and brand details, then bootstrap `projects/{slug}/` with config + master.xlsx.
 
 ## Verify
+
+Check that the plugin loaded:
 
 ```
 /pseo-status
 ```
 
-> `/pseo-status` Phase 4 deliverable. Phase 0/1/2/3'te henüz çalışmaz.
+Run the governance audit (CI smoke test):
 
-## Status
+```
+/pseo-driftcheck
+```
 
-- v0.1.0 alpha — Phase 0 (Manager Bootstrap) active
-- Foundation tamamlanması beklenen: Phase 4
-- v1 (~43 skill) hedefi: Phase 14
+## Quick Smoke Test
+
+```
+/pseo-quickwin
+```
+
+Should complete in under 2 minutes, reporting top quick-win keyword opportunities from your GSC data.
+
+## Troubleshooting
+
+- **Plugin not recognized:** Restart Claude Code after `/plugin add`
+- **MCP server not connecting:** Check `.env` credentials and run `claude mcp list`
+- **Budget exceeded:** Check `scripts/budget/check_budget.py` — default cap 500 DFS credits/day
+- **Python import errors:** Run `pip install jsonschema openpyxl pyyaml` in the plugin directory
+
+See `docs/CONTRIBUTING.md` for development setup.
