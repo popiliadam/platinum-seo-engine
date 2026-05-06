@@ -1313,3 +1313,21 @@ Spec §13.2: <15KB initial load = <2% of 1M context window. Tracking under budge
 - **Phase 15 deliverable canlı**: workspace 5 wave commit + master report = 6 workspace commit atomic audit chain. Engine 3 OQ-only commit (72c4b02+6cfc18c+e3c158b). 0 schema bump. 0 new ADR. 0 engine code mutation. 0 regression (610 PASS throughout audit).
 - **v1.1 Planning NEXT**: P0 Node.js 20 migration (~10 dk 2026-06-02 deadline) → P1 budget gap + brand config normalize + INSTALL.md → P2 WORKFLOWS.md planned→active + npm pin + check_secrets.sh FP + README Quick Start + ADR closure → P3 ctx ledger archive + plugin.json decision + lockfile + .env.example + aio-competitor-map doc.
 
+## 2026-05-06 — v1.1 P0+P1+P2 Fixes (7 OQ RESOLVED, 4 engine commit + 1 workspace commit)
+
+- **P0 DONE — Node.js 20 → 24 migration (Q-PHASE15-NODEJS-01 RESOLVED, engine `bc9391c`)**: ci.yml `actions/checkout@v4` → `@v5` + `actions/setup-python@v5` → `@v6`. Hard deadline 2026-06-02 met 27 gün önceden.
+- **P2 npm pin (Q-PHASE15-NPMPIN-01 RESOLVED, engine `bc9391c`)**: `.mcp.json` `mcp-server-gsc@0.3.0` + `dataforseo-mcp-server@2.8.10`. F-16 baseline güncellendi 469B → 482B / MD5 `906183032322a97254579f453705c182`. test_brand_onboarding.py baseline update — 610 PASS.
+- **P2 check_secrets.sh FP fix (Q-PHASE15-SECRETS-FP-01 RESOLVED, engine `bc9391c`)**: `ghp_[a-zA-Z0-9]{36}` pattern eklendi + test fixture path exclusions (`tests/scripts/test_events_writer.py` + `tests/ci/test_ci_yaml.py` + `docs/OPEN_QUESTIONS.md`). EXIT 0 verified.
+- **P3 .env.example expand (Q-PHASE15-ENV-MISSING-01 RESOLVED, engine `bc9391c`)**: `PSE_WORKSPACE_PATH` + `HIGGSFIELD_API_KEY` placeholder entries eklendi.
+- **P1 INSTALL.md v1.0.0 rewrite (Q-PHASE15-INSTALL-STALE-01 RESOLVED, engine `92ece0e`)**: Alpha/Phase-0 content tamamen kaldırıldı. Real setup flow + credential table + troubleshooting section eklendi.
+- **P2 README Quick Start (Q-PHASE15-INSTALL-STALE-01 yan etki, engine `92ece0e`)**: 4-adım Quick Start section eklendi (clone → configure → init → quickwin).
+- **P2 WORKFLOWS.md planned→active (Q-PHASE15-DOC-STALE-01 RESOLVED, engine `92ece0e`)**: Tüm 43 skill `planned` → `active`. Header v1.0.0 production-ready durum yansıtıyor.
+- **P1 brand_identity canonical keys (Q-PHASE15-BRAND-CONFIG-01 RESOLVED, workspace `eca13c5`)**: dentnotion `project.config.json` `hitap` → `pronoun_preference`, `tone` → `formality`. Skills null almaz.
+- **Q-PHASE15-BUDGET-COST-01 SELF-RESOLVED (not a bug)**: Audit finding yanlıştı. `dfs-pull/SKILL.md` Step 9 `append_provenance(..., cost={"credits":float(estimate),...})` zaten yazıyor. `check_budget.py._extract_credits()` correctly reads this. Old events (pre-Phase 14) had cost=null — historical data, not a code bug.
+- **OQ resolution commit (engine `a3cbb2a`)**: 6 RESOLVED + 1 self-resolved note + 1 NOTED in OPEN_QUESTIONS.md.
+- **ADR-004 + ADR-005 closure**: Soak window 2026-05-12 bitmeden kapatılamaz. Pending.
+- **P3 backlog (defer)**: CONTEXT_LEDGER archive strategy + plugin.json karar + requirements-lock.txt + aio-competitor-map doc note — v1.2 scope.
+- **Engine commits this session**: `bc9391c` (P0+P2 CI/infra) + `92ece0e` (P1+P2 docs) + `a3cbb2a` (OQ resolution) + bu closeout. Workspace: `eca13c5` (brand config).
+- **Invariant durumu**: pytest 610/610 PASS. DECISIONS.md 5877B unchanged. .mcp.json 482B (deliberate pin change, new F-16 baseline). ADR active 4. Phase consecutive unchanged (v1.1 fixes = engine doc/config commits, new consecutive count begins with next delivery phase).
+
+
