@@ -1385,3 +1385,34 @@ Codex post-v1.1 audit yüzeye çıkardığı 4 P0 bulgusu sequential dispatch il
 - RESOLVED gerçekten: Q-PHASE15-BRAND-CONFIG-01 (engine schema fix tamamlandı; workspace eca13c5 + engine 7dc67ba birleşik kapanış); Q-PHASE15-W4-SCRIPTPATH-01 (zaten RESOLVED kaydı vardı, doğrulama).
 - Yeni açılan: Q-WAVE1-DRIFT-DEFER-01 (F-13/F-16/F-17/F-19 real-drift Wave 2 P1 scope); Q-WAVE1-F19-VALIDATOR-01 (validate_invariants.check_F_19 `locale` vs schema `language.content_locale` field-name gap).
 
+
+## v1.1-FIX-WAVE-2 P1 closeout (2026-05-06)
+
+Wave 2 P1 6-task plan revised by manager pre-dispatch (Lesson 38 v2 6'ıncı ardışık enforcement) — runtime cross-check invalidated 2 brief premises (Task 2.6 F-13 already PASS post-Wave-1 archive; Task 2.4 dfs_pull.py is pure transform per Phase 6 D-003, never wrote events). Süleyman approved Seçenek A revize: 5 atomic engine commit + closeout (instead of 6 + 1) — Lesson 49 paterni 7'inci ardışık vaka manager self-failure catch SIFIR (5 phase consecutive convergent), Lesson 28 v3 11'inci pre-emptive prevention 19 vaka cumulative.
+
+**5 atomic engine commits + closeout:**
+- `c9b2923` — `fix(ci): remove plugin-agnostik grep mask (|| true), expand disclaimer filter` — CI Step 5 strict (mask removed); 7 adjacent-slug-pair patterns + 2 phrase patterns added to grep -vE filter; +2 invariant tests in test_ci_yaml.py (no_or_true_mask + adjacent_pair_filter_present); 13/13 PASS.
+- `43f38d4` — `fix(ci): scope check_secrets policy lock + execution regression (ADR-034)` — ADR-034 codifies 4 detection patterns + 7 exclude paths; +3 execution tests (clean EXIT 0 + 7-path policy + 4-pattern policy); 7/7 PASS. Rotation cycle 17: ADR-031+032 archived (cap 7367 → 5741B post-rotation).
+- `7fb8d2c` — `refactor(env): canonical PSEO_WORKSPACE_ROOT + 1y deprecation shim (ADR-035)` — scripts/state/env.py NEW (get_workspace_root helper); .env.example + README + INSTALL + ARCHITECTURE doc canonical; 6 contract tests in test_env_vars.py (canonical, alias-fallback, both-unset, tilde-expansion, deadline-pinned). Rotation cycle 18: ADR-033 archived (cap 7078 → 5568B); 3-active floor 1 cycle below (cap > floor priority). 1-yıl shim deadline 2027-05-06 (ADR-030 paterni reuse).
+- `a4fafb6` — `test(budget): e2e accounting round-trip + rules/budget-events.md codify` — Q-PHASE15-BUDGET-COST-01 SELF-RESOLVED kanıtı: events_writer.append_provenance → check_budget round-trip e2e test (used_24h=1.5 single + 40.5 aggregate); rules/budget-events.md NEW 4 R-budget rule (orchestrator writes / cost shape / per-run estimate / round-trip locked); discovery: SKILL.md operation="staging" enum-dışı (test'te "ingest" kullanıldı, SKILL.md staleness Wave 3+ scope).
+- `2318166` — `fix(validator): F-19 reads language.content_locale (schema 1.3 canonical)` — Q-WAVE1-F19-VALIDATOR-01 RESOLVED; check_F_19 schema 1.3 canonical path (nested language.content_locale + root market) only; legacy root locale path no longer accepted; 6 contract tests in test_validate_invariants_F19.py.
+- `793328e` — `docs(rules): codify F-13 archive-resolution emsali (Q-WAVE1-DRIFT-DEFER-01 partial)` — F-13 PASS doğrulandı (Wave 1 archive sonrası 22/22 provenance integer run_id); rules/append-only-state.md "Drift Resolution Pattern" section ile emsal pattern codify (strict CI gate + legacy archive split, in-place migration YASAK). ADR-036 yazılmadı — pattern doc lighter weight, ADR rotation pressure ↓.
+- `(this commit)` — closeout: CONTEXT_LEDGER + PHASE_STATUS + OPEN_QUESTIONS update + 2 cascade fix (test_drift_check fixture schema 1.3 update + check_secrets exclude list amendment 7→10 path: DECISIONS.md+DECISIONS_ARCHIVE.md+test_check_secrets_sh.py self-reference).
+
+**Wave gates (final):**
+- pytest: **644 PASS + 2 skip** (was 627 baseline post-Wave-1; +17 yeni Wave 2 test cumulative across 5 new test files: test_env_vars.py 6 + test_check_secrets_sh.py +3 + test_ci_yaml.py +2 + test_budget_accounting.py 2 + test_validate_invariants_F19.py 6 = 19 yeni; -2 fixture compat keeps 17 net delta).
+- bash scripts/ci/check_secrets.sh → **EXIT 0** ✓ (ADR-034 amended exclude list, 10 path).
+- ci.yml strict mode 7/7 step (Step 5 mask removed, real exit code visible).
+- drift-check verdict transition: **RED → AMBER** (F-13 PASS + F-19 PASS via Wave 2 fixes; F-16 + F-17 hâlâ FAIL — Wave 3 data hygiene scope).
+- DECISIONS.md cap: 5568B / 6144B ✓ (ADR-034 + ADR-035 active; ADR-031+032+033 archived).
+
+**Lessons (Wave 2):**
+- **Lesson 38 v2 6'ıncı ardışık enforcement (Lesson 49 paterni 7'inci ardışık vaka)**: Wave 2 brief 6 task'ın 2'si runtime kanıtla invalide oldu (F-13 zaten PASS Wave 1 archive sonrası; dfs_pull.py pure transform never wrote events). Manager pre-dispatch full file body inspect → divergence catch → Süleyman onayı ile scope revize. SIFIR maliyetle frozen assumption avoid edildi (kategori 4 manager self-failure SIFIR 5 phase consecutive convergent).
+- **DECISIONS rotation cycle 17+18 cumulative**: 2 ADR added (034+035) + 3 ADR rotated (031+032+033). 3-active floor 1 cycle altında (cap önce, recover next ADR ile). ADR-014 + ADR-026 pattern reuse 18'inci uygulama complete.
+- **Q-PHASE15-BUDGET-COST-01 SELF-RESOLVED note pattern**: Audit finding'in (dfs_pull.py source.credits_used yazıyor) baştan yanlış olduğu ortaya çıktı — Phase 6 D-003 split sonrası dfs_pull.py pure transform; SKILL.md orchestrator yazar. Round-trip e2e test eklendi, rules/budget-events.md disiplini codify edildi. Future audits için: code review öncesi MODULE ROLE classification (transform vs orchestrator) gerekli.
+- **Validator-schema version-awareness gap**: F-19 check schema 1.2 paterniyle (root locale) kalmıştı, 1.3'e Migration 0003 sırasında upgrade edilmedi. Wave 2 catch + fix. Future migrations: validator audit ZORUNLU step, schema version bump checklist'e ek.
+
+**OQ delta (Wave 2):**
+- RESOLVED: Q-WAVE1-F19-VALIDATOR-01 (Task 2.5), Q-WAVE1-DRIFT-DEFER-01 partial (F-13 + F-19 PASS; F-16 + F-17 Wave 3 scope), Q-PHASE15-BUDGET-COST-01 SELF-RESOLVED (Task 2.4 e2e test kanıt).
+- AMENDED: ADR-034 exclude list 7→10 path (cascade fix sırasında Wave 2 amendment, codified in `tests/ci/test_check_secrets_sh.py::test_check_secrets_sh_adr034_exclude_paths`).
+- Yeni açılan: Q-WAVE2-DATA-HYGIENE-01 (F-16 quick_wins URL coverage + F-17 severity cells, Wave 3 scope), Q-WAVE2-DFS-OP-STAGING-01 (dfs-pull SKILL.md operation="staging" schema enum dışı — test'te "ingest" kullanıldı, SKILL.md update Wave 3+ scope).

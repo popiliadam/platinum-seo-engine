@@ -100,7 +100,7 @@ def _setup_workspace(tmp_path: Path, slug: str) -> Path:
     (pdir / "_state" / "workflows").mkdir(parents=True, exist_ok=True)
     (pdir / "_state" / "backups" / "master").mkdir(parents=True, exist_ok=True)
     (pdir / "outputs" / "reports").mkdir(parents=True, exist_ok=True)
-    cfg = {"project_id": slug, "locale": "tr-TR", "market": "TR"}
+    cfg = {"project_id": slug, "language": {"content_locale": "tr-TR"}, "market": "TR"}
     (pdir / "project.config.json").write_text(json.dumps(cfg), "utf-8")
     return pdir / "master.xlsx"
 

@@ -80,9 +80,14 @@ def test_check_secrets_sh_clean_tree_exits_zero():
     )
 
 
-def test_check_secrets_sh_adr034_seven_exclude_paths():
-    """ADR-034 codify: 7 exclude path policy lock (additive değişiklik için
+def test_check_secrets_sh_adr034_exclude_paths():
+    """ADR-034 codify: exclude path policy lock (additive değişiklik için
     ADR-034 amendment gerekir).
+
+    Wave 2 amendment: DECISIONS.md + DECISIONS_ARCHIVE.md + this test
+    file added to the list because ADR-034 body itself codifies the
+    detection patterns (which would otherwise self-match), and this
+    test asserts the patterns by literal (test fixture exemption).
     """
     body = SCRIPT.read_text()
     expected_excludes = [
@@ -90,9 +95,12 @@ def test_check_secrets_sh_adr034_seven_exclude_paths():
         ":!docs/superpowers/specs/",
         ":!docs/CONTEXT_LEDGER.md",
         ":!docs/OPEN_QUESTIONS.md",
+        ":!docs/DECISIONS.md",
+        ":!docs/DECISIONS_ARCHIVE.md",
         ":!scripts/ci/check_secrets.sh",
         ":!tests/scripts/test_events_writer.py",
         ":!tests/ci/test_ci_yaml.py",
+        ":!tests/ci/test_check_secrets_sh.py",
     ]
     for exc in expected_excludes:
         assert exc in body, f"ADR-034 exclude path missing: {exc}"

@@ -11,6 +11,9 @@ set -euo pipefail
              ':!docs/superpowers/specs/' \
              ':!docs/CONTEXT_LEDGER.md' \
              ':!docs/OPEN_QUESTIONS.md' \
+             ':!docs/DECISIONS.md' \
+             ':!docs/DECISIONS_ARCHIVE.md' \
              ':!scripts/ci/check_secrets.sh' \
              ':!tests/scripts/test_events_writer.py' \
-             ':!tests/ci/test_ci_yaml.py'
+             ':!tests/ci/test_ci_yaml.py' \
+             ':!tests/ci/test_check_secrets_sh.py'
