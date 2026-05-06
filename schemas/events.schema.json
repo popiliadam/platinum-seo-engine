@@ -55,8 +55,8 @@
     },
     "operation": {
       "type": "string",
-      "description": "PROVENANCE-only. Pipeline stage (docs/ARCHITECTURE.md §6.1 Stage 1-4 + DONE cascade §21.4). One entry per (file|response, operation) pair.",
-      "enum": ["ingest", "normalize", "project_excel", "validate", "cascade_done"]
+      "description": "PROVENANCE-only. Pipeline stage (docs/ARCHITECTURE.md §6.1 Stage 1-4 + DONE cascade §21.4). 'staging' = Phase 6 D-003 pre-Excel staging routing (raw MCP response → SQLite/JSON staging only, no master.xlsx write; Phase 8+ skills project later). One entry per (file|response, operation) pair.",
+      "enum": ["ingest", "normalize", "project_excel", "validate", "cascade_done", "staging"]
     },
     "target_table": {
       "type": "string",
