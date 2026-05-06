@@ -5,12 +5,18 @@ self-match catch (Phase 8 ilk surface CONTEXT_LEDGER + Phase 14 W1 ikinci
 PHASE_STATUS placeholder → Phase 14 W2 üçüncü ci.yml deployment config kategori).
 Wrapper script convention paralel evolution: dokümantasyon → placeholder,
 deployment config + literal-required → wrapper script self-exclude.
+
+Wave 2 (ADR-034) added execution-level regression tests: clean-tree EXIT 0
++ injected-secret detection round-trip (policy authority for the 7 exclude
+paths and 4 detection patterns).
 """
 import pathlib
 import stat
+import subprocess
 
 
 SCRIPT = pathlib.Path(__file__).resolve().parents[2] / "scripts/ci/check_secrets.sh"
+REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 
 def test_check_secrets_sh_exists():
@@ -51,3 +57,58 @@ def test_check_secrets_sh_three_legacy_exclude_paths():
     assert ":!.env.example" in body
     assert ":!docs/superpowers/specs/" in body
     assert ":!docs/CONTEXT_LEDGER.md" in body
+
+
+# Wave 2 — ADR-034 execution regression tests
+# ============================================
+
+def test_check_secrets_sh_clean_tree_exits_zero():
+    """ADR-034 round-trip kanıt: çalışan repo'da check_secrets EXIT 0.
+    Test fixtures (tests/scripts/test_events_writer.py + tests/ci/test_ci_yaml.py)
+    + doc archive paths exclude list ile false-positive sıfır.
+    """
+    result = subprocess.run(
+        ["bash", str(SCRIPT)],
+        cwd=str(REPO_ROOT),
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, (
+        f"check_secrets.sh expected EXIT 0 on clean tree, got {result.returncode}.\n"
+        f"stdout: {result.stdout}\nstderr: {result.stderr}"
+    )
+
+
+def test_check_secrets_sh_adr034_seven_exclude_paths():
+    """ADR-034 codify: 7 exclude path policy lock (additive değişiklik için
+    ADR-034 amendment gerekir).
+    """
+    body = SCRIPT.read_text()
+    expected_excludes = [
+        ":!.env.example",
+        ":!docs/superpowers/specs/",
+        ":!docs/CONTEXT_LEDGER.md",
+        ":!docs/OPEN_QUESTIONS.md",
+        ":!scripts/ci/check_secrets.sh",
+        ":!tests/scripts/test_events_writer.py",
+        ":!tests/ci/test_ci_yaml.py",
+    ]
+    for exc in expected_excludes:
+        assert exc in body, f"ADR-034 exclude path missing: {exc}"
+
+
+def test_check_secrets_sh_adr034_four_detection_patterns():
+    """ADR-034 codify: 4 detection pattern lock — DATAFORSEO_PASSWORD literal,
+    info@adstark email, hard-coded sample hash (3bf7…), GitHub PAT format
+    (ghp_+36 alphanum).
+    """
+    body = SCRIPT.read_text()
+    expected_patterns = [
+        "DATAFORSEO_PASSWORD=[a-zA-Z0-9]{8,}",
+        "info@adstark",
+        "3bf73e0893f69b42",
+        "ghp_[a-zA-Z0-9]{36}",
+    ]
+    for pat in expected_patterns:
+        assert pat in body, f"ADR-034 detection pattern missing: {pat}"
