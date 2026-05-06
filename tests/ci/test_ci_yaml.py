@@ -48,7 +48,7 @@ def test_pip_cache_enabled():
     assert setup_step["with"]["cache"] == "pip"
 
 
-def test_continue_on_error_strict_mode_governance_steps():
+def test_continue_on_error_all_steps_strict_mode():
     """Phase 14 W3-W3-β strict mode FINAL: tüm 7 step `continue-on-error: false`.
 
     W3-W3-α'da 3 governance step (drift-check + schema-validate + glossary-audit)

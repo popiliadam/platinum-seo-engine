@@ -62,7 +62,7 @@ Worker schema-first override paterni: schema'da olmayan kind kullanmak YASAK. Ye
 
 `event_type` 10 closed enum (events.schema.json):
 
-`content_new`, `content_revise`, `content_remove`, `redirect_deployed`, `tech_fix`, `schema_fix`, `pillar_launch`, `quickwin_applied`, `manual`, `audit_run`, `backlink_outreach` (post-v1).
+`content_new`, `content_revise`, `content_remove`, `redirect_deployed`, `tech_fix`, `schema_fix`, `pillar_launch`, `quickwin_applied`, `manual`, `backlink_outreach`.
 
 13 production + 8 verify/governance skill için branch matrix:
 
@@ -91,7 +91,7 @@ Worker schema-first override paterni: schema'da olmayan kind kullanmak YASAK. Ye
 | backlink-outreach (post-v1) | backlink_outreach | (direct) |
 | generate-images | content_new | image_generated |
 | verify-indexing | manual | verify_indexing |
-| monitoring-weekly | audit_run (`event_kind=audit`) | weekly_monitoring |
+| monitoring-weekly | (none — `event_kind=audit`, `event_type` YASAK) | weekly_monitoring |
 
 Worker schema-first override paterni (Phase 14 W3-W2-B doğum belgesi, 11'inci uygulama):
 
@@ -119,10 +119,10 @@ content-remediation redirect (Q-W3W2Cb-001 in-wave RESOLVED `/main-page` duplica
 {"run_id": 49, "ts": "2026-05-05T11:30:00Z", "event_kind": "work", "event_type": "redirect_deployed", "skill": "content-remediation", "url_normalized": "https://demo-dental.example/main-page", "redirect_target": "https://demo-dental.example/", "redirect_status": 301, "reason": "duplicate_via_canonical_GSC_inspect"}
 ```
 
-monitoring-weekly audit-run (`event_kind=audit`):
+monitoring-weekly audit-run (`event_kind=audit` — `event_type` field YASAK):
 
 ```json
-{"run_id": 50, "ts": "2026-05-05T12:00:00Z", "event_kind": "audit", "event_type": "audit_run", "skill": "monitoring-weekly", "note": "weekly_monitoring", "metrics_snapshot": {"red_count": 14, "amber_count": 2, "green_count": 4}}
+{"run_id": 50, "ts": "2026-05-05T12:00:00Z", "event_kind": "audit", "skill": "monitoring-weekly", "note": "weekly_monitoring", "metrics_snapshot": {"red_count": 14, "amber_count": 2, "green_count": 4}}
 ```
 
 ## Section 5 — `workflow_action` 8-enum Lifecycle (ADR-019)
@@ -141,3 +141,21 @@ Lifecycle invariant:
 - Geri-geçiş YASAK (`done → started` MUST NOT, append-only-state cross-ref).
 
 Cross-references: → rules/append-only-state.md (mutate YASAK), → rules/schema-first.md (events.schema authority), → rules/schema-versioning-discipline.md (enum bump versioning).
+
+## Section 6 — `event_kind=audit` vs `event_type` Disambiguation (Q-PHASE15-EVENTSCHEMA-AUDIT-BRIEF-01)
+
+`event_kind=audit` events (read-only access trail) MUST NOT carry `event_type` field per ADR-020. `event_type` sadece `event_kind=work` events için geçerlidir (skill execution output). `audit_run` bir `event_type` değeri DEĞİLDİR — events.schema `event_type` enum'unda bulunmaz.
+
+- `event_kind=audit` → `event_type` field YASAK (validation'da ignore edilmez, schema violation).
+- `event_kind=work` → `event_type` field ZORUNLU (10-closed-enum, Section 4 branch matrix).
+- Brief template: audit event cross-check "audit_run in event_type?" sorusu YANLIŞ soru. Doğru soru: "audit event'te event_type var mı?" (OLMAMALI).
+
+Doğru audit event:
+```json
+{"run_id": 50, "event_kind": "audit", "skill": "monitoring-weekly", "note": "weekly_monitoring"}
+```
+
+Yanlış (YASAK):
+```json
+{"event_kind": "audit", "event_type": "audit_run", ...}
+```

@@ -2,7 +2,7 @@
 
 ## Unresolved
 
-### Q-W3W3β-TEST-01: test_ci_yaml.py semantic update vs name rename ayrımı [LOW]
+### Q-W3W3β-TEST-01: test_ci_yaml.py semantic update vs name rename ayrımı [LOW] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 14 W3-W3-β W-Q1 worker output
 **Context:** W-Q1 cascade fix `test_ci_yaml.py::test_continue_on_error_strict_mode_governance_steps` testi 3 strict+4 report-only logic'inden 7 strict logic'ine semantic update yaptı (set comparison defensive), AMA test ismi "governance_steps" suffix'i ile kaldı (artık tüm 7 step için geçerli, sadece governance değil). Diff surgical scope tutuldu. Phase 15 audit Wave 4 follow-up: rename `test_continue_on_error_all_steps_strict_mode` veya benzer.
 **Options:**
@@ -11,8 +11,9 @@
 - c) v1.1 polish scope
 **Owner:** karar verici agent (Phase 15 audit Wave 4)
 **Blocking Phase:** None (cosmetic naming, non-blocking)
+**→ RESOLVED 2026-05-06 engine (v1.1 polish batch):** Option a applied. `test_continue_on_error_strict_mode_governance_steps` → `test_continue_on_error_all_steps_strict_mode`. 610/610 PASS.
 
-### Q-W3W3β-CIHOOK-01: GitHub Actions security advisory hook false positive [LOW]
+### Q-W3W3β-CIHOOK-01: GitHub Actions security advisory hook false positive [LOW] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 14 W3-W3-β W-Q1 worker output
 **Context:** W-Q1 ilk ci.yml line 52 edit denemesinde GitHub Actions security advisory hook (komut injection uyarısı) false positive olarak fired. Daha küçük context retry ile başarılı. Substring-pattern based trigger, gerçek injection riski yoktu. Phase 15 audit Wave 1 hooks/CI cross-check scope.
 **Options:**
@@ -21,8 +22,9 @@
 - c) Defer (advisory only, blocking değil)
 **Owner:** karar verici agent (Phase 15 audit Wave 1)
 **Blocking Phase:** None (advisory only)
+**→ RESOLVED 2026-05-06:** Option c accepted. Advisory-only false positive, no security risk. No action needed; documented as known behavior.
 
-### Q-CI-W3-04: pytest local-only fixture marker convention codify [MEDIUM]
+### Q-CI-W3-04: pytest local-only fixture marker convention codify [MEDIUM] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 14 W3-W3-β cascade fix (F-14W3W3β-4 manager self-failure catch transparency mode)
 **Context:** Phase 14 W3-W3-β CI Run 12 Step 4 pytest 4 test fail (`test_quick_wins.py::test_happy_path_gsc_live` + `test_inbox_raw_json_saved` + `test_sf_import.py::test_tier1_14_validates` + `test_tier2_search_console_all_amber`). Root cause: testler LOCAL-ONLY fixture (workspace-staging path lokalde MEVCUT, CI ubuntu-latest YOK = environment divergence). Süleyman K3 Seçenek B onayı: `@pytest.mark.skipif(not WORKSPACE_STAGING.exists(), reason="...")` cascade fix uygulandı 4 test'e. Q-CI-W3-04 NEW: pytest local-only fixture marker convention uzun vade migration scope (Seçenek C: conftest.py 'local_only' marker register + ci.yml '-m "not local_only"' pattern, daha temiz mimari).
 **Options:**
@@ -32,8 +34,9 @@
 - d) Mevcut skipif marker pattern documentation only (no migration)
 **Owner:** karar verici agent (Phase 15 audit Wave 1 kategori #5)
 **Blocking Phase:** None (current skipif marker production-ready 7/7 GREEN, codify ertelenebilir)
+**→ RESOLVED 2026-05-06 engine (v1.1 polish batch):** Option a applied. `rules/skills.md` Section 5 "pytest Local-Only Fixture Convention" eklendi. `skipif(not PATH.exists())` pattern codified. conftest.py migration Phase 16+ scope.
 
-### Q-W3W3α-EVENTSCHEMA-01: events.schema audit_run 10-enum cross-check yapılmadı [MEDIUM]
+### Q-W3W3α-EVENTSCHEMA-01: events.schema audit_run 10-enum cross-check yapılmadı [MEDIUM] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 14 W3-W3-α worker output (W-P1 rules/events-writer.md Section 4 monitoring-weekly satırı `audit_run` belirtti ama schema cross-check yapılmadı)
 **Context:** W-P1 worker rules/events-writer.md Section 4 branch matrix per skill 22 row codify (event_type 10-closed-enum). monitoring-weekly satırı `event_kind=audit + event_type=audit_run` belirtti AMA events.schema.json `event_type` enum'unda `audit_run` mevcut mu doğrulanmadı (worker self-disclosure). Schema'da yoksa worker schema-first override (manual + note paterni) reuse gerekir. Phase 15 audit Wave 1 schema cross-check kategori #2 scope.
 **Options:**
@@ -43,8 +46,9 @@
 - d) Phase 14 W3-W3-β closure scope schema patch ADR aday
 **Owner:** karar verici agent (Phase 15 audit Wave 1 kategori #2 schema cross-check core finding)
 **Blocking Phase:** None (non-blocking, schema cross-check medium priority Phase 15 audit scope)
+**→ RESOLVED 2026-05-06 engine (v1.1 polish batch):** Schema verified: `audit_run` events.schema `event_type` enum'unda YOK (correct per ADR-020 — `event_kind=audit` events must NOT carry `event_type`). `rules/events-writer.md` 3 hata düzeltildi: (1) `audit_run` enum listesinden çıkarıldı (2) branch matrix monitoring-weekly satırı "(none — event_kind=audit, event_type YASAK)" olarak düzeltildi (3) monitoring-weekly JSON example'dan `event_type` kaldırıldı. Section 6 disambiguation eklendi.
 
-### Q-W3W3α-W2: events_writer.py::next_run_id helper module path doğrulanmadı [LOW]
+### Q-W3W3α-W2: events_writer.py::next_run_id helper module path doğrulanmadı [LOW] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 14 W3-W3-α worker output (W-P1 rules/events-writer.md Section 2 next_run_id helper invocation doğrulanmadı)
 **Context:** W-P1 worker rules/events-writer.md Section 2 `scripts/state/events_writer.py::next_run_id(project_slug)` helper invocation codify etti ama module path doğrulanmadı (worker self-disclosure). Helper module workspace repo'da mevcut mı engine repo'da mı? Phase 14 W3-W3-β workspace scope verify aday — workspace `~/Documents/platinum-seo-workspace/scripts/state/events_writer.py` veya engine `scripts/state/events_writer.py` resolve gerek.
 **Options:**
@@ -54,8 +58,9 @@
 - d) Phase 15 audit defer (low priority module path verification post-launch acceptable)
 **Owner:** karar verici agent (Phase 14 W3-W3-β workspace scope verify)
 **Blocking Phase:** None (non-blocking, low priority module path verification W3-W3-β workspace scope)
+**→ RESOLVED 2026-05-06:** Option b verified. `scripts/state/events_writer.py` ENGINE repo'da mevcut. `next_run_id` function line 501 confirmed. Workspace'te scripts/ directory YOK. `rules/events-writer.md` Section 2 path doğru.
 
-### Q-W3W2Cb-003: master_task task_id pattern (MT-W3W2B-001) does NOT match events.schema regex [LOW]
+### Q-W3W2Cb-003: master_task task_id pattern (MT-W3W2B-001) does NOT match events.schema regex [LOW] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 14 W3-W2-C-b worker output (W-O1 Step 7 mark-done schema-first override branch surface)
 **Context:** Existing master_task task_id values (e.g. `MT-W3W2B-001`, `MT-W3W2B-002`) created during Phase 14 W3-W2-B do NOT match the events.schema `^T-[0-9]{4,}$` regex pattern that mark-done expects. Worker created new task_id values `T-10001..T-10004` matching the schema, but pre-existing W3-W2-B drift remains. Convention codify aday: rules/master-task-id.md or master-excel.schema task_id pattern reference.
 **Options:**
@@ -65,8 +70,9 @@
 - d) Phase 15 audit Wave 1 layout normalize ADR aday (cumulative pre-existing drift catch)
 **Owner:** karar verici agent (Phase 15 audit Wave 1 kategori #2 schema cross-check)
 **Blocking Phase:** None (non-blocking, low priority pre-existing drift)
+**→ RESOLVED 2026-05-06 engine (v1.1 polish batch):** Option a applied. `rules/master-task-id.md` NEW file created. `^T-[0-9]{4,}$` canonical pattern codified. Legacy `MT-W3W2B-XXX` historical, append-only protected can't migrate.
 
-### Q-W3W2Cb-004: drift-check F-17 regression — redirect_404.action='301' value not in severityEnum 4-value (rule scope collision) [LOW]
+### Q-W3W2Cb-004: drift-check F-17 regression — redirect_404.action='301' value not in severityEnum 4-value (rule scope collision) [LOW] ✅ SELF-RESOLVED (code correct)
 **Raised:** 2026-05-05 during Phase 14 W3-W2-C-b worker output (W-O1 Step 9 drift-check post-W3-W2-C-b verify surface)
 **Context:** drift-check post-W3-W2-C-b verdict regressed from RED 15/2/3 → RED 14/2/4 (Δ -1 PASS, +1 FAIL F-17 mechanical regression). F-17 rule scans `severity` columns for 4-value enum (LOW/MEDIUM/HIGH/CRITICAL), but `redirect_404.action` column was scanned (value '301' fails enum check). Schema authority cross-check needed: F-17 rule scope is per-sheet specific or generic-column-name? Rule scope kolizyonu, gerçek data drift değil — mekanik regression.
 **Options:**
@@ -76,8 +82,9 @@
 - d) Phase 15 audit Wave 1 implementation question codify (drift-check rule scope semantic codify aday)
 **Owner:** karar verici agent (Phase 15 audit Wave 1 kategori #5 schema cross-check + drift-check implementation)
 **Blocking Phase:** None (non-blocking, mekanik regression bilinçli kabul, gerçek data drift değil)
+**→ SELF-RESOLVED 2026-05-06:** `check_F_17` implementation verified: W3-W2-C-a fix sonrası kod SCHEMA-DRIVEN. Yalnızca `master-excel.schema.json`'da `$ref: "#/definitions/severityEnum"` olan kolonları kontrol eder. `redirect_404.action` kolonu severityEnum ref taşımıyor → F-17'de taranmaz. Regression W3-W2-C-a öncesi pre-fix kodla oluştu, mevcut kod doğru.
 
-### Q-W3W2C-A-LAYOUT-01: master.xlsx duplicate header row Workspace W1 bootstrap (Q-W3W2B-LAYOUT-01 paterni reuse) [MEDIUM]
+### Q-W3W2C-A-LAYOUT-01: master.xlsx duplicate header row Workspace W1 bootstrap (Q-W3W2B-LAYOUT-01 paterni reuse) [MEDIUM] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 14 W3-W2-C-a worker output (W-N1 drift-check post-W3-W2-C-a verify, drift-check helper schema authority dynamic + row 1 fallback ile layout'la yaşıyor)
 **Context:** Workspace W1 bootstrap master.xlsx duplicate header row (row 1 + row 3/4/5 both header). W3-W2-C-a fix `validate_invariants.py` `_resolve_header_row()` helper schema authority dynamic + row 1 fallback (probe match yoksa) ile layout'la birlikte yaşıyor. 4 mekanik header-parse FAIL eliminate (F-01+F-05+F-17+F-18). Q-W3W2B-LAYOUT-01 + Q-DC-LAYOUT-01 paterni reuse — duplicate header row layout normalize ayrı scope.
 **Options:**
@@ -87,8 +94,9 @@
 - d) Phase 15 audit Wave 1 layout normalize ADR aday formal decision Süleyman + karar verici layout migration vs helper flexibility tradeoff
 **Owner:** karar verici agent (Phase 15 audit Wave 1 kategori #2 schema cross-check core finding)
 **Blocking Phase:** None (non-blocking, drift-check helper schema-aware production-ready, layout normalize Phase 15 audit scope)
+**→ RESOLVED 2026-05-06:** Option c accepted. `_resolve_header_row()` helper schema-authority dynamic + row 1 fallback production-ready. Layout normalize Phase 16+ scope (workspace data change required, out of engine scope).
 
-### Q-W3W2C-A-DICTNAME-01: required_columns dict access patterni rules/schema-validation.md codify [LOW]
+### Q-W3W2C-A-DICTNAME-01: required_columns dict access patterni rules/schema-validation.md codify [LOW] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 14 W3-W2-C-a worker output (W-N1 Step 0 fix surface)
 **Context:** master-excel.schema.json `required_columns` array entries dict objects (`{col, name, ref, enum}`) — string değil. Eski F-05'te `len(required)` çalışıyordu ama header set comparison kırıktı (`str(c)` literal dict string set'e giriyordu, probe match imkansızdı). W3-W2-C-a fix `_col_name()` extract ile düzeltildi → schema authority dynamic ÇALIŞIR. Future schema validators rules codify aday: schema validators'ın `required_columns` dict access patterni standart convention.
 **Options:**
@@ -98,8 +106,9 @@
 - d) Phase 15 audit defer (mevcut W3-W2-C-a `_col_name()` extract local pattern v1 release acceptable, post-v1 ADR aday)
 **Owner:** karar verici agent (Phase 15 audit Wave 1 kategori #2 schema cross-check)
 **Blocking Phase:** None (non-blocking, governance polish W3-W3 closure veya Phase 15 audit scope)
+**→ RESOLVED 2026-05-06:** Option d accepted. `_col_name()` helper mevcut kod'da doğru ve production-ready. Codify Phase 16+ ADR aday (first new schema validator'da enforce).
 
-### Q-W3W2C-A-F13F16-01: F-13 historical non-int run_id + F-16 quick_wins URL coverage gap gerçek data drift [MEDIUM]
+### Q-W3W2C-A-F13F16-01: F-13 historical non-int run_id + F-16 quick_wins URL coverage gap gerçek data drift [MEDIUM] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 14 W3-W2-C-a worker output (W-N1 drift-check post-W3-W2-C-a verify RED 15/2/3, hala RED F-13+F-16 non-mekanik)
 **Context:** drift-check post-W3-W2-C-a fix verdict RED 15/2/3 (4 mekanik header-parse FAIL eliminate F-01+F-05+F-17+F-18 ✓), hala RED çünkü: F-13 (5 historical non-int run_id, baseline carry-forward W3-W2-A append-only protected mop-up imkansız lesson 47 5'inci kategori) + F-16 (36 quick_wins URL not in opportunity, gerçek data drift mekanik değil). Bunlar W3-W2-C-a scope dışı — F-13 historical events.jsonl repair migration; F-16 opportunity sheet expansion (quick_wins URL coverage). Phase 14 W3-W2-C-b veya Phase 15'te addressed.
 **Options:**
@@ -110,9 +119,10 @@
 - e) Phase 15 audit Wave 1 kategori #2 birleşik scope karar (Q-W3W2B-LAYOUT-01 + Q-DC-LAYOUT-01 + F-13/F-16 layout + data drift hepsi paralel ADR)
 **Owner:** karar verici agent (Phase 14 W3-W2-C-b production scope veya Phase 15 audit Wave 1)
 **Blocking Phase:** None (non-blocking, drift-check verdict RED dikkat çekici ama mekanik değil real data drift bilinçli kabul append-only protected)
+**→ RESOLVED 2026-05-06:** F-13 Option a: append-only YASAK → migrate imkansız, historical 5 event kabul baseline carry. F-16 Option d: Phase 16 scope "by-design divergence" exception flag. Gerçek content data drift değil; quick_wins kaynaklı URL set daha geniş olması expected.
 
 
-### Q-W3W2B-WRITER-01: non-master_task sheets writer registry codify [LOW]
+### Q-W3W2B-WRITER-01: non-master_task sheets writer registry codify [LOW] — DEFERRED v1.2
 **Raised:** 2026-05-05 during Phase 14 W3-W2-B worker output (W-M1 transaction.update writer surface)
 **Context:** master_task.allowed_writers includes `master_task_sync` exact string — orchestrator passes `writer="master_task_sync"` correctly. Other sheets (cannibalization/content-decay/tech-audit/etc.) pass arbitrary writer strings which `transaction._check_writer_scope` ignores when `allowed_writers is None`. Cross-sheet-invariants 20 rule registry'de allowed_writers field ardından non-master_task sheets için writer registry tanımı eksik — convention kayboluyor. Phase 15 audit Wave 2 kategori #9 (workspace data integrity) writer registry codify aday.
 **Options:**
@@ -123,7 +133,7 @@
 **Owner:** karar verici agent (Phase 15 audit Wave 2 kategori #9)
 **Blocking Phase:** None (non-blocking, low priority writer registry)
 
-### Q-DC-VERDICT-01: drift-check `aggregate_verdicts` UNKNOWN behavior when FAILs > 0 [LOW]
+### Q-DC-VERDICT-01: drift-check `aggregate_verdicts` UNKNOWN behavior when FAILs > 0 [LOW] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 14 W3-W2-A worker output (W-L1 drift-check report inspect)
 **Context:** drift-check skill `aggregate_verdicts` overall_verdict=UNKNOWN when FAILs > 0 (Phase 14 W3-W2-A consistency-report.json verdict field=RED but aggregate UNKNOWN). Implementation behavior question: UNKNOWN when AMBER mix vs FAIL when any critical FAIL? Phase 14 W3-W1 governance skill body refactor production-ready ama bu specific behavior dokümante değil. Phase 15 audit implementation question.
 **Options:**
@@ -133,8 +143,9 @@
 - d) Phase 15 audit document — implementation existing behavior + rationale codify (no code change)
 **Owner:** karar verici agent (Phase 15 audit implementation question)
 **Blocking Phase:** None (non-blocking, low priority semantic)
+**→ RESOLVED 2026-05-06:** Option d accepted. UNKNOWN = "partial picture" semantik kabul: aggregate score hesaplanamıyor çünkü bazı check'ler SKIP. RED consistency-report verdict genel durumu doğru gösteriyor. Code change Phase 16+ scope.
 
-### Q-016: audit_action enum mapping (Edit/Write/Bash → modified/accessed)
+### Q-016: audit_action enum mapping (Edit/Write/Bash → modified/accessed) — DEFERRED v1.2
 **Raised:** 2026-04-30 during Phase 4 W-N (post-tool-use.json hook)
 **Context:** events.schema audit_action enum 6 değer (created, modified, deleted, accessed, permission_changed, config_changed). post-tool-use hook tüm tool'larda (Edit/Write/Bash) `accessed` flatten ediyor — semantik kayıp (Edit/Write → `modified` olmalı). One-liner sıkışıklığı tradeoff.
 **Options:**
@@ -144,7 +155,7 @@
 **Owner:** karar verici agent (Phase 14+ pre-dispatch)
 **Blocking Phase:** None (non-blocking, governance polish)
 
-### Q-RP-01: reporting events.jsonl audit-worthiness (rapor üretme audit-worthy event mi?)
+### Q-RP-01: reporting events.jsonl audit-worthiness (rapor üretme audit-worthy event mi?) — DEFERRED v1.2
 **Raised:** 2026-05-01 during Phase 9 Wave 1 closeout (W-D1 fiili pattern + operation enum constraint cross-check sırasında ortaya çıktı)
 **Context:** 4 reporting skill (monthly-report + weekly-summary + portfolio-overview + portfolio-weekly-brief) Wave 1'de events.jsonl YAZMAMA paterni ile shipped — W-D1 master-task-sync (1095L scan-confirmed) fiili paterni reuse. operation field schema enum 5 değer ("PROVENANCE-only" description: ingest/normalize/project_excel/validate/cascade_done) + reporting bunlardan hiçbirine semantik tam karşılık değil. Karar: events.jsonl write atla (Seçenek C), Phase 14 governance refinement'a defer. Sorun: "rapor üretme" eylemi audit trail'de görünmüyor — gelecek pilot smoke test sonucu işe yarar mı (re-run dedup, kim ne zaman rapor çekti) sorusu açık.
 **Options:**
@@ -166,7 +177,7 @@
 **Owner:** karar verici agent (Phase 14 W2 brief writing, CI yaml convention paralel)
 **Blocking Phase:** Phase 14 W2 (CI pipeline) + Phase 14 W3 (pilot E2E smoke test) — non-blocking W1 deliverable, defer W2-W3 resolve
 
-### Q-PHASE15-RXX-COUNT-01: R-XX invariant sayısı events.jsonl run_id kaç olmalı? [LOW]
+### Q-PHASE15-RXX-COUNT-01: R-XX invariant sayısı events.jsonl run_id kaç olmalı? [LOW] — DEFERRED v1.2
 **Raised:** 2026-05-05 during Phase 15 W1 engine audit (W-R worker output)
 **Context:** events.jsonl run_id sequence currently at 64. No spec document defines expected R-XX hard constraint count as of v1.0.0. Brief assumed a specific count that worker had to override via schema-first approach. Phase 15 W4 discipline audit Wave 4 scope: codify expected R-XX count vs actual divergence.
 **Options:**
@@ -176,7 +187,7 @@
 **Owner:** karar verici agent (Phase 15 W4 discipline audit)
 **Blocking Phase:** None (LOW, non-blocking)
 
-### Q-PHASE15-EVENTENUM-BRIEF-01: event_type enum brief template yanlış jq path [MEDIUM]
+### Q-PHASE15-EVENTENUM-BRIEF-01: event_type enum brief template yanlış jq path [MEDIUM] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 15 W1 engine audit (W-R worker output; schema-first override #16)
 **Context:** Phase 15 W1 brief expected jq `.definitions.event_type.enum` — actual path is `.properties.event_type.enum`. Same issue appeared in W2 (`.definitions.audit_action.enum` → `.properties.audit_action.enum`). Brief template pattern for schema enum checks consistently uses wrong jq path. Worker must do Python fallback each time. Codify correct jq path pattern in audit brief templates (rules/skills.md or lesson 8 v8 Section update).
 **Options:**
@@ -185,8 +196,9 @@
 - c) Codify correct `.properties.<field>.enum` pattern in rules/skills.md
 **Owner:** karar verici agent (Phase 15 W4 lesson 8 evolution audit)
 **Blocking Phase:** None (MEDIUM, non-blocking but causing schema-first overrides)
+**→ RESOLVED 2026-05-06 engine (v1.1 polish batch):** Option c applied. `rules/skills.md` Section 6 "Schema Enum jq Path" eklendi. `.properties.<field>.enum` doğru path; `.definitions.<field>.enum` YANLIŞ. Worker Python fallback artık gerekmeyecek.
 
-### Q-PHASE15-EVENTSCHEMA-AUDIT-BRIEF-01: audit_run enum presence cross-check brief instruction ambiguity [LOW]
+### Q-PHASE15-EVENTSCHEMA-AUDIT-BRIEF-01: audit_run enum presence cross-check brief instruction ambiguity [LOW] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 15 W1 engine audit (W-R worker)
 **Context:** Brief instructed to verify `audit_run` in `event_type` enum but `event_kind=audit` events MUST NOT carry `event_type` per ADR-020 + rules/events-writer.md. The brief instruction was contradictory — audit events use `event_kind=audit` not `event_type=audit_run`. Worker (Q-W3W3α-EVENTSCHEMA-01 resolution) clarified: SKILL.md lines 96-103 correctly documents `event_kind=audit` must NOT carry `event_type`. Brief template improvement needed.
 **Options:**
@@ -194,6 +206,7 @@
 - b) Add clarification note in rules/events-writer.md Section 5 (event_kind=audit vs event_type disambiguation)
 **Owner:** karar verici agent (Phase 15 W4 audit)
 **Blocking Phase:** None (LOW, cosmetic brief template improvement)
+**→ RESOLVED 2026-05-06 engine (v1.1 polish batch):** Option b applied (as Section 6). `rules/events-writer.md` Section 6 "event_kind=audit vs event_type Disambiguation" eklendi. `audit_run` event_type DEĞİLDİR kuralı explicit codify edildi.
 
 ### Q-PHASE15-DOC-STALE-01: WORKFLOWS.md skill status column tümü 'planned' — stale since Phase 0 [MEDIUM] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 15 W2 workspace audit (W-S3 worker output)
@@ -206,7 +219,7 @@
 **Blocking Phase:** None (MEDIUM, docs staleness, non-blocking)
 **→ RESOLVED 2026-05-06 engine `92ece0e`:** Option a applied. All 43 skill entries `planned` → `active`, header updated to reflect v1.0.0 release status.
 
-### Q-PHASE15-ARCHIVE-INTEG-01: archive skill integration cross-check — 43 skills reference archive correctly? [MEDIUM]
+### Q-PHASE15-ARCHIVE-INTEG-01: archive skill integration cross-check — 43 skills reference archive correctly? [MEDIUM] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 15 W2 workspace audit (W-S3 worker output)
 **Context:** `archive` command exists in workspace `.claude/commands/`. Skills that produce final outputs (monthly-report, competitive-analysis, etc.) should reference archive workflow. W-S3 noted that not all skills explicitly document the archive step. Phase 15 W5 UX completeness audit scope.
 **Options:**
@@ -215,6 +228,7 @@
 - c) Defer to v1.1 (UX polish)
 **Owner:** karar verici agent (Phase 15 W5 UX audit)
 **Blocking Phase:** None (MEDIUM, UX completeness, non-blocking)
+**→ RESOLVED 2026-05-06 engine (v1.1 polish batch):** Option b applied. `rules/skills.md` Section 7 "Archive Convention" eklendi. Output üreten skill'ler için archive adımı convention olarak codify edildi. Per-skill audit Phase 16 scope.
 
 ### Q-PHASE15-ADR-CLOSURE-01: ADR-004 + ADR-005 formal closure after soak window [LOW]
 **Raised:** 2026-05-05 during Phase 15 W1 engine audit (W-R worker)
@@ -247,7 +261,7 @@
 **Blocking Phase:** None (LOW, latent risk only)
 **→ RESOLVED 2026-05-06 engine `bc9391c`:** Option a applied. `.mcp.json` pinned: `mcp-server-gsc@0.3.0`, `dataforseo-mcp-server@2.8.10`. F-16 baseline updated 469→482B.
 
-### Q-PHASE15-LOCKFILE-01: requirements.txt soft pins (>=) — no lock file for reproducible installs [LOW]
+### Q-PHASE15-LOCKFILE-01: requirements.txt soft pins (>=) — no lock file for reproducible installs [LOW] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 15 W3 external dependency audit (W-C2 worker output; cat17-external-dependency.md)
 **Context:** `requirements.txt` uses `>=` lower bounds only (jsonschema>=4.0, pytest>=7.0, openpyxl>=3.1, pyyaml>=6.0). No `requirements-lock.txt` or `pip freeze` snapshot exists. Latent risk: silent breaking changes on fresh installs if major versions released. Currently: all 4 packages installed and functional (pytest 9.0.3 vs >=7.0 floor = fine).
 **Options:**
@@ -256,6 +270,7 @@
 - c) Switch to `pyproject.toml` with dependency groups (over-engineering for current scope)
 **Owner:** karar verici agent (v1.1 maintenance or Phase 15 W5)
 **Blocking Phase:** None (LOW, quality improvement only)
+**→ RESOLVED 2026-05-06 engine (v1.1 polish batch):** Option a applied. `requirements-lock.txt` created: attrs==26.1.0, iniconfig==2.3.0, jsonschema==4.26.0, openpyxl==3.1.5, packaging==26.1, pluggy==1.6.0, pytest==9.0.3, PyYAML==6.0.3, requests==2.33.1.
 
 ### Q-PHASE15-BUDGET-COST-01: check_budget.py reads cost.credits but dfs_pull.py never populates it [MEDIUM] ℹ️ SELF-RESOLVED (code correct)
 **Raised:** 2026-05-05 during Phase 15 W3 cost+budget audit (W-C4 worker output; cat20-cost-budget.md)
@@ -280,7 +295,7 @@
 **Blocking Phase:** None (LOW, false positive only, no real security risk)
 **→ RESOLVED 2026-05-06 engine `bc9391c`:** Option b applied. Added `ghp_[a-zA-Z0-9]{36}` to pattern + exclusions for `tests/scripts/test_events_writer.py`, `tests/ci/test_ci_yaml.py`, `docs/OPEN_QUESTIONS.md`. check_secrets.sh EXIT 0 verified.
 
-### Q-PHASE15-CTXLEDGER-01: CONTEXT_LEDGER.md 288KB — compression/archiving strategy [LOW]
+### Q-PHASE15-CTXLEDGER-01: CONTEXT_LEDGER.md 288KB — compression/archiving strategy [LOW] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 15 W4 performance audit (W-D3 worker output; cat25-performance-regression.md)
 **Context:** `docs/CONTEXT_LEDGER.md` has grown to 288,134 bytes (281KB) — 7× the 40KB signal threshold. Growth is by-design append-only (each phase close appends dense summary). No structural integrity issue (file is append-only log), but git history of the file is large and reading it is slow. Session start reads only relevant sections.
 **Options:**
@@ -290,8 +305,9 @@
 - d) Phase 15 W5 strategic audit scope: decide v1.1 CONTEXT_LEDGER policy
 **Owner:** karar verici agent (Phase 15 W5 or v1.1 planning)
 **Blocking Phase:** None (LOW, by-design growth, no functional impact)
+**→ RESOLVED 2026-05-06:** Option b decision made. v1 kapanışı = `CONTEXT_LEDGER.md` v1 tarihi. Post-v1 (Phase 16+) için `CONTEXT_LEDGER_v2.md` başlatılacak. v1 dosyası frozen archive, v2 hot log. Timing: ilk Phase 16 session açılışında.
 
-### Q-PHASE15-W4-LESSON28-01: Lesson 28 v3 description stale — "17 vaka" vs body table "18" [LOW]
+### Q-PHASE15-W4-LESSON28-01: Lesson 28 v3 description stale — "17 vaka" vs body table "18" [LOW] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 15 W4 convention enforcement audit (W-D1 worker output; cat21-convention-enforcement.md)
 **Context:** `memory/project_phase_lessons.md` Lesson 28 v3 YAML `description` field says "17 vaka" but the body table shows 18 rows (3+10+1+3+1=18). Body is authoritative. Description is a cached summary that wasn't updated after the 18th vaka was added. Not a functional issue but a documentation inconsistency.
 **Options:**
@@ -299,8 +315,9 @@
 - b) Accept as cosmetic (body table is authoritative, description is summary hint only)
 **Owner:** karar verici agent (Phase 15 W5 cleanup or inline fix)
 **Blocking Phase:** None (LOW, cosmetic only)
+**→ RESOLVED 2026-05-06:** Option a applied. memory/project_phase_lessons.md frontmatter description "17 vaka" → "18+ vaka" + header "17+ vaka" → "18+ vaka".
 
-### Q-PHASE15-W4-SCRIPTPATH-01: validate_invariants.py + validate_schema.py at scripts/validation/ not scripts/ci/ [LOW]
+### Q-PHASE15-W4-SCRIPTPATH-01: validate_invariants.py + validate_schema.py at scripts/validation/ not scripts/ci/ [LOW] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 15 W4 performance audit (W-D3 worker output; cat25-performance-regression.md; schema-first overrides #1+#2)
 **Context:** Phase 15 W4 brief assumed `scripts/ci/validate_invariants.py` and `scripts/ci/validate_schema.py` — actual paths are `scripts/validation/validate_invariants.py` and `scripts/validation/validate_schema.py`. Brief template for helper paths used incorrect subdirectory. ci.yml references the correct paths. Lesson 38 v2 frozen assumption documented. Fix brief templates for W5.
 **Options:**
@@ -308,8 +325,9 @@
 - b) Add script-path cross-check to lesson 8 v8 Section 11 (brief infrastructure convention)
 **Owner:** karar verici agent (Phase 15 W5 brief writing)
 **Blocking Phase:** None (LOW, helpers ran correctly, override documented)
+**→ RESOLVED 2026-05-06:** Option a: Phase 15 tamamlandı, W5 brief'ine uygulandı (documented). ci.yml doğru path'i kullanıyor. Lesson 38 v2 enforce 7'nci ardışık: brief frozen assumption catch codify edildi. Functional impact SIFIR.
 
-### Q-PHASE15-PLUGIN-JSON-01: plugin.json absent — does Claude Code /plugin add require it? [MEDIUM]
+### Q-PHASE15-PLUGIN-JSON-01: plugin.json absent — does Claude Code /plugin add require it? [MEDIUM] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 15 W5 UX smoke test (W-E1 worker output; cat27-ux-smoke.md)
 **Context:** Engine root has no `plugin.json` manifest. `.claude/settings.local.json` exists. Phase 4 baseline schema mentioned `plugin.json` as a convention but it was never formally verified whether Claude Code's plugin auto-discovery or `/plugin add` workflow requires a `plugin.json` manifest file. If required, engine cannot be loaded as a plugin. If not required (skills loaded via path), then no action needed.
 **Options:**
@@ -318,6 +336,7 @@
 - c) Accept current state if Claude Code auto-discovers skills without manifest
 **Owner:** karar verici agent (v1.1 UX investigation)
 **Blocking Phase:** None currently (engine works without plugin.json), but blocks formal plugin distribution
+**→ RESOLVED 2026-05-06:** Option c (verified). Claude Code `claude /plugin add PATH` komutu `plugin.json` gerektirmez. `skills/` dizini + `CLAUDE.md` + `.claude/settings.local.json` auto-discovery için yeterli. Engine mevcut haliyle tam çalışır. Formal distribution için `plugin.json` Phase 16+ scope (ADR-007 paterni reuse).
 
 ### Q-PHASE15-BRAND-CONFIG-01: brand_identity config uses non-canonical keys (hitap/tone vs pronoun_preference/formality) [MEDIUM] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 15 W5 i18n audit (W-E2 worker output; cat28-i18n.md)
@@ -350,7 +369,7 @@
 **Blocking Phase:** None (LOW, new user onboarding gap only)
 **→ RESOLVED 2026-05-06 engine `bc9391c`:** Option a applied. `PSE_WORKSPACE_PATH` + `HIGGSFIELD_API_KEY` placeholder entries added to `.env.example`.
 
-### Q-PHASE15-AIO-COMPETITOR-01: aio-competitor-map skill has no matching transform script — LLM-native undocumented [LOW]
+### Q-PHASE15-AIO-COMPETITOR-01: aio-competitor-map skill has no matching transform script — LLM-native undocumented [LOW] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 15 W5 atıl alan audit (W-E1 worker output; cat26-atil-alan.md)
 **Context:** `skills/discovery/aio-competitor-map/` skill has no corresponding `scripts/discovery/aio_competitor_map_transform.py`. The skill is LLM-native (no Python transform needed). However, the architectural decision "this skill is intentionally script-less" is not documented in the SKILL.md or any rule file. Risk: future audits may flag this as an orphan without context.
 **Options:**
@@ -359,6 +378,7 @@
 - c) Accept as-is (low risk, only affects future audit clarity)
 **Owner:** karar verici agent (v1.1 documentation polish)
 **Blocking Phase:** None (LOW, clarity only)
+**→ RESOLVED 2026-05-06 engine (v1.1 polish batch):** Option a applied (YAML comment form). SKILL.md frontmatter'a `# llm_native: true — no transform script (LLM-native, intentionally script-less per Q-PHASE15-AIO-COMPETITOR-01)` YAML comment eklendi. `additionalProperties: false` schema uyumlu (YAML comment'ler JSON parse'da görünmez). 610/610 PASS.
 
 
 ## Resolved (last 10 — moved to DECISIONS)

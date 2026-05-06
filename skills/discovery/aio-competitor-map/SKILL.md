@@ -1,4 +1,5 @@
 ---
+# llm_native: true — no transform script (LLM-native, intentionally script-less per Q-PHASE15-AIO-COMPETITOR-01)
 name: aio-competitor-map
 description: |
   Use when: kullanıcı "AIO analiz", "competitor SERP analizi", "top10
