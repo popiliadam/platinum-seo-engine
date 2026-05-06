@@ -402,6 +402,52 @@ revise-content Section C intact when applicable):
 | `image_model`    | `{content_settings.image_model}` (R-72 plugin agnostik)                         |
 | `image_style`    | `{brand_identity.image_style}` (F-13 profile-aware)                             |
 
+Canonical events_writer invocation (schema-first override 16'ıncı uygulama —
+`event_type=manual` + `note=image_generated` paterni; `content_new` schema'da
+url + url_normalized + after + pillar mandatory koşar, standalone hero
+regenerate scope'unda yok → faq-optimization + content-remediation
+precedent paterni reuse):
+
+```python
+import os
+import sys
+import hashlib
+
+sys.path.insert(0, os.getcwd())
+
+from scripts.state import events_writer
+
+# Synthetic task_id mint (whats-next paterni reuse, schema regex ^T-[0-9]{4,}$)
+hex_token = hashlib.sha1(str(new_content_plan_id).encode()).hexdigest()[:4]
+synthetic = 90000 + (int(hex_token, 16) % 9999)
+task_id = f"T-{synthetic}"
+
+# WORK event — schema-first override (manual + note=image_generated)
+# DURUR #5 (Higgsfield unavailable) durumunda da aynı paterni: event_type=manual.
+events_writer.append_work(
+    project_id=project_slug,
+    event_type="manual",
+    task_id=task_id,
+    note=(
+        f"image_generated: kind={image_kind} model={image_model} "
+        f"plan_id={new_content_plan_id}"
+    ),
+    actor="agent:generate-images",
+    primary_source="manual",
+)
+```
+
+The synthetic `task_id` mint paterni preserves provenance traceability via
+the `note` field (`plan_id={new_content_plan_id}`) without coupling the
+skill to a `master_task` row that may not exist (new_content_plan can be
+1:N to master_task; init-project may delay master_task population).
+Schema-first override 16'ıncı uygulama: rules/events-writer.md Section 4
+matrix `generate-images → content_new + image_generated` direkt match
+gibi görünse de events.schema URL-bearing work event constraints
+(`url + url_normalized + after + pillar` REQUIRED) standalone hero
+regenerate scope'unda satisfy edilemez; `manual + note=image_generated`
+schema authority + intent preservation = doğru fit.
+
 ## DURUR Conditions (6)
 
 | #  | Trigger                                                                    | Resolution                                                         |

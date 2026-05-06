@@ -24,26 +24,45 @@ related: [append-only-state, schema-first, schema-versioning-discipline]
 
 Manual events yazılırken `run_id` integer field ZORUNLU. Direct dict construction + `json.dumps` bypass YASAK; `scripts/state/events_writer.py::next_run_id(project_slug)` helper kullanılır.
 
-Kanonik invocation:
+Kanonik invocation (4 convenience wrapper — schema-aware, envelope auto-populate):
 
 ```python
-from scripts.state.events_writer import next_run_id, append
+from scripts.state import events_writer
 
-run_id = next_run_id(project_slug="dentnotion")
-event = {
-    "run_id": run_id,
-    "ts": "2026-05-05T12:00:00Z",
-    "event_kind": "work",
-    "event_type": "content_new",
-    "skill": "new-blog",
-    # ... domain fields
-}
-append(event)  # writes \n-terminated JSON line + flushes
+# WORK event (skill execution lifecycle, event_kind=work)
+events_writer.append_work(
+    project_id="dentnotion",
+    event_type="content_new",
+    task_id="T-10001",
+    actor="agent:new-blog",
+    url="https://dentnotion.com/blog/izmir-implant-tedavisi-fiyatlari-2026",
+    url_normalized="https://dentnotion.com/blog/izmir-implant-tedavisi-fiyatlari-2026",
+    after={"pageSnapshot": {"word_count": 4250, "h1_count": 1}},
+    pillar="P1_implant_authority",
+)
+
+# PROVENANCE event (data ingestion lifecycle, event_kind=provenance)
+events_writer.append_provenance(
+    project_id="dentnotion",
+    run_id=events_writer.next_run_id("dentnotion"),
+    source={"kind": "gsc_mcp", "mcp_server": "gsc"},
+    operation="ingest",
+)
+
+# AUDIT event (read-only access trail, event_kind=audit)
+events_writer.append_audit(
+    project_id="dentnotion",
+    audit_action="accessed",
+    audit_target="reports:monitoring-weekly:2026-05-06_2026-05-13",
+    actor="agent:monitoring-weekly",
+    notes="weekly_monitoring red=14 amber=2",
+)
 ```
 
-- `next_run_id` projenin events.jsonl'ından son `run_id` integer'ı tarar, +1 döner (monotonic).
+- 4 convenience wrapper (`append_work` / `append_provenance` / `append_audit` / `append_workflow`) schema-aware: top-level envelope (`schema_version` + `event_id` + `timestamp` + `project_id`) auto-populate edilir; per-kind required fields kwargs ile geçirilir; bare `append(event)` API YOK — `append_event(event, project_id)` low-level fallback olarak mevcut (events_writer.py `__all__`).
+- `next_run_id(project_id)` helper provenance run sequencing için kullanılır (monotonic +1 dönüş; F-13 baseline carry 5 historical non-int row append-only protected, mop-up YASAK Section 1 invariant).
 - Helper bypass edilirse drift-check F-13 ("non-int run_id") flag eder (mevcut historical 5 satır baseline carry).
-- Phase 14 W3-W3+ skill bazlı override: 13 production skill `events_writer.append` invoke etmek ZORUNLU; raw `open(events_jsonl, "a")` paterni governance lint reject eder.
+- Phase 14 W3-W3+ skill bazlı enforce: 23+ skill `events_writer.append_*` convenience wrapper invoke eder; raw `open(events_jsonl, "a")` paterni + direct `json.dumps` bypass governance lint reject eder.
 
 ## Section 3 — `event_kind` 4-enum (ADR-020)
 
