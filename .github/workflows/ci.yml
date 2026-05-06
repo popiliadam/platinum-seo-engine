@@ -67,15 +67,19 @@ jobs:
         continue-on-error: false
 
       # Step 5 — plugin agnostik invariant (.mcp.json 3 server + skill body slug hardcode YOK F-16)
+      # Wave 2 strict: `|| true` mask removed (real exit code visible).
+      # Adjacent-slug-pair patterns filter F-16 disclaimer multi-line lists
+      # (real hardcode = 1 slug; disclaimer enumerates 8 slugs across 2-3 lines).
       - name: 5. plugin-agnostik-grep
         run: |
           # .mcp.json 3 server invariant
           test "$(jq '.mcpServers | keys | length' .mcp.json)" = "3"
-          # Skill body slug grep — word-boundary + F-16 disclaimer exclude
-          # (lesson 28 manager mop-up matrisi 6'ıncı uygulama Q-CI-W2-02 fix)
+          # Skill body slug grep — word-boundary + F-16 disclaimer exclude.
+          # Filter expansion: adjacent-slug pairs catch multi-line disclaimer
+          # continuation lines (lesson 28 mop-up 6'ıncı uygulama → Wave 2 strict).
           ! grep -rEn "\b(demo-dental|demo-furniture|demo-hvac|demo-petcare|demo-shop|demo-tires|demo-construction|demo-agency)\b" \
             skills/ --include=SKILL.md \
-            | grep -vE "No project slug hardcoded|F-16 disclaimer|plugin agnostik" || true
+            | grep -vE "No project slug hardcoded|F-16 disclaimer|plugin agnostik|are FORBIDDEN|slug'lar|demo-dental.*demo-furniture|demo-furniture.*demo-hvac|demo-hvac.*demo-petcare|demo-petcare.*demo-shop|demo-shop.*demo-tires|demo-tires.*demo-construction|demo-construction.*demo-agency"
         continue-on-error: false
 
       # Step 6 — secret-grep (Phase 14+ CI Rule 3 production-ready 11-phase invariant)
