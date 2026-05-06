@@ -1351,3 +1351,37 @@ Spec §13.2: <15KB initial load = <2% of 1M context window. Tracking under budge
 - **Invariant durumu**: pytest 610/610 PASS. DECISIONS.md 5877B unchanged. .mcp.json 482B (v1.1 F-16 baseline). Q-CD-01 korundu. ADR-004+005 soak 2026-05-12 pending.
 - **v1.1 FINAL engine HEAD**: bu closeout commit (5-commit v1.1 total: bc9391c + 92ece0e + a3cbb2a + d37b368 + ad862dc + bu closeout).
 
+---
+
+### v1.1-FIX-WAVE-1 P0 — 2026-05-06 (Codex audit findings closure)
+
+Codex post-v1.1 audit yüzeye çıkardığı 4 P0 bulgusu sequential dispatch ile kapatıldı:
+
+**Engine commits (4 atomic):**
+1. `3bec210` — `fix(hooks): active.json field name 'active_project' canonical (2 hooks + ADR-032)` — 2 Python hook (post-tool-use + user-prompt-submit) `.project_id` → `.active_project` field rename. workspace `pseo-active.md` writer ile contract eşitlendi. tests/hooks/test_active_project_contract.py 4 case (contract assert + e2e pid resolve + silent skip). F-19 audit append artık silently no-op değil.
+2. `5d01d59` — `fix(scripts): unify project.config.json path references (ADR-033)` — 3 path drift (a) canonical (b) workspace `config/` (c) hyphenated `project-config.json` → tek canonical `projects/{slug}/project.config.json`. 40 file hyphen→dot + 9 file `config/` strip + check_budget/internal_links default. tests/scripts/test_path_canonical.py 2 regex-grep case. ADR-029 archive rotation.
+3. `7dc67ba` — `feat(schema): brand_identity 1.2→1.3 forward migration (ADR-030, Migration 0003)` — schema 1.2→1.3 additive: `pronoun_preference`/`formality` canonical eklendi (eski enum byte-byte korundu); `hitap`/`tone` 1-yıl deprecated alias. Migration 0003 pure key rename (workspace KORUNUR). bootstrap_project.SCHEMA_VERSION sync. brand-onboarding 18→20 field. tests/scripts/test_migration_0003.py 8 case.
+4. `e40879f` — `feat(state): events.jsonl strict-schema CI gate + legacy migration (ADR-031)` — scripts/state/migrate_legacy_events.py atomic .tmp+rename pair, idempotent, audit-trail markdown. tests/state/test_events_schema_compliance.py per-row strict + workspace-bound skip. ci.yml Step 4a events-schema-sanity. ADR-030 archive rotation (body verbatim preserved).
+
+**Workspace commits (3 atomic):**
+- `e85407f` — `fix(workspace): mv project.config.json out of config/ subfolder (ADR-033)` — `git mv` + `rmdir config/`. Single-file move, append-only-state korunur (data değişmedi).
+- `aacbb2c` — `chore: project.config.json schema_version 1.2→1.3 + .bak gitignore (ADR-030)` — version bump + `**/projects/**/*.bak` gitignore.
+- `f8d8663` — `feat(state): archive 15 legacy events to events.jsonl.legacy (ADR-031)` — events.jsonl 88→73 strict + 15 legacy archive + audit report.
+
+**Wave gates (final):**
+- pytest engine: 625 PASS + 2 SKIP (workspace-bound test) → 627 PASS workspace-bound (was 610 baseline; +14 yeni Wave 1 test cumulative)
+- validate_schema workspace project.config.json → schema 1.3 → EXIT 0 ✓
+- events.jsonl strict (workspace-bound): 0 FAIL ✓
+- DECISIONS.md byte cap: 6009B / 6144B ✓ (4 active ADR + 1 freshly rotated)
+- drift-check verdict: hâlâ RED ama mekanik gürültü temizlendi — 4 FAIL artık **real data drift** (F-13: 5 non-int run_id; F-16: 36 quick_wins URL opportunity dışında; F-17: 4 severity enum dışı; F-19: validate_invariants `locale` field-name validator-vs-schema gap [language.content_locale arıyor olmalı]). Codex'in 4 FAIL bulgusu **doğrulandı** — bunlar veri/validator katmanı drift'i, Wave 2 P1 kapsamında ele alınacak.
+- ADR durumu: ADR-026..030 archive (5 yeni rotation), ADR-031+032+033 active.
+
+**Lessons (preliminary):**
+- "RESOLVED prematurely" pattern: Q-PHASE15-BRAND-CONFIG-01 v1.1 polish'te RESOLVED işaretlenmişti — ama engine schema fix yapılmamıştı. Workspace eca13c5 yarısını yapmış, validate_schema gerçek FAIL atıyordu. Future audit closeout: hangi katman fix'i kanıtlandı, hangisi sadece workspace-side, açık tut.
+- "workspace KORUNUR" forward migration paterni: Migration 0003 pure-rename (key only, value verbatim) eca13c5 partial-state'i ileri taşıyabildi. Idempotency garantili (test 8 case + workspace fixture e2e validate).
+- F-19 SKIP→FAIL rotation: workspace mv canonical lokasyona gelince F-19 file'ı buldu ama validate_invariants `locale` field-name validator vs schema `language.content_locale` mismatch nedeniyle FAIL döndü. Pre-existing bug, Wave 1 yüzeye çıkardı.
+
+**OQ delta:**
+- RESOLVED gerçekten: Q-PHASE15-BRAND-CONFIG-01 (engine schema fix tamamlandı; workspace eca13c5 + engine 7dc67ba birleşik kapanış); Q-PHASE15-W4-SCRIPTPATH-01 (zaten RESOLVED kaydı vardı, doğrulama).
+- Yeni açılan: Q-WAVE1-DRIFT-DEFER-01 (F-13/F-16/F-17/F-19 real-drift Wave 2 P1 scope); Q-WAVE1-F19-VALIDATOR-01 (validate_invariants.check_F_19 `locale` vs schema `language.content_locale` field-name gap).
+
