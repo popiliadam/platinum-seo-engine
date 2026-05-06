@@ -10,7 +10,7 @@ description: |
   domain DNS doğrulanması gerekiyor; profile heuristic suggest fallback
   istendi; init-project çalıştırılmadan önce config wizardı isteniyor.
   Do not use when: mevcut proje config update için (separate edit-config
-  skill — gelecek phase); workspace var ve direkt project-config.json
+  skill — gelecek phase); workspace var ve direkt project.config.json
   yazılacak (Phase 14+ behavior; init-project devreye giriyor); başka
   projenin config'i kopyalanacak (template-clone — gelecek phase).
 version: "1.0"
@@ -48,7 +48,7 @@ autonomy:
 settings + profile hint from Süleyman, validates against
 `schemas/project-config.schema.json` v1.2, and emits a
 **staging-only** config artifact under `outputs/onboarding/`. The
-canonical `projects/{slug}/config/project.config.json` write is
+canonical `projects/{slug}/project.config.json` write is
 deferred to Phase 14 (workspace bring-up); pre-Phase-14 invocations
 remain non-destructive — STAGING-ONLY mode (DURUR #5 surfaces an
 AMBER warning but does NOT block the wizard). Süleyman'ın manuel
@@ -89,7 +89,7 @@ kabul edilmez.
   YALNIZCA** Süleyman onayı geldikten sonra (DURUR #1).
 - `outputs/onboarding/{slug}-staging-config.json` —
   project-config.schema.json v1.2 conformant staging artifact;
-  validation amaçlı, `projects/{slug}/config/project.config.json`
+  validation amaçlı, `projects/{slug}/project.config.json`
   DEĞİLDİR (DURUR #5 STAGING-ONLY mode).
 
 ## 10-Step Body Protocol
@@ -169,7 +169,7 @@ Aynı disiplin (default yok, skip = AMBER iterate). 14 alan:
 13. `disclaimer_templates` — object<string,string>
 14. `image_model` — string (default-aware: `nano-banana`)
 
-### Step 6 — `projects/{slug}/config/project.config.json` YAZILMAZ
+### Step 6 — `projects/{slug}/project.config.json` YAZILMAZ
 
 Phase 14 öncesi workspace yok ya da skill scope dışında. Bu adım
 explicit no-op: skill **asla** `projects/{slug}/config/` dizinine
@@ -245,7 +245,7 @@ Stop and flag the manager — do not patch, do not fall back silently.
    REJECT. Type-safe assert; 6. değer kabul edilmez.
 5. **DURUR #5 — Workspace yok (Phase 14 öncesi).** `projects/`
    dizini engine repo'sunda yok → STAGING-ONLY mode (warning, devam).
-   `projects/{slug}/config/project.config.json` ASLA yazılmaz.
+   `projects/{slug}/project.config.json` ASLA yazılmaz.
 6. **DURUR #6 — Domain DNS resolve fail.** `socket.gethostbyname`
    exception fırlatır → AMBER prompt; Süleyman manual confirm
    verirse devam, "no" derse ABORT.

@@ -522,7 +522,7 @@ def test_estimate_credits_per_query() -> None:
 
 def test_budget_preflight_pass_and_fail(tmp_path: Path) -> None:
     """PASS path: under budget. FAIL path: BudgetExceededError raised."""
-    cfg = tmp_path / "project-config.json"
+    cfg = tmp_path / "project.config.json"
     cfg.write_text(json.dumps({
         "dataforseo": {"budget_credits_per_day": 500},
     }))

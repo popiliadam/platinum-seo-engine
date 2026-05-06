@@ -20,7 +20,7 @@ inputs:
   project_slug:
     type: string
     required: true
-    description: "Slug; resolves projects/{slug}/master.xlsx + project-config.json."
+    description: "Slug; resolves projects/{slug}/master.xlsx + project.config.json."
   urls:
     type: array
     required: true
@@ -154,7 +154,7 @@ workflow_runner.start_step(handle.run_id, 0, project_slug=project_slug)
 estimate = opa.estimate_credits(len(urls))
 envelope = opa.preflight_budget(
     estimated_credits=estimate,
-    project_config_path=project_root / "project-config.json",
+    project_config_path=project_root / "project.config.json",
     events_path=project_root / "_state" / "events.jsonl",
 )
 workflow_runner.finish_step(handle.run_id, 0, project_slug=project_slug,

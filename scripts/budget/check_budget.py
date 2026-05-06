@@ -2,7 +2,7 @@
 """
 check_budget.py — pre-flight budget guardrail (§16.8).
 
-Reads `dataforseo.budget_credits_per_day` from project-config.json and sums
+Reads `dataforseo.budget_credits_per_day` from project.config.json and sums
 DataForSEO credit usage from the last 24h of events.jsonl. Emits a single-line
 JSON object on stdout for machine consumption.
 
@@ -10,7 +10,7 @@ Usage:
     check_budget.py [--project-config <path>] [--events <path>]
 
 Defaults (relative to current working dir / workspace):
-    --project-config  project/project-config.json
+    --project-config  project.config.json
     --events          _state/events.jsonl
 
 Stdout (single line JSON):
@@ -112,8 +112,8 @@ def _load_budget(config_path: Path) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Budget pre-flight check (§16.8)")
     parser.add_argument(
-        "--project-config", default="project/project-config.json",
-        help="path to project config (default: project/project-config.json)"
+        "--project-config", default="project.config.json",
+        help="path to project config (default: project.config.json — projects/{slug}/project.config.json per ADR-033)"
     )
     parser.add_argument(
         "--events", default="_state/events.jsonl",

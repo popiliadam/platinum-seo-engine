@@ -150,14 +150,14 @@ Tamamen **semantic HTML5** tag'leri kullanılacak:
 - **Inline minify CSS** kabul edilebilir (HTML içine `<style>` bloğu)
 - **Kurumsal renk** kullanılacak (per-project)
 - **Kurumsal tasarım** dili korunacak (per-project)
-- Kaynak: `project-config.json[brand_identity]` (logo, primary_color, secondary_color, accent_color, font'lar)
+- Kaynak: `project.config.json[brand_identity]` (logo, primary_color, secondary_color, accent_color, font'lar)
 
 **R-24. Tasarım Sample'ı (Init'te 1 Kez)**
 `init-project` skill'i opsiyonel olarak **Scrapling MCP** ile sitenin bir sayfasını fetch edip:
 - Renk paletini çıkarır
 - Font ailelerini çıkarır
 - Header/footer template'lerini örnek alır
-- `project-config.json[brand_identity]`'ye yazar
+- `project.config.json[brand_identity]`'ye yazar
 
 Bu bir kez yapılır, sonraki içerikler bu config'ten besler.
 
@@ -266,7 +266,7 @@ Her rule dosyası şu yapıda olacak:
 </article>
 
 <style>
-  /* Kurumsal renk slot'ları (per-project from project-config.json) */
+  /* Kurumsal renk slot'ları (per-project from project.config.json) */
   .pse-blog-post { font-family: {{FONT_BODY}}; }
   .pse-blog-post h1, h2, h3 { font-family: {{FONT_HEADING}}; color: {{PRIMARY_COLOR}}; }
   .pse-cta { background: {{ACCENT_COLOR}}; color: white; padding: 1em; }
@@ -304,7 +304,7 @@ Aşağıdaki bölüm 3'teki açık sorular için ya kullanıcıdan cevap al ya d
 
 **Q-CR-04:** R-13 — Bold disiplinde "her ~250 kelimede 1" — bu bold edilen şey **sadece keyword** mi yoksa **keyword + önemli terimler** olabilir mi?
 
-**Q-CR-05:** R-23 — Per-project brand_identity için zaten `project-config.json` schema'da slot var (logo_url, primary_color, font_family_*). v1.3'te bu slotlar **zorunlu** mu (init-project'te toplanır), yoksa **opsiyonel** mi (yoksa per-profile neutral defaults)?
+**Q-CR-05:** R-23 — Per-project brand_identity için zaten `project.config.json` schema'da slot var (logo_url, primary_color, font_family_*). v1.3'te bu slotlar **zorunlu** mu (init-project'te toplanır), yoksa **opsiyonel** mi (yoksa per-profile neutral defaults)?
 
 **Q-CR-06:** R-26 — CTA wording per-project memory.md'de mi olmalı, yoksa skill her seferinde kullanıcıya mı sormalı? Önerim: memory.md'de default CTA'lar tanımlı, skill bunu override edebilir.
 

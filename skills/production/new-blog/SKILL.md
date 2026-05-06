@@ -152,7 +152,7 @@ image-link).
 
 ### Principle 2 — Profile-Aware Enforcement
 
-**Statement.** Skill behavior `project-config.json[profile]` enum'una
+**Statement.** Skill behavior `project.config.json[profile]` enum'una
 göre değişir (singular field, Phase 11 W-F1 cascade fix). When `profile`
 is unset, fall back to `profiles[]` priority merge per
 `rules/content-quality.md` Principle 2 tablosu.

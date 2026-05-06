@@ -398,7 +398,7 @@ def test_tier_escalation_non_canonical_order_rejected() -> None:
 def test_budget_preflight_pass_and_fail(tmp_path: Path) -> None:
     """estimate_credits() yields integer-shaped credits; preflight_budget()
     PASS path returns envelope, FAIL path raises BudgetExceededError."""
-    cfg = tmp_path / "project-config.json"
+    cfg = tmp_path / "project.config.json"
     cfg.write_text(json.dumps({
         "dataforseo": {"budget_credits_per_day": 500},
     }))

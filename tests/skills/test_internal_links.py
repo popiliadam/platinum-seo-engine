@@ -495,7 +495,7 @@ def test_internal_links_optional_dfs_path_budget_preflight(
     Mocks the subprocess call to scripts/budget/check_budget.py directly so
     the test does not depend on the script's filesystem behaviour.
     """
-    cfg_path = tmp_path / "project-config.json"
+    cfg_path = tmp_path / "project.config.json"
     cfg_path.write_text("{}")
     events_path = tmp_path / "events.jsonl"
 

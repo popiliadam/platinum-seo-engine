@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://platinum-seo-engine/schemas/project-config.schema.json",
   "title": "Project Configuration Schema v1.2",
-  "description": "Per-project pack definition (projects/{slug}/config/project.config.json). See ARCHITECTURE.md §10. v1.1 (Phase 10): additive bump — content_settings + brand_identity extension fields. v1.2 (Phase 11 W-F1 cascade fix): additive bump — singular 'profile' field (Foundational Principle 2 enforcement field for production skills new-blog/revise-content). 'profiles' array (plural, v1.0) retained for sf-required-reports Tier elevation; singular 'profile' added for Phase 10 Principle 2 profile-aware skill behavior switch (tone, word count, citation density, disclaimer, image style, author byline, counter-argument). Required array UNCHANGED (additive policy, → rules/schema-versioning-discipline.md).",
+  "description": "Per-project pack definition (projects/{slug}/project.config.json). See ARCHITECTURE.md §10. v1.1 (Phase 10): additive bump — content_settings + brand_identity extension fields. v1.2 (Phase 11 W-F1 cascade fix): additive bump — singular 'profile' field (Foundational Principle 2 enforcement field for production skills new-blog/revise-content). 'profiles' array (plural, v1.0) retained for sf-required-reports Tier elevation; singular 'profile' added for Phase 10 Principle 2 profile-aware skill behavior switch (tone, word count, citation density, disclaimer, image style, author byline, counter-argument). Required array UNCHANGED (additive policy, → rules/schema-versioning-discipline.md).",
   "type": "object",
   "additionalProperties": false,
   "required": [

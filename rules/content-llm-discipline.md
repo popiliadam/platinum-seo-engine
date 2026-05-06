@@ -25,13 +25,13 @@ Bu doc Phase 10 LLM/AIO görünürlük disiplinini tanımlar (LLMs.txt, per-bot 
 
 **Rationale.** LLMs.txt emerging standard (2024+); opt-in kullanıcı kararı (training data exposure trade-off).
 
-**Enforcement.** init-project skill `project-config.json[content_settings.ai_training_optin]` boolean OFF default; kullanıcı ON yaparsa skill llms.txt generate eder.
+**Enforcement.** init-project skill `project.config.json[content_settings.ai_training_optin]` boolean OFF default; kullanıcı ON yaparsa skill llms.txt generate eder.
 
 **Failure mode.** Silent (default OFF).
 
 ### R-99: Per-Bot LLM Allow
 
-**Statement.** `robots.txt` per-bot LLM allow/disallow rule'ları (`GPTBot`, `ClaudeBot`, `Google-Extended`, `PerplexityBot`, `CCBot`). `project-config.json[ai_bots]` array consume.
+**Statement.** `robots.txt` per-bot LLM allow/disallow rule'ları (`GPTBot`, `ClaudeBot`, `Google-Extended`, `PerplexityBot`, `CCBot`). `project.config.json[ai_bots]` array consume.
 
 **Rationale.** Principle 2. Per-project LLM training opt-in/opt-out kararı; ranking impact (Google-Extended block edersen AIO citation şansı düşer).
 

@@ -133,7 +133,7 @@ Output Package'da raporlanır.
 import json
 from pathlib import Path
 
-config_path = workspace_root / "projects" / project_slug / "project-config.json"
+config_path = workspace_root / "projects" / project_slug / "project.config.json"
 config = json.loads(config_path.read_text(encoding="utf-8"))
 budget_max = config.get("budget_credits_per_day", 500)
 consumed_today = consumed_credits_today(events_path)  # events.jsonl rollup

@@ -423,7 +423,7 @@ def test_new_content_plan_budget_preflight_blocks_when_exceeded(
     with mock.patch.object(subprocess, "run", return_value=fake_completed):
         with pytest.raises(ncp.BudgetExceededError) as ei:
             ncp.preflight_budget(
-                project_config_path=tmp_path / "project-config.json",
+                project_config_path=tmp_path / "project.config.json",
                 events_path=tmp_path / "events.jsonl",
             )
         assert "budget pre-flight FAIL" in str(ei.value)
@@ -436,7 +436,7 @@ def test_new_content_plan_budget_preflight_blocks_when_exceeded(
     fake_ok.stderr = ""
     with mock.patch.object(subprocess, "run", return_value=fake_ok):
         env = ncp.preflight_budget(
-            project_config_path=tmp_path / "project-config.json",
+            project_config_path=tmp_path / "project.config.json",
             events_path=tmp_path / "events.jsonl",
         )
         assert env["exceeded"] is False

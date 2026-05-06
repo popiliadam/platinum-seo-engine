@@ -413,7 +413,7 @@ from scripts.planning import internal_links_transform as ilt
 estimate = ilt.estimate_credits(url_count=len(internal_rows), use_dfs=True)
 ilt.preflight_budget(
     estimated_credits=estimate,
-    project_config_path=workspace_root/"projects"/project_slug/"project-config.json",
+    project_config_path=workspace_root/"projects"/project_slug/"project.config.json",
     events_path=workspace_root/"projects"/project_slug/"_state"/"events.jsonl",
 )
 ```

@@ -1023,7 +1023,7 @@ def _parse_args(argv: Iterable[str]) -> argparse.Namespace:
                    help="Optional: enrich via DFS on_page_content_parsing "
                         "(triggers budget pre-flight, paid MCP).")
     p.add_argument("--project-config", default=None,
-                   help="Path to project-config.json (required when --use-dfs).")
+                   help="Path to project.config.json (required when --use-dfs).")
     p.add_argument("--events", default=None,
                    help="Path to events.jsonl (required when --use-dfs).")
     p.add_argument("--output-dir", default=None,

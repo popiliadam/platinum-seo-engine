@@ -236,7 +236,7 @@ if cross_validate_dfs:
     estimate = sat.estimate_credits(url_count=len(distinct_urls))
     envelope = sat.preflight_budget(
         estimated_credits=estimate,
-        project_config_path=str(project_root / "project-config.json"),
+        project_config_path=str(project_root / "project.config.json"),
         events_path=str(project_root / "_state" / "events.jsonl"),
     )
     # PASS → fetch DFS, persist raw, re-run transform with raw_dfs.

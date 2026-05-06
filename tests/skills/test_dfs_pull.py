@@ -451,7 +451,7 @@ def test_budget_preflight_integration(tmp_path: Path) -> None:
     assert est == 15.0
 
     # PASS path: budget=500, no prior usage, estimate=15 → projected=15.
-    cfg_path = tmp_path / "project-config.json"
+    cfg_path = tmp_path / "project.config.json"
     cfg_path.write_text(json.dumps({
         "dataforseo": {"budget_credits_per_day": 500}
     }))

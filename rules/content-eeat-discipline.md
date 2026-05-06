@@ -64,7 +64,7 @@ Bu doc Phase 10 EEAT (Experience, Expertise, Authoritativeness, Trustworthiness)
 
 ### R-100: Brand Entity sameAs (Wikipedia/Wikidata)
 
-**Statement.** Organization schema `sameAs` array brand entity profile linkleri: Wikipedia URL + Wikidata Q-ID + LinkedIn + sosyal medya. `project-config.json[brand_identity.same_as_urls]` array kaynak.
+**Statement.** Organization schema `sameAs` array brand entity profile linkleri: Wikipedia URL + Wikidata Q-ID + LinkedIn + sosyal medya. `project.config.json[brand_identity.same_as_urls]` array kaynak.
 
 **Rationale.** Knowledge Graph brand entity binding (Süleyman explicit Phase 10 matrix).
 

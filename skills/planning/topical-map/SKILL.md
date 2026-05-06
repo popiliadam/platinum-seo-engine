@@ -26,7 +26,7 @@ inputs:
   project_slug:
     type: string
     required: true
-    description: "Slug; resolves projects/{slug}/master.xlsx + project-config.json."
+    description: "Slug; resolves projects/{slug}/master.xlsx + project.config.json."
   seed_keyword:
     type: string
     required: true
@@ -228,7 +228,7 @@ paterni). DURUR #1 if exceeded — never silently downgrade.
 from scripts.planning import topical_map_transform as tmt
 
 envelope = tmt.preflight_budget(
-    project_config_path=project_root / "project-config.json",
+    project_config_path=project_root / "project.config.json",
     events_path=project_root / "_state" / "events.jsonl",
 )
 # envelope == {"budget_per_day": 500, "used_24h": 15, "remaining": 485, "exceeded": false}

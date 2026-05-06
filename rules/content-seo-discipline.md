@@ -12,7 +12,7 @@ Bu doc Phase 10 SEO disiplinini tanımlar (heading, internal link, FAQ, keyword,
 
 **Foundational Principles özeti** (tam metin için → [content-quality](content-quality.md#foundational-principles)):
 1. **Truth-Verifiable Content** — uydurma yasak (R-27).
-2. **Profile-Aware Enforcement** — `project-config.json[profiles]` array consume (Principle 2 tablosu).
+2. **Profile-Aware Enforcement** — `project.config.json[profiles]` array consume (Principle 2 tablosu).
 3. **AI Suistimal Önlemi** — H3 zorunluluk gate (R-30) + heading keyword density (R-30) + citation density (R-106) + per-H2 list cap (R-07).
 
 ---
@@ -235,7 +235,7 @@ Bu doc Phase 10 SEO disiplinini tanımlar (heading, internal link, FAQ, keyword,
 
 **Rationale.** Brand entity (Knowledge Graph signal); R-100 cross-link.
 
-**Enforcement.** Skill `project-config.json[brand_identity]` + `same_as_urls` array'inden render.
+**Enforcement.** Skill `project.config.json[brand_identity]` + `same_as_urls` array'inden render.
 
 **Failure mode.** AMBER.
 

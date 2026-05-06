@@ -12,7 +12,7 @@ Bu doc Phase 10 HTML/CSS/image disiplinini tanımlar. **Foundational Principles*
 
 **Foundational Principles özeti** (tam metin için → [content-quality](content-quality.md#foundational-principles)):
 1. **Truth-Verifiable Content** — uydurma yasak (R-27).
-2. **Profile-Aware Enforcement** — `project-config.json[profiles]` array consume (Principle 2 tablosu).
+2. **Profile-Aware Enforcement** — `project.config.json[profiles]` array consume (Principle 2 tablosu).
 3. **AI Suistimal Önlemi** — cheap content padding preempt; image özelinde 8K ultra realistic + nano banana model (R-71, R-72).
 
 ---
@@ -51,7 +51,7 @@ Bu doc Phase 10 HTML/CSS/image disiplinini tanımlar. **Foundational Principles*
 
 ### R-23: CSS (Inline + Kurumsal Renk)
 
-**Statement.** Inline minify CSS kabul edilebilir (`<style>` blok). Kurumsal renk + tasarım dili korunur (per-project). Kaynak: `project-config.json[brand_identity]` (logo, primary_color, secondary_color, accent_color, font_family_heading, font_family_body).
+**Statement.** Inline minify CSS kabul edilebilir (`<style>` blok). Kurumsal renk + tasarım dili korunur (per-project). Kaynak: `project.config.json[brand_identity]` (logo, primary_color, secondary_color, accent_color, font_family_heading, font_family_body).
 
 **Rationale.** Profile-aware (Principle 2) brand consistency; CSS strategy tier'a göre değişir (R-60).
 
@@ -61,7 +61,7 @@ Bu doc Phase 10 HTML/CSS/image disiplinini tanımlar. **Foundational Principles*
 
 ### R-24: Tasarım Sample (Init'te 1 Kez)
 
-**Statement.** `init-project` skill opsiyonel olarak **Scrapling MCP** ile sitenin bir sayfasını fetch eder; renk paleti + font family + header/footer template örneği çıkarır; `project-config.json[brand_identity]`'ye yazar. Bir kez yapılır.
+**Statement.** `init-project` skill opsiyonel olarak **Scrapling MCP** ile sitenin bir sayfasını fetch eder; renk paleti + font family + header/footer template örneği çıkarır; `project.config.json[brand_identity]`'ye yazar. Bir kez yapılır.
 
 **Rationale.** Manual brand_identity giriş yerine otomatik bootstrap; R-23 slot'larını doldurur.
 
@@ -71,7 +71,7 @@ Bu doc Phase 10 HTML/CSS/image disiplinini tanımlar. **Foundational Principles*
 
 ### R-31: TOC Strategy (Project-Config)
 
-**Statement.** Table of Contents (`<nav class="pse-toc">`) strategy `project-config.json[content_settings.toc_strategy]` enum'undan: `none` / `static` / `sticky` / `auto-generate`.
+**Statement.** Table of Contents (`<nav class="pse-toc">`) strategy `project.config.json[content_settings.toc_strategy]` enum'undan: `none` / `static` / `sticky` / `auto-generate`.
 
 **Rationale.** Profile-aware. b2b-saas long-form 3000+ word'de sticky TOC UX zorunlu; e-commerce category page'de TOC yok.
 
@@ -141,7 +141,7 @@ Bu doc Phase 10 HTML/CSS/image disiplinini tanımlar. **Foundational Principles*
 
 ### R-60: CSS Strategy (Profile-Aware)
 
-**Statement.** CSS strategy `project-config.json[content_settings.css_strategy]` enum: `inline` / `external-tier` / `hybrid`. Default `inline` (R-23 reuse).
+**Statement.** CSS strategy `project.config.json[content_settings.css_strategy]` enum: `inline` / `external-tier` / `hybrid`. Default `inline` (R-23 reuse).
 
 **Rationale.** Profile-aware Principle 2. b2b-saas main site mevcut CSS framework'üne entegre → `external-tier`; e-commerce custom block paste → `inline`.
 
@@ -211,7 +211,7 @@ Bu doc Phase 10 HTML/CSS/image disiplinini tanımlar. **Foundational Principles*
 
 ### R-72: Image Model Nano Banana
 
-**Statement.** Default image generation model `nano-banana` (Higgsfield veya equivalent). Model `project-config.json[content_settings.image_model]` ile override edilebilir.
+**Statement.** Default image generation model `nano-banana` (Higgsfield veya equivalent). Model `project.config.json[content_settings.image_model]` ile override edilebilir.
 
 **Rationale.** Süleyman explicit model preference. Plugin agnostik (model değiştirilebilir).
 

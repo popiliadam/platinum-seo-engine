@@ -49,7 +49,7 @@ consumes:
   - "init-project:projects/{slug}/master.xlsx#new_content_plan"
   - "init-project:projects/{slug}/master.xlsx#content_decay"
   - "init-project:projects/{slug}/master.xlsx#content_improve"
-  - "init-project:projects/{slug}/project-config.json"
+  - "init-project:projects/{slug}/project.config.json"
   - "rules:rules/content-quality.md"
   - "rules:rules/content-html-discipline.md"
   - "rules:rules/content-seo-discipline.md"
@@ -116,7 +116,7 @@ context'inde:
 
 ### Principle 2 — Profile-Aware Enforcement (project-config[profile])
 
-Skill behavior project-config.json[profile] enum'una göre değişir.
+Skill behavior project.config.json[profile] enum'una göre değişir.
 Enum 5-value: `e-commerce` | `ymyl` | `local-service` | `b2b-saas` |
 `portfolio`. FAQ context enforcement:
 
@@ -208,7 +208,7 @@ filter).
 
 ### Step 2: project-config Read (Profile-Aware Switch — Principle 2)
 
-`projects/{slug}/project-config.json` parse:
+`projects/{slug}/project.config.json` parse:
 
 - `profile` field read (Principle 2 enum 5-value; F-3 schema 1.2
   baseline).

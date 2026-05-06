@@ -30,7 +30,7 @@ inputs:
   project_slug:
     type: string
     required: true
-    description: "Workspace proje slug (resolves projects/{slug}/master.xlsx + project-config.json)."
+    description: "Workspace proje slug (resolves projects/{slug}/master.xlsx + project.config.json)."
   url:
     type: string
     required: true
@@ -54,7 +54,7 @@ consumes:
   - "init-project:projects/{slug}/master.xlsx#redirect_404"
   - "init-project:projects/{slug}/master.xlsx#robots_txt"
   - "init-project:projects/{slug}/master.xlsx#completed_work"
-  - "init-project:projects/{slug}/project-config.json"
+  - "init-project:projects/{slug}/project.config.json"
   - "rules:rules/content-quality.md"
   - "rules:rules/content-html-discipline.md"
   - "rules:rules/content-seo-discipline.md"
@@ -122,7 +122,7 @@ Multi-signal cross-check zorunlu (R-85), single-signal yetmez.
 
 ### Principle 2 — Profile-Aware Enforcement (project-config[profile])
 
-Skill behavior project-config.json[profile] enum'una göre değişir.
+Skill behavior project.config.json[profile] enum'una göre değişir.
 Enum 5-value: `e-commerce` | `ymyl` | `local-service` | `b2b-saas` |
 `portfolio`. Remediation context'inde R-90 manual approve gate
 profile'a göre sıkılaşır:
@@ -223,7 +223,7 @@ gerekli (Süleyman onayı), single-signal remediation YASAK.
 ### Step 3: R-90 Manual Approve Gate (autonomy MEDIUM, Principle 2)
 
 Süleyman onayı zorunlu (autonomy.confidence: MEDIUM, requires_
-approval: true). project-config.json read → `profile` field
+approval: true). project.config.json read → `profile` field
 profile-aware gate sıkılaştırması:
 
 - `profile == "ymyl"` → DAHA SIKI: legal/medical/financial content
@@ -382,7 +382,7 @@ READ-ONLY consume (write yapılmaz):
 
 - `master.xlsx[content_decay]` (F-2 — action read).
 - `master.xlsx[content_improve]` (F-15 — consistency report read).
-- `project-config.json` (P2 profile read).
+- `project.config.json` (P2 profile read).
 
 Output artifacts:
 
