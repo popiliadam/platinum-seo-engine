@@ -1,6 +1,6 @@
 {
   "name": "platinum-seo-engine",
-  "version": "0.1.0-alpha",
+  "version": "1.1.0",
   "description": "SEO operasyonunu VS Code + Claude Code üzerinden yöneten plugin sistemi — schema-locked, Excel+JSONL state, drift-checked, ~43 skill, 14 phase roadmap.",
   "author": "Platinum SEO Engine Contributors",
   "license": "MIT",

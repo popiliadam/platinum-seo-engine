@@ -22,6 +22,7 @@ ADR-011 rotation kararıyla `DECISIONS.md`'den taşınmış eski kararlar. Appen
 - ADR-030 (v1.1 P0 Wave 1 Task 1.4, 2026-05-06 — onaltıncı rotation cycle, ADR-031 ekleme ile DECISIONS.md 6968B tetiklemesi sonrası en eski active cut; brand_identity rename detayı engine commit `7dc67ba` body'sinde de korunur)
 - ADR-031..032 (v1.1 P1 Wave 2 Task 2.2, 2026-05-06 — onyedinci rotation cycle, ADR-034 ekleme ile DECISIONS.md 7367B tetiklemesi sonrası 2 en eski active cut; events.jsonl legacy archive detayı workspace commit `f8d8663` + active.json canonical detayı engine commit `3bec210` body'sinde de korunur)
 - ADR-033 (v1.1 P1 Wave 2 Task 2.3, 2026-05-06 — onsekizinci rotation cycle, ADR-035 ekleme ile DECISIONS.md 7078B tetiklemesi sonrası en eski active cut; project.config.json canonical path detayı engine commit `5d01d59` + workspace commit `e85407f` body'sinde de korunur; 3-active floor 1 cycle altında — ADR-034+035 active)
+- ADR-034 (v1.1 P2+P3 Wave 3 Task 3.3, 2026-05-06 — ondokuzuncu rotation cycle, ADR-036 version sync invariant ekleme ile DECISIONS.md 6562B tetiklemesi sonrası en eski active cut; check_secrets.sh policy detayı `tests/ci/test_check_secrets_sh.py` body'sinde de korunur)
 
 **Active ADR'ler için:** [DECISIONS.md](DECISIONS.md)
 
@@ -315,3 +316,12 @@ ADR-011 rotation kararıyla `DECISIONS.md`'den taşınmış eski kararlar. Appen
 **Context:** Three competing forms: (a) `projects/{slug}/project.config.json` (engine canon); (b) `projects/{slug}/config/...` (workspace pilot); (c) hyphenated `project-config.json` (check_budget + 40 SKILL.md).
 **Decision:** Canonical = `projects/{slug}/project.config.json`. Engine sweep: 40 hyphen→dot + 9 strip `config/` + check_budget/internal_links defaults. `excel.config.json`/`excel-source-manifest.json` stay in `config/` (separate).
 **Consequences:** `test_path_canonical.py` regex-guards both forbidden forms. Workspace mv applied (`e85407f`). Aligned.
+
+---
+
+## ADR-034 — check_secrets.sh Scope Policy
+**Date:** 2026-05-06
+**Status:** accepted
+**Context:** v1.1 polish (`bc9391c`) gave `scripts/ci/check_secrets.sh` 7 exclude paths + 4 patterns as code comment, no policy authority. FP risk surfaced via test-fixture tokens, negative-assertion CI tests, doc placeholders.
+**Decision:** Patterns + exclude paths are policy. New entries require ADR-034 amendment. `tests/ci/test_check_secrets_sh.py` locks the round trip: clean EXIT 0 + 7-path policy assertion + 4-pattern policy assertion.
+**Consequences:** Test fixtures with secret-shaped values must live in the 2 whitelisted files; new test files with credentials extend the exclude list via amendment.
