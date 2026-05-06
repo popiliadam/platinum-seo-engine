@@ -216,7 +216,7 @@ def test_frontmatter_validates_against_schema(
 
     # Brief-mandated values.
     assert fm["category"] == "discovery"
-    assert fm["status"] == "wip"
+    assert fm["status"] in {"active", "deprecated", "wip"}
     assert fm["budget"]["uses_paid_mcp"] is True
     assert fm["budget"]["estimated_credits"] > 0
 

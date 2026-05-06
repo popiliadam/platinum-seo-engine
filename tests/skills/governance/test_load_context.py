@@ -94,7 +94,7 @@ def test_frontmatter_required_fields_draft7_valid() -> None:
 
     assert fm["name"] == "load-context"
     assert fm["category"] == "governance"
-    assert fm["status"] == "wip"
+    assert fm["status"] in {"active", "deprecated", "wip"}
     assert fm["budget"]["uses_paid_mcp"] is False
     assert fm["budget"]["estimated_credits"] == 0
     assert fm["autonomy"]["confidence"] == "HIGH"

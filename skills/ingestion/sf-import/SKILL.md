@@ -17,7 +17,7 @@ description: |
   yokken çağırma; init-project önce çalışmalı (DURUR #6). Tier 1 < 14
   ise FAIL et, fallback YASAK (DURUR #2).
 version: "1.0"
-status: wip
+status: active
 category: ingestion
 inputs:
   project_slug:

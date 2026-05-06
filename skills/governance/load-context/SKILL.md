@@ -14,7 +14,7 @@ description: |
   yazma — manager kararı), bug fix (debug). load-context read-only
   bootstrap aggregator; master.xlsx asla mutate edilmez.
 version: "1.0"
-status: wip
+status: active
 category: governance
 inputs:
   phase_id:

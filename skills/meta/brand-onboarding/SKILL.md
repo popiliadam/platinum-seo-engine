@@ -14,7 +14,7 @@ description: |
   yazılacak (Phase 14+ behavior; init-project devreye giriyor); başka
   projenin config'i kopyalanacak (template-clone — gelecek phase).
 version: "1.0"
-status: wip
+status: active
 category: meta
 inputs:
   project_slug: { type: string, required: true,  description: "kebab-case slug (^[a-z][a-z0-9-]*$). Reserved word check (admin/system/root/api/www) + projects/{slug} collision check (DURUR #2)." }

@@ -25,7 +25,7 @@ description: |
   (DURUR AggregateDimensionInvalidError); workbook'a YAZILACAK bir şey
   varsa (FORBIDDEN — bu skill 100% READ-ONLY aggregator).
 version: "1.0"
-status: wip
+status: active
 category: reporting
 inputs:
   portfolio_root:

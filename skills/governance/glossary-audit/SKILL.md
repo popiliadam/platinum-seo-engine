@@ -14,7 +14,7 @@ description: |
   AMBER-only warn skill — RED kararı vermez, missing term ya da
   orphan term'i sadece liste eder; insan triage'a gerek var.
 version: "1.0"
-status: wip
+status: active
 category: governance
 inputs:
   glossary_path:

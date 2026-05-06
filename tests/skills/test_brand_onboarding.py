@@ -115,7 +115,7 @@ def test_frontmatter_schema_valid(skill_frontmatter_schema: dict) -> None:
 
     assert fm["name"] == "brand-onboarding"
     assert fm["category"] == "meta"
-    assert fm["status"] == "wip"
+    assert fm["status"] in {"active", "deprecated", "wip"}
     assert fm["triggers"]["manual"] == ["/pseo-brand-onboarding"]
     assert fm["mcp_tools"].get("required") in ([], None)
     assert fm["mcp_tools"].get("optional") in ([], None)

@@ -10,7 +10,7 @@ description: |
   (content-decay), tech audit (tech-audit), cannibalization analizi
   gerekiyor — ayrı discovery skill'leri.
 version: "1.0"
-status: wip
+status: active
 category: discovery
 inputs:
   project_slug: { type: string, required: true }

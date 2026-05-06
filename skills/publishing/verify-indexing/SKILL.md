@@ -18,7 +18,7 @@ description: |
   manuel WordPress upload doğrulama (skill scope dışı, manuel
   inceleme).
 version: "1.0"
-status: wip
+status: active
 category: publishing
 inputs:
   target_urls:

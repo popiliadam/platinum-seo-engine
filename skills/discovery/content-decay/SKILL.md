@@ -14,7 +14,7 @@ description: |
   cannibalization analizi — ayrı discovery skill'leri. Master.xlsx
   yokken çağırma; init-project + gsc-pull önce çalışmalı (DURUR #6).
 version: "1.0"
-status: wip
+status: active
 category: discovery
 inputs:
   project_slug:

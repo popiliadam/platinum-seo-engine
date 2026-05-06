@@ -19,7 +19,7 @@ description: |
   (o skill'in master writer çıktısı zaten yazıldı, bu skill SSoT
   toplaması için).
 version: "1.0"
-status: wip
+status: active
 category: planning
 inputs:
   project_slug:

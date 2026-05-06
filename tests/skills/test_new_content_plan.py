@@ -218,7 +218,7 @@ def test_new_content_plan_frontmatter_validates(
     additionalProperties:false (Q-W-A4-01), Draft 7 validation passes."""
     fm = skill_frontmatter
     assert fm["name"] == "new-content-plan"
-    assert fm["status"] == "wip"
+    assert fm["status"] in {"active", "deprecated", "wip"}
     assert fm["version"] == "1.0"
     assert fm["category"] == "planning"
 

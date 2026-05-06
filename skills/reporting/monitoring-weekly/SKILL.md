@@ -22,7 +22,7 @@ description: |
   manager onayı Phase 14+ governance); master.xlsx WRITE talep edilirse
   YASAK (Phase 9 reporting paterni: 8 skill no-write invariant).
 version: "1.0"
-status: wip
+status: active
 category: reporting
 inputs:
   week_start:

@@ -11,7 +11,7 @@ description: |
   sf-import, quick-wins, drift-check) — whats-next router skill'dir,
   başka skill'leri SUGGEST eder, çağırmaz; advisory-only.
 version: "1.0"
-status: wip
+status: active
 category: meta
 inputs:
   user_intent:

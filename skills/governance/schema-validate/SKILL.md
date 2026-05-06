@@ -14,7 +14,7 @@ description: |
   (build-error-resolver). schema-validate read-only audit, master.xlsx
   asla mutate edilmez.
 version: "1.0"
-status: wip
+status: active
 category: governance
 inputs:
   schema_path:

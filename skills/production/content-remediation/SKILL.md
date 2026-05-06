@@ -24,7 +24,7 @@ description: |
   action="redirect" + target_url=null (DURUR #3, R-91 decision tree
   reject).
 version: "1.0"
-status: wip
+status: active
 category: production
 inputs:
   project_slug:

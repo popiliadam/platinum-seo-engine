@@ -19,7 +19,7 @@ description: |
   template render edilir, skill upload yapmaz); master.xlsx eksikse
   (init-project önce çalışmalı, DURUR #1).
 version: "1.0"
-status: wip
+status: active
 category: production
 inputs:
   project_slug:        { type: string,  required: true,  description: "Workspace proje slug'ı (örn 'projeA'). projects/{slug}/ dizinine map edilir." }

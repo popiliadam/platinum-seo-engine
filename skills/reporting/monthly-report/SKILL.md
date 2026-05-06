@@ -20,7 +20,7 @@ description: |
   harcanması bekleniyorsa (bu skill 0 credit; DFS backlinks Phase 10+'ta
   ayrı skill üzerinden).
 version: "1.0"
-status: wip
+status: active
 category: reporting
 inputs:
   project_slug:

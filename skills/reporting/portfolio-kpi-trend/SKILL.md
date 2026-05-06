@@ -24,7 +24,7 @@ description: |
   skill çoklu proje time series üretir); workbook'a YAZILACAK bir
   şey varsa (FORBIDDEN — bu skill strict read-only aggregator).
 version: "1.0"
-status: wip
+status: active
 category: reporting
 inputs:
   portfolio_root:

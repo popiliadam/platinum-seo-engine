@@ -20,7 +20,7 @@ description: |
   (DURUR #5); budget_credits_per_day aşılmış (DURUR #1 — skip skill,
   AMBER); SERP empty top_n=0 (DURUR #2 REJECT).
 version: "1.0"
-status: wip
+status: active
 category: discovery
 inputs:
   target_keyword:
