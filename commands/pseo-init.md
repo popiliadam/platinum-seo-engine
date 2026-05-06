@@ -34,6 +34,6 @@ Onay sonrası (kullanıcı "evet"/"yaz"/"commit" derse) aynı argümanları `--d
 
 Workspace root resolution: `PSEO_WORKSPACE_ROOT` env var → yoksa kullanıcıya hatırlat (`~/Documents/platinum-seo-engine` default'u workspace değil engine repo'sudur; gerçek workspace ayrı bir klasördür).
 
-## 4. Phase 5+ tamamlayıcı adımlar (stub)
+## 4. Tam scaffold (init-project skill)
 
-`scripts/state/bootstrap_project.py` yalnızca `project.config.json` üretir. Spec §11.2 `init-project` skill'inin diğer adımları (master.xlsx kopyalama, `inbox/`, `outputs/`, `_state/` klasörleri açma, `shared/portfolio.json` güncelleme, `project_created` event'i, GSC validation, approval gate) Phase 5'te `skills/meta/init-project/SKILL.md` yazılınca aktif olacak. Bu komut o zamana kadar yalnızca config scaffolder rolünü üstlenir.
+Bu komut yalnızca `project.config.json` scaffold rolünü üstlenir. Tam workspace tree (master.xlsx kopyalama, `inbox/` + `outputs/` + `_state/` klasörler, `shared/portfolio.json` güncelleme, `project_created` event'i, GSC validation, approval gate) `skills/meta/init-project/SKILL.md` (Phase 5, aktif) tarafından sürülür. Brief'te "tam init" ihtiyacı varsa skill'i çağır; sadece config dosyası lazımsa bu komut yeterli.
