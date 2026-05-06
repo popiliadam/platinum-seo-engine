@@ -101,6 +101,48 @@ Multi-line format respect: prepend block her zaman 2 satır (`import os, sys\nsy
 - Schema-first cross-ref → rules/schema-first.md (skill metadata events.schema authority).
 - Naming cross-ref → rules/naming.md (skill folder hierarchy + flat tests/skills/test_*.py convention F-14W3W2Ca-1 catch).
 
+## Section 5 — pytest Local-Only Fixture Convention (Q-CI-W3-04)
+
+Workspace-staging path veya lokalde mevcut ama CI runner'da YOK olan fixture'a bağlı testler `@pytest.mark.skipif` marker ZORUNLU.
+
+```python
+from pathlib import Path
+WORKSPACE_STAGING = Path.home() / "Documents/platinum-seo-workspace/projects/dentnotion/_state/cache"
+
+@pytest.mark.skipif(not WORKSPACE_STAGING.exists(), reason="workspace-staging only available locally")
+def test_happy_path_gsc_live():
+    ...
+```
+
+- CI ubuntu-latest runner'da workspace-staging path YOKTUR → marker olmayan test 4 fail = CI kırılır.
+- F-14W3W3β-4 cascade fix (Süleyman K3 Seçenek B): test_quick_wins.py + test_sf_import.py 4 test @pytest.mark.skipif marker eklendi.
+- Konftest.py `local_only` marker register + `-m "not local_only"` CI flag (cleaner pattern) Phase 16+ scope.
+- Mevcut `skipif(not PATH.exists())` pattern production-ready, migration ertelenebilir.
+
+## Section 6 — Schema Enum jq Path (Q-PHASE15-EVENTENUM-BRIEF-01)
+
+`events.schema.json` gibi JSON Schema dosyalarında enum değer path'i `.properties.<field>.enum` — `.definitions.<field>.enum` DEĞİL.
+
+```bash
+# DOĞRU
+jq '.properties.event_type.enum' schemas/events.schema.json
+jq '.properties.event_kind.enum' schemas/events.schema.json
+
+# YANLIŞ (Phase 15 W1 schema-first override #16 doğum belgesi)
+jq '.definitions.event_type.enum' schemas/events.schema.json  # null döner
+```
+
+Brief template schema enum cross-check adımlarında `.properties.<field>.enum` path kullanılmalı. Worker her seferinde Python fallback yapmak ZORUNDA KALMAZ.
+
+## Section 7 — Archive Convention (Q-PHASE15-ARCHIVE-INTEG-01)
+
+Output üreten skill'ler (monthly-report, competitive-analysis, audit reports, vb.) son adımda workspace `.claude/commands/archive` konvansiyonuna referans verir.
+
+- SKILL.md son Step: "Output'ları `outputs/` altına kaydet + archive command'ı ile workspace backup'a al."
+- Sadece output üreten skill'ler için (discovery/analysis sonuç → markdown/JSON → archive).
+- Prompt-only skill'ler (quick-wins, whats-next) için archive adımı gerekmez.
+- Phase 16+ enforce: audit AMBER gate (Q-PHASE15-ARCHIVE-INTEG-01).
+
 ## Enforcement
 
 - CI: `tests/ci/test_run_skill_python.py` — substring-key detection multi-line format respect doğrular.
