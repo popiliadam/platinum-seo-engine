@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -c 'import json,os,pathlib,sys; ws=os.environ.get(\"PSEO_WORKSPACE_ROOT\"); marker=(pathlib.Path(ws)/\"shared\"/\"active.json\") if ws else None; active=(json.loads(marker.read_text(encoding=\"utf-8\")) if (marker and marker.exists()) else None); pid=(active or {}).get(\"project_id\") if active else None; lines=[]; lines.append(\"PSEO context: workspace=\"+ws+\" project=\"+(pid or \"<none>\")) if (ws and active) else lines.append(\"PSEO context: no active project bound — run /pseo-bootstrap-project or set PSEO_WORKSPACE_ROOT\"); lines.append(\"Drift router: when uncertain about next step invoke the meta:whats-next skill (Phase 5+) — until then consult docs/PHASE_STATUS.md.\"); sys.stdout.write(chr(10).join(lines)+chr(10))'",
+            "command": "python3 -c 'import json,os,pathlib,sys; ws=os.environ.get(\"PSEO_WORKSPACE_ROOT\"); marker=(pathlib.Path(ws)/\"shared\"/\"active.json\") if ws else None; active=(json.loads(marker.read_text(encoding=\"utf-8\")) if (marker and marker.exists()) else None); pid=(active or {}).get(\"active_project\") if active else None; lines=[]; lines.append(\"PSEO context: workspace=\"+ws+\" project=\"+(pid or \"<none>\")) if (ws and active) else lines.append(\"PSEO context: no active project bound — run /pseo-bootstrap-project or set PSEO_WORKSPACE_ROOT\"); lines.append(\"Drift router: when uncertain about next step invoke the meta:whats-next skill (Phase 5+) — until then consult docs/PHASE_STATUS.md.\"); sys.stdout.write(chr(10).join(lines)+chr(10))'",
             "timeout": 10,
             "statusMessage": "Injecting PSEO project context..."
           }
