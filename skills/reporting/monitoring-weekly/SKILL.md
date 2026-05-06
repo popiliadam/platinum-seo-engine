@@ -215,6 +215,209 @@ swallow.
 8. **events.jsonl append** — single audit row (or 2 if DURUR #5
    fires). Schema-first override applied per the section above.
 
+## Inline Orchestration (Phase B Wave 3 — Q-V1.2-MONITORING-WEEKLY-MISSING-SCRIPT-01 RESOLVED)
+
+Skill body inline transform paterni (option b — thin orchestration, no
+`scripts/reporting/monitoring_weekly.py` subprocess). 3 Python block
+sequential helper exec compatible (rules/skills.md Section 1 enforce —
+1. block sys.path marker; rules/skills.md Section 3 multi-line format).
+
+### Block 1 — Setup + Read drift-check Output
+
+```python
+import os
+import sys
+import json
+from pathlib import Path
+from datetime import datetime, timezone
+from string import Template
+
+sys.path.insert(0, os.getcwd())
+
+# Entrypoint variables (orchestrator injects at runtime; plugin-agnostik —
+# no project slug literals in skill body per F-16 invariant).
+project_slug = os.environ.get("PSEO_PROJECT_ID")
+if not project_slug:
+    print("PSEO_PROJECT_ID env var required — orchestrator-injected at runtime")
+    sys.exit(0)
+week_start = os.environ.get("MONITORING_WEEK_START", "")
+week_end = os.environ.get("MONITORING_WEEK_END", "")
+workspace_root_env = os.environ.get("PSEO_WORKSPACE_ROOT")
+if workspace_root_env:
+    workspace_root = Path(workspace_root_env)
+else:
+    workspace_root = Path.home() / "Documents" / "platinum-seo-workspace"
+
+REPO_ROOT = Path.cwd()
+
+# Read drift-check consistency-report.json (DURUR #3 fallback if missing)
+consistency_path = (
+    workspace_root / "projects" / project_slug / "_state" / "cache" / "consistency-report.json"
+)
+if consistency_path.exists():
+    drift_data = json.loads(consistency_path.read_text(encoding="utf-8"))
+    red_count = drift_data.get("red_count", drift_data.get("fail_count", 0))
+    amber_count = drift_data.get("amber_count", 0)
+    green_count = drift_data.get("green_count", drift_data.get("pass_count", 0))
+    drift_verdict = drift_data.get("verdict", "UNKNOWN")
+    drift_available = True
+else:
+    # DURUR #3 — drift-check henüz çalıştırılmamış
+    red_count = amber_count = green_count = 0
+    drift_verdict = "AMBER (drift-check henüz çalıştırılmamış)"
+    drift_available = False
+```
+
+### Block 2 — Read portfolio.json + Aggregate Per-Project Metrics
+
+```python
+# Read shared/portfolio.json — cross-project metrics aggregation
+portfolio_path = workspace_root / "shared" / "portfolio.json"
+if portfolio_path.exists():
+    portfolio_data = json.loads(portfolio_path.read_text(encoding="utf-8"))
+    projects = portfolio_data.get("projects", [])
+    project_entry = next(
+        (p for p in projects if p.get("slug") == project_slug),
+        None,
+    )
+    if project_entry:
+        completion_pct = float(project_entry.get("completion_percentage", 0.0))
+        active_oq_count = int(project_entry.get("active_oq_count", 0))
+        recent_events = int(project_entry.get("recent_events_count_7day", 0))
+        portfolio_available = True
+    else:
+        completion_pct = 0.0
+        active_oq_count = 0
+        recent_events = 0
+        portfolio_available = False
+else:
+    # DURUR fallback — portfolio.json yoksa health snapshot incomplete
+    completion_pct = 0.0
+    active_oq_count = 0
+    recent_events = 0
+    portfolio_available = False
+
+# Compute overall severity from drift + portfolio signals
+if red_count >= 5 or not drift_available:
+    severity = "RED" if red_count >= 5 else "AMBER"
+elif amber_count > 0:
+    severity = "AMBER"
+else:
+    severity = "GREEN"
+```
+
+### Block 3 — Emit Audit Event + Render Markdown Report
+
+```python
+# Render markdown via templates/reports/monitoring-weekly.template.md
+# DURUR #4 inline fallback if template missing.
+template_path = REPO_ROOT / "templates" / "reports" / "monitoring-weekly.template.md"
+INLINE_TEMPLATE = (
+    "---\n"
+    "project_id: $project_slug\n"
+    "period_start: $week_start\n"
+    "period_end: $week_end\n"
+    "generated_at: $generated_at\n"
+    "report_kind: monitoring_weekly\n"
+    "severity: $severity\n"
+    "---\n\n"
+    "# Monitoring Weekly — $project_slug\n\n"
+    "**Pencere:** $week_start – $week_end\n"
+    "**Genel severity:** $severity\n\n"
+    "## Exec Summary\n\n$exec_summary\n\n"
+    "## Drift Section\n\n$drift_section\n\n"
+    "## GSC Anomaly Section\n\n$gsc_anomaly_section\n\n"
+    "## Budget Burn Section\n\n$budget_burn_section\n\n"
+    "## Escalations\n\n$escalations\n"
+)
+
+if template_path.exists():
+    template_str = template_path.read_text(encoding="utf-8")
+else:
+    template_str = INLINE_TEMPLATE  # DURUR #4
+
+generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+exec_summary = (
+    f"Haftalık sağlık özeti: drift={red_count}R/{amber_count}A/{green_count}G "
+    f"(verdict={drift_verdict}); completion={completion_pct:.1f}%; "
+    f"active_oq={active_oq_count}; recent_events_7day={recent_events}."
+)
+drift_section = (
+    f"Drift counts (consistency-report.json): RED={red_count} "
+    f"AMBER={amber_count} GREEN={green_count}. "
+    f"Verdict: {drift_verdict}. Available: {drift_available}."
+)
+gsc_anomaly_section = (
+    "GSC week-over-week delta — Wave 3 inline scope: raw counts placeholder "
+    "(Phase 14+ governance refinement scope: 5σ threshold compute via "
+    "master.xlsx[gsc_performance] read-only)."
+)
+budget_burn_section = (
+    f"Recent events 7-day count: {recent_events} (portfolio.json available={portfolio_available}). "
+    "Budget burn rate calc Phase 14+ scope (events.jsonl cost.credits aggregation)."
+)
+escalations = (
+    "DURUR #5 5σ anomaly threshold check Phase 14+ governance scope. "
+    f"Mevcut severity={severity}. RED ≥5 invariant FAIL veya AMBER ≥1 trigger."
+)
+
+variables = {
+    "project_slug": project_slug,
+    "week_start": week_start,
+    "week_end": week_end,
+    "generated_at": generated_at,
+    "severity": severity,
+    "exec_summary": exec_summary,
+    "drift_section": drift_section,
+    "gsc_anomaly_section": gsc_anomaly_section,
+    "budget_burn_section": budget_burn_section,
+    "escalations": escalations,
+}
+
+rendered = Template(template_str).safe_substitute(variables)
+
+# Write markdown report
+report_dir = workspace_root / "projects" / project_slug / "outputs" / "reports"
+report_dir.mkdir(parents=True, exist_ok=True)
+report_path = report_dir / f"{date_str}-monitoring-weekly.md"
+report_path.write_text(rendered, encoding="utf-8")
+
+# Emit audit event (event_kind=audit, no event_type per Section 6 disambiguation)
+from scripts.state import events_writer
+
+events_writer.append_audit(
+    project_id=project_slug,
+    audit_action="accessed",
+    audit_target=f"reports:monitoring-weekly:{week_start}_{week_end}",
+    actor="agent:monitoring-weekly",
+    workspace_root=workspace_root,
+    notes=(
+        f"weekly_monitoring severity={severity} "
+        f"red={red_count} amber={amber_count} green={green_count} "
+        f"completion={completion_pct:.1f}% active_oq={active_oq_count} "
+        f"drift_available={drift_available} portfolio_available={portfolio_available}"
+    ),
+)
+
+print(f"monitoring-weekly report written: {report_path}")
+print(f"audit event appended: project={project_slug} severity={severity}")
+```
+
+### Schema-First Compliance
+
+- `event_kind=audit` — `event_type` field YASAK (rules/events-writer.md
+  Section 4c + Section 6).
+- `audit_action="accessed"` — read-only access trail (drift-check
+  doğum belgesi paterni reuse: Phase 5 governance audit kind).
+- `audit_target` namespace `reports:monitoring-weekly:{week}` —
+  cross-project audit query selectability.
+- `events_writer.append_audit` convenience wrapper — envelope
+  auto-populate (schema_version + event_id + timestamp + project_id);
+  bare `append(event)` API YASAK (rules/events-writer.md Section 2 +
+  Phase B Wave 1 fix).
+
 ## Foundational Principles Enforcement (3-Layer)
 
 The 3 üst-prensip (Phase 10 `rules/content-quality.md#foundational-
