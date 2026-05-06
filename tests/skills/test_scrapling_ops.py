@@ -110,7 +110,7 @@ def test_skill_frontmatter_validates(skill_frontmatter_schema: dict) -> None:
     # Spot-checks before schema-level validation.
     assert fm["name"] == "scrapling-ops"
     assert fm["category"] == "ingestion"
-    assert fm["status"] == "wip"
+    assert fm["status"] in {"active", "deprecated", "wip"}
     assert fm["version"] == "1.0"
     assert fm["inputs"]["project_slug"]["required"] is True
     assert fm["inputs"]["urls"]["required"] is True

@@ -26,7 +26,7 @@ description: |
   (DURUR #1, FAQ section parse edilemez); R-09 cap aşımı 16+ FAQ
   attempt (DURUR #2, AI suistimal Principle 3 enforce).
 version: "1.0"
-status: wip
+status: active
 category: production
 inputs:
   project_slug:

@@ -18,7 +18,7 @@ description: |
   skill'ler. project.config display_name yokken çağırma (DURUR #10);
   budget aşılmışsa fallback YASAK (DURUR #2).
 version: "1.0"
-status: wip
+status: active
 category: discovery
 inputs:
   project_slug:

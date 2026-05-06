@@ -22,7 +22,7 @@ description: |
   skill'i ayrı); master.xlsx writer çağrısı isteniyorsa (FORBIDDEN
   — bu skill 100% READ-ONLY, hiçbir master_task hücresine yazmaz).
 version: "1.0"
-status: wip
+status: active
 category: reporting
 inputs:
   portfolio_root:

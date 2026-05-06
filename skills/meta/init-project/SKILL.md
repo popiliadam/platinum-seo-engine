@@ -14,7 +14,7 @@ description: |
   — bu yıkıcı, init-project ASLA mevcut master.xlsx'e dokunmaz (F1
   workbook policy + idempotency invariant).
 version: "1.0"
-status: wip
+status: active
 category: meta
 inputs:
   project_slug: { type: string, required: true, description: "Lowercase kebab-case (e.g. 'my-project'). Matches projects/{slug}/." }

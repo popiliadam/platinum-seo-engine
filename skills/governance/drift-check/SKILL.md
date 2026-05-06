@@ -11,7 +11,7 @@ description: |
   build error (build-error-resolver) — drift-check governance read-only,
   master.xlsx asla mutate edilmez.
 version: "1.0"
-status: wip
+status: active
 category: governance
 inputs:
   project_slug: { type: string, required: false, description: "Tek proje hedeflemek için. Verilmezse PSEO_WORKSPACE_ROOT altındaki tüm projeler taranır." }

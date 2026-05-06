@@ -17,7 +17,7 @@ description: |
   issues (tech-audit) — ayrı discovery skill'leri. Master.xlsx yokken
   çağırma; init-project önce çalışmalı (DURUR #6).
 version: "1.0"
-status: wip
+status: active
 category: discovery
 inputs:
   project_slug:

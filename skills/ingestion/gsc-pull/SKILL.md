@@ -14,7 +14,7 @@ description: |
   (tech-audit skill) — ayrı ingestion / discovery skill'leri. Master.xlsx
   yokken çağırma; init-project önce çalışmalı (DURUR #6).
 version: "1.0"
-status: wip
+status: active
 category: ingestion
 inputs:
   project_slug:

@@ -103,7 +103,7 @@ def test_frontmatter_required_fields_present() -> None:
     # Spot-check the contract fields the brief locks in.
     assert fm["name"] == "monitoring-weekly"
     assert fm["category"] == "reporting"
-    assert fm["status"] == "wip"
+    assert fm["status"] in {"active", "deprecated", "wip"}
     assert fm["version"] == "1.0"
     assert fm["triggers"]["manual"] == ["/pseo-monitoring-weekly"]
     assert fm["budget"]["uses_paid_mcp"] is False

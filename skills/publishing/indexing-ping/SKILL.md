@@ -19,7 +19,7 @@ description: |
   yapılacak target URL'ler ile birlikte (DURUR #5 REJECT, redirect_404
   sheet'te action=410 satırları skip).
 version: "1.0"
-status: wip
+status: active
 category: publishing
 inputs:
   target_urls:

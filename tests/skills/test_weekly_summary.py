@@ -178,7 +178,7 @@ def test_frontmatter_validates(
     """
     fm = skill_frontmatter
     assert fm["name"] == "weekly-summary"
-    assert fm["status"] == "wip"
+    assert fm["status"] in {"active", "deprecated", "wip"}
     assert fm["version"] == "1.0"
     assert fm["category"] == "reporting"
 

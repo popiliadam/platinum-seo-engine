@@ -18,7 +18,7 @@ description: |
   fail ise batch unhealthy → DURUR #4. Tier_escalation override §14.5
   canonical sequence dışındaysa STOP (DURUR #7).
 version: "1.0"
-status: wip
+status: active
 category: discovery
 inputs:
   project_slug:

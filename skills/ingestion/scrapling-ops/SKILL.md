@@ -18,7 +18,7 @@ description: |
   altındaki şemalar bu skill içinde HENÜZ enforce edilmiyor). Excel'e
   doğrudan yazılması istenirse YASAK — Phase 6 staging-only.
 version: "1.0"
-status: wip
+status: active
 category: ingestion
 inputs:
   project_slug:

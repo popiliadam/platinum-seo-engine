@@ -21,7 +21,7 @@ description: |
   sheet'i boşsa cluster-map önce çalışmalı (DURUR #6 CLUSTER_KEYWORDS_EMPTY).
   Budget aşılmışsa fallback YASAK (DURUR #1).
 version: "1.0"
-status: wip
+status: active
 category: planning
 inputs:
   project_slug:

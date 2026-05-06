@@ -19,7 +19,7 @@ description: |
   project önce çalışmalı (DURUR #4). Budget aşılmışsa fallback YASAK
   (DURUR #2).
 version: "1.0"
-status: wip
+status: active
 category: discovery
 inputs:
   project_slug:

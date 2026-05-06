@@ -17,7 +17,7 @@ description: |
   Budget pre-flight FAIL ise asla bypass etme — workflow_runner
   awaiting_approval state'ine route et (DURUR #1).
 version: "1.0"
-status: wip
+status: active
 category: discovery
 inputs:
   project_slug:

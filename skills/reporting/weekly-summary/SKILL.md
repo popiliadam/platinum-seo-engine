@@ -17,7 +17,7 @@ description: |
   portfolio-weekly-brief kullan); ham GSC delta gerekiyor
   (monthly-report scope; weekly-summary LOCAL aggregation).
 version: "1.0"
-status: wip
+status: active
 category: reporting
 inputs:
   project_slug:

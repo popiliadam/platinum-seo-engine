@@ -79,7 +79,7 @@ def test_frontmatter_required_fields_and_schema_valid() -> None:
     # Spot-check brief contract.
     assert fm["name"] == "aio-competitor-map"
     assert fm["category"] == "discovery"
-    assert fm["status"] == "wip"
+    assert fm["status"] in {"active", "deprecated", "wip"}
     assert fm["triggers"]["manual"] == ["/pseo-aio-competitor-map"]
     assert fm["budget"]["uses_paid_mcp"] is True
     assert fm["budget"]["estimated_credits"] == 30

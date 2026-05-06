@@ -25,7 +25,7 @@ description: |
   YAZILACAK bir şey varsa (FORBIDDEN — bu skill strict read-only
   aggregator); KPI snapshot isteniyorsa portfolio-overview kullan.
 version: "1.0"
-status: wip
+status: active
 category: reporting
 inputs:
   portfolio_root:

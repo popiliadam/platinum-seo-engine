@@ -14,7 +14,7 @@ description: |
   (content-decay) — ayrı skill'ler. Master.xlsx yokken çağırma; init-project
   önce çalışmalı (DURUR #8). Budget aşılmışsa fallback YASAK (DURUR #1).
 version: "1.0"
-status: wip
+status: active
 category: discovery
 inputs:
   project_slug:

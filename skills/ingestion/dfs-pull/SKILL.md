@@ -16,7 +16,7 @@ description: |
   ayrı ingestion skill'leri. Master.xlsx yokken çağırma; init-project
   önce çalışmalı (DURUR #6). Budget aşılmışsa fallback YASAK (DURUR #2).
 version: "1.0"
-status: wip
+status: active
 category: ingestion
 inputs:
   project_slug:

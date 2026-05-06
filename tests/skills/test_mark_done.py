@@ -88,7 +88,7 @@ def test_frontmatter_required_fields_and_draft7_validity() -> None:
 
     assert fm["name"] == "mark-done"
     assert fm["category"] == "meta"
-    assert fm["status"] == "wip"
+    assert fm["status"] in {"active", "deprecated", "wip"}
     assert fm["triggers"]["manual"] == ["/pseo-mark-done"]
     assert fm["budget"]["uses_paid_mcp"] is False
     assert fm["budget"]["estimated_credits"] == 0

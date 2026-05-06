@@ -20,7 +20,7 @@ description: |
   yokken çağırma; init-project önce çalışmalı (DURUR #3). Budget aşılmışsa
   fallback YASAK (DURUR #1).
 version: "1.0"
-status: wip
+status: active
 category: planning
 inputs:
   project_slug:

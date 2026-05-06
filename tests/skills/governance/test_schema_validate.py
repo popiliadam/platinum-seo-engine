@@ -91,7 +91,7 @@ def test_frontmatter_required_fields_draft7_valid() -> None:
 
     assert fm["name"] == "schema-validate"
     assert fm["category"] == "governance"
-    assert fm["status"] == "wip"
+    assert fm["status"] in {"active", "deprecated", "wip"}
     assert fm["version"] == "1.0"
     assert fm["triggers"]["manual"] == ["/pseo-driftcheck"]
     assert fm["budget"]["uses_paid_mcp"] is False

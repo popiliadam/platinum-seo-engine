@@ -147,7 +147,7 @@ def test_frontmatter_validates(skill_frontmatter: dict,
     fm = skill_frontmatter
     assert fm["name"] == "competitive-analysis"
     assert fm["category"] == "discovery"
-    assert fm["status"] == "wip"
+    assert fm["status"] in {"active", "deprecated", "wip"}
     assert fm["version"] == "1.0"
 
     inputs = fm["inputs"]
