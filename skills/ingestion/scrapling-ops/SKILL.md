@@ -4,7 +4,7 @@ description: |
   Use when: kullanıcı "scrapling fetch", "URL listesi çek", "competitor
   snapshot", "rakip site içeriği indir", "stealth fetch", "anti-bot
   bypass", "Cloudflare aşımı", "tier escalation" der ya da
-  /pseo-scrapling çağırır. Phase 6 generic helper — staging-only,
+  /pseo-scrape çağırır. Phase 6 generic helper — staging-only,
   Excel'e yazmaz; raw HTML inbox + SQLite-shaped staging JSON üretir.
   Also use when: bir başka skill ('S1_competitor_snapshot' gibi
   scenario consumer'ı) bu helper'ı tier_escalation orkestrasyonu için
@@ -48,7 +48,7 @@ consumes:
   - "init-project:projects/{slug}/master.xlsx"
 produces: []
 triggers:
-  manual: ["/pseo-scrapling"]
+  manual: ["/pseo-scrape"]
   natural_language: |
     "scrapling fetch", "URL listesi çek", "competitor snapshot",
     "rakip site içeriği indir", "stealth fetch", "anti-bot bypass",

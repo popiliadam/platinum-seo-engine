@@ -23,13 +23,14 @@ model: sonnet
 
 ## 2. Skill chain
 
-`skills/reporting/monthly-report/SKILL.md` şu adımları koşar:
+`skills/reporting/monthly-report/SKILL.md` LOCAL aggregator (Phase 9 W1, no MCP, no DFS, 0 credit) şu adımları koşar:
 
-1. master.xlsx'ten ay boyunca toplanan logical sheet'leri oku (gsc_landing_query, content_decay, quick_wins, master_task)
-2. `monthly-report.schema.json` formatında JSON data objesi üret (`{workspace}/projects/{slug}/_state/reports/{month}-monthly.json`)
-3. `templates/reports/monthly-report.template.md` + bu JSON'u `scripts/reporting/render_template.py` ile birleştir
-4. Çıktıyı `{workspace}/projects/{slug}/outputs/reports/{month}-monthly.md` olarak yaz
-5. `events.jsonl` → `report_generated` event'i
+1. master.xlsx'ten 9 logical sheet oku (READ-ONLY): `master_task` + `completed_work` + `gsc_performance` + `opportunity` + `content_decay` + `tech_seo` + `schema` + `new_content_plan` + `content_improve`
+2. events.jsonl son 28 gün work-event context (READ-ONLY) — provenance + workflow events filter
+3. `monthly-report.schema.json` v1.0 formatında JSON data objesi üret (10 zorunlu section + framing_policy default `positive_client` + output_formats subset of `[html, pdf, notion]`)
+4. `templates/reports/monthly-report.template.md` + JSON'u `scripts/reporting/render_template.py` ile birleştir → `outputs/reports/{date}-monthly.md` (insan-okunur markdown)
+5. JSON kopyası `inbox/local/{date}-monthly-{slug}.json` olarak persist (provenance audit trail)
+6. master.xlsx **WRITE YOK** (skill `outputs[]` `master.xlsx#none` confirm); events.jsonl **WRITE YOK** (Q-RP-01 deferred Phase 14+ governance refinement)
 
 ## 3. Manuel template render (helper)
 

@@ -37,6 +37,6 @@ Quick check — aktif projenin `project.config.json`'unun schema'ya uyup uymadı
 ## 4. Bağımlılıklar
 
 - `skills/governance/drift-check/SKILL.md` — aktif (Phase 5)
-- `scripts/validation/validate_invariants.py` — 20 cross-sheet kuralı
-- `scripts/validation/drift_report.py` — `consistency-report.schema.json` üretimi
-- `templates/reports/drift.template.md` — markdown render
+- `scripts/validation/validate_invariants.py` — 20 cross-sheet kuralı (5 CRITICAL + 10 HIGH + 5 MEDIUM) + `build_consistency_report()` (consistency-report.schema.json üretimi, Draft7Validator inline)
+- `scripts/reporting/render_template.py` — drift markdown render
+- `templates/reports/drift.template.md` — markdown template
