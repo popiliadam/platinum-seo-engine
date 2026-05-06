@@ -276,7 +276,7 @@
       "required_columns": [
         { "col": "A", "name": "task_id" },
         { "col": "B", "name": "task" },
-        { "col": "C", "name": "primary_source", "enum": ["content_decay", "quickwin", "tech_fix", "schema", "pillar", "manual", "sxo", "cannibalization", "redirect_404", "internal_links"] },
+        { "col": "C", "name": "primary_source", "enum": ["content_decay", "quickwin", "tech_fix", "schema", "pillar", "manual", "sxo", "cannibalization", "redirect_404", "internal_links", "new_content_plan"], "_note": "Q-IL-1 paterni reuse: enum 9→10 (Phase 8 W-D1 +internal_links) → 10→11 (v1.2 Phase B audit followup +new_content_plan, additive only, schema_version unchanged per ADR-018 convention; resolves Q-V1.2-MASTER-TASK-PRIMARY-SOURCE-01)" },
         { "col": "D", "name": "related_sources" },
         { "col": "E", "name": "url" },
         { "col": "F", "name": "category" },

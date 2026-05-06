@@ -133,10 +133,13 @@ PROTECTED_COLUMNS: frozenset[str] = frozenset({
     "note",
 })
 
-#: master_task primary_source enum (schema line 275). Phase 8 closeout
+#: master_task primary_source enum (schema line 279). Phase 8 closeout
 #: Q-IL-1: schema bump 9→10 values (additive, ADR-018 pattern,
 #: schema_version unchanged) — internal_links is now an explicit enum
 #: member; W-C4 transform refactored to emit "internal_links" directly.
+#: v1.2 Phase B audit followup (2026-05-06) — Q-V1.2-MASTER-TASK-PRIMARY-SOURCE-01:
+#: enum 10→11 (additive, +new_content_plan); resolves T-10001 F-17
+#: priority normalize blocked-by-RowSchemaError; Q-IL-1 paterni reuse.
 PRIMARY_SOURCE_ENUM: frozenset[str] = frozenset({
     "content_decay",
     "quickwin",
@@ -148,6 +151,7 @@ PRIMARY_SOURCE_ENUM: frozenset[str] = frozenset({
     "cannibalization",
     "redirect_404",
     "internal_links",
+    "new_content_plan",
 })
 
 #: statusEnum (master-excel.schema.json#/definitions/statusEnum).
