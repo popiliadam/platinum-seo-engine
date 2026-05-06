@@ -2,6 +2,57 @@
 
 ## Unresolved
 
+### Q-V1.2-LOAD-CONTEXT-ORPHAN-DIR-01: skills/meta/load-context/ orphan empty directory [P1]
+**Raised:** 2026-05-06 during v1.1 Integration Audit Wave 1 (filesystem inventory cross-check).
+**Context:** `skills/meta/load-context/` directory exists on disk but contains NO `SKILL.md`. The actual load-context skill lives at `skills/governance/load-context/SKILL.md` (correct location post-Phase 13+ governance refactor). The orphan empty `meta/load-context/` is residual from category move that never deleted the source directory. Empty dir doesn't affect runtime (Claude Code skill loader skips dirs without SKILL.md silently) but creates governance drift + design.md §11.1 docs ambiguity.
+**Options:**
+- a) Delete empty `skills/meta/load-context/` directory + update `docs/superpowers/specs/2026-04-30-platinum-seo-engine-design.md` §11.1 to reflect governance-category placement (combined with Q-V1.2-DESIGN-CATEGORY-DRIFT inline P2 finding)
+- b) Move skill back from governance/ to meta/ (semantic argument: load-context is a META operation per spec §11.1 "Meta(5)" original intent)
+- c) Defer indefinitely; orphan empty dir harmless (audit-only finding, not blocking)
+**Owner:** karar verici agent (v1.2 doc-pass cleanup batch)
+**Blocking Phase:** None for v1.1.0 (no runtime impact); v1.2 cleanup candidate.
+
+### Q-V1.2-AIO-COMPETITOR-FENCE-01: aio-competitor-map block 2 AST FAIL bare identifier [P1]
+**Raised:** 2026-05-06 during v1.1 Integration Audit Wave 1 (Python AST parse) + Wave 4 (executability scorecard re-confirm).
+**Context:** `skills/discovery/aio-competitor-map/SKILL.md` block 2 line 9 contains pseudocode `"status": 5xx_marker` where `5xx_marker` is a bare identifier (Python 3 SyntaxError: identifier cannot start with digit, "invalid decimal literal"). Skill body has `# llm_native: true` (Q-PHASE15-AIO-COMPETITOR-01 codified) so executability is intentionally not required, but ` ```python ` fence sets that expectation for `scripts/ci/run_skill_python.py` helper. AST parse fails on this pseudocode block.
+**Options:**
+- a) Change ```python fence to ```text or ```pseudocode for block 2 only — preserves doc readability + signals non-executable nature to AST tooling.
+- b) Replace `5xx_marker` with `"5xx_marker"` (quoted string literal) — keeps fence consistent, makes block AST-valid pseudocode that won't actually run (no MCP, no real loop body).
+- c) Refactor block 2 to skip pseudocode entirely — replace with a markdown narrative paragraph describing the tier-1 fetch fallback intent.
+- d) Defer — keep `wip` status + skip CI strict mode for `wip` skills (currently the case).
+**Owner:** karar verici agent (v1.2 SKILL.md polish batch + lint convention review)
+**Blocking Phase:** None for v1.1.0 (skill `wip` status, helper exec not enforced strict for wip).
+
+### Q-V1.2-EVENTS-WRITER-MATRIX-COVERAGE-01: rules/events-writer.md Section 4 branch matrix %47 coverage [P1]
+**Raised:** 2026-05-06 during v1.1 Integration Audit Wave 3 (Hipotez 8 verification).
+**Context:** `rules/events-writer.md` Section 4 contains a 22-row skill→event_type branch matrix (23 rows including content-remediation 3 sub-rows + mark-done 2 sub-rows). Of these, **20 unique skill names** match actual filesystem skill names. Coverage = 20/43 = **47%**. 23 skills are NOT explicitly mapped to event_type branch logic in the rule body. Skills missing from matrix: aio-competitor-map, brand-onboarding, cannibalization, content-decay, dfs-pull, drift-check, glossary-audit, gsc-pull, indexing-ping, init-project, load-context, monthly-report, portfolio-* (6 skills), quick-wins, scrapling-ops, sf-import, weekly-summary, whats-next. Some are `event_kind=audit` (skip event_type per Section 6 ADR-020 disambiguation), others are `event_kind=provenance` (per Section 4 schema). Worker schema-first override paterni (F-14W3W2B-1 doğum belgesi) handles unmapped skills via `event_type=manual + note=[skill=X event_type_intent=...]` but explicit row missing forces brief writer to figure out branch matrix on-the-fly per dispatch.
+**Options:**
+- a) Extend Section 4 to 43-row coverage (1 row per skill) — single matrix table, more rows but exhaustive.
+- b) Restructure Section 4 with 3 sub-tables: Section 4a (work events 22-row), Section 4b (provenance events ~10-row), Section 4c (audit-only events ~5-row, no event_type column) — more discoverable than monolithic 43-row table.
+- c) Defer + codify the schema-first override pattern as the "default for unmapped skills" rule explicitly — keeps rule body short, documents the override paterni as canonical.
+**Owner:** karar verici agent (v1.2 governance refinement scope; rules/events-writer.md edit + schema cross-ref)
+**Blocking Phase:** None for v1.1.0 (worker override handles missing rows); v1.2 dispatch ergonomics.
+
+### Q-V1.2-SCHEMA-VALIDATE-MISSING-RULE-01: governance/schema-validate cites missing rules/foundational-principles.md [P1]
+**Raised:** 2026-05-06 during v1.1 Integration Audit Wave 4 (executability scorecard refs existence check).
+**Context:** `skills/governance/schema-validate/SKILL.md` body cites `rules/foundational-principles.md` but the file does NOT exist in `rules/` (current 20 rules: append-only-state, budget-events, ci-rule3, content-html-discipline, content-quality, content-seo-discipline, env-vars, events-writer, excel-discipline, glossary-discipline, master-task-id, naming, schema-first, schema-versioning-discipline, secrets-management, single-source-of-truth, skill-description-discipline, skills, time-discipline + 1 more). Likely candidates the cite was meant to point to: `rules/schema-first.md` (schema authority), `rules/single-source-of-truth.md` (foundational consolidation principle), or a planned-but-never-authored rule.
+**Options:**
+- a) Author `rules/foundational-principles.md` — codify the foundational invariants currently scattered across schema-first + single-source-of-truth + append-only-state into one cross-reference rule. Net new rule body, brief-writer effort.
+- b) Replace cite in skill body with existing rule reference (likely `schema-first.md` semantically closest match) — single-line edit, low effort.
+- c) Delete cite — if cite was an early Phase 13 placeholder that was never materialized.
+**Owner:** karar verici agent (v1.2 ref-integrity sweep batch)
+**Blocking Phase:** None for v1.1.0 (broken markdown link harmless at runtime); v1.2 doc-pass.
+
+### Q-V1.2-MONITORING-WEEKLY-MISSING-SCRIPT-01: reporting/monitoring-weekly cites missing scripts/reporting/monitoring_weekly.py [P1]
+**Raised:** 2026-05-06 during v1.1 Integration Audit Wave 4 (executability scorecard refs existence check).
+**Context:** `skills/reporting/monitoring-weekly/SKILL.md` body cites `scripts/reporting/monitoring_weekly.py` but `ls scripts/reporting/` reveals: monthly_report.py, portfolio_heatmap.py, portfolio_kpi_trend.py, portfolio_monthly_roundup.py, portfolio_overview.py, portfolio_task_heatmap.py, portfolio_weekly_brief.py, weekly_summary.py — NO `monitoring_weekly.py`. monitoring-weekly is a Phase 12 weekly-cron skill (event_kind=audit per rules/events-writer.md Section 6) intended for cross-project drift monitoring + KPI trend snapshot. If skill body invokes `subprocess(['python3', 'scripts/reporting/monitoring_weekly.py', ...])` at runtime, FileNotFoundError.
+**Options:**
+- a) Author `scripts/reporting/monitoring_weekly.py` with the audit-orchestration logic (calls drift-check + reads portfolio-overview state + emits audit-kind event). Net new script ~150-300 lines, similar size to monthly_report.py.
+- b) Skill body executes inline transform without subprocess — read drift-check output + portfolio.json + emit event directly in inline Python block. Lighter weight, fits "thin orchestration" paterni.
+- c) Delegate to existing portfolio-overview + weekly-summary skills via skill-chain pattern — monitoring-weekly becomes thin meta-skill that calls others. Most consistent with current weekly-summary architecture.
+**Owner:** karar verici agent (v1.2 missing-script materialization batch)
+**Blocking Phase:** None for v1.1.0 (monitoring-weekly skill body is `wip` status, broken subprocess masked); v1.2 implementation.
+
 ### Q-V1.2-MASTER-TASK-PRIMARY-SOURCE-01: master_task.primary_source enum missing `new_content_plan` [HIGH]
 **Raised:** 2026-05-06 during v1.1-FIX-WAVE-3 Task 3.4 apply (transaction.update RowSchemaError surface).
 **Context:** F-17 priority normalize blocked on T-10001 (`P1` → `HIGH`) because the row carries `primary_source = "new_content_plan"`, which is not in the schema enum: `[content_decay, quickwin, tech_fix, schema, pillar, manual, sxo, cannibalization, redirect_404, internal_links]`. Phase 8 W-D1 added `internal_links` (Q-IL-1 enum 9→10 bump) but `new_content_plan` from the Phase 8 `new-content-plan` skill was never added. The skill is active (`skills/planning/new-content-plan/SKILL.md`) and writes to `master_task` legitimately, so this is a schema enum gap not a workspace data error.

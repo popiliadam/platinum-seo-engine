@@ -1449,3 +1449,76 @@ Wave 3 closes the v1.1 fix cycle. Two ONAY GATES (data modification + final tag)
 
 **Manager pre-dispatch correction discipline (Wave 3 Task 3.4 case study):**
 The Wave 3 brief carried Süleyman's verification text "4 sheet duplicate header pattern: row 1 header, row 2-3 blank, row 3/4 DUP" — accepting Manager's initial (incorrect) finding. Manager owed Süleyman the corrected analysis BEFORE proceeding with apply, even after explicit approval, because the substance of the Seçenek A approval was based on incorrect framing. Manager presented the correction inline + continued with corrected scope (no re-approval needed since substance unchanged). Süleyman re-confirmed apply onayı with verification 100% (5-reference _resolve_header_row authority cited). This is the canonical pattern for stacked-enforcement self-correction: **transparent correction note + corrected scope continuation + Süleyman verification re-confirm at next gate**.
+
+---
+
+## v1.1-Integration-Audit Closeout (2026-05-06) — Read-Only Audit, Doc-Only Commit
+
+Single manager session ~115dk audit of v1.1.0 RELEASED engine plugin. Brief: `docs/superpowers/plans/v1.1-integration-audit-brief.md`. 4-Wave methodology + closeout per brief Section 7 deliverable structure. **0 engine code changes** — read-only audit, only `docs/` append + workspace audit dir deliverables.
+
+**Workspace deliverable:** `outputs/audits/v1.1-integration-audit/` (8 files, ~74KB)
+- `00-master-report.md` — executive summary + verdict AMBER + top 10 findings + hipotez table (12,536B)
+- `01-skill-manifest-matrix.csv` — 43 skills × 22 cols (frontmatter + Python AST + MCP detection + cross-ref counts + git meta) (21,628B)
+- `02-mcp-coverage-matrix.md` — 4 MCP × 43 skills + tool catalog × skill usage + connectivity + 7 findings (9,487B)
+- `03-cross-reference-graph.md` — Section 1-11 + 3-iteration self-correction + Mermaid diagram + workflow chains (17,266B)
+- `04-workflow-chains.md` — Phase 5-12 chain integrity + per-chain detail (4,528B)
+- `05-executability-report.md` — per-skill 0-5 scorecard + 4 issue details + aggregate findings (4,567B)
+- `06-issues-list.md` — 28 findings P0/P1/P2/P3/INFO categorized + lesson application summary (14,815B)
+- `07-v1.2-oq-proposals.md` — 5 P1 OQ append draft + commit message proposal (11,041B)
+
+**Engine repo append (this commit):**
+- `docs/OPEN_QUESTIONS.md` — 5 new v1.2 OQs prepended to "## Unresolved" section (Q-V1.2-LOAD-CONTEXT-ORPHAN-DIR-01 + Q-V1.2-AIO-COMPETITOR-FENCE-01 + Q-V1.2-EVENTS-WRITER-MATRIX-COVERAGE-01 + Q-V1.2-SCHEMA-VALIDATE-MISSING-RULE-01 + Q-V1.2-MONITORING-WEEKLY-MISSING-SCRIPT-01)
+- `docs/CONTEXT_LEDGER.md` — this section append (~3KB)
+- `docs/PHASE_STATUS.md` — Active Phase banner advance "v1.1-Integration-Audit COMPLETE — v1.2 planning ready"
+
+**Audit findings summary (28 total, 26 unique post-deduplication):**
+
+| Severity | Count | Disposition |
+|---|---|---|
+| P0 | 0 | none — no critical blocker |
+| P1 | 5 | engine OQ filing (this commit) |
+| P2 | 4 | master report inline (06-issues-list + 00-master-report) |
+| P3 | 2 | inline (governance polish + methodology limitation) |
+| INFO | 15 | hipotez verifications + cumulative metrics |
+
+**5 P1 findings (filed as new v1.2 OQs):**
+1. `Q-V1.2-LOAD-CONTEXT-ORPHAN-DIR-01` — Wave 1: `skills/meta/load-context/` orphan empty directory (no SKILL.md)
+2. `Q-V1.2-AIO-COMPETITOR-FENCE-01` — Wave 1+4: `aio-competitor-map` block 2 line 9 `5xx_marker` bare identifier (AST FAIL pseudocode fence mismatch)
+3. `Q-V1.2-EVENTS-WRITER-MATRIX-COVERAGE-01` — Wave 3: `rules/events-writer.md` Section 4 branch matrix %47 coverage (20/43 skills mapped)
+4. `Q-V1.2-SCHEMA-VALIDATE-MISSING-RULE-01` — Wave 4: `governance/schema-validate` cites missing `rules/foundational-principles.md`
+5. `Q-V1.2-MONITORING-WEEKLY-MISSING-SCRIPT-01` — Wave 4: `reporting/monitoring-weekly` cites missing `scripts/reporting/monitoring_weekly.py`
+
+**Lessons (audit methodology):**
+- **Lesson 38 v2 7'inci ardışık enforcement** — runtime kanıtla 5/8 brief hipotez invalidated (Hipotez 3 discovery cross-ref minimal — moderate; Hipotez 5 dead code — 0 real; Hipotez 6 schema → skill ref eksik — all referenced; Hipotez 7 production en uzun — terminal node; Hipotez 8 events-writer matrix gap — confirmed)
+- **Lesson 67 4-iteration enforcement within single audit session** (Phase 16 audit doğum belgesi 2'inci uygulama):
+  1. Wave 3 iteration #1 regex import detection → 70 phantom dead code findings (33 script + 19 schema + 12 rule + 6 skill, all FALSE POSITIVE due to regex `from\s+scripts\.([\w.]+)\s+import` capturing only first segment)
+  2. Wave 3 iteration #2 basename grep → 0 dead findings (FALSE NEGATIVE — common words like `events`/`env` matched everywhere)
+  3. Wave 3 iteration #3 AST + literal path → balanced result: 1 migration script (historical) + 6 terminal nodes (semantic OK) → 0 truly orphan
+  4. Wave 4 namespace package fix — 23 false-positive "unresolvable imports" (PEP 420 namespace packages without __init__.py: scripts/state, scripts/excel, scripts/ci, scripts/migrations, scripts/security, scripts/validation); resolve_module() updated → score 4.35 → 4.91 in single iteration
+- **Lesson 49 paterni 8'inci ardışık vaka** — manager self-failure SIFIR (transparent rapor + correction + Süleyman onay re-confirm at next gate paterni reuse), 9 phase consecutive convergent invariant intact
+- **Lesson 21 11'inci ardışık aday** — Wave 3+4 self-correction = positive drift via underlying methodology improvement (regex → AST + literal path)
+- **Atomic phase paterni 27'inci kanıt** — v1.1-Integration-Audit = audit-only doc-pass closeout (engine code untouched, 28 phase consecutive cumulative: Phase 7..15 + v1.1-Wave-1+Wave-2+Wave-3 + v1.1-Integration-Audit = 28 ardışık atomic dispatch invariant intact)
+
+**Verdict (per `00-master-report.md`):**
+- Overall integration health: **🟡 AMBER** (5 P1 findings → all v1.2 OQ scope, no v1.1.0 release rollback warranted)
+- MCP connectivity: 🟢 GREEN (3/3 engine + 1 user-level all ✓ Connected)
+- Workflow chain integrity: 🟢 GREEN (8/8 critical chains intact)
+- Cross-reference graph: 🟢 GREEN (0 real dead code post 3-iteration self-correction)
+- Executability: 🟢 GREEN (avg 4.91/5; 39/43 skills perfect)
+- Plugin agnostic discipline: 🟢 GREEN (all MCP calls via `mcp__server__tool` pattern; Higgsfield user-level outside .mcp.json)
+
+**Acceptance criteria status (per Brief Section 8):**
+1-6 ✅ COMPLETE (all 6 wave deliverables written to workspace audit dir)
+7 ✅ COMPLETE (5 P1 OQ filed in engine `OPEN_QUESTIONS.md` via this commit)
+8 ✅ pytest 673 PASS UNCHANGED (read-only audit, no code touched)
+9 ✅ NO engine code commit (only docs/ append; workspace audit dir contains deliverable artifacts, not "fixes")
+
+**Brief Section 9 timeline target: ~115 dk → actual: ~115 dk** (4 wave 100 dk + closeout 15 dk).
+
+**Push status:** Commit ready, push timing Süleyman karar verir (decision_authority paterni — kritik git push komutu için onay).
+
+**Next steps:**
+1. Süleyman push onay timing (engine repo HEAD advance)
+2. v1.2 brief authoring (separate session) — 5 P1 + 4 P2 + 2 P3 finding'leri fix scope'a dönüştür
+3. v1.2 fix wave'leri (separate sessions) — atomic per-finding fix dispatch
+4. ADR-004 + ADR-005 closure 2026-05-12 soak window (engine + workspace eski repo silme onayı)
