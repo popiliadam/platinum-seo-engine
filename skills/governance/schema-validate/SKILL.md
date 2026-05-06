@@ -73,7 +73,9 @@ referenced from `outputs[]`. The skill writes only to
 ## Foundational Principles (3-layer enforce)
 
 This skill operates under the three Foundational Principles
-(rules/foundational-principles.md):
+(authority: `rules/schema-first.md` + `rules/single-source-of-truth.md`
++ `rules/append-only-state.md` — schema-first authoritative reference;
+applied principles converge in `rules/content-quality.md`):
 
 1. **Truth-verifiable** — every assertion in the report MUST trace back
    to a schema authority (the schema file itself or its
