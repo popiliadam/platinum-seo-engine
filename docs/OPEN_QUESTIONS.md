@@ -132,6 +132,7 @@
 - d) Phase 15 audit defer (mevcut skill-name string'leri events.jsonl provenance trail'de kayıt ediliyor + W3-W2-B run paterni acceptable, low priority)
 **Owner:** karar verici agent (Phase 15 audit Wave 2 kategori #9)
 **Blocking Phase:** None (non-blocking, low priority writer registry)
+**→ DEFERRED v1.2 2026-05-06:** Option d accepted. Mevcut durum: non-master_task sheets için `allowed_writers=None` → `_check_writer_scope` bypass. Provenance trail events.jsonl'da zaten kayıtlı (skill-name writer string). Retroaktif schema bump gereksinimi yok. v1.2 Wave 2 kategori #9 writer registry audit scope.
 
 ### Q-DC-VERDICT-01: drift-check `aggregate_verdicts` UNKNOWN behavior when FAILs > 0 [LOW] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 14 W3-W2-A worker output (W-L1 drift-check report inspect)
@@ -154,6 +155,7 @@
 - c) Phase 14+ governance refinement'a defer (mevcut audit trail completeness yeterli, semantik upgrade later)
 **Owner:** karar verici agent (Phase 14+ pre-dispatch)
 **Blocking Phase:** None (non-blocking, governance polish)
+**→ DEFERRED v1.2 2026-05-06:** Option c accepted (governance polish, low priority). Mevcut audit trail completeness yeterli — Edit/Write → `accessed` flatten tradeoff acceptable. Per-tool mapping hook one-liner büyütür, net değer düşük. v1.2 governance refinement scope.
 
 ### Q-RP-01: reporting events.jsonl audit-worthiness (rapor üretme audit-worthy event mi?) — DEFERRED v1.2
 **Raised:** 2026-05-01 during Phase 9 Wave 1 closeout (W-D1 fiili pattern + operation enum constraint cross-check sırasında ortaya çıktı)
@@ -165,8 +167,9 @@
 - d) Reporting-specific audit log (outputs/reports/_audit.jsonl ayrı dosya) — events.jsonl scope'u dışı, ayrı convention
 **Owner:** karar verici agent (Phase 14+ pre-dispatch, pilot smoke test deneyimi sonrası)
 **Blocking Phase:** None (non-blocking, governance polish; Wave 2 + Phase 9 closeout aynı paterni reuse — defer kararı geçerli)
+**→ DEFERRED v1.2 2026-05-06:** Option c accepted (Phase 14+ governance refinement defer). Mevcut 4 reporting skill events.jsonl yazmıyor — LOCAL aggregation audit trail'e değmez assumption v1.1 sonrası hala geçerli. events.schema operation enum additive bump v1.2 ADR aday (pilot smoke test deneyimi yetersiz, daha fazla run count gerekli). v1.2 governance refinement scope.
 
-### Q-WS-02: README "Quick Start" engine plugin invocation convention (workspace → engine plugin nasıl invoke edilir?)
+### Q-WS-02: README "Quick Start" engine plugin invocation convention (workspace → engine plugin nasıl invoke edilir?) ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-04 during Phase 14 W1 worker output (W-I1 surface)
 **Context:** Workspace repo `README.md` "Quick Start" bölümünde "Engine plugin skill çalıştır" yazıyor, ancak workspace → engine plugin invocation convention v1 release closure'da netleşecek. Workspace pwd'si `~/Documents/platinum-seo-workspace/projects/demo-dental/` iken engine plugin skill'leri (`~/Documents/platinum-seo-engine/skills/...`) nasıl çağrılır? Plugin path lookup, env var (`PLATINUM_SEO_ENGINE_ROOT`?), Claude Code plugin auto-discovery, manuel invocation pattern'leri arasında karar gerek.
 **Options:**
@@ -176,6 +179,7 @@
 - d) Phase 14 W2 CI yaml domain'inde resolve (CI runner workspace + engine paths absolute, README quick start CI runner reference)
 **Owner:** karar verici agent (Phase 14 W2 brief writing, CI yaml convention paralel)
 **Blocking Phase:** Phase 14 W2 (CI pipeline) + Phase 14 W3 (pilot E2E smoke test) — non-blocking W1 deliverable, defer W2-W3 resolve
+**→ RESOLVED 2026-05-06 engine `92ece0e`:** Engine `README.md` 4-adım Quick Start section eklendi (clone → configure → init → quickwin). Convention: Claude Code plugin auto-discovery paterni (Option b) — engine `~/.claude/plugins/platinum-seo-engine/` kayıtlı, skill invocation workspace pwd-agnostic çalışır. Invocation pattern: Claude Code session'da skill adı ile direkt çağrı. Workspace `.env` template `PLATINUM_SEO_ENGINE_ROOT` placeholder Q-PHASE15-ENV-MISSING-01 ile eklendi (bc9391c).
 
 ### Q-PHASE15-RXX-COUNT-01: R-XX invariant sayısı events.jsonl run_id kaç olmalı? [LOW] — DEFERRED v1.2
 **Raised:** 2026-05-05 during Phase 15 W1 engine audit (W-R worker output)
@@ -186,6 +190,7 @@
 - c) Accept current count as baseline, document in DECISIONS.md
 **Owner:** karar verici agent (Phase 15 W4 discipline audit)
 **Blocking Phase:** None (LOW, non-blocking)
+**→ DEFERRED v1.2 2026-05-06:** Option b accepted (non-blocking, v1.2 planning scope). No spec document defines R-XX hard constraint count. Current events.jsonl run_id=64 kabul baseline. "R-XX count must match CONTEXT_LEDGER phase count" kuralı codify Phase 16+ audit scope — net value düşük pre-v1.2. v1.2 discipline audit aday.
 
 ### Q-PHASE15-EVENTENUM-BRIEF-01: event_type enum brief template yanlış jq path [MEDIUM] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 15 W1 engine audit (W-R worker output; schema-first override #16)

@@ -1330,4 +1330,24 @@ Spec §13.2: <15KB initial load = <2% of 1M context window. Tracking under budge
 - **Engine commits this session**: `bc9391c` (P0+P2 CI/infra) + `92ece0e` (P1+P2 docs) + `a3cbb2a` (OQ resolution) + bu closeout. Workspace: `eca13c5` (brand config).
 - **Invariant durumu**: pytest 610/610 PASS. DECISIONS.md 5877B unchanged. .mcp.json 482B (deliberate pin change, new F-16 baseline). ADR active 4. Phase consecutive unchanged (v1.1 fixes = engine doc/config commits, new consecutive count begins with next delivery phase).
 
+## 2026-05-06 — v1.1 Polish Batch + Closeout (engine `ad862dc` + bu closeout commit)
+
+- **v1.1 Polish batch `ad862dc` (7 file +154/-29)**:
+  - `rules/events-writer.md`: 3 schema error fix (Q-W3W3α-EVENTSCHEMA-01 — `audit_run` event_type enum'dan çıkarıldı + monitoring-weekly branch matrix düzeltildi + JSON örnek `event_type` alanı kaldırıldı) + Section 6 "event_kind=audit vs event_type Disambiguation" eklendi (Q-PHASE15-EVENTSCHEMA-AUDIT-BRIEF-01 RESOLVED).
+  - `rules/skills.md`: Section 5 pytest local-only fixture skipif marker convention (Q-CI-W3-04 RESOLVED) + Section 6 Schema Enum jq path `.properties.<field>.enum` doğru pattern codify (Q-PHASE15-EVENTENUM-BRIEF-01 RESOLVED) + Section 7 Archive Convention output-producing skills (Q-PHASE15-ARCHIVE-INTEG-01 RESOLVED).
+  - `rules/master-task-id.md`: YENİ dosya — `task_id ^T-[0-9]{4,}$` canonical pattern codify, legacy `MT-W3W2B-XXX` historical append-only protected (Q-W3W2Cb-003 RESOLVED).
+  - `requirements-lock.txt`: YENİ dosya — pip freeze snapshot (attrs+iniconfig+jsonschema+openpyxl+packaging+pluggy+pytest+PyYAML+requests) (Q-PHASE15-LOCKFILE-01 RESOLVED).
+  - `tests/ci/test_ci_yaml.py`: test rename `test_continue_on_error_strict_mode_governance_steps` → `test_continue_on_error_all_steps_strict_mode` (Q-W3W3β-TEST-01 RESOLVED).
+  - `skills/discovery/aio-competitor-map/SKILL.md`: YAML comment `# llm_native: true` eklendi (field değil, `additionalProperties: false` ihlali önlendi) (Q-PHASE15-AIO-COMPETITOR-01 RESOLVED).
+  - `docs/OPEN_QUESTIONS.md`: 16 OQ RESOLVED + 4 DEFERRED v1.2 header marker. NOT: 4 DEFERRED header marker'da body resolution note eksikti → bu closeout commit'te tamamlandı.
+  - `610/610 pytest PASS. DECISIONS.md 5877B unchanged.`
+- **Bu closeout (OPEN_QUESTIONS.md tamamlama + CONTEXT_LEDGER + PHASE_STATUS)**:
+  - `Q-W3W2B-WRITER-01` DEFERRED body: Option d — non-master_task sheets `allowed_writers=None` bypass kabul, provenance events.jsonl'da kayıtlı, v1.2 writer registry audit scope.
+  - `Q-016` DEFERRED body: Option c — Edit/Write→`accessed` flatten tradeoff acceptable, hook one-liner büyütme net değer düşük, v1.2 governance scope.
+  - `Q-RP-01` DEFERRED body: Option c — reporting skills events.jsonl yazmıyor LOCAL aggregation assumption v1.1 sonrası geçerli, v1.2 ADR aday.
+  - `Q-PHASE15-RXX-COUNT-01` DEFERRED body: Option b — no spec defines R-XX hard count, run_id=64 baseline kabul, v1.2 discipline audit aday.
+  - `Q-WS-02` ✅ RESOLVED: engine `92ece0e` README Quick Start 4-adım section + Claude Code plugin auto-discovery convention (Option b), workspace `PLATINUM_SEO_ENGINE_ROOT` placeholder `bc9391c`.
+- **OQ toplam**: v1.1 batch (ad862dc + bu closeout) = 24 OQ RESOLVED cumulative. 3 DEFERRED v1.2 (Q-016, Q-RP-01, Q-W3W2B-WRITER-01, Q-PHASE15-RXX-COUNT-01 body tamamlandı). 1 genuinely blocked: Q-PHASE15-ADR-CLOSURE-01 soak window 2026-05-12.
+- **Invariant durumu**: pytest 610/610 PASS. DECISIONS.md 5877B unchanged. .mcp.json 482B (v1.1 F-16 baseline). Q-CD-01 korundu. ADR-004+005 soak 2026-05-12 pending.
+- **v1.1 FINAL engine HEAD**: bu closeout commit (5-commit v1.1 total: bc9391c + 92ece0e + a3cbb2a + d37b368 + ad862dc + bu closeout).
 
