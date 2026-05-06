@@ -265,6 +265,7 @@ Both are workspace-side data tasks, not engine code drift. Wave 3 scope after v1
 **Owner:** karar verici agent (Phase 15 W4 discipline audit)
 **Blocking Phase:** None (LOW, non-blocking)
 **→ DEFERRED v1.2 2026-05-06:** Option b accepted (non-blocking, v1.2 planning scope). No spec document defines R-XX hard constraint count. Current events.jsonl run_id=64 kabul baseline. "R-XX count must match CONTEXT_LEDGER phase count" kuralı codify Phase 16+ audit scope — net value düşük pre-v1.2. v1.2 discipline audit aday.
+**→ FOLLOW-UP RESOLVED 2026-05-06 v1.1-FIX-WAVE-3 Task 3.6 (engine ADR-038):** R-XX numbering policy codified — gap-tolerant, future renumber YASAK. Audit across `rules/` + `skills/` + `docs/` finds 102 unique R-XX values, max R-122. Gaps from rule mergers + supersedes are by-design (history-stable, ADR gap-015 paterni). `rules/` keeps superseded entries with `(superseded)` marker; new rules pick next-unused number. v2.0 may revisit if cumulative gap > 30%.
 
 ### Q-PHASE15-EVENTENUM-BRIEF-01: event_type enum brief template yanlış jq path [MEDIUM] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 15 W1 engine audit (W-R worker output; schema-first override #16)
