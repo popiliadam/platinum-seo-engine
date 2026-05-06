@@ -221,6 +221,40 @@ precision.
   the worker brief acceptance gate #9 + the skill test suite's
   base64-obfuscated grep guard).
 
+## Audit Event Emit (Q-RP-01 RESOLVED 2026-05-06 Phase B post-closeout)
+
+Schema-first override Section 4c paterni reuse (drift-check Phase 5 doğum belgesi). `event_kind=audit` row append per `rules/events-writer.md` Section 4c — `event_type` field YASAK per Section 6 disambiguation.
+
+```python
+import os
+import sys
+from pathlib import Path
+
+sys.path.insert(0, os.getcwd())
+
+project_slug = os.environ.get("PSEO_PROJECT_ID")
+if not project_slug:
+    print("PSEO_PROJECT_ID not set — audit event skip")
+    sys.exit(0)
+report_date = os.environ.get("REPORT_DATE", "2026-05-06")
+
+workspace_root_env = os.environ.get("PSEO_WORKSPACE_ROOT")
+workspace_root = (
+    Path(workspace_root_env) if workspace_root_env
+    else Path.home() / "Documents" / "platinum-seo-workspace"
+)
+
+from scripts.state import events_writer
+events_writer.append_audit(
+    project_id=project_slug,
+    audit_action="accessed",
+    audit_target=f"reports:portfolio-weekly-brief:{report_date}",
+    actor="agent:portfolio-weekly-brief",
+    workspace_root=workspace_root,
+    notes=f"local_aggregation report-only (portfolio-weekly-brief; date={report_date})",
+)
+```
+
 ## Cross-references
 
 - Schemas: `schemas/portfolio-config.schema.json` v1.1
