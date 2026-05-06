@@ -816,11 +816,36 @@ def check_F_15(workbook: Any, project_slug: str, **_) -> dict:
     )
 
 
+def _extract_url_from_action_field(text: str) -> str:
+    """Extract URL from opportunity.assigned_url_action field.
+
+    Supports two formats (Q-V1.2-OPP-COVERAGE-01 defensive parsing,
+    schema-first override 17'inci uygulama Phase B post-closeout):
+    - Canonical "url | action" (Phase 8 quickwins_transform.py paterni)
+    - Freeform "Optimize <url> for query 'X'" (manual/non-canonical
+      content drift; workspace gerçek master.xlsx 2026-05-06 state)
+
+    Returns first matched URL (post-strip), or empty string.
+    """
+    if not isinstance(text, str) or not text:
+        return ""
+    # Canonical first: split by '|', validate URL prefix
+    if "|" in text:
+        head = text.split("|", 1)[0].strip()
+        if head.startswith(("http://", "https://")):
+            return head
+    # Freeform fallback: regex extract first URL in text
+    m = re.search(r'https?://[^\s\'"|]+', text)
+    return m.group(0) if m else ""
+
+
 def check_F_16(workbook: Any, project_slug: str, **_) -> dict:
     """quick_wins.url ⊆ opportunity URL set (cross-sheet foreign key).
 
-    opportunity.assigned_url_action stores `url | action` — we extract
-    the URL prefix before normalizing.
+    opportunity.assigned_url_action defensive parse: supports canonical
+    "url | action" (quickwins_transform paterni) + freeform "Optimize
+    <url> for query 'X'" (workspace data drift Q-V1.2-OPP-COVERAGE-01,
+    Phase B post-closeout schema-first override 17'inci uygulama).
     """
     rule = "quick_wins.url ⊆ opportunity.assigned_url_action URL set"
     if not (_has_sheet(workbook, "quick_wins") and _has_sheet(workbook, "opportunity")):
@@ -841,7 +866,7 @@ def check_F_16(workbook: Any, project_slug: str, **_) -> dict:
     for r in _iter_rows_as_dicts(workbook, "opportunity"):
         au = r.get("assigned_url_action")
         if isinstance(au, str) and au:
-            url_part = au.split("|", 1)[0].strip()
+            url_part = _extract_url_from_action_field(au)
             if url_part:
                 opp_urls.add(_normalize_url(url_part))
     opp_urls.discard("")
