@@ -13,7 +13,7 @@
     {
       "name": "platinum-seo-engine",
       "source": "./",
-      "description": "v1.1.0 — 43 skills, 19 schemas, 18 rules, 9 commands, 4 hooks, 3 MCP servers (gsc + dataforseo + ScraplingServer). Production-ready (drift-check AMBER, pytest 673 PASS, 9 ADR codified)."
+      "description": "v1.1.0 + v1.3 ergonomi expansion — 43 skills, 19 schemas, 18 rules, 15 commands (was 9), 4 hooks, 3 MCP servers (gsc + dataforseo + ScraplingServer). Production-ready (drift-check AMBER: F-16 + F-17 PASS, F-13 historical kalıntı; pytest 676 passed + 8 skipped baseline; 13/13 v1.x audit findings RESOLVED; 2 ADR closed post-soak 2026-05-06)."
     }
   ]
 }
