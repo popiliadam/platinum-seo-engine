@@ -33,7 +33,7 @@ Required for full functionality:
 | `GOOGLE_APPLICATION_CREDENTIALS` | Google Cloud Console → IAM → Service Accounts |
 | `DATAFORSEO_USERNAME` | [app.dataforseo.com](https://app.dataforseo.com) → API tab |
 | `DATAFORSEO_PASSWORD` | Same |
-| `PSE_WORKSPACE_PATH` | Local path to your workspace repo (e.g. `~/Documents/platinum-seo-workspace`) |
+| `PSEO_WORKSPACE_ROOT` | Local path to your workspace repo (e.g. `~/Documents/platinum-seo-workspace`). Canonical per ADR-035; `PSE_WORKSPACE_PATH` is a 1-year deprecated alias (removal 2027-05-06). |
 
 Optional (for image generation):
 
