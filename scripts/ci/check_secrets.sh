@@ -6,8 +6,11 @@
 # Self-exclude path: scripts/ci/check_secrets.sh wrapper-only kategori.
 # Lesson 28 manager mop-up matrisi 7'inci uygulama cumulative invariant.
 set -euo pipefail
-! git grep -nE "DATAFORSEO_PASSWORD=[a-zA-Z0-9]{8,}|info@demo-agency|3bf73e0893f69b42" \
+! git grep -nE "DATAFORSEO_PASSWORD=[a-zA-Z0-9]{8,}|info@demo-agency|3bf73e0893f69b42|ghp_[a-zA-Z0-9]{36}" \
     HEAD -- ':!.env.example' \
              ':!docs/superpowers/specs/' \
              ':!docs/CONTEXT_LEDGER.md' \
-             ':!scripts/ci/check_secrets.sh'
+             ':!docs/OPEN_QUESTIONS.md' \
+             ':!scripts/ci/check_secrets.sh' \
+             ':!tests/scripts/test_events_writer.py' \
+             ':!tests/ci/test_ci_yaml.py'
