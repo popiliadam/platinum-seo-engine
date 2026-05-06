@@ -74,6 +74,7 @@ def test_continue_on_error_all_steps_strict_mode():
         "2. schema-validate",
         "3. glossary-audit",
         "4. pytest",
+        "4a. events-schema-sanity",
         "5. plugin-agnostik-grep",
         "6. secret-grep",
         "7. frontmatter-compile",

@@ -3,7 +3,7 @@
 Platinum SEO Engine plugin için mimari kararların kaydı.
 Append-only — superseded entry'ler işaretlenir, silinmez.
 
-> **Rotation:** ADR-001..029 archive'da (gap: 015) → [DECISIONS_ARCHIVE.md](DECISIONS_ARCHIVE.md). ADR-026: hard cap 6144B primary (ADR-022 cap-only supersede), 3 active floor (ADR-014 rotation pattern, archive).
+> **Rotation:** ADR-001..030 archive'da (gap: 015) → [DECISIONS_ARCHIVE.md](DECISIONS_ARCHIVE.md). ADR-026: hard cap 6144B primary (ADR-022 cap-only supersede), 3 active floor (ADR-014 rotation pattern, archive).
 
 ## Summary Table
 
@@ -38,17 +38,18 @@ Append-only — superseded entry'ler işaretlenir, silinmez.
 | ADR-028 | Tech Audit Schema: issue_category Enum + Web Vitals 2024 Note | accepted | DECISIONS_ARCHIVE.md |
 | ADR-029 | Budget Convention: per-run estimated_credits (Phase 7+) | accepted | DECISIONS_ARCHIVE.md |
 | ADR-032 | active.json Field: `active_project` Canonical (Hook Contract Fix) | accepted | (below) |
-| ADR-030 | brand_identity Rename: pronoun_preference + formality (Migration 0003) | accepted | (below) |
+| ADR-030 | brand_identity Rename: pronoun_preference + formality (Migration 0003) | accepted | DECISIONS_ARCHIVE.md |
+| ADR-031 | events.jsonl Legacy Archive: events.jsonl.legacy (READ-ONLY) | accepted | (below) |
 | ADR-033 | project.config.json Canonical Path | accepted | (below) |
 
 ---
 
-## ADR-030 — brand_identity Rename: pronoun_preference + formality (Migration 0003)
+## ADR-031 — events.jsonl Legacy Archive
 **Date:** 2026-05-06
 **Status:** accepted
-**Context:** Workspace `eca13c5` renamed `brand_identity.hitap`→`pronoun_preference`, `tone`→`formality` (canonical Principle 2 vocab). Schema 1.2 had `additionalProperties: false` + only legacy keys → workspace failed `validate_schema`. Q-PHASE15-BRAND-CONFIG-01 was prematurely closed without engine fix.
-**Decision:** Schema 1.2→1.3 additive. Add `pronoun_preference` enum `["sen","siz"]` + `formality` enum `["semi-pro","conversational","formal","casual"]`. Legacy `hitap`+`tone` retained as deprecated aliases (1-yr shim). Migration 0003 = pure key rename, values KORUNUR (no remap). brand-onboarding 18→20 fields; required[] unchanged.
-**Consequences:** Workspace validates EXIT 0 post-migrate. Skills can still read legacy keys until v2.0. Idempotency: 8 cases in `test_migration_0003.py`. Legacy removal scheduled v2.0.
+**Context:** Workspace demo-dental events.jsonl (88 rows) had 15 schema violations: skill names used as `event_type` (gsc_pull/dfs_pull/etc) instead of 10-enum; audit events missing `event_id`; extra fields (`credits_used`/`fail_count`). Append-only-state forbids in-place edit; F-13/15/16/17 couldn't surface real drift.
+**Decision:** Two-file split. `events.jsonl` — strict, schema-PASS (CI gate). `events.jsonl.legacy` — READ-ONLY archive. `scripts/state/migrate_legacy_events.py` atomic-partitions (`.tmp` rename pair), idempotent, emits `outputs/reports/{date}-events-archive.md` audit trail. Future writers MUST produce strict rows; `tests/state/test_events_schema_compliance.py` enforces.
+**Consequences:** Workspace 88 → 73 strict + 15 legacy. F-13/15/16/17 re-eval clears mechanical noise. CI Step 4a keeps schema validity visible; per-row gate fires in workspace-bound runs.
 
 ---
 

@@ -19,6 +19,7 @@ ADR-011 rotation kararıyla `DECISIONS.md`'den taşınmış eski kararlar. Appen
 - ADR-025 (Phase 7 closeout, 2026-05-01 — onüçüncü rotation cycle, ADR-028+ADR-029 ekleme sonrası en eski active cut; templates/scrapling/S1_competitor_snapshot.schema.json W-B3 yarattı, ADR-025 implementation realize)
 - ADR-026..028 (v1.1 P0 Wave 1, 2026-05-06 — ondördüncü rotation cycle, ADR-030..033 ekleme ile DECISIONS.md hard cap tetiklenmesi sonrası 3 en eski active cut; ADR-026 cap-only supersede entry korunur byte-byte)
 - ADR-029 (v1.1 P0 Wave 1 Task 1.2, 2026-05-06 — onbeşinci rotation cycle, ADR-033 ekleme ile DECISIONS.md 6549B tetiklemesi sonrası en eski active cut)
+- ADR-030 (v1.1 P0 Wave 1 Task 1.4, 2026-05-06 — onaltıncı rotation cycle, ADR-031 ekleme ile DECISIONS.md 6968B tetiklemesi sonrası en eski active cut; brand_identity rename detayı engine commit `7dc67ba` body'sinde de korunur)
 
 **Active ADR'ler için:** [DECISIONS.md](DECISIONS.md)
 
@@ -276,3 +277,12 @@ ADR-011 rotation kararıyla `DECISIONS.md`'den taşınmış eski kararlar. Appen
 **Context:** Q-W-A3-03: Phase 7 paid skill budget.estimated_credits convention belirsiz (per-URL×count vs per-run total?). schema sadece estimated_credits (number ≥0).
 **Decision:** Phase 7+ standart: budget.estimated_credits = per-run total tahmin (skill run credit). Per-URL skill internal logic; expose tek değer per-run. ADR-016 events.jsonl cost.credits SSoT compatible.
 **Consequences:** Paid skill pre-flight tek değerle check_budget query. Phase 14 budget reporting per-skill granularity.
+
+---
+
+## ADR-030 — brand_identity Rename: pronoun_preference + formality (Migration 0003)
+**Date:** 2026-05-06
+**Status:** accepted
+**Context:** Workspace `eca13c5` renamed `brand_identity.hitap`→`pronoun_preference`, `tone`→`formality` (canonical Principle 2 vocab). Schema 1.2 had `additionalProperties: false` + only legacy keys → workspace failed `validate_schema`. Q-PHASE15-BRAND-CONFIG-01 was prematurely closed without engine fix.
+**Decision:** Schema 1.2→1.3 additive. Add `pronoun_preference` enum `["sen","siz"]` + `formality` enum `["semi-pro","conversational","formal","casual"]`. Legacy `hitap`+`tone` retained as deprecated aliases (1-yr shim). Migration 0003 = pure key rename, values KORUNUR (no remap). brand-onboarding 18→20 fields; required[] unchanged.
+**Consequences:** Workspace validates EXIT 0 post-migrate. Skills can still read legacy keys until v2.0. Idempotency: 8 cases in `test_migration_0003.py`. Legacy removal scheduled v2.0.
