@@ -3,7 +3,7 @@
 Platinum SEO Engine plugin için mimari kararların kaydı.
 Append-only — superseded entry'ler işaretlenir, silinmez.
 
-> **Rotation:** ADR-001..032 archive'da (gap: 015) → [DECISIONS_ARCHIVE.md](DECISIONS_ARCHIVE.md). ADR-026: hard cap 6144B primary (ADR-022 cap-only supersede), 3 active floor (ADR-014 rotation pattern, archive).
+> **Rotation:** ADR-001..033 archive'da (gap: 015) → [DECISIONS_ARCHIVE.md](DECISIONS_ARCHIVE.md). ADR-026: hard cap 6144B primary (ADR-022 cap-only supersede), 3 active floor (ADR-014 rotation pattern, archive). Wave 2 Task 2.3 cycle 18 floor 1 alt (ADR-034+035 active) — cap önce, floor recover Wave 3+ ADR ekleme ile.
 
 ## Summary Table
 
@@ -40,23 +40,24 @@ Append-only — superseded entry'ler işaretlenir, silinmez.
 | ADR-032 | active.json Field: `active_project` Canonical (Hook Contract Fix) | accepted | DECISIONS_ARCHIVE.md |
 | ADR-030 | brand_identity Rename: pronoun_preference + formality (Migration 0003) | accepted | DECISIONS_ARCHIVE.md |
 | ADR-031 | events.jsonl Legacy Archive: events.jsonl.legacy (READ-ONLY) | accepted | DECISIONS_ARCHIVE.md |
-| ADR-033 | project.config.json Canonical Path | accepted | (below) |
+| ADR-033 | project.config.json Canonical Path | accepted | DECISIONS_ARCHIVE.md |
 | ADR-034 | check_secrets.sh Scope Policy: 4 patterns + 7 exclude paths | accepted | (below) |
-
----
-
-## ADR-033 — project.config.json Canonical Path
-**Date:** 2026-05-06
-**Status:** accepted
-**Context:** Three competing forms: (a) `projects/{slug}/project.config.json` (engine canon); (b) `projects/{slug}/config/...` (workspace pilot); (c) hyphenated `project-config.json` (check_budget + 40 SKILL.md).
-**Decision:** Canonical = `projects/{slug}/project.config.json`. Engine sweep: 40 hyphen→dot + 9 strip `config/` + check_budget/internal_links defaults. `excel.config.json`/`excel-source-manifest.json` stay in `config/` (separate).
-**Consequences:** `test_path_canonical.py` regex-guards both forbidden forms. Workspace mv applied (`e85407f`). Aligned.
+| ADR-035 | Workspace Env Var: PSEO_WORKSPACE_ROOT Canonical (1-Year Shim) | accepted | (below) |
 
 ---
 
 ## ADR-034 — check_secrets.sh Scope Policy
 **Date:** 2026-05-06
 **Status:** accepted
-**Context:** `scripts/ci/check_secrets.sh` (CI Step 6) had silent FP risk: test-fixture tokens (`ghp_…36`), negative-assertion CI tests (`DATAFORSEO_PASSWORD=` literal), doc placeholders. v1.1 polish (`bc9391c`) added 7 exclude paths and 4 patterns inline as code-comment, no policy authority.
-**Decision:** Codify: detection patterns are `DATAFORSEO_PASSWORD=[a-zA-Z0-9]{8,}|info@demo-agency|3bf73e0893f69b42|ghp_[a-zA-Z0-9]{36}`. Exclude paths = 3 doc placeholders (`.env.example`, `docs/superpowers/specs/`, `docs/CONTEXT_LEDGER.md`) + 1 OQ archive (`docs/OPEN_QUESTIONS.md`) + 1 wrapper self-reference (`scripts/ci/check_secrets.sh`) + 2 test fixtures (`tests/scripts/test_events_writer.py`, `tests/ci/test_ci_yaml.py`). New patterns or excludes require ADR amendment. `tests/ci/test_check_secrets_sh.py` execution invariants (clean EXIT 0 + injected-secret detect) lock the round trip.
-**Consequences:** Scope additions traceable. EXIT=0 guaranteed; intentional secret in tracked file fails CI. Test fixtures may add secret-shaped values only inside the 2 whitelisted files; new test files with credential literals MUST extend the exclude list via ADR-034 amendment.
+**Context:** v1.1 polish (`bc9391c`) gave `scripts/ci/check_secrets.sh` 7 exclude paths + 4 patterns as code comment, no policy authority. FP risk surfaced via test-fixture tokens, negative-assertion CI tests, doc placeholders.
+**Decision:** Patterns + exclude paths are policy. New entries require ADR-034 amendment. `tests/ci/test_check_secrets_sh.py` locks the round trip: clean EXIT 0 + 7-path policy assertion + 4-pattern policy assertion.
+**Consequences:** Test fixtures with secret-shaped values must live in the 2 whitelisted files; new test files with credentials extend the exclude list via amendment.
+
+---
+
+## ADR-035 — Workspace Env Var: PSEO_WORKSPACE_ROOT Canonical (1-Year Shim)
+**Date:** 2026-05-06
+**Status:** accepted
+**Context:** `PSEO_WORKSPACE_ROOT` used by 20+ scripts/hooks/tests since Phase 14; `PSE_WORKSPACE_PATH` lived in `.env.example`+INSTALL+README+ARCHITECTURE. Asymmetry → onboarding confusion.
+**Decision:** Canonical = `PSEO_WORKSPACE_ROOT`. `PSE_WORKSPACE_PATH` deprecated alias, 1-year shim (removal 2027-05-06, mirrors ADR-030). `scripts/state/env.py::get_workspace_root()` reads canonical first, falls back with `DeprecationWarning`. Docs aligned. Existing 20+ scripts that read canonical directly stay unchanged (no risky sweep).
+**Consequences:** New users set canonical only. Legacy `.env` works via helper until deadline. `tests/scripts/test_env_vars.py` locks the contract. v2.0 removes alias.

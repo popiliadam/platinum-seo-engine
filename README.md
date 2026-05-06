@@ -18,7 +18,7 @@ claude /plugin add ~/Documents/platinum-seo-engine
 
 # 2. Configure credentials
 cp ~/Documents/platinum-seo-engine/.env.example ~/Documents/platinum-seo-engine/.env
-# edit .env: GOOGLE_APPLICATION_CREDENTIALS + DATAFORSEO_USERNAME/PASSWORD + PSE_WORKSPACE_PATH
+# edit .env: GOOGLE_APPLICATION_CREDENTIALS + DATAFORSEO_USERNAME/PASSWORD + PSEO_WORKSPACE_ROOT
 
 # 3. Initialize a project (prompts for domain + brand)
 /pseo-init
