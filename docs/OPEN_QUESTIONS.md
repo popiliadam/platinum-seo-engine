@@ -2,6 +2,16 @@
 
 ## Unresolved
 
+### Q-V1.2-MASTER-TASK-PRIMARY-SOURCE-01: master_task.primary_source enum missing `new_content_plan` [HIGH]
+**Raised:** 2026-05-06 during v1.1-FIX-WAVE-3 Task 3.4 apply (transaction.update RowSchemaError surface).
+**Context:** F-17 priority normalize blocked on T-10001 (`P1` → `HIGH`) because the row carries `primary_source = "new_content_plan"`, which is not in the schema enum: `[content_decay, quickwin, tech_fix, schema, pillar, manual, sxo, cannibalization, redirect_404, internal_links]`. Phase 8 W-D1 added `internal_links` (Q-IL-1 enum 9→10 bump) but `new_content_plan` from the Phase 8 `new-content-plan` skill was never added. The skill is active (`skills/planning/new-content-plan/SKILL.md`) and writes to `master_task` legitimately, so this is a schema enum gap not a workspace data error.
+**Options:**
+- a) Schema additive bump 10→11: append `"new_content_plan"` to `master_task.required_columns.primary_source.enum` (Q-IL-1 paterni reuse, additive only). Workspace re-validate trivially passes. ADR aday or doc note.
+- b) Workspace data fix: rewrite T-10001.primary_source to a valid enum value (e.g., `manual` or `quickwin`) and proceed with F-17 normalize. Loss of semantic provenance.
+- c) Defer T-10001 priority normalize indefinitely; document partial-PASS for F-17 (3/4 cells). Drift-check stays AMBER on F-17 forever.
+**Owner:** karar verici agent (v1.2 schema audit OR engine release)
+**Blocking Phase:** None for v1.1.0 (T-10001 P1 acceptable as documented partial); v1.2 candidate for resolution.
+
 ### Q-V1.2-OPP-COVERAGE-01: F-16 quick_wins URL coverage in opportunity sheet [HIGH]
 **Raised:** 2026-05-06 during v1.1-FIX-WAVE-3 Task 3.4 (Q-WAVE2-DATA-HYGIENE-01 split-out).
 **Context:** Validator-true F-16 finding: 36 `quick_wins.url` values are not present in `opportunity.assigned_url_action` URL set. The opportunity sheet has 211 distinct URLs but they are a disjoint set from the 36 quick_wins URLs — opportunity is keyed on `(query, opportunity_score, ..., assigned_url_action)` so each row encodes a search query + the URL recommended to optimize for it. Adding 36 placeholder rows would require generating realistic `query`/`opportunity_score`/`current_position` values per URL — that is **SEO domain knowledge**, not a mechanical script. Code-driven hygiene cannot resolve without data engineering input.
@@ -14,7 +24,7 @@
 **Blocking Phase:** None (drift-check AMBER acceptable for v1.1; Q-WAVE2-DATA-HYGIENE-01 supersede candidate after v1.2 closure)
 
 ### Q-WAVE2-DATA-HYGIENE-01: F-16 quick_wins URL coverage + F-17 severity cells [MEDIUM] ✅ PARTIAL RESOLVED 2026-05-06
-**→ PARTIAL RESOLVED 2026-05-06 v1.1-FIX-WAVE-3 Task 3.4 (engine ADR-037 + workspace data fix):** F-17 RESOLVED via `scripts/maintenance/data_hygiene_master_xlsx.py` priority code mapping (P1→HIGH, P2→MEDIUM, P3→LOW per severityEnum 4-value canonical) — 4 cells normalized via `transaction.update`, audit trail at `outputs/reports/{date}-data-hygiene-master-apply.md`. F-16 36-URL coverage SPLIT OUT to **Q-V1.2-OPP-COVERAGE-01 [HIGH]** (SEO domain question, v1.2 scope). Validator-true counts (`_resolve_header_row` Phase 14 W3-W2-C-a authority): F-16=36 + F-17=4 (matches Wave 2 brief). Header echo defense regression-locked via `tests/scripts/test_header_echo_defense.py`.
+**→ PARTIAL RESOLVED 2026-05-06 v1.1-FIX-WAVE-3 Task 3.4 (engine ADR-037 + workspace data fix):** F-17 PARTIAL via `scripts/maintenance/data_hygiene_master_xlsx.py` priority code mapping (P1→HIGH, P2→MEDIUM, P3→LOW per severityEnum 4-value canonical) — **3/4 cells normalized** via `transaction.update` (T-10002/10003/10004 P2→MEDIUM applied; T-10001 P1→HIGH blocked by row-level RowSchemaError on `primary_source="new_content_plan"` enum gap). Post-apply F-17 = 1/174 (was 4/174). Audit trail at `outputs/reports/2026-05-06-data-hygiene-master-apply.md`. F-16 36-URL coverage SPLIT OUT to **Q-V1.2-OPP-COVERAGE-01 [HIGH]**. T-10001 deferral SPLIT OUT to **Q-V1.2-MASTER-TASK-PRIMARY-SOURCE-01 [HIGH]** (schema enum gap discovery). Validator-true counts (`_resolve_header_row` Phase 14 W3-W2-C-a authority): F-16=36 + F-17=4 (matches Wave 2 brief). Header echo defense regression-locked via `tests/scripts/test_header_echo_defense.py`.
 **Raised:** 2026-05-06 during v1.1-FIX-WAVE-2 P1 closeout (drift-check post Task 2.5 F-19 fix re-run).
 **Context:** Wave 2 closure transitioned drift-check verdict RED → AMBER. F-13 + F-19 PASS now (Wave 1 archive + Wave 2 validator fix). Remaining 2 FAILs are workspace data hygiene:
 - F-16: 36 quick_wins URLs not present in opportunity sheet (URL set divergence; Phase 15 Q-W3W2C-A-F13F16-01 followup, Phase 16 by-design exception flag option d previously accepted but Wave 3 may sync)

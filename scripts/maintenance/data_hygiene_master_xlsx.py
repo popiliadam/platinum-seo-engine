@@ -123,30 +123,66 @@ def _apply_priority_normalize(
     workbook_path: Path,
     changes: list[PriorityChange],
     project_slug: str,
-) -> int:
+) -> dict[str, tuple[int, str | None]]:
     """Apply each P-code → severityEnum mapping via transaction.update.
 
     Each call mutates rows where priority == old to set priority = new.
-    Returns total rows_affected (sums across the 3 mappings).
+    Returns ``{old: (rows_affected, error_message_or_None)}`` per mapping
+    so the audit trail can mark partial failures (e.g., a row blocked by
+    a separate row-level schema violation in another column).
+
+    Writer scope: ``"human"`` — master_task.allowed_writers schema authority
+    accepts this canonical escape hatch for Süleyman-supervised maintenance
+    runs (ADR-037 mandates per-apply approval + audit trail, which IS the
+    human-supervised flow).  Future v1.2 may add ``data_hygiene`` to the
+    schema's allowed_writers for tighter provenance.
     """
-    total = 0
+    result: dict[str, tuple[int, str | None]] = {}
     for old in ("P1", "P2", "P3"):
         if not any(c.old == old for c in changes):
             continue
         new = PRIORITY_MAPPING[old]
         try:
-            result = transaction.update(
+            tx_result = transaction.update(
                 workbook_path,
                 "master_task",
                 where={"priority": old},
                 set_={"priority": new},
                 project_slug=project_slug,
-                writer="data_hygiene_master_xlsx",
+                writer="human",
             )
-            total += result.rows_affected
-        except Exception as exc:  # surfacing via stderr is fine for CLI
+            result[old] = (tx_result.rows_affected, None)
+        except Exception as exc:
+            result[old] = (0, repr(exc))
             print(f"WARN: update {old}→{new} raised {exc!r}", file=sys.stderr)
-    return total
+    return result
+
+
+def _format_apply_result(
+    changes: list[PriorityChange],
+    apply_result: dict[str, tuple[int, str | None]],
+) -> str:
+    """Append-style apply summary section (joined to dry-run audit text)."""
+    out: list[str] = ["", "## Apply Result", ""]
+    total_applied = sum(rows for rows, _err in apply_result.values())
+    total_planned = len(changes)
+    out.append(f"- Planned (scan): **{total_planned} cells**")
+    out.append(f"- Applied: **{total_applied} rows** via `transaction.update`")
+    deferred = total_planned - total_applied
+    if deferred:
+        out.append(f"- Deferred (blocked by row-level schema): **{deferred} cells**")
+    out.append("")
+    if apply_result:
+        out.extend([
+            "| mapping | rows_affected | error |",
+            "|---|---|---|",
+        ])
+        for old, (rows, err) in apply_result.items():
+            new = PRIORITY_MAPPING[old]
+            err_cell = err if err else "—"
+            out.append(f"| {old}→{new} | {rows} | `{err_cell}` |")
+        out.append("")
+    return "\n".join(out)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -181,8 +217,15 @@ def main(argv: list[str] | None = None) -> int:
     print(f"\nAudit written to: {args.out}")
 
     if args.apply and changes:
-        affected = _apply_priority_normalize(workbook_path, changes, args.project)
-        print(f"\nApplied: {affected} rows updated via transaction.update")
+        apply_result = _apply_priority_normalize(workbook_path, changes, args.project)
+        # Re-write audit with apply-result section appended.
+        audit_text = audit_text + _format_apply_result(changes, apply_result)
+        args.out.write_text(audit_text, encoding="utf-8")
+        total_applied = sum(rows for rows, _err in apply_result.values())
+        print(f"\nApplied: {total_applied} rows updated via transaction.update")
+        if total_applied < len(changes):
+            print(f"Deferred: {len(changes) - total_applied} rows blocked by row-level schema "
+                  "(see audit Apply Result table)")
     elif args.apply:
         print("\nApply mode: 0 changes (already clean)")
     else:
