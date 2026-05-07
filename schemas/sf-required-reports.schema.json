@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://platinum-seo-engine/schemas/sf-required-reports.schema.json",
+  "$id": "http://platinum-seo-engine/schemas/sf-required-reports",
   "title": "SF Required Reports Registry v1.0",
   "description": "Plugin-authoritative registry of 40 Screaming Frog export types across 3 tiers (§7.1 REQUIRED/14, §7.2 RECOMMENDED/10, §7.3 OPTIONAL/16) plus profile-based elevation rules (§7.4). Validates the shape of a reports-registry document; the canonical data is carried in examples/defaults. See ARCHITECTURE.md §7.",
   "type": "object",

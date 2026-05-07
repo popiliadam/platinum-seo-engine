@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://platinum-seo-engine/templates/staging-to-excel-map.schema.json",
+  "$id": "http://platinum-seo-engine/schemas/staging-to-excel-map",
   "title": "Staging→Excel Projection Map v1.0",
   "description": "Schema for the projection-map document that binds SQLite staging tables/views to Excel logical sheets and declares the projection strategy. Consumed by excel_project_sf / excel_project_* at Stage 3 of the SF pipeline. See docs/ARCHITECTURE.md §6.1 (Stage 3 — Projection) and §11.3 (per-sheet projection_mode).",
   "type": "object",

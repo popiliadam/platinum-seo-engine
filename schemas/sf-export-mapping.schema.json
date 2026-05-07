@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://platinum-seo-engine/schemas/sf-export-mapping.schema.json",
+  "$id": "http://platinum-seo-engine/schemas/sf-export-mapping",
   "title": "SF Export Filename Mapping v1.0",
   "description": "Schema for the filename_alias mapping document that converts physical Screaming Frog export filenames to canonical report_type identifiers. Handles p_ prefix, Turkish ı/i case collision, version suffixes like (1)/-copy/_old, and whitespace/underscore variants (§6.4). Consumed by sf_import Stage 1.",
   "type": "object",

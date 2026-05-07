@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://platinum-seo-engine/templates/mcp-tool-registry.schema.json",
+  "$id": "http://platinum-seo-engine/schemas/mcp-tool-registry",
   "title": "MCP Tool Registry v1.0",
   "description": "Schema for the per-project MCP tool registry — a single inventory of every MCP server declared in .mcp.json and every tool that server exposes. Acceptance criterion §34 row 10: `claude mcp list` output MUST match this registry (exit 1 on drift). Distinct from the mapping files: gsc-tool-mapping.json / dataforseo-endpoint-mapping.json / scrapling-output-mapping.json describe HOW a tool feeds Excel sheets; this registry describes WHICH tools are declared to exist and their version locks + capabilities + auth method. Keeps the runtime surface (what Claude can actually call) auditable against the configured surface (what the project said it runs). Version locks here use the same const pattern as S3-D-1 (dataforseo-mcp-server const '2.8.9').",
   "type": "object",

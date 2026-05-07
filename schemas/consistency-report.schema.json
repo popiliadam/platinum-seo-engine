@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://platinum-seo-engine/schemas/consistency-report.schema.json",
+  "$id": "http://platinum-seo-engine/schemas/consistency-report",
   "title": "Consistency Report v1.0",
   "description": "Schema for a single consistency-check report — emitted by the consistency_check tool after every Excel transaction checkpoint (§9.4 L6) and on demand. Merges two rule sets: (a) 20 Cross-Sheet Rules (CSR-F-01..15, CSR-D-01..03, CSR-M-01..02) defined in cross-sheet-invariants.json, and (b) 8 Critical Invariants (CI-01..08) defined in §17.2. Verdict aggregation per §17.2: any RED → RED; else any AMBER/WARN → AMBER; all PASS → GREEN. Enums are inline at each property path for direct readability.",
   "type": "object",

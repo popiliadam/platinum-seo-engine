@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://platinum-seo-engine/templates/portfolio-config.schema.json",
+  "$id": "http://platinum-seo-engine/schemas/portfolio-config",
   "title": "Portfolio Configuration Schema v1.1",
   "description": "Portfolio workspace registry (projects/_portfolio/portfolio.config.json). Lists active vs pending-onboard projects, per-project SLAs, reminder cadence, and optional editorial overrides per project. See docs/ARCHITECTURE.md §4.2 / §26.2. Policy key: editorial_override_allowed = true (requires override_rationale).",
   "type": "object",
