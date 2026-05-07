@@ -488,7 +488,7 @@ def render_roundup_markdown(
     if not template_path.exists():
         raise PortfolioMonthlyRoundupError(f"template not found: {template_path}")
     tpl = Template(template_path.read_text(encoding="utf-8"))
-    try: return tpl.substitute(build_template_vars(roundup))
+    try: return tpl.safe_substitute(build_template_vars(roundup))
     except KeyError as exc:
         raise PortfolioMonthlyRoundupError(
             f"template references unknown variable: {exc.args[0]}") from exc

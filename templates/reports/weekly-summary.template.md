@@ -34,4 +34,9 @@ $tasks_added_table
 
 $drift_signals
 
-> Üretildi: `weekly-summary` skill — `scripts/reporting/weekly_summary.py`
+## Kanıt zinciri
+
+- Yazıcı: `weekly-summary` skill — `scripts/reporting/weekly_summary.py`
+- Run ID: `$run_id`
+- Şablon: `templates/reports/weekly-summary.template.md` (`string.Template` engine — `scripts/reporting/render_template.py`)
+- Üretildi: `$generated_at`

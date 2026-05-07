@@ -45,4 +45,10 @@ G (priority — `severityEnum` 4 values), J (status — `statusEnum`
 project's optional consistency-report carries a non-GREEN verdict
 (WARNING, transform proceeds — NOT a DURUR)._
 
-> Üretildi: `portfolio-task-heatmap` skill — `scripts/reporting/portfolio_task_heatmap.py`
+## Kanıt zinciri
+
+- Yazıcı: `portfolio-task-heatmap` skill — `scripts/reporting/portfolio_task_heatmap.py` (READ-ONLY aggregator)
+- Run ID: `$run_id`
+- Schema otoritesi: `schemas/portfolio-config.schema.json` v1.1 + `schemas/master-excel.schema.json#master_task`
+- Şablon: `templates/reports/portfolio-task-heatmap.template.md` (`string.Template` engine — `scripts/reporting/render_template.py`)
+- Üretildi: `$generated_at`

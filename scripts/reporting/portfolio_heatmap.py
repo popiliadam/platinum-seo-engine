@@ -452,7 +452,7 @@ def build_report_markdown(
         "totals_summary": _build_totals_summary(heatmap),
     }
     try:
-        return Template(template_text).substitute(
+        return Template(template_text).safe_substitute(
             {k: str(v) for k, v in data.items()}
         )
     except KeyError as exc:

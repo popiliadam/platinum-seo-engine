@@ -36,6 +36,7 @@ $projects_delta_table
 
 - Yazıcı: `portfolio_weekly_brief` (READ-ONLY agregator; master.xlsx#none)
 - Snapshot: `inbox/local/$week_end-portfolio-weekly-brief.json`
+- Run ID: `$run_id`
 - Schema otoritesi: `schemas/portfolio-config.schema.json` v1.1
   (`cadence.weekly_brief` + `slas.weekly_sync_max_days` +
   `active_projects[].last_sync_at`)

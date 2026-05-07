@@ -26,4 +26,9 @@ $report_summary
 
 $geo_gaps_summary
 
-> Üretildi: `topical-map` skill — `scripts/planning/topical_map_transform.py`
+## Kanıt zinciri
+
+- Yazıcı: `topical-map` skill — `scripts/planning/topical_map_transform.py`
+- Run ID: `$run_id`
+- Şablon: `templates/reports/topical-map.template.md` (`string.Template` engine — `scripts/reporting/render_template.py`)
+- Üretildi: `$date`

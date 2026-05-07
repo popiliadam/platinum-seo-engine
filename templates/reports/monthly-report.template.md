@@ -64,5 +64,10 @@ $next_plan_md
 
 ---
 
-> Üretildi: `monthly-report` skill — `scripts/reporting/monthly_report.py`
-> Kaynaklar: master.xlsx (READ-ONLY) + events.jsonl (READ-ONLY, son 28 gün)
+## Kanıt zinciri
+
+- Yazıcı: `monthly-report` skill — `scripts/reporting/monthly_report.py`
+- Kaynaklar: master.xlsx (READ-ONLY) + events.jsonl (READ-ONLY, son 28 gün)
+- Run ID: `$run_id`
+- Şablon: `templates/reports/monthly-report.template.md` (`string.Template` engine — `scripts/reporting/render_template.py`)
+- Üretildi: `$generated_at`

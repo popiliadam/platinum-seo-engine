@@ -492,7 +492,7 @@ def render_report_markdown(
         raise PortfolioKpiTrendError(f"template not found: {template_path}")
     try:
         return Template(template_path.read_text(encoding="utf-8")
-                        ).substitute(build_template_vars(batch))
+                        ).safe_substitute(build_template_vars(batch))
     except KeyError as exc:
         raise PortfolioKpiTrendError(
             f"template references unknown variable: {exc.args[0]}") from exc

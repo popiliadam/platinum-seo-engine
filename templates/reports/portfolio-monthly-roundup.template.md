@@ -49,6 +49,7 @@ $editorial_overrides_notes
 
 - Yazıcı: `portfolio_monthly_roundup` (READ-ONLY agregator; master.xlsx#none)
 - Snapshot: `inbox/local/$period_end-portfolio-monthly-roundup.json`
+- Run ID: `$run_id`
 - Schema otoritesi: `schemas/portfolio-config.schema.json` v1.1
   (`cadence.monthly_roundup` + `EditorialOverrides`) +
   `schemas/monthly-report.schema.json` v1.0

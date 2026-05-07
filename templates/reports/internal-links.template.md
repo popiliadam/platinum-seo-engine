@@ -21,4 +21,9 @@ $report_summary
 
 - **URL:** `$top_broken_url`
 
-> Üretildi: `internal-links` skill — `scripts/planning/internal_links_transform.py`
+## Kanıt zinciri
+
+- Yazıcı: `internal-links` skill — `scripts/planning/internal_links_transform.py`
+- Run ID: `$run_id`
+- Şablon: `templates/reports/internal-links.template.md` (`string.Template` engine — `scripts/reporting/render_template.py`)
+- Üretildi: `$date`

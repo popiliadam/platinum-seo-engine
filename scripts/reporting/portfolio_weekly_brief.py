@@ -523,7 +523,7 @@ def render_brief_markdown(
         raise PortfolioWeeklyBriefError(f"template not found: {template_path}")
     tpl = Template(template_path.read_text(encoding="utf-8"))
     try:
-        return tpl.substitute(build_template_vars(brief))
+        return tpl.safe_substitute(build_template_vars(brief))
     except KeyError as exc:
         raise PortfolioWeeklyBriefError(
             f"template references unknown variable: {exc.args[0]}"

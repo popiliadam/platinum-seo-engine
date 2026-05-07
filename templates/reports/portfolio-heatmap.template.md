@@ -36,6 +36,7 @@ $dimension_table
 
 - Yazıcı: `portfolio_heatmap` (READ-ONLY aggregator; `master.xlsx#none`)
 - Snapshot: `projects/_portfolio/inbox/local/$run_date-portfolio-heatmap.json`
+- Run ID: `$run_id`
 - Schema otoritesi: `schemas/portfolio-config.schema.json` v1.1 +
   `schemas/master-excel.schema.json` (master_task col B+C+F+G,
   opportunity, quick_wins, content_decay, cannibalization)
