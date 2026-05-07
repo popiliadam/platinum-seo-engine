@@ -17,8 +17,14 @@ Env vars (read at runtime; no .env file is loaded):
     PSEO_WORKSPACE_ROOT   REQUIRED — workspace root path. workspace_root
                           resolves to {root}/projects/{slug}. Bootstrap
                           exits 2 if unset (no engine repo path fallback;
-                          F-16 plugin agnostik invariant).
-    PSEO_PROJECTS_DIR     override default output dir (./projects)
+                          F-16 plugin agnostik invariant). When --out is
+                          omitted and PSEO_PROJECTS_DIR is unset, output
+                          file path defaults to {root}/projects/{slug}/
+                          project.config.json (Q-V1.4-BOOTSTRAP-DEFAULT-OUT-01
+                          closure: previously cwd-relative ./projects/ which
+                          polluted engine repo on CLI direct invocation).
+    PSEO_PROJECTS_DIR     explicit override of output projects/ root
+                          (trumps PSEO_WORKSPACE_ROOT/projects default).
 
 Path defaults follow the modern workspace convention (lowercase
 master.xlsx F1 workbook policy + nested inbox/_state/outputs structure).
@@ -178,7 +184,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.out:
         out_path = Path(args.out).expanduser()
     else:
-        projects_dir = Path(os.getenv("PSEO_PROJECTS_DIR") or "projects")
+        projects_dir_env = os.getenv("PSEO_PROJECTS_DIR")
+        if projects_dir_env:
+            projects_dir = Path(projects_dir_env).expanduser()
+        else:
+            workspace_root = Path(os.environ["PSEO_WORKSPACE_ROOT"]).expanduser()
+            projects_dir = workspace_root / "projects"
         out_path = projects_dir / args.project / "project.config.json"
 
     if out_path.exists() and not args.force:
