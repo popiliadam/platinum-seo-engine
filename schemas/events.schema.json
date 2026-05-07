@@ -218,14 +218,14 @@
     },
     "primary_source": {
       "type": "string",
-      "description": "WORK-only. Matches master_task.primary_source (§21.1 col C). Copied here so each work event is self-contained for archival replay.",
-      "enum": ["content_decay", "quickwin", "tech_fix", "schema", "pillar", "sxo", "cannibalization", "redirect_404", "manual"]
+      "description": "WORK-only. Matches master_task.primary_source (§21.1 col C). Copied here so each work event is self-contained for archival replay. Enum 9→11 sync per master-excel ADR-018 additive policy (resolves Q-V1.2-MASTER-TASK-PRIMARY-SOURCE-01 events-side, K-05 v1.4-deep-audit-fix).",
+      "enum": ["content_decay", "quickwin", "tech_fix", "schema", "pillar", "sxo", "cannibalization", "redirect_404", "manual", "internal_links", "new_content_plan"]
     },
     "related_sources": {
       "type": "array",
-      "description": "WORK-only. Matches master_task.related_sources (§21.1 col D) — merged-task union.",
+      "description": "WORK-only. Matches master_task.related_sources (§21.1 col D) — merged-task union. Enum mirrors primary_source (additive 9→11 per ADR-018).",
       "items": {
-        "enum": ["content_decay", "quickwin", "tech_fix", "schema", "pillar", "sxo", "cannibalization", "redirect_404", "manual"]
+        "enum": ["content_decay", "quickwin", "tech_fix", "schema", "pillar", "sxo", "cannibalization", "redirect_404", "manual", "internal_links", "new_content_plan"]
       },
       "uniqueItems": true
     },
