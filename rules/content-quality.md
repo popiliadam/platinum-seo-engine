@@ -11,7 +11,7 @@ spec_section: "Phase 10 — Content Rules Processing"
 
 Bu doc Phase 10 content kuralları setinin **master** dosyasıdır. Diğer 5 dosya (`content-html-discipline.md`, `content-seo-discipline.md`, `content-eeat-discipline.md`, `content-llm-discipline.md`, `content-update-discipline.md`) bu dosyadaki **Foundational Principles** bölümüne `→ rules/content-quality.md#foundational-principles` ile referans verir; tekrar yazılmaz (DRY, → [single-source-of-truth](single-source-of-truth.md)).
 
-R-XX numbering integrity: R-01..R-26 input doc'tan korundu (content-rules-input.md SUPERSEDED), R-27..R-122 Phase 10'da eklendi (Süleyman 266-cevap matrix). Çakışma yok.
+R-XX numbering integrity: R-01..R-26 input doc'tan korundu (content-rules-input.md SUPERSEDED — R-26 CTA Zorunlu v1.4-deep-audit-fix Tier 2 K-01 closure ile content-seo-discipline.md'ye aktarıldı), R-27..R-122 Phase 10'da eklendi (Süleyman 266-cevap matrix). Çakışma yok.
 
 ---
 

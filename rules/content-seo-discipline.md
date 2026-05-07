@@ -150,6 +150,18 @@ Bu doc Phase 10 SEO disiplinini tanımlar (heading, internal link, FAQ, keyword,
 
 **Failure mode.** AMBER → 2x AMBER → RED (stuffing).
 
+### R-26: CTA Zorunlu (Doğal Akış)
+
+**Statement.** Her content'in **son ana paragrafı** CTA içermek ZORUNDADIR (MUST). CTA başlıksız (R-05 "Sonuç" yasak), doğal akışta — ürün/hizmet/aksiyon link'i intent-driven (informational → newsletter signup, commercial → demo request, transactional → purchase, navigational → contact).
+
+**Rationale.** CTA olmadan content "open loop" — kullanıcı ne yapsın? AEO/AIO citation hijack riski (CTA citasyonun yapışması yerine ürünsüz fragment'ı çıkarır). Süleyman explicit cevap: input-doc R-26 (content-rules-input.md SUPERSEDED → v1.4-deep-audit-fix Tier 2 K-01 closure ile content-seo-discipline.md'ye aktarıldı).
+
+**Enforcement.** new-blog skill template `{{CTA_PARAGRAPH_NATURAL_FLOW}}` placeholder; render time intent enum match (R-10 cross-link); başlıksız `<p class="pse-cta">` final paragraph.
+
+**Failure mode.** AMBER → 2x AMBER → RED.
+
+**Cross-links:** R-05 (Sonuç başlığı yasak), R-10 (intent), R-12 (cluster keywords).
+
 ### R-29: Pasaj Alıntılanabilirlik (H2 Cevap-Önce + TL;DR)
 
 **Statement.** Her H2 section başlangıcında **cevap-önce mini paragraf** (1-2 cümle direkt cevap), sonra detay; opsiyonel TL;DR `<aside class="pse-tldr">` blok.

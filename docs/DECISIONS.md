@@ -61,6 +61,6 @@ Append-only — superseded entry'ler işaretlenir, silinmez.
 ## ADR-038 — R-XX Numbering: gap-tolerant, future renumber YASAK
 **Date:** 2026-05-06
 **Status:** accepted
-**Context:** Audit across `rules/` + `skills/` + `docs/` finds 102 unique `R-XX` rule references with max R-122. Numbering carries gaps from rule mergers + supersedes (R-15, R-26, etc.). No spec defines hard count.
+**Context:** Audit across `rules/` + `skills/` + `docs/` finds 102 unique `R-XX` rule references with max R-122. Numbering carries gaps from rule mergers + supersedes (R-15, etc.). No spec defines hard count.
 **Decision:** Numbering policy: monotonic-but-gap-tolerant. Once an R-XX number is assigned, **renumber FORBIDDEN** (history-stable, like ADR gap-015). New rules pick the next-unused number; superseded entries keep their number with a `(superseded)` marker.
-**Consequences:** Q-PHASE15-RXX-COUNT-01 closure: gap-count is by-design. v2.0 may revisit if cumulative gap exceeds 30%. No active count invariant test required.
+**Consequences:** Q-PHASE15-RXX-COUNT-01 closure (gap by-design); K-01 closure 2026-05-07: undefined R-XX cited in templates = MUST-FIX (test_r_xx_resolution.py lock; R-26 inserted).
