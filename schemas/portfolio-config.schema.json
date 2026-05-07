@@ -14,9 +14,8 @@
   ],
   "properties": {
     "schema_version": {
-      "type": "string",
-      "pattern": "^1\\.[0-9]+$",
-      "description": "Semver major.minor — 1.0 legacy skeleton; 1.1 adds active_projects / editorial_overrides."
+      "const": "1.1",
+      "description": "Schema version. v1.0 legacy skeleton; v1.1 adds active_projects / editorial_overrides. Strict const per ADR-018 (was loose pattern; H-B v1.4-deep-audit-fix). Future minor bump 1.1 → 1.2 = additive fields, requires migration script."
     },
     "portfolio_id": {
       "type": "string",

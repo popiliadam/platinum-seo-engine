@@ -7,6 +7,10 @@
   "required": ["project_slug", "domain", "last_updated"],
   "additionalProperties": false,
   "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "description": "Schema version this memory.md frontmatter conforms to (rules/schema-versioning-discipline.md). Optional in v1.0 (backwards-compat for instances written pre-Phase 11); strongly recommended for new files."
+    },
     "project_slug": {
       "type": "string",
       "description": "Project identifier. Must equal projects/{slug}/ directory name and project-config.schema.json.project_id. kebab-case only.",
