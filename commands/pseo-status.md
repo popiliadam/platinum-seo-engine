@@ -18,16 +18,21 @@ Aktif projenin workflow run state'ini ve önerilecek sonraki adımı listele.
 
 Aktif marker: !`if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş"; else PROJECT="${1:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/active.json" 2>/dev/null)}"; if [ -z "$PROJECT" ]; then echo "NO_ACTIVE_PROJECT"; else echo "active=$PROJECT"; fi; fi`
 
+**Engine path resolution** — `CLAUDE_PLUGIN_ROOT` Claude Code tarafından set edilmediyse fallback gerekli. Command altyapısı: `${CLAUDE_PLUGIN_ROOT:-${PSEO_ENGINE_ROOT:-$(find /Users/apple/.claude/plugins/cache/*/platinum-seo-engine* -type d 2>/dev/null | sort -V | tail -1)}}` formatı denenir.
+
 Eğer çıktı `NO_ACTIVE_PROJECT` ise: kullanıcıdan slug iste veya `/pseo-active <slug>` çağırmasını öner; aşağıdaki adımları atla.
 
 ## 2. workflow_runner.list_runs() çağrısı
 
 `scripts/state/workflow_runner.py` modül CLI olarak değil, Python `import` ile expose edilmiş (bkz. `list_runs(project_slug, *, workspace_root=None, status_filter=None)` — döndürdüğü liste `RunHandle` dataclass'lardır). Inline Python ile çağır:
 
-!`if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş — kullanıcıya workspace path'ini sor"; exit 2; fi; PROJECT="${1:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/active.json" 2>/dev/null)}"; PYTHONPATH="${CLAUDE_PLUGIN_ROOT}" python3 -c "
+!`if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş — kullanıcıya workspace path'ini sor"; exit 2; fi; ENGINE_ROOT="${CLAUDE_PLUGIN_ROOT:-${PSEO_ENGINE_ROOT:-$(find /Users/apple/.claude/plugins/cache 2>/dev/null -type d -name 'platinum-seo-engine' | sort | tail -1 | xargs -I{} find {} -maxdepth 1 -type d -name '[0-9]*' 2>/dev/null | sort -V | tail -1)}}"; if [ -z "$ENGINE_ROOT" ]; then echo "ERROR: CLAUDE_PLUGIN_ROOT yok ve fallback bulunamadı — PSEO_ENGINE_ROOT env var set edin"; exit 3; fi; PROJECT="${1:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/active.json" 2>/dev/null)}"; PSEO_ENGINE_ROOT="$ENGINE_ROOT" PYTHONPATH="$ENGINE_ROOT" python3 -c "
 import json, os, sys
 from pathlib import Path
-sys.path.insert(0, os.environ['CLAUDE_PLUGIN_ROOT'])
+engine = os.environ.get('CLAUDE_PLUGIN_ROOT') or os.environ.get('PSEO_ENGINE_ROOT')
+if not engine:
+    print('ERROR: engine path resolution failed', file=sys.stderr); sys.exit(3)
+sys.path.insert(0, engine)
 from scripts.state import workflow_runner as wr
 ws_path = Path(os.environ['PSEO_WORKSPACE_ROOT']).expanduser()
 slug = '$PROJECT'
