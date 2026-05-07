@@ -2,13 +2,13 @@
 name: Skills
 status: enforced
 applies_to: [plugin]
-spec_section: "§9 + ADR-022"
+spec_section: "§9 + ADR-022/026"
 related: [schema-first, naming, skill-description-discipline]
 ---
 
 # Skills
 
-Skill body Python block convention + helper exec compatibility kuralları (`scripts/ci/run_skill_python.py` substring-key detection paterni). Phase 14 W3-W1 governance refactor 4 skill paterni reuse + W3-W2-B+ enforce default. Lesson 38 v2 kümülatif 5'inci ardışık production-ready uygulamasında codify edilmiştir (Q-CI-W3-01 birleşik resolve).
+Skill body Python block convention + helper exec compatibility kuralları (`scripts/ci/run_skill_python.py` substring-key detection paterni). Phase 14 W3-W1 governance refactor 4 skill paterni reuse + W3-W2-B+ enforce default. Lesson 38 v2 paterni reuse ile codify edilmiştir (Q-CI-W3-01 birleşik resolve).
 
 ## Section 1 — Skill Body 1. Python Block ZORUNLU Prefix Paterni
 
@@ -28,7 +28,7 @@ Skill body Python block'ları **sequential dispatch** ile çalışır:
 - `sys.path[0]` auto-resolve `scripts.*` package import için ZORUNLU (örn `from scripts.governance.validate_invariants import check_F_05`).
 - Skill standalone executable: `python3 scripts/ci/run_skill_python.py skills/governance/drift-check/SKILL.md` — exit=0 PASS, exit=1 FAIL.
 
-W3-W3-α CI strict mode geçişi (lesson 8 v8 boyut #14 production-ready 4'üncü uygulama) için 4 governance skill helper exec EXIT=0 4/4 kanıtlanmış zemin oluşturur (drift-check + schema-validate + glossary-audit + load-context).
+W3-W3-α CI strict mode geçişi (lesson 8 v8 boyut #14 production-ready uygulama paterni) için 4 governance skill helper exec EXIT=0 4/4 kanıtlanmış zemin oluşturur (drift-check + schema-validate + glossary-audit + load-context).
 
 ## Section 3 — Multi-line Format Spec (KRİTİK)
 
@@ -96,7 +96,7 @@ Multi-line format respect: prepend block her zaman 2 satır (`import os, sys\nsy
 
 - W3-W1 governance refactor 4 skill paterni reuse: `skills/governance/{drift-check, schema-validate, glossary-audit, load-context}/SKILL.md` ilk block standardı.
 - Phase 14 W3-W2-B+ enforce default: 13 production skill body Python block tek concat helper exec ile uyumlu olmalı.
-- Lesson 38 v2 enforce kümülatif (5'inci ardışık production-ready): brief authority claim infrastructure convention dynamic state cross-check, partial inspect YASAK frozen assumption YASAK.
+- Lesson 38 v2 enforce paterni: brief authority claim infrastructure convention dynamic state cross-check, partial inspect YASAK frozen assumption YASAK.
 - Lesson 21 paterni reuse: worker proaktif scope expansion underlying helper module fix positive drift (validate_invariants.py + run_skill_python.py auto-prepend).
 - Schema-first cross-ref → rules/schema-first.md (skill metadata events.schema authority).
 - Naming cross-ref → rules/naming.md (skill folder hierarchy + flat tests/skills/test_*.py convention F-14W3W2Ca-1 catch).

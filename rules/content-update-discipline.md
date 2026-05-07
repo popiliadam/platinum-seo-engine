@@ -98,7 +98,7 @@ Profile-aware:
 
 **Statement.** content-decay sunset/prune candidate (decay threshold + low traffic + cluster relevance gone) **suggestion only**; user manual approve sonrası R-91 redirect/410 path.
 
-**Rationale.** Otomatik silme yasak (→ [safety-and-quality](https://example/) cross-doc paterni — silme = manual approve).
+**Rationale.** Otomatik silme yasak; silme operasyonu **manual approve** gerektirir (cross-doc safety paterni).
 
 **Enforcement.** content-decay output `action=sunset_suggestion`; user explicit approve → master.xlsx update → R-91 trigger.
 

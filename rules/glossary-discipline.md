@@ -24,7 +24,7 @@ Aynı terimin iki farklı tanımı = drift. Bir skill "drift" derken X'i, bir di
 ```markdown
 # rules/excel-discipline.md (örnek atıf)
 Master Excel'e yazım sadece transaction layer üzerinden yapılır;
-bu invariant check'i (bkz. docs/GLOSSARY.md#invariant-check) tetikler.
+bu invariant check'i (bkz. docs/GLOSSARY.md#invariant) tetikler.
 ```
 
 ```markdown
