@@ -5,7 +5,7 @@
 
 Bir Claude Code plugin'i; SEO operasyonunu schema-locked workflow'larla yöneten motor.
 
-**Status:** v1.3.0 — ergonomi expansion (15 slash command) + audit-fix-wave-0+2 (8/8 finding RESOLVED) + pre-publication security audit (Wave 1) — drift-check AMBER (F-16 + F-17 PASS, F-13 historical kalıntı) (2026-05-07) — [Release Notes](docs/RELEASE_NOTES_v1.3.0.md)
+**Status:** v1.4.0 — hooks-overhaul (3-Tier event coverage) + bootstrap-paths-fix (Q-V1.4-BOOTSTRAP-PATHS-01 RESOLVED) + deep-audit-fix (9 CRITICAL + 11/12 HIGH RESOLVED, 6 governance regression test) + cleanup-batch (2 unqualified hook scripts authored) — drift-check AMBER (F-16 + F-17 PASS, F-13 historical kalıntı) (2026-05-07) — [Release Notes](docs/RELEASE_NOTES_v1.4.0.md)
 
 ---
 

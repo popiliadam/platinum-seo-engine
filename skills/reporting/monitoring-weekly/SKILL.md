@@ -471,12 +471,16 @@ counts (template `string.Template` substitution).
 ## Inline Template Fallback (DURUR #4)
 
 When `templates/reports/monitoring-weekly.template.md` is absent, the
-transform falls back to an inline template string defined in
-`scripts/reporting/monitoring_weekly.py` as `INLINE_TEMPLATE`. The
-fallback template carries the same 5 sections + same `$var` slots as
-the on-disk template. The audit event records `template_path=inline`
-in the `note` field. The test suite asserts both render paths
-produce structurally equivalent output.
+transform falls back to an inline template string defined in **Block 3
+of this SKILL.md** (the `INLINE_TEMPLATE` constant inside the inline
+orchestration block; see line ~315). The fallback template carries the
+same 5 sections + same `$var` slots as the on-disk template. The audit
+event records `template_path=inline` in the `note` field. The test suite
+asserts both render paths produce structurally equivalent output.
+
+(Q-V1.2-MONITORING-WEEKLY-MISSING-SCRIPT-01 RESOLVED via option b —
+no separate `scripts/reporting/monitoring_weekly.py` exists; the
+constant lives inline alongside the orchestration blocks.)
 
 ## Cross-references
 
