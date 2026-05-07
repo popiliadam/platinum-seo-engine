@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "http://platinum-seo-engine/schemas/events",
   "title": "Events Log Entry v1.0",
-  "description": "Unified events log schema — replaces provenance-log + work-log. One row/file = one event. Three kinds: 'provenance' (pipeline ingest/normalize/project/validate/cascade — every MCP response or SF file produces one entry, append-only, run_id monotonic per project), 'work' (DONE protocol §21.4 step 4 emits these into logs/work-done/{YYYY-MM}/{task_id}.json — 10 closed event_type subtypes, monthly-report aggregates last-28-day events), 'audit' (governance placeholder — Phase 14+ for permission/access changes). Discriminator field is event_kind. Common envelope: schema_version, event_kind, event_id, timestamp, project_id. Sub-kind specific fields are defined alongside; conditional requireds enforced via allOf if/then. Cross-kind invariants: agent_run_id on a work event must reference an existing provenance event run_id. Retention: provenance append-only forever; work 12 months active then archive zip (§20.3); audit policy TBD. Both url + url_normalized required on URL-bearing work events (D-S3-5). All hash fields use sha256:hex64 pattern.",
+  "description": "Unified events log schema — replaces provenance-log + work-log. One row/file = one event. Three kinds: 'provenance' (pipeline ingest/normalize/project/validate/cascade — every MCP response or SF file produces one entry, append-only, run_id monotonic per project), 'work' (DONE protocol §21.4 step 4 emits these into logs/work-done/{YYYY-MM}/{task_id}.json — 12 closed event_type subtypes including 2 skill_<name> canonical entries, monthly-report aggregates last-28-day events), 'audit' (governance placeholder — Phase 14+ for permission/access changes). Discriminator field is event_kind. Common envelope: schema_version, event_kind, event_id, timestamp, project_id. Sub-kind specific fields are defined alongside; conditional requireds enforced via allOf if/then. Cross-kind invariants: agent_run_id on a work event must reference an existing provenance event run_id. Retention: provenance append-only forever; work 12 months active then archive zip (§20.3); audit policy TBD. Both url + url_normalized required on URL-bearing work events (D-S3-5). All hash fields use sha256:hex64 pattern.",
   "type": "object",
   "required": ["schema_version", "event_kind", "event_id", "timestamp", "project_id"],
   "additionalProperties": false,
@@ -146,7 +146,7 @@
 
     "event_type": {
       "type": "string",
-      "description": "WORK-only. docs/ARCHITECTURE.md §20.2 — closed 10-value enum. Stored value; display decoration (emoji in reports) applied at render time.",
+      "description": "WORK-only. docs/ARCHITECTURE.md §20.2 — closed 12-value enum (10 legacy + 2 skill_<name> canonical, additive 2026-05-07 v1.6-Phase-2 H-E ADR-018 paterni; operation enum staging Wave 3 + statusEnum 4→7 + primary_source 9→11 prior art). Stored value; display decoration (emoji in reports) applied at render time. skill_<name> canonical entries replace legacy DSL workaround event_type=manual + note=[skill=X] (whats-next router event + content-remediation improve_routing); semantic-doğru manual usages (indexing-ping F-8 sub-object compliance + monitoring-weekly audit kind) kapsam dışı — bilinçli design choice.",
       "enum": [
         "content_new",
         "content_revise",
@@ -157,7 +157,9 @@
         "schema_fix",
         "redirect_deployed",
         "backlink_outreach",
-        "manual"
+        "manual",
+        "skill_content_remediation",
+        "skill_whats_next"
       ]
     },
     "task_id": {
@@ -319,10 +321,10 @@
       "then": { "required": ["before", "after"] }
     },
     {
-      "description": "redirect_deployed + content_remove + backlink_outreach + manual require note.",
+      "description": "redirect_deployed + content_remove + backlink_outreach + manual + skill_<name> canonical entries require note. skill_X canonical entries inherit note discipline because legacy DSL workaround stored skill metadata in note alanı; canonical paterni'nde note hala structured data taşıyıcı (router context, improve_routing explanation, etc).",
       "if":   { "allOf": [
                  { "properties": { "event_kind": { "const": "work" } } },
-                 { "properties": { "event_type": { "enum": ["redirect_deployed", "content_remove", "backlink_outreach", "manual"] } } }
+                 { "properties": { "event_type": { "enum": ["redirect_deployed", "content_remove", "backlink_outreach", "manual", "skill_content_remediation", "skill_whats_next"] } } }
                ] },
       "then": { "required": ["note"] }
     },
