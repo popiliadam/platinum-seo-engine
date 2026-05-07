@@ -79,8 +79,10 @@ ADR.
 ## Outputs (artifacts produced)
 
 - `projects/{slug}/_state/events.jsonl` — single `event_kind=work`,
-  `event_type=manual` row per run, `note` carries the markdown
-  summary of the ranked recommendations (router event).
+  `event_type=skill_whats_next` row per run (canonical v1.6-Phase-2 H-E;
+  replaces legacy DSL workaround `event_type=manual + note=[skill=...]`),
+  `note` carries the markdown summary of the ranked recommendations
+  (router event).
 - Console / return-value: short markdown bullet list of the Top-K
   recommendations (advisory; no Excel writes).
 
@@ -206,8 +208,9 @@ recommendations = [
 
 ### Step 8 — `emit_router_event` (events.jsonl router event)
 
-Single `event_kind=work`, `event_type=manual` row per run. The
-`task_id` is a synthetic router id derived from the workflow run_id
+Single `event_kind=work`, `event_type=skill_whats_next` row per run
+(canonical v1.6-Phase-2 H-E). The `task_id` is a synthetic router id
+derived from the workflow run_id
 hex token (events.schema requires `^T-[0-9]{4,}$`; we map the 4-char
 hex token → 5-digit decimal prefixed with `9` so router ids never
 collide with master_task `T-NNNN` ids):
@@ -220,9 +223,9 @@ task_id = f"T-{synthetic}"
 note = render_markdown_summary(recommendations, user_intent)
 events_writer.append_work(
     project_id=project_slug,
-    event_type="manual",
+    event_type="skill_whats_next",
     task_id=task_id,
-    note=note,           # required for event_type=manual (events.schema)
+    note=note,           # required for skill_X canonical (events.schema v1.6-Phase-2 H-E)
     primary_source="manual",
 )
 ```

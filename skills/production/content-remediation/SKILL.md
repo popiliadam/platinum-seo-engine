@@ -417,8 +417,8 @@ GSC `index_inspect` coverage state ile canonical drift surface edilir:
 
 **(c) Manual review** — drift surface ama düz redirect yetersiz (örn. content materially differs, cluster-level rerouting gerekli):
 
-- `action == manual_review` (skill spec event_type=manual + note explanation).
-- improve_routing event_type=manual + `note = "[skill=content-remediation event_type_intent=canonical_review explanation=...]"` (worker schema-first override paterni reuse, rules/events-writer.md Section 4 cross-ref).
+- `action == manual_review` (skill spec event_type=skill_content_remediation + note explanation).
+- improve_routing event_type=skill_content_remediation + `note = "[event_type_intent=canonical_review explanation=...]"` (canonical event_type per v1.6-Phase-2 H-E; replaces legacy DSL workaround `event_type=manual + note=[skill=content-remediation ...]`; rules/events-writer.md Section 4 cross-ref).
 - Manager scope: revise-content tetikle veya cluster-map yeniden değerlendir.
 
 ### Cross-Skill Convention
