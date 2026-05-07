@@ -123,3 +123,4 @@ state/runs/
 
 # ─── External tool configs (out-of-scope, F-16 plugin agnostik) ───
 .codex/
+.claude/settings.local.json

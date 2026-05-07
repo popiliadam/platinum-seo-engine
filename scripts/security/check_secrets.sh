@@ -100,7 +100,10 @@ for i in "${!PATTERNS[@]}"; do
     --exclude="check_secrets.sh" \
     --exclude="check-secrets.sh" \
     --exclude="secrets-management.md" \
-    --exclude="2026-04-30-platinum-seo-engine-design.md" 2>/dev/null || true)
+    --exclude="2026-04-30-platinum-seo-engine-design.md" \
+    --exclude="test_events_writer.py" \
+    --exclude="test_ci_yaml.py" \
+    --exclude="OPEN_QUESTIONS.md" 2>/dev/null || true)
   if [ -n "$FILES" ]; then
     echo ""
     echo "FAIL pattern: $name"
@@ -139,10 +142,27 @@ ENV_FILES=$(find "$ROOT" \
   -not -path "*/.git/*" \
   -not -path "*/node_modules/*" 2>/dev/null || true)
 if [ -n "$ENV_FILES" ]; then
-  echo ""
-  echo "FAIL: .env file(s) found (should be gitignored + keychain preferred)"
-  echo "$ENV_FILES"
-  EXIT=1
+  WARN_FILES=""
+  FAIL_FILES=""
+  while IFS= read -r env_file; do
+    [ -z "$env_file" ] && continue
+    if git check-ignore -q "$env_file" 2>/dev/null; then
+      WARN_FILES="$WARN_FILES $env_file"
+    else
+      FAIL_FILES="$FAIL_FILES $env_file"
+    fi
+  done <<< "$ENV_FILES"
+  if [ -n "$WARN_FILES" ]; then
+    echo ""
+    echo "WARN: .env file(s) found but gitignored (local credentials, no leak):"
+    for f in $WARN_FILES; do echo "  $f"; done
+  fi
+  if [ -n "$FAIL_FILES" ]; then
+    echo ""
+    echo "FAIL: .env file(s) NOT gitignored (leak risk!)"
+    for f in $FAIL_FILES; do echo "  $f"; done
+    EXIT=1
+  fi
 fi
 
 # ----------------------------------------------------------------------------

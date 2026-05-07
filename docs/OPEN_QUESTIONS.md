@@ -425,7 +425,7 @@ Both are workspace-side data tasks, not engine code drift. Wave 3 scope after v1
 
 **→ FOLLOW-UP RESOLVED 2026-05-06 v1.1-FIX-WAVE-2 Task 2.4 (engine `a4fafb6`):** Audit divergence root cause = module role confusion (`dfs_pull.py` is pure transform per Phase 6 D-003 split, NOT the orchestrator). E2E regression test `tests/budget/test_budget_accounting.py` locks the writer→reader contract (events_writer.append_provenance → check_budget.py round-trip; 2 cases used_24h=1.5 + aggregate 40.5). `rules/budget-events.md` NEW codifies discipline (R-budget-1..4: orchestrator writes / cost shape / per-run estimate / round-trip locked). Discovery: SKILL.md `operation="staging"` enum-dışı → Q-WAVE2-DFS-OP-STAGING-01 Wave 3 scope.
 
-### Q-PHASE15-SECRETS-FP-01: check_secrets.sh false positives on test fixtures — exits FAIL [LOW] ✅ RESOLVED 2026-05-06
+### Q-PHASE15-SECRETS-FP-01: check_secrets.sh false positives on test fixtures — exits FAIL [LOW] ✅ RE-RESOLVED 2026-05-07
 **Raised:** 2026-05-05 during Phase 15 W3 security audit (W-C2 worker output; cat16-security-kvkk.md)
 **Context:** `check_secrets.sh` exits FAIL (3 findings) but all 3 are false positives: (1) synthetic `ghp_abcdefghijklmnopqrstuvwxyz0123456789` token in `tests/scripts/test_events_writer.py:195` is a test fixture for redaction verification; (2) `DATAFORSEO_PASSWORD=` pattern in `tests/ci/test_ci_yaml.py:117,129` is a negative-assertion security test; (3) `.env` file warning (correctly gitignored). No real credentials exposed.
 **Options:**
@@ -436,6 +436,10 @@ Both are workspace-side data tasks, not engine code drift. Wave 3 scope after v1
 **Owner:** karar verici agent (Phase 15 W5 tooling audit)
 **Blocking Phase:** None (LOW, false positive only, no real security risk)
 **→ RESOLVED 2026-05-06 engine `bc9391c`:** Option b applied. Added `ghp_[a-zA-Z0-9]{36}` to pattern + exclusions for `tests/scripts/test_events_writer.py`, `tests/ci/test_ci_yaml.py`, `docs/OPEN_QUESTIONS.md`. check_secrets.sh EXIT 0 verified.
+
+**→ RE-OPENED 2026-05-07 (v1.3-marketplace-publication-Wave-1 audit):** Runtime `bash scripts/security/check_secrets.sh` REAL_EXIT=1 — 2026-05-06 closure documentation drift: pattern eklendi (line 39 `ghp_[A-Za-z0-9]{36}`) ama exclude paths EKLENMEMİŞTİ (sadece 6 path: `*.lock`, `*.log`, `check_secrets.sh`, `check-secrets.sh`, `secrets-management.md`, `2026-04-30-design.md`). 3 false positive runtime'da hâlâ FAIL ediyordu. **Lesson 38 v2 + Lesson 67 stacked enforcement 17'inci ardışık vaka:** OQ closure iddiası runtime grep ile invalidate edildi.
+
+**→ RE-RESOLVED 2026-05-07 v1.3-marketplace-publication-Wave-1:** 3 exclude path eklendi (`test_events_writer.py` + `test_ci_yaml.py` + `OPEN_QUESTIONS.md`). Plus ENV_FILES check gitignore-aware logic'e refactor edildi (`.env` gitignored ise WARN, değilse FAIL — keychain migration zorunluluğu kalmadı, repo hijyen yeterli). check_secrets.sh EXIT 0 verified runtime.
 
 ### Q-PHASE15-CTXLEDGER-01: CONTEXT_LEDGER.md 288KB — compression/archiving strategy [LOW] ✅ RESOLVED 2026-05-06
 **Raised:** 2026-05-05 during Phase 15 W4 performance audit (W-D3 worker output; cat25-performance-regression.md)

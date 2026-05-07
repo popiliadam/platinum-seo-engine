@@ -12,9 +12,9 @@ by invoking the existing cross-module APIs the skill body documents:
 
 Discipline:
   - tmp_path fixtures only; the live workspace
-    (/Users/apple/Documents/platinum-seo-workspace-staging) is read
-    AT-REST in test 5 (live execution evidence) but never mutated by
-    pytest.
+    (`~/Documents/platinum-seo-workspace-staging` or `$PSEO_WORKSPACE_STAGING`)
+    is read AT-REST in test 5 (live execution evidence) but never mutated
+    by pytest.
   - Schema-first: every artifact validated with Draft7Validator.
   - F1 invariant: master.xlsx is COPIED from templates/master-excel.xlsx;
     re-run preserves SHA-256.
@@ -52,7 +52,12 @@ TEMPLATE_XLSX = TEMPLATES / "master-excel.xlsx"
 
 # Live workspace path (read-only in this suite; the brief mandates a
 # rerun against dentnotion to prove idempotency — that lives in test 5).
-WORKSPACE_STAGING = Path("/Users/apple/Documents/platinum-seo-workspace-staging")
+WORKSPACE_STAGING = Path(
+    os.environ.get(
+        "PSEO_WORKSPACE_STAGING",
+        str(Path.home() / "Documents" / "platinum-seo-workspace-staging"),
+    )
+)
 PILOT_SLUG = "dentnotion"
 
 

@@ -27,6 +27,7 @@ Schemas referenced:
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 
@@ -44,7 +45,12 @@ from scripts.state import events_writer, workflow_runner
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-WORKSPACE_STAGING = Path("/Users/apple/Documents/platinum-seo-workspace-staging")
+WORKSPACE_STAGING = Path(
+    os.environ.get(
+        "PSEO_WORKSPACE_STAGING",
+        str(Path.home() / "Documents" / "platinum-seo-workspace-staging"),
+    )
+)
 PILOT_SLUG = "dentnotion"
 PILOT_DATE = "2026-04-30"
 LIVE_RAW_PATH = (
