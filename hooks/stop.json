@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/stop_validation.py\"",
+            "timeout": 30,
+            "statusMessage": "Stop validation: drift + OQ scan..."
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -13,6 +13,8 @@
     "./hooks/session-start.json",
     "./hooks/pre-tool-use.json",
     "./hooks/post-tool-use.json",
-    "./hooks/user-prompt-submit.json"
+    "./hooks/user-prompt-submit.json",
+    "./hooks/stop.json",
+    "./hooks/subagent-stop.json"
   ]
 }

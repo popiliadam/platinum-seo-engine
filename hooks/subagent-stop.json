@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "SubagentStop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/subagent_output_validate.py\"",
+            "timeout": 15,
+            "statusMessage": "Subagent output schema sniff..."
+          }
+        ]
+      }
+    ]
+  }
+}
