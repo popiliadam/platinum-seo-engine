@@ -224,3 +224,103 @@ def test_paths_no_legacy_exact_values(env_with_ws_root: str) -> None:
         assert cfg["paths"][field] != legacy_value, (
             f"paths.{field} reverted to legacy {legacy_value!r}"
         )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Q-V1.4-BOOTSTRAP-DEFAULT-OUT-01 — main() default --out PSEO_WORKSPACE_ROOT-aware
+# (CLI direct invocation pollution bypass; init-project SKILL §Step 4 already
+# uses --out explicit so production runtime unaffected; CLI direct kullanıcı
+# trap eliminated). Option (a) applied: --out > PSEO_PROJECTS_DIR > PSEO_WORKSPACE_ROOT/projects.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_default_out_uses_workspace_root_when_no_projects_dir_env(tmp_path: Path) -> None:
+    """No --out + no PSEO_PROJECTS_DIR → output goes to
+    PSEO_WORKSPACE_ROOT/projects/{slug}/project.config.json (NOT cwd-relative).
+
+    Critical: cwd ≠ PSEO_WORKSPACE_ROOT to disambiguate the pre-fix bug
+    (cwd-relative "projects/" pollution) from correct env-aware default."""
+    env = {k: v for k, v in os.environ.items() if k not in {"PSEO_PROJECTS_DIR"}}
+    ws_root = tmp_path / "workspace"
+    cwd = tmp_path / "engine_cwd"  # SEPARATE dir from ws_root
+    ws_root.mkdir()
+    cwd.mkdir()
+    env["PSEO_WORKSPACE_ROOT"] = str(ws_root)
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT),
+         "--project", "test-default-out",
+         "--domain", "https://test.example/",
+         "--profile", "local-service"],
+        capture_output=True, text=True, timeout=15,
+        cwd=str(cwd),  # different from ws_root — pollution would land here pre-fix
+        env=env,
+    )
+    assert result.returncode == 0, result.stderr
+    expected_path = ws_root / "projects" / "test-default-out" / "project.config.json"
+    pollution_path = cwd / "projects" / "test-default-out" / "project.config.json"
+    assert expected_path.exists(), (
+        f"bootstrap MUST write to PSEO_WORKSPACE_ROOT/projects ({expected_path}); "
+        f"stderr={result.stderr}"
+    )
+    assert not pollution_path.exists(), (
+        f"cwd-relative pollution detected at {pollution_path} — "
+        f"main() output path NOT PSEO_WORKSPACE_ROOT-aware (Q-V1.4-BOOTSTRAP-DEFAULT-OUT-01)"
+    )
+    cfg = json.loads(expected_path.read_text("utf-8"))
+    assert cfg["project_id"] == "test-default-out"
+
+
+def test_pseo_projects_dir_env_takes_precedence(tmp_path: Path) -> None:
+    """PSEO_PROJECTS_DIR explicit override → trumps PSEO_WORKSPACE_ROOT/projects
+    default (backward compat for explicit env-driven workflows)."""
+    ws_root = tmp_path / "workspace"
+    projects_dir = tmp_path / "custom-projects"
+    ws_root.mkdir()
+    projects_dir.mkdir()
+    env = {**os.environ, "PSEO_WORKSPACE_ROOT": str(ws_root),
+           "PSEO_PROJECTS_DIR": str(projects_dir)}
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT),
+         "--project", "test-projects-dir-env",
+         "--domain", "https://test.example/",
+         "--profile", "local-service"],
+        capture_output=True, text=True, timeout=15,
+        env=env,
+    )
+    assert result.returncode == 0, result.stderr
+    expected_path = projects_dir / "test-projects-dir-env" / "project.config.json"
+    not_expected_path = ws_root / "projects" / "test-projects-dir-env" / "project.config.json"
+    assert expected_path.exists(), (
+        f"PSEO_PROJECTS_DIR override should write to {expected_path}; stderr={result.stderr}"
+    )
+    assert not not_expected_path.exists(), (
+        f"PSEO_WORKSPACE_ROOT/projects should NOT be written when PSEO_PROJECTS_DIR is set"
+    )
+
+
+def test_explicit_out_takes_precedence(tmp_path: Path) -> None:
+    """args.out explicit → trumps both PSEO_PROJECTS_DIR and PSEO_WORKSPACE_ROOT
+    (init-project SKILL §Step 4 paterni invariant intact)."""
+    ws_root = tmp_path / "workspace"
+    projects_dir = tmp_path / "custom-projects"
+    explicit_out = tmp_path / "explicit" / "config.json"
+    ws_root.mkdir()
+    projects_dir.mkdir()
+    env = {**os.environ, "PSEO_WORKSPACE_ROOT": str(ws_root),
+           "PSEO_PROJECTS_DIR": str(projects_dir)}
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT),
+         "--project", "test-explicit-out",
+         "--domain", "https://test.example/",
+         "--profile", "local-service",
+         "--out", str(explicit_out)],
+        capture_output=True, text=True, timeout=15,
+        env=env,
+    )
+    assert result.returncode == 0, result.stderr
+    assert explicit_out.exists(), (
+        f"--out explicit should write to {explicit_out}; stderr={result.stderr}"
+    )
+    # Neither env-driven path should be touched
+    assert not (projects_dir / "test-explicit-out").exists()
+    assert not (ws_root / "projects" / "test-explicit-out").exists()
