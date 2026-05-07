@@ -40,13 +40,13 @@ Bu doc Phase 10 HTML/CSS/image disiplinini tanımlar. **Foundational Principles*
 
 **Failure mode.** AMBER → manual review.
 
-### R-22: Header/Footer Dokunulmazlığı
+### R-22: Header/Footer Dokunulmazlığı (HTML Fragment Boundary master)
 
-**Statement.** Üretilen HTML site'in `<header>` ve `<footer>`'ında bozulma yaratmayacak. Sadece `<article>` veya `<main>` içine yerleştirilecek HTML fragment üretilir.
+**Statement.** Üretilen HTML site'in `<header>` ve `<footer>`'ında bozulma yaratmayacak. Sadece `<article>` veya `<main>` içine yerleştirilecek HTML fragment üretilir; kök element `<article class="pse-blog-post">`. CSS `<style>` blok inline (article scope'unda).
 
-**Rationale.** R-57 (HTML fragment boundary) ile birlikte WordPress/Ticimax custom-block paste'inde global layout korunur.
+**Rationale.** WordPress/Ticimax custom-block paste'inde global layout korunur. R-57 supersede edildi (ADR-038 K-01 closure paterni); R-22 hem header/footer dokunulmazlığını hem fragment boundary'yi (article scope) tek master'da topluyor.
 
-**Enforcement.** Output HTML kök element `<article class="pse-blog-post">` (template skeleton); `<html>`, `<head>`, `<body>`, `<header>` (site header), `<footer>` (site footer) tag'leri output'ta YASAK.
+**Enforcement.** Output HTML kök element `<article class="pse-blog-post">` (template skeleton); `<html>`, `<head>`, `<body>`, `<header>` (site header), `<footer>` (site footer), `<!DOCTYPE>` tag'leri output'ta YASAK. Regex output check: `<!DOCTYPE` veya `<html` → RED.
 
 **Failure mode.** RED.
 
@@ -110,15 +110,11 @@ Bu doc Phase 10 HTML/CSS/image disiplinini tanımlar. **Foundational Principles*
 
 **Failure mode.** RED.
 
-### R-57: HTML Fragment Boundary (Article Scope)
+### R-57: HTML Fragment Boundary (Article Scope) (superseded by R-22)
 
-**Statement.** Skill output **fragment** — kök element `<article class="pse-blog-post">`; `<!DOCTYPE>`, `<html>`, `<head>`, `<body>` YASAK. CSS `<style>` blok inline (article scope'unda).
+**Statement.** **Superseded by R-22** (Header/Footer Dokunulmazlığı, [content-html-discipline.md:43](content-html-discipline.md)). R-22 zaten article scope + `<header>/<footer>` yasağı + fragment boundary'yi tek başlık altında topluyor; R-57 ek detay (regex check) artık R-22 Enforcement satırına dahil. Yeni citation R-22 olmalıdır; bu giriş ADR-038 history-stable numbering policy gereği korundu.
 
-**Rationale.** R-22 reuse. Custom-block paste'inde global page render bozmaz.
-
-**Enforcement.** Output regex check: `<!DOCTYPE` veya `<html` → RED.
-
-**Failure mode.** RED.
+**Cross-link:** R-22 (master).
 
 ### R-58: Lifecycle-Aware Robots Meta
 

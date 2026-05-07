@@ -48,7 +48,7 @@ H2: {{SECTION_2_TITLE}}
   ...
 
 [YMYL profile only:]
-H2: Karşı Argümanlar                                                    # R-50/R-115 zorunlu
+H2: Karşı Argümanlar                                                    # R-50 zorunlu (R-115 superseded)
   counter-argument paragraph + balanced view
 
 [YMYL medical/legal/financial profile only:]
@@ -116,7 +116,7 @@ expert_quotes:                            # R-105 bank-driven, project.config.js
 - [ ] Per 500 word 1-2 citation (R-106)
 - [ ] Bold per ~250 word (R-13)
 - [ ] CTA doğal akış (R-26)
-- [ ] Profile=ymyl ise: counter-argument H2 (R-50/R-115) + author byline (R-28) + disclaimer (R-51)
+- [ ] Profile=ymyl ise: counter-argument H2 (R-50, R-115 superseded) + author byline (R-28) + disclaimer (R-51)
 - [ ] Citation 3-katman doğrulama (R-44)
 - [ ] R-08 SERP analiz tamamlandı
 - [ ] R-15 site gerçeği doğrulama (master.xlsx[crawl_sitemap] + dataforseo_on_page_content_parsing)

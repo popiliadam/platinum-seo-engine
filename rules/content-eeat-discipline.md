@@ -88,15 +88,11 @@ Bu doc Phase 10 EEAT (Experience, Expertise, Authoritativeness, Trustworthiness)
 
 **Failure mode.** AMBER → 2x AMBER → RED.
 
-### R-115: Counter-Argument (YMYL Profile-Aware)
+### R-115: Counter-Argument (YMYL Profile-Aware) (superseded by R-50)
 
-**Statement.** YMYL profile'ında counter-argument H2 section zorunlu (R-50 anchor). e-commerce/local-service skip; b2b-saas opsiyonel.
+**Statement.** **Superseded by R-50** (Counter-Argument Profile-Aware, [content-quality.md:145](content-quality.md)). R-115 sözcük-sözcük R-50 ile aynı statement; ADR-038 K-01 closure paterni ile master R-50'ye aktarıldı. Yeni citation R-50 olmalıdır; bu giriş history-stable numbering policy gereği korundu.
 
-**Rationale.** Principle 2 + EEAT (Authoritativeness). YMYL medical/legal/financial içerikte tek-yönlü öneri trust kırar.
-
-**Enforcement.** Profile-aware. YMYL skill prompt'unda counter-argument H2 zorunlu (başlık örn. "Karşı Argümanlar", R-04 sembol yasağı).
-
-**Failure mode.** YMYL'da AMBER → 2x AMBER → RED.
+**Cross-link:** R-50 (master).
 
 ---
 
