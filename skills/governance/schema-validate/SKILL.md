@@ -4,9 +4,10 @@ description: |
   Use when: kullanıcı "schema validate", "schema doğrula", "frontmatter
   kontrol", "draft7 audit", "/pseo-driftcheck" der ya da phase gateway
   öncesi quality gate fired. JSON Schema Draft7 validation across all
-  schemas under schemas/, cross-sheet-invariants 20 rules
-  (F-01..F-15 + D-01..D-03 + M-01..M-02), and SKILL.md frontmatter
-  compliance under skills/**/.
+  schemas under schemas/, cross-sheet-invariants ≥20 rules
+  (F-01..F-15 + D-01..D-03 + M-01..M-02 baseline; F-16..F-22 additive
+  K-02 v1.5-Phase-2 = 27), and SKILL.md frontmatter compliance under
+  skills/**/.
   Also use when: yeni schema eklendi (additive bump), frontmatter
   drift şüphesi, CI quality gate, drift-check öncesi pre-flight.
   Do not use when: master.xlsx invariants (drift-check'in işi),
@@ -61,8 +62,9 @@ Read-only schema audit. Enumerate all `schemas/*.schema.json` via runtime
 `glob()` (NOT hardcoded count — count drift is the failure mode this skill
 is designed to surface), validate each as a well-formed JSON Schema
 Draft7 meta-schema, validate the cross-sheet-invariants instance
-document's `rules[]` array (20 rule registry, key=`rules` per
-S3.5 instance pivot), and validate every `skills/**/SKILL.md`
+document's `rules[]` array (≥20 rule registry, key=`rules` per
+S3.5 instance pivot; additive growth via K-02 paterni), and
+validate every `skills/**/SKILL.md`
 frontmatter block against `schemas/skill-frontmatter.schema.json`.
 
 **Read-only contract:** `master.xlsx` MUST NOT be opened, mutated, or
@@ -192,9 +194,13 @@ for entry in rules:
     assert not missing, f"rule {entry.get('id', '?')} missing keys: {missing}"
 ```
 
-The cross-sheet-invariants instance document carries 20 rules
-(F-01..F-15 + D-01..D-03 + M-01..M-02 = 20) per spec §7. The top-level
-key is `rules` per S3.5 pivot — NOT `invariants`. This skill explicitly
+The cross-sheet-invariants instance document carries ≥20 rules
+(F-01..F-15 + D-01..D-03 + M-01..M-02 baseline = 20; F-16..F-22 additive
+K-02 v1.5-Phase-2 = 27) per spec §7. Per-rule F-NN ↔
+`validate_invariants.py` parity is enforced separately by
+`tests/schemas/test_cross_sheet_invariants_sync.py` (bidirectional +
+`KNOWN_SCHEMA_ONLY` known-deferred for F-06/F-07). The top-level key
+is `rules` per S3.5 pivot — NOT `invariants`. This skill explicitly
 exercises that key so a memory-drift typo (the natural mistake) is
 caught at the audit step, not silently masked.
 
