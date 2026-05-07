@@ -1,18 +1,18 @@
 """Regression: every scripts/hooks/* path cited in rules/*.md MUST exist
-OR be tracked under Q-V1.5-HOOK-SCRIPTS-MISSING-01 deferred set.
+OR be tracked under EXPECTED_DEFERRED set with Q-XXX reference.
 
 Locks Q-V1.4-AUDIT-GOVERNANCE-01 hook script existence gap (brief T4
 Step 3; previously deferred per audit "Doğrulanmadı" list).
 
-Audit found 4 cited hook scripts that do not exist in scripts/hooks/:
-- check_append_only.sh (rules/append-only-state.md:36)
-- check_naming.py (rules/naming.md:43, "Phase 13'te otomatize")
-- check_excel_writer.py (rules/excel-discipline.md:39)
-- validate_before_write.py (rules/schema-first.md:36, "Phase 13'te otomatize")
-
-Two are "Phase 13'te otomatize" (deferred-by-design); two are unqualified
-gaps. All 4 routed to Q-V1.5-HOOK-SCRIPTS-MISSING-01 for v1.5 milestone
-authoring (test instruments the gap, doesn't paper-over it).
+History:
+- Audit (2026-05-07) found 4 cited hook scripts not authored. All 4 routed
+  to Q-V1.5-HOOK-SCRIPTS-MISSING-01.
+- Cleanup batch (2026-05-07, post-v1.4-deep-audit-fix) applied option (b):
+  authored 2 unqualified-gap hooks (check_append_only.sh +
+  check_excel_writer.py). EXPECTED_DEFERRED reduced 4 → 2.
+- Remaining 2 ("Phase 13'te otomatize" qualifier in rule body — deferred
+  by-design): check_naming.py + validate_before_write.py. v1.5+ session
+  to author when the rule's stated Phase 13 timeline finalizes.
 """
 import re
 from pathlib import Path
@@ -25,13 +25,13 @@ HOOKS_DIR = ROOT / "scripts" / "hooks"
 
 HOOK_PATH_RE = re.compile(r"`scripts/hooks/([a-zA-Z0-9_]+\.(?:sh|py))`")
 
-# Per Q-V1.5-HOOK-SCRIPTS-MISSING-01: 4 hook scripts cited in rules but
-# not yet authored. v1.5 milestone owns deferred authoring.
+# Per Q-V1.5-HOOK-SCRIPTS-MISSING-01 + cleanup batch closure (option b):
+# 2 hook scripts remain deferred — both carry "Phase 13'te otomatize"
+# qualifier in rule body, so the rule itself documents the gap as
+# by-design. Authoring waits on Phase 13 timeline finalization.
 EXPECTED_DEFERRED = {
-    "check_append_only.sh",
-    "check_naming.py",
-    "check_excel_writer.py",
-    "validate_before_write.py",
+    "check_naming.py",          # rules/naming.md:43 "Phase 13'te otomatize"
+    "validate_before_write.py", # rules/schema-first.md:36 "Phase 13'te otomatize"
 }
 
 
