@@ -75,17 +75,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Sequence
-from urllib.parse import (
-    parse_qsl,
-    quote,
-    urlencode,
-    urlsplit,
-    urlunsplit,
-)
-
 # scripts/* is a namespace package; ensure repo root is on sys.path so
-# `from scripts.ingestion.dfs_pull import _normalize_dfs_response` works
-# both as a module import and from the CLI entry-point.
+# `from scripts.*` imports work both as a module and from the CLI entry-point.
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:  # pragma: no cover — import-time wiring
     sys.path.insert(0, str(_REPO_ROOT))
@@ -95,6 +86,12 @@ if str(_REPO_ROOT) not in sys.path:  # pragma: no cover — import-time wiring
 # place. Copying would silently fork the contract on the next DFS shape
 # change. See tests/skills/test_geo_analysis.py for the import test.
 from scripts.ingestion.dfs_pull import _normalize_dfs_response  # noqa: E402
+
+# Canonical D-03 URL normalize (K-01 dedup, v1.5-Phase-1 Tier 1).
+from scripts.util.url_normalize import (  # noqa: E402  (sys.path mutation above)
+    URLNormalizeError as _URLNormalizeError,
+    normalize_url as _canonical_normalize_url,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -162,16 +159,6 @@ CREDITS_PER_QUERY_LLM_MENTIONS = 5.0
 #: DFS SERP organic_live_advanced ~1 credit per query (standard).
 CREDITS_PER_QUERY_SERP_ORGANIC = 1.0
 
-# Default scheme ports stripped from netloc (D-03).
-_DEFAULT_PORTS = {"http": "80", "https": "443"}
-
-# Tracking-style query params dropped wholesale (D-03 cleanup).
-_TRACKING_PARAMS = frozenset({
-    "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
-    "gclid", "fbclid", "mc_cid", "mc_eid", "msclkid",
-})
-
-
 # ---------------------------------------------------------------------------
 # Errors
 # ---------------------------------------------------------------------------
@@ -198,25 +185,14 @@ class ProjectNameMissingError(GeoAnalysisError):
 # URL canonicalization (D-03 invariant) — mirrors on_page_audit_transform
 # ---------------------------------------------------------------------------
 
-def _normalize_url(url: str) -> str:
-    """
-    Normalize a URL per D-03 invariant.
+def _normalize_url(url: Any) -> str:
+    """Hybrid D-03 URL normalize via :mod:`scripts.util.url_normalize`.
 
-    Rules (deterministic, idempotent):
-      1. Trim surrounding whitespace.
-      2. Lowercase scheme + host (path/query case-preserved).
-      3. IDN host → punycode (idna ascii) when non-ASCII.
-      4. Strip default port (:80 for http, :443 for https).
-      5. Trailing slash on path: keep root '/' as-is, strip on others.
-      6. Drop fragment (everything after '#').
-      7. Drop tracking params (utm_*, gclid, fbclid, mc_*, msclkid).
-      8. Sort remaining query params by key (stable for equal keys).
+    Tolerant on empty / scheme-less input (returns "") — LLM citations
+    may surface a brand without a full URL. Strict on non-string type
+    (raises :class:`GeoAnalysisError`) so caller bugs are still loud.
 
-    Empty / unparseable input returns "" — geo-analysis tolerates LLM
-    citations without a URL (some models surface a brand without linking),
-    so we don't raise on an empty string the way on-page-audit does.
-
-    Raises GeoAnalysisError on completely malformed input (non-string).
+    K-01 dedup (v1.5-Phase-1 Tier 1).
     """
     if url is None or url == "":
         return ""
@@ -224,53 +200,13 @@ def _normalize_url(url: str) -> str:
         raise GeoAnalysisError(
             f"url must be a string, got {type(url).__name__}"
         )
-    raw = url.strip()
-    if not raw:
+    if not url.strip():
         return ""
-
-    parts = urlsplit(raw)
-    scheme = parts.scheme.lower()
-    if not scheme:
-        # Unparseable scheme-less input → treat as missing (graceful for LLM
-        # citations that may reference a brand name rather than a full URL).
+    try:
+        return _canonical_normalize_url(url)
+    except _URLNormalizeError:
+        # Scheme-less / unparseable -> graceful empty (LLM citation tolerance).
         return ""
-
-    host = parts.hostname or ""
-    if host:
-        try:
-            host_ascii = host.encode("idna").decode("ascii").lower()
-        except (UnicodeError, UnicodeDecodeError):
-            host_ascii = host.lower()
-    else:
-        host_ascii = ""
-
-    port = parts.port
-    if port is not None and str(port) != _DEFAULT_PORTS.get(scheme):
-        netloc = f"{host_ascii}:{port}"
-    else:
-        netloc = host_ascii
-
-    if parts.username is not None:
-        user = quote(parts.username, safe="")
-        if parts.password is not None:
-            user = f"{user}:{quote(parts.password, safe='')}"
-        netloc = f"{user}@{netloc}"
-
-    path = parts.path or "/"
-    if len(path) > 1 and path.endswith("/"):
-        path = path.rstrip("/")
-        if not path:
-            path = "/"
-
-    qs_pairs = parse_qsl(parts.query, keep_blank_values=True)
-    cleaned = [
-        (k, v) for (k, v) in qs_pairs
-        if k.lower() not in _TRACKING_PARAMS
-    ]
-    cleaned.sort(key=lambda kv: (kv[0], kv[1]))
-    query = urlencode(cleaned, doseq=False)
-
-    return urlunsplit((scheme, netloc, path, query, ""))
 
 
 # ---------------------------------------------------------------------------

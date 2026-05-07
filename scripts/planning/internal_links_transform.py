@@ -68,19 +68,17 @@ from dataclasses import dataclass, field
 from datetime import date as _date, datetime
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
-from urllib.parse import (
-    parse_qsl,
-    quote,
-    urlencode,
-    urlsplit,
-    urlunsplit,
-)
-
 # scripts/budget is a namespace package (no __init__.py); make repo root
 # importable so tests + CLI can both reach it.
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
+
+# Canonical D-03 URL normalize (K-01 dedup, v1.5-Phase-1 Tier 1).
+from scripts.util.url_normalize import (  # noqa: E402  (sys.path mutation above)
+    URLNormalizeError as _URLNormalizeError,
+    normalize_url as _canonical_normalize_url,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -166,15 +164,6 @@ ANCHOR_DIVERSITY_DISTINCT_THRESHOLD = 2
 #: Optional DFS path credit estimate (per URL).
 DFS_CREDITS_PER_URL = 3   # on_page_content_parsing per worker brief / spec §11.6
 
-#: Default scheme ports we strip from netloc (D-03 invariant — same as
-#: cannibalization_transform.normalize_url).
-_DEFAULT_PORTS = {"http": "80", "https": "443"}
-_TRACKING_PARAMS = frozenset({
-    "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
-    "gclid", "fbclid", "mc_cid", "mc_eid", "msclkid",
-})
-
-
 # ---------------------------------------------------------------------------
 # Exceptions
 # ---------------------------------------------------------------------------
@@ -209,60 +198,16 @@ class BudgetExceededError(InternalLinksError):
 # ---------------------------------------------------------------------------
 
 def normalize_url(url: str) -> str:
-    """Idempotent URL normalize per D-03.
+    """D-03 URL normalize via :mod:`scripts.util.url_normalize`.
 
-    Rules: lowercase scheme+host, IDN→punycode, strip default port,
-    strip trailing slash (root excluded), drop fragment, drop tracking
-    params, sort remaining query keys.
-
-    Raises InternalLinksError on completely unparseable input.
+    Adapter wrapping :class:`URLNormalizeError` into
+    :class:`InternalLinksError` so call-site DURUR semantics stay
+    backward-compatible after K-01 dedup (v1.5-Phase-1 Tier 1).
     """
-    if not isinstance(url, str):
-        raise InternalLinksError(
-            f"url must be a string, got {type(url).__name__}"
-        )
-    raw = url.strip()
-    if not raw:
-        raise InternalLinksError("url is empty")
-
-    parts = urlsplit(raw)
-    scheme = parts.scheme.lower()
-    if not scheme:
-        raise InternalLinksError(f"url missing scheme: {url!r}")
-
-    host = parts.hostname or ""
-    if host:
-        try:
-            host_ascii = host.encode("idna").decode("ascii").lower()
-        except (UnicodeError, UnicodeDecodeError):
-            host_ascii = host.lower()
-    else:
-        host_ascii = ""
-
-    port = parts.port
-    if port is not None and str(port) != _DEFAULT_PORTS.get(scheme):
-        netloc = f"{host_ascii}:{port}"
-    else:
-        netloc = host_ascii
-
-    if parts.username is not None:
-        user = quote(parts.username, safe="")
-        if parts.password is not None:
-            user = f"{user}:{quote(parts.password, safe='')}"
-        netloc = f"{user}@{netloc}"
-
-    path = parts.path or "/"
-    if len(path) > 1 and path.endswith("/"):
-        path = path.rstrip("/")
-        if not path:
-            path = "/"
-
-    qs_pairs = parse_qsl(parts.query, keep_blank_values=True)
-    cleaned = [(k, v) for (k, v) in qs_pairs if k.lower() not in _TRACKING_PARAMS]
-    cleaned.sort(key=lambda kv: (kv[0], kv[1]))
-    query = urlencode(cleaned, doseq=False)
-
-    return urlunsplit((scheme, netloc, path, query, ""))
+    try:
+        return _canonical_normalize_url(url)
+    except _URLNormalizeError as exc:
+        raise InternalLinksError(str(exc)) from exc
 
 
 # ---------------------------------------------------------------------------

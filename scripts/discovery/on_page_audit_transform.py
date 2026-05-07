@@ -42,12 +42,15 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
-from urllib.parse import (
-    parse_qsl,
-    quote,
-    urlencode,
-    urlsplit,
-    urlunsplit,
+# scripts is a namespace package; ensure repo root on sys.path so absolute
+# imports resolve when invoked as a CLI module.
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from scripts.util.url_normalize import (  # noqa: E402  (sys.path mutation)
+    URLNormalizeError as _URLNormalizeError,
+    normalize_url as _canonical_normalize_url,
 )
 
 # ---------------------------------------------------------------------------
@@ -67,16 +70,6 @@ ON_PAGE_AUDIT_COLUMNS = (
 
 # DFS content_parsing per-URL credit estimate (paid).
 CREDITS_PER_URL_CONTENT_PARSING = 3.0
-
-# Default scheme ports we strip from netloc (D-03).
-_DEFAULT_PORTS = {"http": "80", "https": "443"}
-
-# Tracking-style query params we drop entirely (D-03 cleanup).
-_TRACKING_PARAMS = frozenset({
-    "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
-    "gclid", "fbclid", "mc_cid", "mc_eid", "msclkid",
-})
-
 
 # ---------------------------------------------------------------------------
 # Errors
@@ -106,71 +99,16 @@ class CrossRefMismatchError(OnPageAuditError):
 # ---------------------------------------------------------------------------
 
 def _normalize_url(url: str) -> str:
+    """D-03 URL normalize via :mod:`scripts.util.url_normalize`.
+
+    Adapter wrapping :class:`URLNormalizeError` into
+    :class:`OnPageAuditError` so call-site DURUR semantics stay
+    backward-compatible after K-01 dedup (v1.5-Phase-1 Tier 1).
     """
-    Normalize a URL per D-03 invariant.
-
-    Rules (deterministic, idempotent):
-      1. Trim surrounding whitespace.
-      2. Lowercase scheme + host (path/query case-preserved).
-      3. IDN host → punycode (idna ascii) when non-ASCII.
-      4. Strip default port (:80 for http, :443 for https).
-      5. Trailing slash on path: keep root '/' as-is, strip on others.
-      6. Drop fragment (everything after '#').
-      7. Drop tracking params (utm_*, gclid, fbclid, ...).
-      8. Sort remaining query params by key, stable for equal keys.
-
-    Raises OnPageAuditError on completely unparseable input (empty, no
-    scheme, non-string).
-    """
-    if not isinstance(url, str):
-        raise OnPageAuditError(
-            f"url must be a string, got {type(url).__name__}"
-        )
-    raw = url.strip()
-    if not raw:
-        raise OnPageAuditError("url is empty")
-
-    parts = urlsplit(raw)
-    scheme = parts.scheme.lower()
-    if not scheme:
-        raise OnPageAuditError(f"url missing scheme: {url!r}")
-
-    host = parts.hostname or ""
-    if host:
-        try:
-            host_ascii = host.encode("idna").decode("ascii").lower()
-        except (UnicodeError, UnicodeDecodeError):
-            host_ascii = host.lower()
-    else:
-        host_ascii = ""
-
-    port = parts.port
-    if port is not None and str(port) != _DEFAULT_PORTS.get(scheme):
-        netloc = f"{host_ascii}:{port}"
-    else:
-        netloc = host_ascii
-
-    if parts.username is not None:
-        user = quote(parts.username, safe="")
-        if parts.password is not None:
-            user = f"{user}:{quote(parts.password, safe='')}"
-        netloc = f"{user}@{netloc}"
-
-    path = parts.path or "/"
-    if len(path) > 1 and path.endswith("/"):
-        path = path.rstrip("/")
-        if not path:
-            path = "/"
-
-    qs_pairs = parse_qsl(parts.query, keep_blank_values=True)
-    cleaned = [
-        (k, v) for (k, v) in qs_pairs
-        if k.lower() not in _TRACKING_PARAMS
-    ]
-    cleaned.sort(key=lambda kv: (kv[0], kv[1]))
-    query = urlencode(cleaned, doseq=False)
-
-    return urlunsplit((scheme, netloc, path, query, ""))
+    try:
+        return _canonical_normalize_url(url)
+    except _URLNormalizeError as exc:
+        raise OnPageAuditError(str(exc)) from exc
 
 
 # ---------------------------------------------------------------------------

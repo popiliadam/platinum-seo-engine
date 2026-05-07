@@ -43,12 +43,15 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
-from urllib.parse import (
-    parse_qsl,
-    quote,
-    urlencode,
-    urlsplit,
-    urlunsplit,
+# scripts is a namespace package; ensure repo root on sys.path so absolute
+# imports resolve when invoked as a CLI module.
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from scripts.util.url_normalize import (  # noqa: E402  (sys.path mutation)
+    URLNormalizeError as _URLNormalizeError,
+    normalize_url as _canonical_normalize_url,
 )
 
 # ---------------------------------------------------------------------------
@@ -75,18 +78,6 @@ _STATUS_ENUM = frozenset({
 # Default K — minimum impressions per page to qualify as a real conflict.
 _DEFAULT_MIN_IMPRESSIONS = 10
 
-# Default scheme ports we strip from netloc (D-03).
-_DEFAULT_PORTS = {"http": "80", "https": "443"}
-
-# Tracking-style query params we drop entirely (D-03 cleanup; deterministic
-# and idempotent). Keep the list small + obviously-tracking; do NOT drop
-# arbitrary query keys (would lose canonicality).
-_TRACKING_PARAMS = frozenset({
-    "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
-    "gclid", "fbclid", "mc_cid", "mc_eid", "msclkid",
-})
-
-
 # ---------------------------------------------------------------------------
 # Exceptions (DURUR-style explicit)
 # ---------------------------------------------------------------------------
@@ -104,71 +95,16 @@ class RowSchemaError(CannibalizationError):
 # ---------------------------------------------------------------------------
 
 def normalize_url(url: str) -> str:
+    """D-03 URL normalize via :mod:`scripts.util.url_normalize`.
+
+    Adapter wrapping :class:`URLNormalizeError` into
+    :class:`CannibalizationError` so call-site DURUR semantics stay
+    backward-compatible after K-01 dedup (v1.5-Phase-1 Tier 1).
     """
-    Normalize a URL per D-03 invariant.
-
-    Rules (deterministic, idempotent):
-      1. Trim surrounding whitespace.
-      2. Lowercase scheme + host (path/query case-preserved).
-      3. IDN host → punycode (idna ascii) when non-ASCII.
-      4. Strip default port (:80 for http, :443 for https).
-      5. Trailing slash on path: keep root '/' as-is, strip on others.
-      6. Drop fragment (everything after '#').
-      7. Drop tracking params (utm_*, gclid, fbclid, ...).
-      8. Sort remaining query params by key, stable for equal keys.
-
-    Returns the normalized URL string. Raises CannibalizationError on
-    completely unparseable input (non-string, empty, no scheme).
-    """
-    if not isinstance(url, str):
-        raise CannibalizationError(
-            f"url must be a string, got {type(url).__name__}"
-        )
-    raw = url.strip()
-    if not raw:
-        raise CannibalizationError("url is empty")
-
-    parts = urlsplit(raw)
-    scheme = parts.scheme.lower()
-    if not scheme:
-        raise CannibalizationError(f"url missing scheme: {url!r}")
-
-    host = parts.hostname or ""
-    if host:
-        try:
-            host_ascii = host.encode("idna").decode("ascii")
-        except (UnicodeError, UnicodeDecodeError):
-            host_ascii = host.lower()
-        else:
-            host_ascii = host_ascii.lower()
-    else:
-        host_ascii = ""
-
-    port = parts.port
-    if port is not None and str(port) != _DEFAULT_PORTS.get(scheme):
-        netloc = f"{host_ascii}:{port}"
-    else:
-        netloc = host_ascii
-
-    if parts.username is not None:
-        user = quote(parts.username, safe="")
-        if parts.password is not None:
-            user = f"{user}:{quote(parts.password, safe='')}"
-        netloc = f"{user}@{netloc}"
-
-    path = parts.path or "/"
-    if len(path) > 1 and path.endswith("/"):
-        path = path.rstrip("/")
-        if not path:
-            path = "/"
-
-    qs_pairs = parse_qsl(parts.query, keep_blank_values=True)
-    cleaned = [(k, v) for (k, v) in qs_pairs if k.lower() not in _TRACKING_PARAMS]
-    cleaned.sort(key=lambda kv: (kv[0], kv[1]))
-    query = urlencode(cleaned, doseq=False)
-
-    fragment = ""
-    return urlunsplit((scheme, netloc, path, query, fragment))
+    try:
+        return _canonical_normalize_url(url)
+    except _URLNormalizeError as exc:
+        raise CannibalizationError(str(exc)) from exc
 
 
 # ---------------------------------------------------------------------------
