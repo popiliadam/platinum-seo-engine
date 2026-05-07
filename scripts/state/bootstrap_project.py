@@ -14,11 +14,20 @@ Usage:
         [--out PATH] [--dry-run] [--force]
 
 Env vars (read at runtime; no .env file is loaded):
-    PSEO_WORKSPACE_ROOT   override default workspace_root path
+    PSEO_WORKSPACE_ROOT   REQUIRED — workspace root path. workspace_root
+                          resolves to {root}/projects/{slug}. Bootstrap
+                          exits 2 if unset (no engine repo path fallback;
+                          F-16 plugin agnostik invariant).
     PSEO_PROJECTS_DIR     override default output dir (./projects)
 
-Exit codes: 0 = success, non-zero on validation/error (stderr message).
-Stdout contains the generated JSON when --dry-run is set.
+Path defaults follow the modern workspace convention (lowercase
+master.xlsx F1 workbook policy + nested inbox/_state/outputs structure).
+Phase 6+ ingestion skills (sf-import, gsc-pull, dfs-pull, quick-wins,
+content-decay) read these paths.
+
+Exit codes: 0 = success, 2 = PSEO_WORKSPACE_ROOT missing, non-zero on
+validation/IO error (stderr message). Stdout contains the generated
+JSON when --dry-run is set.
 """
 from __future__ import annotations
 
@@ -43,10 +52,13 @@ def log(msg: str) -> None:
 
 def build_project_config(args: argparse.Namespace) -> dict:
     slug = args.project
-    workspace_root = (
-        os.getenv("PSEO_WORKSPACE_ROOT")
-        or f"~/Documents/platinum-seo-engine/projects/{slug}"
-    )
+    workspace_root_env = os.getenv("PSEO_WORKSPACE_ROOT")
+    if not workspace_root_env:
+        log("ERROR: PSEO_WORKSPACE_ROOT environment variable is not set.")
+        log("Set it to the workspace root path before running bootstrap")
+        log("(e.g. PSEO_WORKSPACE_ROOT=~/Documents/platinum-seo-workspace).")
+        sys.exit(2)
+    workspace_root = f"{workspace_root_env}/projects/{slug}"
     cfg: dict = {
         "schema_version": SCHEMA_VERSION,
         "project_id": slug,
@@ -63,12 +75,12 @@ def build_project_config(args: argparse.Namespace) -> dict:
         "profiles": args.profile or ["local-service"],
         "paths": {
             "workspace_root": workspace_root,
-            "excel_filename": f"{slug}_MASTER.xlsx",
-            "sf_exports_dir": "sf-exports",
-            "staging_dir": "staging",
-            "reports_dir": "reports",
-            "blog_dir": "blog",
-            "backups_dir": "_backups",
+            "excel_filename": "master.xlsx",
+            "sf_exports_dir": "inbox/sf",
+            "staging_dir": "_state/cache",
+            "reports_dir": "outputs/reports",
+            "blog_dir": "outputs/content/drafts",
+            "backups_dir": "_state/backups",
         },
         "gsc": {
             "site_url": args.gsc_site_url or args.domain,
