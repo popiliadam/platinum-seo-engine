@@ -33,6 +33,6 @@ Bir veri şekli yazılmadan ÖNCE schema'sı `schemas/{name}.schema.json` dosyas
 
 ## Enforcement
 - CI: `tests/schemas/test_all_schemas_exist.py` — yazım yapan her script için schema referansı doğrular.
-- Pre-write hook: `scripts/hooks/validate_before_write.py` (Phase 13'te otomatize).
+- Pre-write hook: `scripts/hooks/validate_before_write.py` schema-first paired-update disiplinini staged diff üzerinden zorlar.
 - Phase 13 `schema-validate` skill: tüm dosyaları schema'ya karşı tarar.
 - Manuel review: PR review checklist "Yeni veri şekli için schema PR'ı önce mi geldi?" maddesi.

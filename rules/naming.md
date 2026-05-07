@@ -40,5 +40,5 @@ Drift'in en sessiz girişi, isim kayışıdır: aynı varlık iki yerde iki fark
 
 ## Enforcement
 - CI: `tests/naming/test_slug_regex.py` tüm `*.schema.json`, `commands/*.md`, `skills/*/SKILL.md` taranır.
-- Pre-commit hook: `scripts/hooks/check_naming.py` (Phase 13'te otomatize).
+- Pre-commit hook: `scripts/hooks/check_naming.py` slug & filename regex'ini staged diff üzerinden zorlar.
 - Manuel review: PR review checklist'inde "isim biçimi sözleşmeye uyuyor mu?" maddesi.
