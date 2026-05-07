@@ -37,6 +37,8 @@ import json
 import re
 from pathlib import Path
 
+import os
+
 import pytest
 import yaml
 from jsonschema import Draft7Validator
@@ -53,7 +55,12 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SCHEMAS = REPO_ROOT / "schemas"
 SKILL_MD = REPO_ROOT / "skills" / "ingestion" / "sf-import" / "SKILL.md"
 
-WORKSPACE_STAGING = Path("/Users/apple/Documents/platinum-seo-workspace-staging")
+WORKSPACE_STAGING = Path(
+    os.environ.get(
+        "PSEO_WORKSPACE_STAGING",
+        str(Path.home() / "Documents" / "platinum-seo-workspace-staging"),
+    )
+)
 PILOT_SLUG = "demo-dental"
 PILOT_SF_DATE = "2026-04-27"
 PILOT_RAW_DIR = (
