@@ -37,3 +37,26 @@ Drift, çoğunlukla iyi niyetli kopyala-yapıştırla başlar: aynı kural spec'
 - CI: `tests/duplication/test_no_duplicate_glossary_terms.py`.
 - Manuel review: PR review checklist "Bu bilgi başka bir yerde de var mı?" maddesi.
 - Cross-link: → rules/append-only-state.md, → rules/schema-first.md.
+
+## Reports Frontmatter Policy (H-F v1.4-deep-audit-fix Tier 3 closure)
+
+`templates/reports/*.md` içindeki rapor template'leri iki tipe ayrılır; tip bazında frontmatter zorunluluğu farklıdır:
+
+**Tip A — Multi-project aggregation OR schema-validated** (frontmatter ZORUNLU):
+- `portfolio-{heatmap,kpi-trend,monthly-roundup,overview,task-heatmap,weekly-brief}` — read-only multi-project agregator (`schemas/portfolio-config.schema.json` const)
+- `monthly-report` — `schemas/monthly-report.schema.json` v1.0 conformant
+- `monitoring-weekly` + `weekly-summary` — period-rolling lifecycle aggregators
+- Frontmatter: `report_kind`, `project_id`/`portfolio_id`, period boundaries, `generated_at` MUST.
+
+**Tip B — Single-project descriptive** (frontmatter OPSIYONEL; `<!-- rules consumed -->` HTML comment block ZORUNLU):
+- 17 single-project transform raporu (`cannibalization`, `cluster-map`, `competitive-analysis`, `content-decay`, `content-gaps`, `dfs-pull`, `drift`, `geo-analysis`, `gsc-pull`, `internal-links`, `new-content-plan`, `on-page-audit`, `quickwin`, `schema-audit`, `scrapling-ops`, `tech-audit`, `topical-map`).
+- Comment block formatı:
+  ```html
+  <!--
+    Reports Frontmatter Policy: single-project descriptive (rules/single-source-of-truth.md#reports-frontmatter-policy).
+    Rules consumed: rules/<rule>.md, rules/events-writer.md, rules/append-only-state.md
+  -->
+  ```
+- Bu blok skill orchestrator'un hangi rule'ları enforce ettiğini deklarasyondur; SSOT cross-link rapor kullanım context'inde explicit kalır.
+
+**Why:** 9 multi-project rapor schema-validated → frontmatter zaten authority; 17 single-project descriptive rapor frontmatter eksikti (H-F audit finding) — HTML comment block lightweight çözüm, render output'unu etkilemez (HTML comments markdown'da invisible).
