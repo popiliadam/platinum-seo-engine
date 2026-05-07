@@ -5,15 +5,15 @@
     "email": "suleymanncapar@gmail.com"
   },
   "metadata": {
-    "description": "Platinum SEO Engine — autonomous SEO operations plugin. Two-repo architecture (engine logic + workspace data). Schema-locked, drift-checked, Excel+JSONL state.",
-    "version": "1.4.0",
+    "description": "Platinum SEO Engine \u2014 autonomous SEO operations plugin. Two-repo architecture (engine logic + workspace data). Schema-locked, drift-checked, Excel+JSONL state.",
+    "version": "1.5.0",
     "repository": "https://github.com/popiliadam/platinum-seo-engine"
   },
   "plugins": [
     {
       "name": "platinum-seo-engine",
       "source": "./",
-      "description": "v1.4.0 — 43 skills, 20 schemas, 20 rules, 15 commands, 6 hooks, 3 MCP servers (gsc + dataforseo + ScraplingServer; higgsfield user-level optional). Production-ready: drift-check AMBER (F-16 + F-17 PASS, F-13 historical kalıntı), pytest 970 passed + 11 skipped baseline, 13/13 v1.x audit findings RESOLVED, 2 ADR closed post-soak (004 + 005), 8/8 v1.3 audit finding RESOLVED (3 KRİTİK Wave 0 + 5 sub-critical Wave 2), v1.4 deep-audit-fix + cleanup-batch closed (3 Q-V1.4-AUDIT + Q-V1.4-BOOTSTRAP-DEFAULT-OUT-01 + Q-V1.5-HOOK-SCRIPTS-MISSING-01 partial RESOLVED), pre-publication security audit Wave 1 (drift sıfır)."
+      "description": "v1.5.0 \u2014 43 skills, 20 schemas, 20 rules, 15 commands, 6 hooks, 3 MCP servers (gsc + dataforseo + ScraplingServer; higgsfield user-level optional). Production-ready: drift-check AMBER (F-16 + F-17 PASS, F-13 historical kal\u0131nt\u0131), pytest 1065 passed + 11 skipped (was 970 v1.4.0; +95 yeni test cumulative v1.5 cycle, regression s\u0131f\u0131r), 13/13 v1.x audit findings RESOLVED, 8/8 v1.3 audit finding RESOLVED, v1.4 deep-audit-fix + cleanup-batch closed (3 Q-V1.4-AUDIT + Q-V1.4-BOOTSTRAP-DEFAULT-OUT-01 + Q-V1.5-HOOK-SCRIPTS-MISSING-01 partial RESOLVED), v1.5 audit closure: Phase-1 K-01+Y-01 url_normalize 10-file dedup + Phase-2 K-02 cross-sheet-invariants 20\u219227 + D-01 missing test coverage + O-04 CI Python sync + O-05 memory reconcile + Phase-3 Y-05 version_bump.py 5-file sync automation + Y-07 dump_workspace.py manager session summary + D-02+D-03 orphan archival (10 finding + 4 yeni script: url_normalize + version_bump + dump_workspace [Y-02 dfs_response DEFER v1.5+ semantic divergence]), pre-publication security audit Wave 1 (drift s\u0131f\u0131r)."
     }
   ]
 }

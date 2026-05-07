@@ -5,7 +5,7 @@
 
 Bir Claude Code plugin'i; SEO operasyonunu schema-locked workflow'larla yöneten motor.
 
-**Status:** v1.4.0 — hooks-overhaul (3-Tier event coverage) + bootstrap-paths-fix (Q-V1.4-BOOTSTRAP-PATHS-01 RESOLVED) + deep-audit-fix (9 CRITICAL + 11/12 HIGH RESOLVED, 6 governance regression test) + cleanup-batch (2 unqualified hook scripts authored) — drift-check AMBER (F-16 + F-17 PASS, F-13 historical kalıntı) (2026-05-07) — [Release Notes](docs/RELEASE_NOTES_v1.4.0.md)
+**Status:** v1.5.0 — audit-closure milestone: Phase-1 (K-01+Y-01 url_normalize 10-file dedup) + Phase-2 (K-02 schema sync 20→27 + D-01 missing test coverage + O-04 CI Python sync + O-05 memory reconcile) + Phase-3 (Y-05 version_bump.py 5-file sync automation + Y-07 dump_workspace.py manager session summary + D-02/D-03 orphan archival) — 10 finding RESOLVED + 4 yeni script + 95 yeni test (970→1065 PASS, regression sıfır) — drift-check AMBER (F-16 + F-17 PASS, F-13 historical kalıntı) (2026-05-07) — [Release Notes](docs/RELEASE_NOTES_v1.5.0.md)
 
 ---
 
