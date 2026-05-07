@@ -25,8 +25,9 @@ run(project_slug, ...)       — full 10-step orchestration
 
 Cross-references
 ----------------
-- Schemas: events.schema.json (event_kind=work, event_type=manual,
-  task_id pattern ^T-[0-9]{4,}$, note required), workflow-run.schema.json
+- Schemas: events.schema.json (event_kind=work, event_type=skill_whats_next
+  canonical per v1.6-Phase-2 H-E; task_id pattern ^T-[0-9]{4,}$, note
+  required), workflow-run.schema.json
   (outputs.* string-typed, F5).
 - Cross-modules: scripts.state.workflow_runner,
   scripts.state.events_writer, openpyxl (read-only).
@@ -381,10 +382,15 @@ def emit_router_event(
     note: str,
     workspace_root: Path | None = None,
 ) -> events_writer.EventResult:
-    """Single event_kind=work, event_type=manual, primary_source=manual."""
+    """Single event_kind=work, event_type=skill_whats_next, primary_source=manual.
+
+    Canonical event_type per v1.6-Phase-2 H-E (events.schema event_type enum
+    10→12 additive bump 2026-05-07; ADR-018 paterni reuse). Replaces legacy
+    DSL workaround event_type=manual + note=[skill=whats-next].
+    """
     return events_writer.append_work(
         project_id=project_slug,
-        event_type="manual",
+        event_type="skill_whats_next",
         task_id=synthetic_task_id(run_id),
         note=note,
         primary_source="manual",

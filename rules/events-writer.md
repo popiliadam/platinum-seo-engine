@@ -85,27 +85,28 @@ Worker schema-first override paterni: schema'da olmayan kind kullanmak YASAK. Ye
 - **Section 4b** — `event_kind=provenance` events (`operation` 6-enum, data ingestion lifecycle)
 - **Section 4c** — `event_kind=audit` events (`audit_action` 6-enum, no `event_type` per Section 6)
 
-### Worker Schema-First Override Paterni (Phase 14 W3-W2-B doğum belgesi, 16'ıncı uygulama Phase B Wave 1 generate-images)
+### Worker Schema-First Override Paterni (Phase 14 W3-W2-B doğum belgesi, 16'ıncı uygulama Phase B Wave 1 generate-images; v1.6-Phase-2 canonical entries paterni — alternative path)
 
-- Skill spec'inde literal `event_type=skill_name` (örn `event_type=faq_optimization`) talep edilse bile schema'da YOKsa, worker `event_type=manual` + `note=[skill=faq-optimization event_type_intent=faq_optimization]` yazar.
+- Skill spec'inde literal `event_type=skill_name` (örn `event_type=faq_optimization`) talep edilse bile schema'da YOKsa, worker `event_type=manual` + `note=[skill=faq-optimization event_type_intent=faq_optimization]` yazar (legacy DSL workaround paterni).
+- **v1.6-Phase-2 H-E canonical entries (2026-05-07):** Schema'da `skill_<name>` canonical entries varsa (currently: `skill_content_remediation`, `skill_whats_next`), worker direct emission yapar — DSL workaround gereksiz. Canonical paterni note alanını yine korur (allOf branch enforce; structured data taşıyıcı).
 - Direct match olan skill'lerde override gerekmez (örn `new-blog` → `content_new` schema'da var; ancak URL-context yoksa override).
 - URL-bearing work event constraints (events.schema allOf): `content_new`, `content_revise`, `content_remove`, `redirect_deployed`, `tech_fix`, `schema_fix`, `pillar_launch`, `quickwin_applied` → `url + url_normalized` REQUIRED; standalone scope'unda satisfy edilemiyorsa schema-first override `manual + note`.
 - Branch matrix per skill SKILL.md'de codify edilir (skill-spec authority + schema-first override = brief revize 7 madde paterni).
 
 ### Section 4a — Work Events (event_kind=work, 9 unique base + 4 sub-branches = 13 row)
 
-`event_type` 10 closed enum (events.schema.json):
+`event_type` 12 closed enum (events.schema.json — additive bump 2026-05-07 v1.6-Phase-2 H-E ADR-018 paterni; 10 legacy + 2 skill_<name> canonical):
 
-`content_new`, `content_revise`, `content_remove`, `redirect_deployed`, `tech_fix`, `schema_fix`, `pillar_launch`, `quickwin_applied`, `manual`, `backlink_outreach`.
+`content_new`, `content_revise`, `content_remove`, `redirect_deployed`, `tech_fix`, `schema_fix`, `pillar_launch`, `quickwin_applied`, `manual`, `backlink_outreach`, `skill_content_remediation`, `skill_whats_next`.
 
 | Skill | event_type (schema) | event_type_intent (note field) | Status / Notes |
 |---|---|---|---|
-| whats-next | manual | routing_recommendation | ✅ Active — synthetic task_id mint paterni |
+| whats-next | skill_whats_next | (direct) | ✅ Active — canonical event_type v1.6-Phase-2 H-E; synthetic task_id mint paterni |
 | generate-images | manual | image_generated | ✅ Active — schema-first override 16 (Phase B W1); content_new URL+pillar yok |
 | new-blog | content_new | (direct) | ⏳ Future — + url+url_normalized+after.pageSnapshot+pillar mandatory |
 | revise-content | content_revise | (direct) | ⏳ Future — + before+after schema-required |
 | faq-optimization | manual | faq_optimization | ⏳ Future — schema-first override (no URL-context) |
-| content-remediation (improve) | manual | content_remediation_improve | ⏳ Future |
+| content-remediation (improve) | skill_content_remediation | (direct) | ⏳ Future — canonical event_type v1.6-Phase-2 H-E |
 | content-remediation (delete) | content_remove | (direct) | ⏳ Future — + note required |
 | content-remediation (redirect) | redirect_deployed | (direct) | ⏳ Future — + url+url_normalized+note required |
 | mark-done (quickwin) | quickwin_applied | (direct) | ⏳ Future — + cluster+before+after |

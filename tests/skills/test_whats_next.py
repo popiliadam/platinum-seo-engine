@@ -25,8 +25,8 @@ Tests
    > quick_wins_pending=50 > master_task_medium=40).
 
 5. test_router_event_emitted
-   `run()` writes exactly one event_kind=work, event_type=manual row
-   into events.jsonl with task_id matching ^T-9[0-9]{4}$ and the
+   `run()` writes exactly one event_kind=work, event_type=skill_whats_next
+   row into events.jsonl with task_id matching ^T-9[0-9]{4}$ and the
    markdown summary in `note`. Workflow run completes with
    outputs.recommendations_count + outputs.top_skill STRING-TYPED
    (F5 invariant).
@@ -34,8 +34,9 @@ Tests
 Schemas referenced
 ------------------
 - schemas/skill-frontmatter.schema.json
-- schemas/events.schema.json (event_kind=work, event_type=manual,
-  task_id pattern, note required, primary_source=manual)
+- schemas/events.schema.json (event_kind=work, event_type=skill_whats_next
+  canonical per v1.6-Phase-2 H-E, task_id pattern, note required,
+  primary_source=manual)
 - schemas/workflow-run.schema.json (outputs.* string-typed)
 - schemas/master-excel.schema.json (sheet column conventions)
 """
@@ -387,21 +388,21 @@ def test_router_event_emitted(
         json.loads(l) for l in events_path.read_text("utf-8").splitlines()
         if l.strip()
     ]
-    work_manual = [
+    work_router = [
         e for e in lines
-        if e.get("event_kind") == "work" and e.get("event_type") == "manual"
+        if e.get("event_kind") == "work" and e.get("event_type") == "skill_whats_next"
     ]
-    assert len(work_manual) == 1, (
-        f"expected exactly one work/manual router event, got {len(work_manual)}: "
-        f"{work_manual}"
+    assert len(work_router) == 1, (
+        f"expected exactly one work/skill_whats_next router event, got {len(work_router)}: "
+        f"{work_router}"
     )
-    evt = work_manual[0]
+    evt = work_router[0]
     # task_id pattern (events.schema): ^T-[0-9]{4,}$
     assert re.match(r"^T-[0-9]{4,}$", evt["task_id"]), evt["task_id"]
     # Synthetic router id band: 90000..99998 (mod 9999 + 90000).
     n = int(evt["task_id"].split("-")[1])
     assert 90000 <= n <= 99999, f"synthetic id outside router band: {evt['task_id']}"
-    # note required for event_type=manual.
+    # note required for skill_X canonical entries (events.schema v1.6-Phase-2 H-E).
     assert evt["note"] and "whats-next" in evt["note"]
     assert evt["primary_source"] == "manual"
     # Re-validate against the canonical events schema.
