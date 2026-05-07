@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10"]
+        python-version: ["3.10", "3.14"]
     steps:
       - uses: actions/checkout@v5
         with:
@@ -26,7 +26,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install jsonschema pytest openpyxl pyyaml
+          pip install -r requirements-lock.txt
 
       # Step 1 — governance skill drift-check (master.xlsx invariant 20 cross-sheet rules)
       # Phase 14 W3-W3-α strict mode (Q-CI-W3-03 RESOLVED runtime kanıt + 4 governance helper exec EXIT=0 4/4 zemin).
@@ -34,7 +34,7 @@ jobs:
         run: python3 scripts/ci/run_skill_python.py skills/governance/drift-check/SKILL.md
         continue-on-error: false
 
-      # Step 2 — governance skill schema-validate (jsonschema Draft7 all schemas + cross-sheet-invariants 20 rules)
+      # Step 2 — governance skill schema-validate (jsonschema Draft7 all schemas + cross-sheet-invariants ≥20 rules (additive K-02))
       # Phase 14 W3-W3-α strict mode.
       - name: 2. schema-validate
         run: python3 scripts/ci/run_skill_python.py skills/governance/schema-validate/SKILL.md

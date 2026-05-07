@@ -1,6 +1,7 @@
 # requirements-lock.txt — pinned versions for reproducible installs (Q-PHASE15-LOCKFILE-01)
-# Generated: 2026-05-06 | Platform: darwin | Python: 3.x
+# Generated: 2026-05-06 | Platform: darwin | Python: 3.14
 # Update with: pip freeze > requirements-lock.txt
+# CI matrix: ["3.10", "3.14"] (floor + current; .github/workflows/ci.yml)
 attrs==26.1.0
 iniconfig==2.3.0
 jsonschema==4.26.0
