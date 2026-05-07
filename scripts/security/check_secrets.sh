@@ -16,7 +16,25 @@
 # ============================================================================
 set -euo pipefail
 
-ROOT="${1:-.}"
+# ----------------------------------------------------------------------------
+# Argument parsing
+#   ./check_secrets.sh [ROOT]                         # full mode (default)
+#   ./check_secrets.sh --changed-since [REF] [ROOT]   # incremental mode (B2 perf)
+#
+# Incremental mode scans ONLY files changed since REF (default HEAD~1) — useful
+# for PreToolUse hook fast-path or CI per-PR scans. Structural checks (cred dirs,
+# .env files, key files, chmod) are SKIPPED in incremental mode by design — those
+# are full-tree checks; pattern scan dominates per-edit latency (B2 finding).
+# ----------------------------------------------------------------------------
+INCREMENTAL=0
+INCREMENTAL_REF=""
+if [ "${1:-}" = "--changed-since" ]; then
+  INCREMENTAL=1
+  INCREMENTAL_REF="${2:-HEAD~1}"
+  ROOT="${3:-.}"
+else
+  ROOT="${1:-.}"
+fi
 EXIT=0
 
 # ----------------------------------------------------------------------------
@@ -73,8 +91,21 @@ PATTERN_NAMES=(
 )
 
 echo "============================================================"
-echo "check_secrets.sh — scanning: $ROOT"
+if [ "$INCREMENTAL" = "1" ]; then
+  echo "check_secrets.sh — scanning (incremental, since $INCREMENTAL_REF): $ROOT"
+else
+  echo "check_secrets.sh — scanning: $ROOT"
+fi
 echo "============================================================"
+
+# Pre-compute changed file list once when in incremental mode (B2 perf).
+CHANGED_FILES_LIST=""
+if [ "$INCREMENTAL" = "1" ]; then
+  CHANGED_FILES_LIST=$(cd "$ROOT" && git diff --name-only "$INCREMENTAL_REF" 2>/dev/null || true)
+  if [ -z "$CHANGED_FILES_LIST" ]; then
+    echo "INCREMENTAL: no files changed since $INCREMENTAL_REF (or git unavailable)"
+  fi
+fi
 
 # ----------------------------------------------------------------------------
 # 1) Regex patterns scan
@@ -86,24 +117,41 @@ echo "============================================================"
 for i in "${!PATTERNS[@]}"; do
   p="${PATTERNS[$i]}"
   name="${PATTERN_NAMES[$i]:-pattern_$i}"
-  # grep -l (files-with-matches only) — never prints match content
-  FILES=$(grep -rlE "$p" "$ROOT" \
-    --exclude-dir=.git \
-    --exclude-dir=node_modules \
-    --exclude-dir=_backups \
-    --exclude-dir=staging \
-    --exclude-dir=__pycache__ \
-    --exclude-dir=.venv \
-    --exclude-dir=venv \
-    --exclude="*.lock" \
-    --exclude="*.log" \
-    --exclude="check_secrets.sh" \
-    --exclude="check-secrets.sh" \
-    --exclude="secrets-management.md" \
-    --exclude="2026-04-30-platinum-seo-engine-design.md" \
-    --exclude="test_events_writer.py" \
-    --exclude="test_ci_yaml.py" \
-    --exclude="OPEN_QUESTIONS.md" 2>/dev/null || true)
+  if [ "$INCREMENTAL" = "1" ]; then
+    # Incremental: scan only changed files (file-by-file grep -lE)
+    FILES=""
+    if [ -n "$CHANGED_FILES_LIST" ]; then
+      while IFS= read -r cf; do
+        [ -z "$cf" ] && continue
+        full="$ROOT/$cf"
+        [ -f "$full" ] || continue
+        if grep -lE "$p" "$full" >/dev/null 2>&1; then
+          FILES="${FILES}${full}"$'\n'
+        fi
+      done <<< "$CHANGED_FILES_LIST"
+      FILES="${FILES%$'\n'}"
+    fi
+  else
+    # Full mode: recursive grep with policy excludes (ADR-034)
+    # grep -l (files-with-matches only) — never prints match content
+    FILES=$(grep -rlE "$p" "$ROOT" \
+      --exclude-dir=.git \
+      --exclude-dir=node_modules \
+      --exclude-dir=_backups \
+      --exclude-dir=staging \
+      --exclude-dir=__pycache__ \
+      --exclude-dir=.venv \
+      --exclude-dir=venv \
+      --exclude="*.lock" \
+      --exclude="*.log" \
+      --exclude="check_secrets.sh" \
+      --exclude="check-secrets.sh" \
+      --exclude="secrets-management.md" \
+      --exclude="2026-04-30-platinum-seo-engine-design.md" \
+      --exclude="test_events_writer.py" \
+      --exclude="test_ci_yaml.py" \
+      --exclude="OPEN_QUESTIONS.md" 2>/dev/null || true)
+  fi
   if [ -n "$FILES" ]; then
     echo ""
     echo "FAIL pattern: $name"
@@ -115,6 +163,10 @@ for i in "${!PATTERNS[@]}"; do
     EXIT=1
   fi
 done
+
+# Structural section guard: skip in incremental mode (B2 perf — patterns
+# dominate per-edit latency; structural checks are full-tree concerns).
+if [ "$INCREMENTAL" = "0" ]; then
 
 # ----------------------------------------------------------------------------
 # 2) credentials/ directories (legacy leak surface) outside _backups/
@@ -210,6 +262,8 @@ if [ -n "$ARCHIVED_CRED_FILES" ]; then
   echo "  Fix: chmod 0000 <file>"
   # WARN only, not FAIL — legacy handling
 fi
+
+fi  # end of structural-only sections (incremental mode skips all of section 2-6)
 
 # ----------------------------------------------------------------------------
 # Summary
