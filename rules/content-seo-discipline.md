@@ -1,7 +1,8 @@
 ---
 name: Content SEO Discipline
-status: Active
-applied_to: [new-blog, revise-content, faq-optimization, content-remediation, generate-images]
+status: enforced
+applies_to: [plugin]
+applied_to_skills: [new-blog, revise-content, faq-optimization, content-remediation, generate-images]
 source: docs/superpowers/specs/2026-04-30-content-rules-input.md (R-01..R-13) + Phase 10 decision matrix (R-29, R-30, R-33, R-34, R-36, R-78..R-84, R-107..R-113)
 spec_section: "Phase 10 — Content Rules Processing"
 ---

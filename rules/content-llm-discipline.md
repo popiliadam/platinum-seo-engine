@@ -1,7 +1,8 @@
 ---
 name: Content LLM Discipline
-status: Active
-applied_to: [new-blog, revise-content, faq-optimization]
+status: enforced
+applies_to: [plugin]
+applied_to_skills: [new-blog, revise-content, faq-optimization]
 source: docs/superpowers/specs/2026-04-30-content-rules-input.md (R-16, R-19) + Phase 10 decision matrix (R-98, R-99, R-101, R-102, R-103, R-106)
 spec_section: "Phase 10 — Content Rules Processing"
 ---

@@ -1,7 +1,8 @@
 ---
 name: Content Update Discipline
-status: Active
-applied_to: [revise-content, content-remediation, faq-optimization]
+status: enforced
+applies_to: [plugin]
+applied_to_skills: [revise-content, content-remediation, faq-optimization]
 source: docs/superpowers/specs/2026-04-30-content-rules-input.md (R-25) + Phase 10 decision matrix (R-85, R-86, R-87, R-88, R-89, R-90, R-91)
 spec_section: "Phase 10 — Content Rules Processing"
 ---

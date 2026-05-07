@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "http://platinum-seo-engine/schemas/rules-frontmatter",
+  "title": "Rules Frontmatter Contract v1.0",
+  "description": "YAML frontmatter discipline for every rules/*.md file (spec §8 + ADR-013). Locks the contract: name + status + applies_to identify the rule's scope; spec_section + related cross-link to design + adjacent rules; applied_to_skills (optional) lists production skill consumers for content rules. Validated by tests/rules/test_frontmatter.py + glossary-audit skill on every commit. Resolves H-A v1.4-deep-audit-fix Tier 2 Step 1 (4-pattern frontmatter drift across 20 rules).",
+  "schema_version": "1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "status", "applies_to", "spec_section"],
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "description": "Schema version this rule frontmatter conforms to (rules/schema-versioning-discipline.md). Optional in v1.0 (backwards-compat for 20 rules written pre-v1.4-deep-audit-fix); strongly recommended for new rules. Future major bump (2.0) may require it."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 80,
+      "description": "Human-readable rule title; used in cross-rule references and glossary lookups."
+    },
+    "status": {
+      "enum": ["enforced", "deprecated", "draft", "experimental"],
+      "description": "Lifecycle marker. enforced = production-locked, glossary-audit fires on violation; deprecated = scheduled removal; draft = pre-spec, not enforced; experimental = under evaluation."
+    },
+    "applies_to": {
+      "type": "array",
+      "items": {"enum": ["plugin", "workspace", "skill"]},
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "Scope of enforcement. plugin = engine repo (read-only motor); workspace = project state repo; skill = SKILL.md author obligation."
+    },
+    "spec_section": {
+      "type": "string",
+      "minLength": 2,
+      "description": "Anchor in design.md or ADR (e.g. '§8.4', '§9 + ADR-022/026'). Cross-links rule to its authoritative origin."
+    },
+    "related": {
+      "type": "array",
+      "items": {"type": "string"},
+      "uniqueItems": true,
+      "description": "Adjacent rule slugs (without .md extension) for SSOT navigation."
+    },
+    "applied_to_skills": {
+      "type": "array",
+      "items": {"type": "string"},
+      "uniqueItems": true,
+      "description": "Optional list of production skill slugs this rule constrains. Used by content-* rules to declare downstream consumers (new-blog, revise-content, etc.). Replaces the legacy field name 'applied_to' (renamed in v1.4-deep-audit-fix Tier 2)."
+    },
+    "since": {
+      "type": "string",
+      "format": "date",
+      "description": "Date the rule was introduced (ISO 8601 date)."
+    },
+    "supersedes": {
+      "type": "string",
+      "description": "Slug of the rule this one replaces, or 'none'. Aligns with ADR archive chain convention."
+    },
+    "source": {
+      "type": "string",
+      "description": "Origin document path (e.g. spec doc + Phase decision matrix); useful for migration tracking."
+    }
+  }
+}
