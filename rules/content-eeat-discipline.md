@@ -1,7 +1,8 @@
 ---
 name: Content EEAT Discipline
-status: Active
-applied_to: [new-blog, revise-content, faq-optimization, content-remediation]
+status: enforced
+applies_to: [plugin]
+applied_to_skills: [new-blog, revise-content, faq-optimization, content-remediation]
 source: docs/superpowers/specs/2026-04-30-content-rules-input.md (R-17) + Phase 10 decision matrix (R-28, R-37, R-48, R-49, R-100, R-104, R-115)
 spec_section: "Phase 10 — Content Rules Processing"
 ---

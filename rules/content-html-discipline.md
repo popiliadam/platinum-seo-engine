@@ -1,7 +1,8 @@
 ---
 name: Content HTML Discipline
-status: Active
-applied_to: [new-blog, revise-content, faq-optimization, content-remediation, generate-images]
+status: enforced
+applies_to: [plugin]
+applied_to_skills: [new-blog, revise-content, faq-optimization, content-remediation, generate-images]
 source: docs/superpowers/specs/2026-04-30-content-rules-input.md (R-20..R-24) + Phase 10 decision matrix (R-31, R-35, R-39, R-43, R-57..R-65, R-71..R-77)
 spec_section: "Phase 10 — Content Rules Processing"
 ---

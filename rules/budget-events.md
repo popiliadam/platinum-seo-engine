@@ -1,8 +1,11 @@
 ---
-status: Active
-since: 2026-05-06
+name: Budget Events
+status: enforced
+applies_to: [workspace, skill]
+spec_section: "§16.8 + ADR-016 + ADR-029"
+related: [append-only-state, events-writer, schema-first]
+since: "2026-05-06"
 supersedes: none
-related_rules: [append-only-state.md, events-writer.md, schema-first.md]
 ---
 
 # Budget Events — cost.credits Canonical Field

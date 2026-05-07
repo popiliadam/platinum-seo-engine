@@ -1,7 +1,8 @@
 ---
 name: Content Quality
-status: Active
-applied_to: [new-blog, revise-content, faq-optimization, content-remediation, generate-images]
+status: enforced
+applies_to: [plugin]
+applied_to_skills: [new-blog, revise-content, faq-optimization, content-remediation, generate-images]
 source: docs/superpowers/specs/2026-04-30-content-rules-input.md (R-01..R-26) + Phase 10 decision matrix (Süleyman 266 cevap, R-27..R-122)
 spec_section: "Phase 10 — Content Rules Processing"
 ---
