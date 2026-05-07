@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://platinum-seo-engine/schemas/project-config.schema.json",
+  "$id": "http://platinum-seo-engine/schemas/project-config",
   "title": "Project Configuration Schema v1.3",
   "description": "Per-project pack definition (projects/{slug}/project.config.json). See ARCHITECTURE.md §10. v1.1 (Phase 10): additive bump — content_settings + brand_identity extension fields. v1.2 (Phase 11 W-F1 cascade fix): additive bump — singular 'profile' field (Foundational Principle 2 enforcement field for production skills new-blog/revise-content). v1.3 (v1.1 P0 ADR-030, Migration 0003): brand_identity additive rename — `pronoun_preference` (canonical, replaces deprecated `hitap`) and `formality` (canonical, replaces deprecated `tone`). Old keys retained as deprecated aliases under additionalProperties: false during 1-year shim window. 'profiles' array (plural, v1.0) retained for sf-required-reports Tier elevation; singular 'profile' added for Phase 10 Principle 2 profile-aware skill behavior switch. Required array UNCHANGED (additive policy, → rules/schema-versioning-discipline.md).",
   "type": "object",

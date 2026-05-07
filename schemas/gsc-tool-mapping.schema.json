@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://platinum-seo-engine/schemas/gsc-tool-mapping.schema.json",
+  "$id": "http://platinum-seo-engine/schemas/gsc-tool-mapping",
   "title": "GSC MCP Tool Mapping Contract v1.0",
   "description": "Meta-schema for the Google Search Console MCP integration contract (§12). Validates a use-case registry document that maps 8 canonical GSC use-cases to MCP tool calls, staging tables, Excel target sheets, projection modes, cache policy, and cross-sheet rules. URL normalization (§12.2) is mandatory: every GSC response URL becomes url_original + url_normalized in staging before any projection. Canonical use-case keys and mcp_tool names are carried in enums as the single source of truth.",
   "type": "object",

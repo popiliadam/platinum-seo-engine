@@ -1,5 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "http://platinum-seo-engine/schemas/master-excel",
   "additionalProperties": false,
   "schema_version": "1.0",
   "cross_sheet_rules_ref": "cross-sheet-invariants.json",

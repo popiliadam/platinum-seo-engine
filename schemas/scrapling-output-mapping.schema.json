@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://platinum-seo-engine/schemas/scrapling-output-mapping.schema.json",
+  "$id": "http://platinum-seo-engine/schemas/scrapling-output-mapping",
   "title": "Scrapling Output Mapping Contract v1.0",
   "description": "Meta-schema for the Scrapling integration contract (§14). Covers both execution modes (§14.1): MCP tool call (interactive ad-hoc) and local script (cron/batch/monitoring). Registers the 4 canonical S1-S4 scenarios (§14.2): weekly competitor snapshot, monthly external mentions, weekly price monitor, and post-publish self audit. Every scenario MUST declare tier_escalation as the fixed sequence ['get','fetch','stealthy_fetch'] (§14.5) and MUST point at an output_schema_file under templates/scrapling/. URL normalization is inherited from the global pipeline — staging rows written from Scrapling output carry both url_original and url_normalized.",
   "type": "object",

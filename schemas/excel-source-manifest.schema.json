@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://platinum-seo-engine/templates/excel-source-manifest.schema.json",
+  "$id": "http://platinum-seo-engine/schemas/excel-source-manifest",
   "title": "Excel Source Manifest Schema v1.0",
   "description": "Per-sheet ownership + provenance contract (projects/{slug}/config/excel-source-manifest.json). Declares primary_owner, allowed_writers, source_ref/staging_tables, and projection_mode for every logical sheet. See docs/ARCHITECTURE.md §11.2 and §11.3.",
   "type": "object",

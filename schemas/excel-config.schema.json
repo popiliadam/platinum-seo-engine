@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://platinum-seo-engine/templates/excel-config.schema.json",
+  "$id": "http://platinum-seo-engine/schemas/excel-config",
   "title": "Excel Config Schema v1.0",
   "description": "Per-project Excel pack definition (projects/{slug}/config/excel.config.json). Binds logical_sheet_id to display_name (emoji allowed in display), configures backup policy, and optional per-sheet extra columns. See docs/ARCHITECTURE.md §11.1.",
   "type": "object",
