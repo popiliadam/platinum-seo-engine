@@ -38,3 +38,23 @@ Excel formülü drift'in en hızlı kapısıdır: VLOOKUP/SUM/INDEX-MATCH formü
 - CI: `tests/excel/test_invariants.py` — §7 cross-sheet kuralları.
 - Pre-commit hook: `scripts/hooks/check_excel_writer.py` — `master-excel.xlsx` diff'i `transaction.py`'den gelmiyorsa reddeder.
 - Manuel review: PR review checklist "Excel write `transaction.py` üzerinden mi? Formül var mı?" maddesi.
+
+## When to run `scripts/excel/bootstrap_excel.py`
+`scripts/excel/bootstrap_excel.py` schema-driven `templates/master-excel.xlsx` template generator'ıdır (ADR-009). `transaction.py` runtime'da bu template'i seed olarak kullanır — schema'dan üretim zincirinin başlangıç adımıdır. Plugin-agnostic: slug, domain, hardcoded path yok; idempotent + deterministic (ADR-010: ZIP entry mtime 1980-01-01 + core.xml epoch 1970-01-01 pinning, byte-identical re-runs).
+
+**Ne zaman çalıştırılır:**
+- `schemas/master-excel.schema.json` değiştiğinde (sheet/column/header_row add/rename/remove)
+- `schema_version` bump sonrası (ADR-018 paterni — additive ya da major)
+- Template byte-determinism doğrulaması için (ADR-009 idempotency check)
+- Yeni proje bootstrap'inde DEĞİL — `scripts/state/bootstrap_project.py` template'i kopyalar, regenerate etmez
+
+**Manuel çalıştırma:**
+
+```bash
+python3 scripts/excel/bootstrap_excel.py
+git diff templates/master-excel.xlsx  # idempotent ise byte-değişiklik yok
+```
+
+**Otomatize değil:** Bu adım pre-commit ya da CI hook'una bağlı değil — schema değişiklik PR'ı yazarken manuel çalıştırılır. Schema PR diff'ine `templates/master-excel.xlsx` re-generate edilmiş hâli dahil edilir; CI bu cite'i değil schema-only değişikliği test eder.
+
+**Cross-link:** ADR-009 (master-excel schema-driven), ADR-010 (deterministic xlsx). Brief: docs/superpowers/plans/v1.5-audit-closure-brief.md Phase 3 Tier 3 D-03.
