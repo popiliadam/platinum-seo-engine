@@ -1,5 +1,13 @@
 """Fix schema $id format per ADR-012 + naming.md.
 
+**Status: DEPRECATED — once-applied 2026-05-07** (Q-V1.4-AUDIT-CRITICAL-01
+Tier 1 K-02 schema $id format closure). Kept for audit history per ADR-012:
+the file location is authoritative, archived one-shot scripts are retained
+inline rather than moved so the cited brief + audit references resolve
+deterministically. Re-running ``--apply`` is a no-op (idempotent), but the
+script is no longer wired into any skill, command, hook, or CI step — see
+``v1.5-Phase-3 Tier 3 D-02`` (docs/superpowers/plans/v1.5-audit-closure-brief.md).
+
 Pattern: http://platinum-seo-engine/schemas/<slug>
 - HTTP (not HTTPS) — ADR-012 history-stable URI
 - /schemas/ path (file location authoritative)
