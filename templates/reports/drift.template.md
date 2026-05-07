@@ -1,3 +1,7 @@
+<!--
+  Reports Frontmatter Policy: single-project descriptive (rules/single-source-of-truth.md#reports-frontmatter-policy).
+  Rules consumed: rules/excel-discipline.md, rules/schema-first.md, rules/events-writer.md, rules/append-only-state.md
+-->
 # Drift Check — $project_slug
 
 **Tarih:** $date
