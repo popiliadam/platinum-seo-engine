@@ -62,6 +62,7 @@ import argparse
 import csv
 import io
 import json
+import os
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -73,6 +74,12 @@ from typing import Any, Iterable, Mapping, Sequence
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
+
+# Y-06 profile-aware default cascade (v1.6-Phase-3 Tier 3).
+from scripts.util.profile_aware_defaults import (  # noqa: E402
+    cascade_default,
+    load_profile,
+)
 
 # Canonical D-03 URL normalize (K-01 dedup, v1.5-Phase-1 Tier 1).
 from scripts.util.url_normalize import (  # noqa: E402  (sys.path mutation above)
@@ -962,8 +969,11 @@ def _parse_args(argv: Iterable[str]) -> argparse.Namespace:
                    help="ISO date YYYY-MM-DD (default: today, UTC).")
     p.add_argument("--default-status", default="TODO",
                    help="statusEnum seed value (default: TODO).")
-    p.add_argument("--max-entries", type=int, default=DEFAULT_MAX_ENTRIES,
-                   help=f"DURUR #7 cap (default: {DEFAULT_MAX_ENTRIES}).")
+    p.add_argument("--max-entries", type=int, default=None,
+                   help=f"DURUR #7 cap (inline default: {DEFAULT_MAX_ENTRIES}; "
+                        f"profile override via Y-06 cascade_default — "
+                        f"PSEO_WORKSPACE_ROOT/{{slug}}/project.config.json "
+                        f"max_entries field if present).")
     p.add_argument("--use-dfs", action="store_true",
                    help="Optional: enrich via DFS on_page_content_parsing "
                         "(triggers budget pre-flight, paid MCP).")
@@ -1010,6 +1020,18 @@ def main(argv: list[str]) -> int:
             print(f"budget pre-flight FAIL: {exc}", file=sys.stderr)
             return 1
 
+    # Y-06 three-tier cascade: CLI override > profile config > inline default.
+    # internal_links has --project-slug — full Y-06 demonstration: load
+    # profile from PSEO_WORKSPACE_ROOT/{slug}/project.config.json per
+    # ADR-033 canonical (empty dict if env var unset or file missing →
+    # behavior preserved).
+    profile = load_profile(
+        os.environ.get("PSEO_WORKSPACE_ROOT"), args.project_slug,
+    )
+    max_entries = cascade_default(
+        profile, "max_entries", DEFAULT_MAX_ENTRIES, override=args.max_entries,
+    )
+
     try:
         result = transform(
             internal_all_rows=internal_rows,
@@ -1017,7 +1039,7 @@ def main(argv: list[str]) -> int:
             project_slug=args.project_slug,
             run_date=run_date,
             default_status=args.default_status,
-            max_entries=args.max_entries,
+            max_entries=max_entries,
         )
     except (
         InternalLinksError,

@@ -49,6 +49,9 @@ if str(_REPO_ROOT) not in sys.path:
 # Direct re-export: quickwins previously raised bare ValueError;
 # URLNormalizeError(ValueError) preserves that contract (K-01 dedup,
 # v1.5-Phase-1 Tier 1).
+from scripts.util.profile_aware_defaults import (  # noqa: E402
+    cascade_default,
+)
 from scripts.util.url_normalize import normalize_url  # noqa: E402,F401
 
 # ---------------------------------------------------------------------------
@@ -78,6 +81,14 @@ OPPORTUNITY_COLUMNS = (
     "potential_clicks",
     "assigned_url_action",
 )
+
+# ---------------------------------------------------------------------------
+# Tunable defaults (Y-06 cascade candidates — profile config can override
+# at main() resolution via cascade_default with the same keys).
+# ---------------------------------------------------------------------------
+
+_DEFAULT_TOP_N: int = 50
+_DEFAULT_THRESHOLD_POSITION_MAX: int = 20
 
 # ---------------------------------------------------------------------------
 # Opportunity score
@@ -414,10 +425,14 @@ def _parse_args(argv: Iterable[str]) -> argparse.Namespace:
                    help="Path to raw mcp__gsc__detect_quick_wins JSON.")
     p.add_argument("--enriched", default=None,
                    help="Optional path to enhanced_search_analytics JSON.")
-    p.add_argument("--top-n", type=int, default=50,
-                   help="Top-N rows by opportunity score (default: 50).")
-    p.add_argument("--threshold-position-max", type=int, default=20,
-                   help="Position ceiling for scoring (default: 20).")
+    p.add_argument("--top-n", type=int, default=None,
+                   help=f"Top-N rows by opportunity score (inline default: "
+                        f"{_DEFAULT_TOP_N}; profile override via Y-06 "
+                        f"cascade_default).")
+    p.add_argument("--threshold-position-max", type=int, default=None,
+                   help=f"Position ceiling for scoring (inline default: "
+                        f"{_DEFAULT_THRESHOLD_POSITION_MAX}; profile "
+                        f"override via Y-06 cascade_default).")
     p.add_argument("--output-dir", default=None,
                    help="If set, write quick_wins.json + opportunity.json here.")
     return p.parse_args(list(argv))
@@ -441,12 +456,23 @@ def main(argv: list[str]) -> int:
     if args.enriched:
         enriched = _load_enrichment(Path(args.enriched))
 
+    # Y-06 three-tier cascade: CLI override > profile config > inline default.
+    # Profile dict empty pending project-config schema fields; load_profile
+    # wiring is opt-in for future v1.7+.
+    top_n = cascade_default(
+        {}, "top_n", _DEFAULT_TOP_N, override=args.top_n,
+    )
+    threshold_position_max = cascade_default(
+        {}, "threshold_position_max", _DEFAULT_THRESHOLD_POSITION_MAX,
+        override=args.threshold_position_max,
+    )
+
     try:
         result = transform(
             raw,
             enriched=enriched,
-            top_n=args.top_n,
-            threshold_position_max=args.threshold_position_max,
+            top_n=top_n,
+            threshold_position_max=threshold_position_max,
         )
     except ValueError as exc:
         print(f"transform failed: {exc}", file=sys.stderr)
