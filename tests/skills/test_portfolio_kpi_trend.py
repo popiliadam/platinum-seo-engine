@@ -428,7 +428,7 @@ def test_empty_events_tolerance_and_trend_line_continuity(
 # Test 5 — event_type 10 enum coverage (every enum value gets a bucket)
 # ---------------------------------------------------------------------------
 
-def test_event_type_10_enum_coverage(
+def test_event_type_12_enum_coverage(
     tmp_path: Path,
     synthetic_portfolio_config: dict,
     fixed_now: datetime,
@@ -491,9 +491,12 @@ def test_event_type_10_enum_coverage(
         assert et in batch.totals_event_type_buckets
         assert batch.totals_event_type_buckets[et] == 1
 
-    # 10 enum coverage assertion at the schema-authority level: the
+    # 12 enum coverage assertion at the schema-authority level: the
     # transform's EVENT_TYPE_ENUM constant matches the events.schema.json
-    # event_type enum verbatim.
+    # event_type enum verbatim. Additive 10→12 per v1.6-Phase-2 H-E
+    # (skill_content_remediation + skill_whats_next canonical entries
+    # replace legacy DSL workaround event_type=manual + note=[skill=X];
+    # ADR-018 paterni reuse — operation enum staging Wave 3 prior art).
     events_schema = json.loads(
         (SCHEMAS / "events.schema.json").read_text("utf-8")
     )
@@ -503,11 +506,11 @@ def test_event_type_10_enum_coverage(
         f"transform={pkt.EVENT_TYPE_ENUM} schema={tuple(schema_enum)}"
     )
 
-    # Totals bucket count exactly 10 (no extras, no missing).
+    # Totals bucket count exactly 12 (no extras, no missing).
     assert len(
         [k for k in batch.totals_event_type_buckets
          if k in pkt.EVENT_TYPE_ENUM]
-    ) == 10
+    ) == 12
 
     # Render smoke — markdown surfaces the event_type density table.
     rendered = pkt.render_report_markdown(

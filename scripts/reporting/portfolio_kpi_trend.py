@@ -31,8 +31,8 @@ if str(_REPO_ROOT) not in sys.path:
 
 EVENT_TYPE_ENUM: tuple[str, ...] = (
     "content_new", "content_revise", "content_remove", "tech_fix",
-    "quickwin_applied", "pillar_launch", "schema_fix",
-    "redirect_deployed", "backlink_outreach", "manual",
+    "quickwin_applied", "pillar_launch", "schema_fix", "redirect_deployed",
+    "backlink_outreach", "manual", "skill_content_remediation", "skill_whats_next",
 )
 STATUS_ENUM: tuple[str, ...] = (
     "TODO", "ONGOING", "EXISTS", "DONE", "BLOCKED", "DEFERRED", "CANCELED",
