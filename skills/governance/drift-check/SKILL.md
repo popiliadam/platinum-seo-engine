@@ -316,6 +316,21 @@ def check_F_XX(workbook, project_slug) -> dict:
 | F-21  | every cell value <32767 chars (Excel hard limit)                      |
 | F-22  | backup directory FIFO 7 (transaction.py keep-7 rotation)              |
 
+### Engine Self-Governance (6, v1.4-deep-audit-fix Tier 4)
+
+These invariants enforce engine repo discipline (schemas/+rules/+templates/) — not workspace state. Each row owns a regression-lock test that fires on every commit; drift-check skill body invokes them via `pytest tests/<area>/test_<name>.py` (standalone-executable convention per rules/skills.md Section 1).
+
+| ID    | Rule                                                                  | Regression Test                            |
+|-------|-----------------------------------------------------------------------|--------------------------------------------|
+| F-23  | schema $id format HTTP + slug + no .schema.json suffix (ADR-012)      | tests/schemas/test_id_format.py             |
+| F-24  | schema_version coverage (every schema declares; const not pattern)    | tests/schemas/test_version_field.py         |
+| F-25  | cross-schema enums sync (events.primary_source ⊆ master_task)         | tests/schemas/test_cross_schema_enums.py    |
+| F-26  | R-XX resolution (every R-XX cited in templates defined or superseded) | tests/rules/test_r_xx_resolution.py         |
+| F-27  | report run_id + Kanıt zinciri H2 (every templates/reports/*.md)       | tests/templates/test_run_id_coverage.py     |
+| F-28  | rules frontmatter validates against rules-frontmatter.schema.json     | tests/rules/test_frontmatter.py             |
+
+Severity: ALL HIGH — engine self-violation breaks SSOT/schema-first discipline at the meta level. Per §17.2, any FAIL → RED (no manual triage placeholder; automated tests are deterministic).
+
 ## F2 flag — F-08 RED is EXPECTED on the pilot workbook
 
 The pilot project `master.xlsx` currently contains only `quick_wins`
