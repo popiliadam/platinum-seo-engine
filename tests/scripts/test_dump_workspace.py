@@ -129,11 +129,11 @@ def _write_active_json(workspace_root: Path, slug: str) -> None:
 
 
 def test_dump_with_explicit_slug_returns_summary_dict(dump_module, tmp_path):
-    _make_workspace(tmp_path, slug="demo-furniture")
+    _make_workspace(tmp_path, slug="demo")
 
-    result = dump_module.dump_workspace(workspace_root=tmp_path, project_slug="demo-furniture")
+    result = dump_module.dump_workspace(workspace_root=tmp_path, project_slug="demo")
 
-    assert result["project"] == "demo-furniture"
+    assert result["project"] == "demo"
     assert "events_tail" in result
     assert "master_task_todo_count" in result
     assert "workflow_pending_approvals" in result
@@ -145,19 +145,19 @@ def test_dump_with_explicit_slug_returns_summary_dict(dump_module, tmp_path):
 
 
 def test_dump_uses_active_json_when_slug_none(dump_module, tmp_path):
-    _make_workspace(tmp_path, slug="demo-furniture")
-    _write_active_json(tmp_path, "demo-furniture")
+    _make_workspace(tmp_path, slug="demo")
+    _write_active_json(tmp_path, "demo")
 
     result = dump_module.dump_workspace(workspace_root=tmp_path, project_slug=None)
 
-    assert result["project"] == "demo-furniture"
+    assert result["project"] == "demo"
 
 
 # ---------- 3. raises when slug=None and no active.json ----------
 
 
 def test_dump_raises_when_slug_none_and_active_json_missing(dump_module, tmp_path):
-    _make_workspace(tmp_path, slug="demo-furniture")
+    _make_workspace(tmp_path, slug="demo")
 
     with pytest.raises(FileNotFoundError, match=r"active\.json|bound"):
         dump_module.dump_workspace(workspace_root=tmp_path, project_slug=None)
@@ -302,7 +302,7 @@ def test_invalid_workspace_raises(dump_module, tmp_path):
 
 
 def test_explicit_slug_not_found_raises(dump_module, tmp_path):
-    _make_workspace(tmp_path, slug="demo-furniture")
+    _make_workspace(tmp_path, slug="demo")
 
     with pytest.raises(FileNotFoundError, match=r"unknown|project|slug"):
         dump_module.dump_workspace(
