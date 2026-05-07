@@ -30,7 +30,7 @@ post_metadata:
   content_version: v1                                      # R-103
 
 post_body_html: |
-  <!-- Skill output HTML fragment (article scope, R-22 + R-57) -->
+  <!-- Skill output HTML fragment (article scope, R-22 master; R-57 superseded) -->
   {{FULL_HTML_BODY_FRAGMENT_FROM_NEW_BLOG_TEMPLATE}}
 
 schema_markup_jsonld: |
