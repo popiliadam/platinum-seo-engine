@@ -219,10 +219,14 @@ def test_cross_sheet_invariants_rules_key_compile() -> None:
 
     rules = csi["rules"]
     assert isinstance(rules, list)
-    # 20 rule registry per spec §7
-    assert len(rules) == 20, (
-        f"rules array must have 20 entries (F-01..F-15 + D-01..D-03 + "
-        f"M-01..M-02); got {len(rules)}"
+    # ≥20 rule registry per spec §7 (additive growth K-02 paterni:
+    # v1.5-Phase-2 Tier 1 added F-16..F-22 → 20 → 27). Per-rule
+    # F-NN ↔ validate_invariants.py parity is enforced separately by
+    # tests/schemas/test_cross_sheet_invariants_sync.py (bidirectional +
+    # KNOWN_SCHEMA_ONLY known-deferred).
+    assert len(rules) >= 20, (
+        f"rules array must have ≥20 entries (F-01..F-15 + D-01..D-03 + "
+        f"M-01..M-02 baseline; F-16..F-22 additive K-02); got {len(rules)}"
     )
 
     # Per-rule structural validate: id + severity + category + rule

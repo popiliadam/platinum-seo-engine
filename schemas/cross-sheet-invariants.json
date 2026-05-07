@@ -48,7 +48,7 @@
     {
       "id": "F-05",
       "rule": "completed_work.task_id ⊆ master_task WHERE status=DONE",
-      "severity": "HIGH",
+      "severity": "CRITICAL",
       "category": "csr_foundation",
       "rationale": "A completed_work row referencing a non-DONE task means the DONE cascade §21.4 was partial — either master_task was reverted or the cascade aborted before step 5.",
       "computed_by": "consistency_check"
@@ -112,7 +112,7 @@
     {
       "id": "F-13",
       "rule": "robots_txt.disallowed == crawl_sitemap WHERE indexability='Non-indexable (robots)'",
-      "severity": "MEDIUM",
+      "severity": "HIGH",
       "category": "csr_foundation",
       "rationale": "robots.txt declarations and SF-detected indexability must agree; a delta means one of the two is stale (cached robots or stale crawl).",
       "computed_by": "consistency_check"
@@ -120,7 +120,7 @@
     {
       "id": "F-14",
       "rule": "gsc_performance.page ⊆ (crawl_sitemap ∪ redirect_targets)",
-      "severity": "MEDIUM",
+      "severity": "HIGH",
       "category": "csr_foundation",
       "rationale": "GSC may report impressions for redirected URLs for up to 6 months; accepting sitemap-OR-redirect-target union avoids false-positive orphan flags.",
       "computed_by": "consistency_check"
@@ -171,6 +171,62 @@
       "severity": "MEDIUM",
       "category": "csr_mcp",
       "rationale": "Stale SF data + fresh Excel date is a lying report. Freshness SLA is per-sheet in excel-source-manifest.json; staler-than-SLA triggers AMBER.",
+      "computed_by": "consistency_check"
+    },
+    {
+      "id": "F-16",
+      "rule": "quick_wins.url ⊆ opportunity.assigned_url_action URL set",
+      "severity": "HIGH",
+      "category": "csr_foundation",
+      "rationale": "Quick-win rows must point at URLs that the opportunity sheet has already triaged (canonical 'url | action' or freeform 'Optimize <url> for query X'); orphan quick_wins indicate that the opportunity intake step was skipped (Q-V1.2-OPP-COVERAGE-01 Phase B post-closeout schema-first override 17'inci uygulama).",
+      "computed_by": "consistency_check"
+    },
+    {
+      "id": "F-17",
+      "rule": "every severity-typed cell ∈ severityEnum {LOW,MEDIUM,HIGH,CRITICAL}",
+      "severity": "HIGH",
+      "category": "csr_data",
+      "rationale": "Severity-typed columns (priority/level/impact carrying $ref severityEnum in master-excel.schema.json) must hold one of the four canonical values; any other token corrupts severity-aware reporting and breaks the verdict aggregator.",
+      "computed_by": "consistency_check"
+    },
+    {
+      "id": "F-18",
+      "rule": "every master_task.created_date is ISO 8601 parseable",
+      "severity": "MEDIUM",
+      "category": "csr_data",
+      "rationale": "master_task.created_date (col K) must parse as ISO 8601; Excel-cached datetimes already pass, freeform strings require fromisoformat tolerance (Z → +00:00). Non-parseable cells break time-series reporting and the DONE cascade audit trail.",
+      "computed_by": "consistency_check"
+    },
+    {
+      "id": "F-19",
+      "rule": "project.config.json declares language.content_locale (nested) + market (root) per schema 1.3",
+      "severity": "MEDIUM",
+      "category": "schema_validation",
+      "rationale": "Schema 1.3 (ADR-030 / Migration 0003) makes nested language.content_locale (BCP 47) + root market the canonical locale path; root locale and defaults.locale are forbidden via additionalProperties: false. Wave 2 fix Q-WAVE1-F19-VALIDATOR-01 collapses pre-1.3 reads onto the 1.3 path only.",
+      "computed_by": "consistency_check"
+    },
+    {
+      "id": "F-20",
+      "rule": "every events.jsonl line is < 64 KiB (events_writer cap)",
+      "severity": "MEDIUM",
+      "category": "row_count_integrity",
+      "rationale": "events_writer enforces a 64 KiB per-line cap so events.jsonl stays line-stream parseable on stdlib JSON readers; lines exceeding the cap indicate a writer bypass (rule append-only-state §3) and corrupt the audit-trail replay loop.",
+      "computed_by": "consistency_check"
+    },
+    {
+      "id": "F-21",
+      "rule": "every cell value < 32767 chars (Excel/openpyxl hard limit)",
+      "severity": "MEDIUM",
+      "category": "schema_validation",
+      "rationale": "Excel's hard cell-value limit is 32 767 characters; openpyxl raises IllegalCharacterError above this. Cells at or over the cap mean upstream prose was not summarized; downstream master.xlsx writes will fail and DURUR-3 fires.",
+      "computed_by": "consistency_check"
+    },
+    {
+      "id": "F-22",
+      "rule": "_state/backups/master keeps at most 7 .xlsx backups (FIFO)",
+      "severity": "MEDIUM",
+      "category": "file_hash_integrity",
+      "rationale": "transaction.py keep-7 FIFO rotation invariant; exceeding the cap means the rotation step was skipped and disk pressure accumulates. auto_repair_available=true — surplus backups can be deleted oldest-first without data loss.",
       "computed_by": "consistency_check"
     }
   ]
