@@ -49,6 +49,9 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from scripts.util.profile_aware_defaults import (  # noqa: E402  (sys.path mutation)
+    cascade_default,
+)
 from scripts.util.url_normalize import (  # noqa: E402  (sys.path mutation)
     URLNormalizeError as _URLNormalizeError,
     normalize_url as _canonical_normalize_url,
@@ -457,10 +460,11 @@ def _parse_args(argv: Iterable[str]) -> argparse.Namespace:
         help="Path to raw mcp__gsc__search_analytics JSON (query+page dims).",
     )
     p.add_argument(
-        "--min-impressions", type=int, default=_DEFAULT_MIN_IMPRESSIONS,
+        "--min-impressions", type=int, default=None,
         help=(
             f"Minimum impressions per page to qualify as a conflict "
-            f"contributor (default: {_DEFAULT_MIN_IMPRESSIONS})."
+            f"contributor (inline default: {_DEFAULT_MIN_IMPRESSIONS}; "
+            f"profile override via Y-06 cascade_default)."
         ),
     )
     p.add_argument(
@@ -488,10 +492,18 @@ def main(argv: list[str]) -> int:
         return 2
     raw = _read_json(raw_path)
 
+    # Y-06 three-tier cascade: CLI override > profile config > inline default.
+    # Profile dict is empty pending project-config schema field for
+    # min_impressions; load_profile wiring is opt-in for future v1.7+.
+    min_impressions = cascade_default(
+        {}, "min_impressions", _DEFAULT_MIN_IMPRESSIONS,
+        override=args.min_impressions,
+    )
+
     try:
         result = transform(
             raw,
-            min_impressions=args.min_impressions,
+            min_impressions=min_impressions,
             default_status=args.default_status,
         )
     except CannibalizationError as exc:

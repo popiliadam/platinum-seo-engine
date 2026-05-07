@@ -168,6 +168,9 @@ class RowSchemaError(TechAuditError):
 from scripts.util.dfs_response import (  # noqa: E402  (sys.path mutation above)
     normalize_dfs_response as _normalize_dfs_response,
 )
+from scripts.util.profile_aware_defaults import (  # noqa: E402
+    cascade_default,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -866,8 +869,10 @@ def _parse_args(argv: Iterable[str]) -> argparse.Namespace:
                    help="Path to raw mcp__dataforseo__on_page_lighthouse JSON.")
     p.add_argument("--content-parsing", default=None,
                    help="Path to raw mcp__dataforseo__on_page_content_parsing JSON.")
-    p.add_argument("--url-cap", type=int, default=DEFAULT_URL_CAP,
-                   help=f"DoS prevention cap on URL count (default: {DEFAULT_URL_CAP}).")
+    p.add_argument("--url-cap", type=int, default=None,
+                   help=f"DoS prevention cap on URL count (inline default: "
+                        f"{DEFAULT_URL_CAP}; profile override via Y-06 "
+                        f"cascade_default).")
     p.add_argument("--output-dir", default=None,
                    help="If set, write tech_seo.json into this directory.")
     return p.parse_args(list(argv))
@@ -897,11 +902,18 @@ def main(argv: list[str]) -> int:
             return 2
         content_raw = _read_json(cp_path)
 
+    # Y-06 three-tier cascade: CLI override > profile config > inline default.
+    # Profile dict empty pending project-config schema field for url_cap;
+    # load_profile wiring is opt-in for future v1.7+.
+    url_cap = cascade_default(
+        {}, "url_cap", DEFAULT_URL_CAP, override=args.url_cap,
+    )
+
     try:
         result = transform(
             lighthouse_raw=lighthouse_raw,
             content_parsing_raw=content_raw,
-            url_cap=args.url_cap,
+            url_cap=url_cap,
         )
     except (
         URLCapExceededError,

@@ -101,6 +101,11 @@ if str(_REPO_ROOT) not in sys.path:  # pragma: no cover — import-time wiring
 # place. The identity is locked by an import-discipline test.
 from scripts.ingestion.dfs_pull import _normalize_dfs_response  # noqa: E402
 
+# Y-06 profile-aware default cascade (v1.6-Phase-3 Tier 3).
+from scripts.util.profile_aware_defaults import (  # noqa: E402
+    cascade_default,
+)
+
 
 # ---------------------------------------------------------------------------
 # Constants — schema-aligned column tuple
@@ -1000,8 +1005,10 @@ def _parse_args(argv: Iterable[str]) -> argparse.Namespace:
                    help="The seed concept driving the taxonomy (becomes pillar #1).")
     p.add_argument("--geo-staging", default=None,
                    help="Optional path to Phase 7 geo_analysis_geo_signals staging JSON.")
-    p.add_argument("--max-pillars", type=int, default=DEFAULT_MAX_PILLARS,
-                   help=f"Upper bound on pillar rows (default: {DEFAULT_MAX_PILLARS}).")
+    p.add_argument("--max-pillars", type=int, default=None,
+                   help=f"Upper bound on pillar rows (inline default: "
+                        f"{DEFAULT_MAX_PILLARS}; profile override via Y-06 "
+                        f"cascade_default).")
     p.add_argument("--max-clusters-per-pillar", type=int,
                    default=DEFAULT_MAX_CLUSTERS_PER_PILLAR,
                    help=f"Upper bound on cluster rows per pillar (default: "
@@ -1049,13 +1056,20 @@ def main(argv: list[str]) -> int:
 
     geo_rows = _load_geo_staging(args.geo_staging) if args.geo_staging else []
 
+    # Y-06 three-tier cascade: CLI override > profile config > inline default.
+    # Profile dict empty pending project-config schema fields; load_profile
+    # wiring is opt-in for future v1.7+.
+    max_pillars = cascade_default(
+        {}, "max_pillars", DEFAULT_MAX_PILLARS, override=args.max_pillars,
+    )
+
     try:
         result = transform(
             raw_keyword_ideas=raw_ideas,
             raw_related_keywords=raw_related,
             seed_keyword=args.seed_keyword,
             geo_staging_rows=geo_rows,
-            max_pillars=args.max_pillars,
+            max_pillars=max_pillars,
             max_clusters_per_pillar=args.max_clusters_per_pillar,
             max_supporting_per_cluster=args.max_supporting_per_cluster,
             min_pillar_volume=args.min_pillar_volume,
