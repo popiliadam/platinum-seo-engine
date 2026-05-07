@@ -61,13 +61,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
-from urllib.parse import (
-    parse_qsl,
-    quote,
-    urlencode,
-    urlsplit,
-    urlunsplit,
-)
+from urllib.parse import urlsplit  # used by domain_from_url()
 
 # ---------------------------------------------------------------------------
 # Path wiring — make `scripts.budget`, `scripts.ingestion.dfs_pull` importable
@@ -85,6 +79,12 @@ try:  # pragma: no cover — import-time wiring
     from scripts.ingestion.dfs_pull import _normalize_dfs_response  # type: ignore[import-not-found]
 except Exception:  # pragma: no cover
     _normalize_dfs_response = None  # type: ignore[assignment]
+
+# Canonical D-03 URL normalize (K-01 dedup, v1.5-Phase-1 Tier 1).
+from scripts.util.url_normalize import (  # noqa: E402  (sys.path mutation above)
+    URLNormalizeError as _URLNormalizeError,
+    normalize_url as _canonical_normalize_url,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -130,15 +130,6 @@ S1_COLUMNS: tuple[str, ...] = (
 
 #: DFS competitors_domain ~5 credits per call (single batched lookup).
 CREDITS_PER_COMPETITORS_DOMAIN_CALL: float = 5.0
-
-#: Default scheme ports we strip from netloc (D-03).
-_DEFAULT_PORTS = {"http": "80", "https": "443"}
-
-#: Tracking-style query params we drop entirely (D-03 cleanup; idempotent).
-_TRACKING_PARAMS = frozenset({
-    "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
-    "gclid", "fbclid", "mc_cid", "mc_eid", "msclkid",
-})
 
 #: Default content excerpt cut-off matching the S1 maxLength constraint.
 CONTENT_EXCERPT_MAX_CHARS: int = 500
@@ -189,68 +180,16 @@ class InboxPathError(CompetitiveAnalysisError):
 # ---------------------------------------------------------------------------
 
 def normalize_url(url: str) -> str:
+    """D-03 URL normalize via :mod:`scripts.util.url_normalize`.
+
+    Adapter wrapping :class:`URLNormalizeError` into
+    :class:`CompetitiveAnalysisError` so call-site DURUR semantics stay
+    backward-compatible after K-01 dedup (v1.5-Phase-1 Tier 1).
     """
-    Normalize a URL per the D-03 invariant. Idempotent.
-
-    Rules:
-      1. Trim surrounding whitespace.
-      2. Lowercase scheme + host (path / query case-preserved).
-      3. IDN host → punycode (idna ascii) when non-ASCII.
-      4. Strip default port (:80 for http, :443 for https).
-      5. Trailing slash: keep root '/' as-is, strip on others.
-      6. Drop fragment.
-      7. Drop tracking params (utm_*, gclid, fbclid, ...).
-      8. Sort remaining query params by key (stable for equal keys).
-
-    Raises CompetitiveAnalysisError on completely unparseable input
-    (non-string, empty, no scheme).
-    """
-    if not isinstance(url, str):
-        raise CompetitiveAnalysisError(
-            f"url must be a string, got {type(url).__name__}"
-        )
-    raw = url.strip()
-    if not raw:
-        raise CompetitiveAnalysisError("url is empty")
-
-    parts = urlsplit(raw)
-    scheme = parts.scheme.lower()
-    if not scheme:
-        raise CompetitiveAnalysisError(f"url missing scheme: {url!r}")
-
-    host = parts.hostname or ""
-    if host:
-        try:
-            host_ascii = host.encode("idna").decode("ascii").lower()
-        except (UnicodeError, UnicodeDecodeError):
-            host_ascii = host.lower()
-    else:
-        host_ascii = ""
-
-    port = parts.port
-    if port is not None and str(port) != _DEFAULT_PORTS.get(scheme):
-        netloc = f"{host_ascii}:{port}"
-    else:
-        netloc = host_ascii
-
-    if parts.username is not None:
-        user = quote(parts.username, safe="")
-        if parts.password is not None:
-            user = f"{user}:{quote(parts.password, safe='')}"
-        netloc = f"{user}@{netloc}"
-
-    path = parts.path or "/"
-    if len(path) > 1 and path.endswith("/"):
-        path = path.rstrip("/")
-        if not path:
-            path = "/"
-
-    qs_pairs = parse_qsl(parts.query, keep_blank_values=True)
-    cleaned = [(k, v) for (k, v) in qs_pairs if k.lower() not in _TRACKING_PARAMS]
-    cleaned.sort(key=lambda kv: (kv[0], kv[1]))
-    query = urlencode(cleaned, doseq=False)
-
-    return urlunsplit((scheme, netloc, path, query, ""))
+    try:
+        return _canonical_normalize_url(url)
+    except _URLNormalizeError as exc:
+        raise CompetitiveAnalysisError(str(exc)) from exc
 
 
 def domain_from_url(url: str) -> str:

@@ -63,12 +63,15 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable
-from urllib.parse import (
-    parse_qsl,
-    quote,
-    urlencode,
-    urlsplit,
-    urlunsplit,
+# scripts is a namespace package; ensure repo root on sys.path so absolute
+# imports resolve when invoked as a CLI module.
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from scripts.util.url_normalize import (  # noqa: E402  (sys.path mutation)
+    URLNormalizeError as _URLNormalizeError,
+    normalize_url as _canonical_normalize_url,
 )
 
 # ---------------------------------------------------------------------------
@@ -93,15 +96,6 @@ _STATUS_ENUM = frozenset({
 # DFS on_page_content_parsing per-URL credit estimate (paid; same as
 # on_page_audit transform for parity — single round-trip per URL).
 CREDITS_PER_URL_CONTENT_PARSING = 3.0
-
-# Default scheme ports we strip from netloc (D-03).
-_DEFAULT_PORTS = {"http": "80", "https": "443"}
-
-# Tracking-style query params we drop entirely (D-03 cleanup).
-_TRACKING_PARAMS = frozenset({
-    "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
-    "gclid", "fbclid", "mc_cid", "mc_eid", "msclkid",
-})
 
 # Aggregation threshold — same (schema_type, gap) across ≥N URLs collapses
 # into a single site-wide row.
@@ -157,63 +151,21 @@ class BudgetExceededError(SchemaAuditError):
 # URL normalization (D-03 invariant — same rule as cannibalization_transform)
 # ---------------------------------------------------------------------------
 
-def _normalize_url(url: str) -> str:
-    """Normalize a URL per D-03 (idempotent). Empty / non-string → ''.
+def _normalize_url(url: Any) -> str:
+    """Tolerant D-03 URL normalize via :mod:`scripts.util.url_normalize`.
 
-    Mirrors `cannibalization_transform.normalize_url` semantics so cross-
-    sheet joins (cannibalization ↔ schema) remain bit-stable. Returns the
-    empty string for un-parseable input rather than raising — schema
-    audit drops the row instead of aborting the whole batch when one URL
-    in a SF export is malformed.
+    Returns the empty string for any un-parseable input rather than
+    raising — schema audit drops the row instead of aborting the whole
+    batch when one URL in a SF export is malformed. Cross-sheet joins
+    (cannibalization ↔ schema) remain bit-stable because the canonical
+    helper is the same one cannibalization adapts to.
+
+    K-01 dedup (v1.5-Phase-1 Tier 1).
     """
-    if not isinstance(url, str):
-        return ""
-    raw = url.strip()
-    if not raw:
-        return ""
     try:
-        parts = urlsplit(raw)
-    except ValueError:
+        return _canonical_normalize_url(url)
+    except _URLNormalizeError:
         return ""
-    scheme = parts.scheme.lower()
-    if not scheme:
-        return ""
-
-    host = parts.hostname or ""
-    if host:
-        try:
-            host_ascii = host.encode("idna").decode("ascii")
-        except (UnicodeError, UnicodeDecodeError):
-            host_ascii = host.lower()
-        else:
-            host_ascii = host_ascii.lower()
-    else:
-        host_ascii = ""
-
-    port = parts.port
-    if port is not None and str(port) != _DEFAULT_PORTS.get(scheme):
-        netloc = f"{host_ascii}:{port}"
-    else:
-        netloc = host_ascii
-
-    if parts.username is not None:
-        user = quote(parts.username, safe="")
-        if parts.password is not None:
-            user = f"{user}:{quote(parts.password, safe='')}"
-        netloc = f"{user}@{netloc}"
-
-    path = parts.path or "/"
-    if len(path) > 1 and path.endswith("/"):
-        path = path.rstrip("/")
-        if not path:
-            path = "/"
-
-    qs_pairs = parse_qsl(parts.query, keep_blank_values=True)
-    cleaned = [(k, v) for (k, v) in qs_pairs if k.lower() not in _TRACKING_PARAMS]
-    cleaned.sort(key=lambda kv: (kv[0], kv[1]))
-    query = urlencode(cleaned, doseq=False)
-
-    return urlunsplit((scheme, netloc, path, query, ""))
 
 
 # ---------------------------------------------------------------------------
