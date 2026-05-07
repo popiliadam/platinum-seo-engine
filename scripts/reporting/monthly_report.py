@@ -646,6 +646,7 @@ def render_report_markdown(*, report: Mapping[str, Any], template_text: str) -> 
     $key or syntax error so the skill surfaces failure (no silent fallback).
     """
     flat = _flatten_for_template(report)
+    flat.setdefault("run_id", "$run_id")
     try:
         return Template(template_text).substitute(flat)
     except KeyError as exc:

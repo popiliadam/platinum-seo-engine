@@ -39,4 +39,9 @@ $budget_burn_section
 
 $escalations
 
-> Üretildi: `monitoring-weekly` skill — `scripts/reporting/monitoring_weekly.py` (Phase 12 W-G6, Phase 9 reporting paterni reuse).
+## Kanıt zinciri
+
+- Yazıcı: `monitoring-weekly` skill — `scripts/reporting/monitoring_weekly.py` (Phase 12 W-G6, Phase 9 reporting paterni reuse)
+- Run ID: `$run_id`
+- Şablon: `templates/reports/monitoring-weekly.template.md` (`string.Template` engine — `scripts/reporting/render_template.py`)
+- Üretildi: `$generated_at`

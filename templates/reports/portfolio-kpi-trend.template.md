@@ -37,6 +37,7 @@ $projects_block
 
 - Yazıcı: `portfolio_kpi_trend` (READ-ONLY agregator; master.xlsx#none)
 - Snapshot: `projects/_portfolio/inbox/local/$period_end-portfolio-kpi-trend.json`
+- Run ID: `$run_id`
 - Schema otoritesi:
   - `schemas/portfolio-config.schema.json` v1.1 (`active_projects` +
     `cross_query.read_only=true`),

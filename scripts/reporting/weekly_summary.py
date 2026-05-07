@@ -428,7 +428,7 @@ def build_report_markdown(
         "tasks_added_count": str(len(batch.tasks_added)),
         "drift_signals":     _render_drift_signals(batch.drift_signals),
     }
-    return Template(template_text).substitute(
+    return Template(template_text).safe_substitute(
         {k: str(v) for k, v in data.items()}
     )
 
