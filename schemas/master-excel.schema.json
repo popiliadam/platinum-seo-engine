@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "http://platinum-seo-engine/schemas/master-excel",
+  "title": "Master Excel Sheet Contract v1.0",
   "additionalProperties": false,
   "schema_version": "1.0",
   "cross_sheet_rules_ref": "cross-sheet-invariants.json",
@@ -26,6 +27,11 @@
     "severityEnum": {
       "type": "string",
       "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
+    },
+    "taskIdPattern": {
+      "type": "string",
+      "pattern": "^T-[0-9]{4,}$",
+      "description": "Master task ID format. Authority: rules/master-task-id.md. Single-source target for events.schema.json + monthly-report.schema.json $ref consolidation (Tier 1 Step 6)."
     }
   },
   "sheets": {
@@ -275,7 +281,7 @@
       "header_row": 3,
       "data_start_row": 4,
       "required_columns": [
-        { "col": "A", "name": "task_id" },
+        { "col": "A", "name": "task_id", "ref": "#/definitions/taskIdPattern" },
         { "col": "B", "name": "task" },
         { "col": "C", "name": "primary_source", "enum": ["content_decay", "quickwin", "tech_fix", "schema", "pillar", "manual", "sxo", "cannibalization", "redirect_404", "internal_links", "new_content_plan"], "_note": "Q-IL-1 paterni reuse: enum 9→10 (Phase 8 W-D1 +internal_links) → 10→11 (v1.2 Phase B audit followup +new_content_plan, additive only, schema_version unchanged per ADR-018 convention; resolves Q-V1.2-MASTER-TASK-PRIMARY-SOURCE-01)" },
         { "col": "D", "name": "related_sources" },
