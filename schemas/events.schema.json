@@ -161,9 +161,11 @@
       ]
     },
     "task_id": {
-      "type": "string",
-      "description": "WORK-only. References master_task.task_id. Convention: T-NNNN (zero-padded 4 digits).",
-      "pattern": "^T-[0-9]{4,}$"
+      "description": "WORK-only. References master_task.task_id. Canonical convention: T-NNNN (zero-padded 4 digits, taskIdPattern). Legacy bypass for transitional MT-WxWyZ-NNN ids per rules/master-task-id.md (legacyTaskIdPattern, H-L v1.4-deep-audit-fix Tier 3 closure).",
+      "oneOf": [
+        { "$ref": "#/definitions/taskIdPattern" },
+        { "$ref": "#/definitions/legacyTaskIdPattern" }
+      ]
     },
     "url":            { "type": "string", "format": "uri", "description": "WORK-only." },
     "url_normalized": {
@@ -364,7 +366,12 @@
     "taskIdPattern": {
       "type": "string",
       "pattern": "^T-[0-9]{4,}$",
-      "description": "Master task ID format. Authority: rules/master-task-id.md. Mirrors master-excel.schema.json#/definitions/taskIdPattern (per-schema replication, ADR-XXX cross-schema $ref deferred v1.5)."
+      "description": "Master task ID canonical format. Authority: rules/master-task-id.md. Mirrors master-excel.schema.json#/definitions/taskIdPattern (per-schema replication, ADR-XXX cross-schema $ref deferred v1.5)."
+    },
+    "legacyTaskIdPattern": {
+      "type": "string",
+      "pattern": "^MT-W[0-9]+W[0-9]+[A-Z]?-[0-9]+$",
+      "description": "Master task ID legacy transitional format (e.g. MT-W3W2B-001). Per rules/master-task-id.md transitional kabul; H-L v1.4-deep-audit-fix Tier 3 closure introduced this bypass via task_id oneOf so legacy events.jsonl rows validate. New work events SHOULD use taskIdPattern (canonical); legacy retained for replay-determinism of pre-canonical entries."
     },
     "sha256Hash": {
       "type": "string",
