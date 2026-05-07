@@ -21,7 +21,8 @@ brand_style:
   primary_color: {{PRIMARY_COLOR}}              # project.config.json[brand_identity.primary_color], R-23
   font_heading: {{FONT_HEADING}}                # brand_identity.font_family_heading
   font_body: {{FONT_BODY}}                      # brand_identity.font_family_body
-profiles: {{PROFILES_ARRAY}}                    # project.config.json[profiles], Principle 2
+profiles: {{PROFILES_ARRAY}}                    # project.config.json[profiles], Principle 2 baseline
+profile: {{PROFILE_SINGULAR}}                   # master.xlsx[new_content_plan].profile per-task override (H-H cascade; Principle 2 cascade paragraph; OPTIONAL — set ise plural'i refine eder, plural'in subset olmalı)
 primary_keyword: {{PRIMARY_KEYWORD}}            # cluster_keywords primary, R-12
 secondary_keywords: {{SECONDARY_KEYWORDS_3_7}}  # cluster_keywords secondary 3-7, R-12
 ```

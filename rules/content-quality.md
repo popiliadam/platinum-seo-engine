@@ -55,7 +55,12 @@ Bu 3 prensip Phase 10 content rules setinin **üst-prensibidir**. Hiçbir alt-ru
 
 **Enforcement.** Phase 11 worker `project.config.json[profiles]` array'ini her skill başında okur; `union + dedup + priority merge` resolution (project-config.schema.json `profiles` field semantik korundu); behavior boyutları yukarıdaki tabloya göre seçilir.
 
-**Failure mode.** AMBER — yanlış profile resolution worker raporlar; RED yalnızca `profiles=[]` (boş array — schema `minItems:1` ihlali).
+**Profile cascade — singular `profile` vs plural `profiles[]` (H-H v1.4-deep-audit-fix Tier 3 closure):** `project-config.schema.json` v1.2'den itibaren hem plural `profiles[]` array (proje-genel composable union) hem singular `profile` string (per-content override) destekler. Skill render-time cascade davranışı:
+- Plural `profiles[]` (proje config seviyesi) → tüm skill'lere uygulanan baseline (Phase 5 W-F1 paterni). Worker `union + dedup + priority merge` resolution.
+- Singular `profile` (frontmatter / master.xlsx[new_content_plan].profile per-task seviyesi) → o özel content için baseline'i **override** veya **refine** eder (Phase 11 W-F1 cascade fix). Singular set ise tablo o profile'a göre seçilir; set DEĞİLse plural priority merge geçerlidir.
+- Singular `profile` enum domeni plural ile aynıdır (`e-commerce`/`ymyl`/`local-service`/`b2b-saas`/`portfolio`); cross-validation: singular ⊆ plural (singular değer plural array'inde mevcut olmalı).
+
+**Failure mode.** AMBER — yanlış profile resolution worker raporlar; RED yalnızca `profiles=[]` (boş array — schema `minItems:1` ihlali). Singular `profile` plural array dışı bir değerse → AMBER (cross-validation warn).
 
 **Cross-rule coverage.** R-23 (CSS profile-aware), R-37 (otorite domain profile), R-50/R-115 (counter-argument), R-51 (disclaimer template), R-58 (lifecycle robots), R-60 (CSS profile), R-104 (stats density).
 
