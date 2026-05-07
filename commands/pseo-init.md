@@ -37,3 +37,12 @@ Workspace root resolution: `PSEO_WORKSPACE_ROOT` env var → yoksa kullanıcıya
 ## 4. Tam scaffold (init-project skill)
 
 Bu komut yalnızca `project.config.json` scaffold rolünü üstlenir. Tam workspace tree (master.xlsx kopyalama, `inbox/` + `outputs/` + `_state/` klasörler, `shared/portfolio.json` güncelleme, `project_created` event'i, GSC validation, approval gate) `skills/meta/init-project/SKILL.md` (Phase 5, aktif) tarafından sürülür. Brief'te "tam init" ihtiyacı varsa skill'i çağır; sadece config dosyası lazımsa bu komut yeterli.
+
+## 5. Bağımlılıklar
+
+- Skill: `skills/meta/init-project/SKILL.md` — aktif (Phase 5 W2)
+- Script: `scripts/state/bootstrap_project.py` (CLI + `SCHEMA_VERSION` sync)
+- MCP optional: `mcp__gsc__list_sites` (`--gsc-site-url` verildiğinde GSC ownership verify)
+- Templates: `templates/master-excel.xlsx` (idempotent re-bootstrap KORUNUR — F1 workbook policy)
+- Schemas: `schemas/project-config.schema.json` (current v1.3, content_locale field)
+- Output: `projects/{slug}/project.config.json` + (skill ile) master.xlsx + `shared/portfolio.json` append + `_state/events.jsonl` `project_created` event

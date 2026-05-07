@@ -3,7 +3,7 @@ description: |
   Use when: kullanıcı "site scrape", "Scrapling fetch", "URL scrape", "tier escalation", "stealthy fetch", "anti-bot" der ya da `/pseo-scrape` çağırırsa.
   Also use when: URL listesi için generic content fetch gerekli (per-scenario sub-schemas Phase 7+ skill'lerle gelir; bu komut generic helper'dır).
   Do not use when: GSC ingestion (`pseo-gsc-pull`), DataForSEO (`pseo-dfs-pull`), per-scenario competitive-analysis (Phase 7) / content-improve (Phase 9) — onlar scrapling-ops'u sub-schema ile çağırır.
-argument-hint: "[project-slug] [urls-file]"
+argument-hint: "[project-slug] [urls-file] [--scenario generic|s1_competitor_snapshot|...] [--max-urls 50]"
 allowed-tools: Bash(jq:*), Read
 model: sonnet
 ---
@@ -41,5 +41,9 @@ model: sonnet
 ## 4. Bağımlılıklar
 
 - `skills/ingestion/scrapling-ops/SKILL.md` — Phase 6
-- `mcp__ScraplingServer__*` Scrapling MCP tools (.mcp.json bash wrapper)
+- MCP required: `mcp__ScraplingServer__fetch` + `bulk_fetch` + `stealthy_fetch` + `bulk_stealthy_fetch` (Tier 1+2)
+- MCP optional: `mcp__ScraplingServer__open_session` + `close_session` + `get` (Tier 0 + session-level)
+- `.mcp.json` bash wrapper (`SCRAPLING_BIN` env)
+- `scenario` argument (default `generic`): Phase 7+ sub-schema enforcement routing tag (`s1_competitor_snapshot` vb.)
+- `max_urls` argument (default 50): URL count budget — üzerinde DURUR (no silent truncation)
 - `templates/scrapling/.gitkeep` — sub-schemas Phase 7+ defer (ADR-025)

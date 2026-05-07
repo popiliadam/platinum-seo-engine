@@ -10,7 +10,7 @@ model: sonnet
 
 # /pseo-quickwin — GSC Quick-Wins Chain
 
-> **Skill chain:** `skills/ingestion/gsc-pull/SKILL.md` (Phase 6) → `skills/discovery/quick-wins/SKILL.md` (Phase 5). Aktif. GSC son 90 gün → ortalama pozisyon 8–20 bandı → `master.xlsx#quick_wins` + onay gate + `outputs/reports/{date}-quick-wins.md`.
+> **Skill chain:** `skills/ingestion/gsc-pull/SKILL.md` (Phase 6) → `skills/discovery/quick-wins/SKILL.md` (Phase 5). Aktif. GSC son 28 gün (`days_back` default) → pozisyon 11–20 bandı (`threshold_position_min/max` defaults), impressions ≥100, top_n=50 → `master.xlsx#quick_wins` + `master.xlsx#opportunity` + onay gate + `outputs/reports/{date}-quick-wins.md`.
 
 ## 1. Aktif projeyi çöz
 
@@ -23,16 +23,16 @@ model: sonnet
 Bu komut şu sırayı tetikler:
 
 1. **`gsc-pull`** (`skills/ingestion/gsc-pull/SKILL.md`)
-   - Son 90 gün GSC `searchAnalytics.query` verisini çek
-   - master.xlsx `gsc_landing_query` logical sheet'ine `transaction.py` ile yaz
-   - `events.jsonl`'e `data_ingested` event'i (source.kind=gsc_mcp)
+   - Son 28 gün GSC `searchAnalytics` verisini çek (recent vs previous window delta paterni)
+   - master.xlsx `gsc_performance` logical sheet'ine `scripts/excel/transaction.py` ile yaz
+   - `events.jsonl`'e `event_kind=provenance` event'i (source.kind=gsc_mcp)
 
 2. **`quick-wins`** (`skills/discovery/quick-wins/SKILL.md`)
-   - GSC verisinden ortalama pozisyon 8–20 bandındaki sorguları filtrele
-   - Impressions ≥ minimum eşik, CTR < benchmark
-   - master.xlsx `quick_wins` logical sheet'ine yaz
+   - GSC verisinden pozisyon 11–20 bandındaki sorguları filtrele (threshold_position_min=11, max=20 defaults)
+   - Impressions ≥100 (threshold_impressions default), top_n=50 cap
+   - master.xlsx `quick_wins` + `opportunity` logical sheet'lerine yaz (10 col schema-locked)
    - Onay gate: `awaiting_approval` (workflow-run.schema)
-   - Onay sonrası `outputs/reports/{date}-quick-wins.md` üret (`templates/reports/quickwin.template.md`)
+   - Onay sonrası `outputs/reports/{date}-quickwin.md` üret (`templates/reports/quickwin.template.md`)
 
 ## 3. Çalıştırma notları
 
@@ -43,5 +43,9 @@ Bu komut şu sırayı tetikler:
 
 - `skills/discovery/quick-wins/SKILL.md` — aktif (Phase 5)
 - `skills/ingestion/gsc-pull/SKILL.md` — aktif (Phase 6)
-- `mcp__gsc__*` GSC MCP tools (`.mcp.json` bash wrapper, `.env` auto-source)
+- MCP (quick-wins required): `mcp__gsc__detect_quick_wins` + `mcp__gsc__enhanced_search_analytics`
+- MCP (quick-wins optional): `mcp__gsc__search_analytics` (alternative data source)
+- MCP (gsc-pull required): `mcp__gsc__enhanced_search_analytics` + `mcp__gsc__search_analytics`
+- MCP (gsc-pull optional): `mcp__gsc__index_inspect` (URL inspection enrichment)
+- `.mcp.json` bash wrapper, `.env` auto-source (GOOGLE_APPLICATION_CREDENTIALS)
 - `project.config.gsc.site_url` — required input
