@@ -44,8 +44,9 @@ $defs), schemas/events.schema.json (source.kind=dataforseo_mcp,
 target_excel_sheet=tech_seo, cost.credits per ADR-016),
 schemas/skill-frontmatter.schema.json (frontmatter contract), spec §11.6
 (DFS on-page tools), §16.5 (raw JSON inbox + transform), §16.8 (budget
-pre-flight). Pattern reference: scripts/ingestion/dfs_pull.py
-(_normalize_dfs_response shape adapter + budget pre-flight integration).
+pre-flight). Pattern reference: scripts/util/dfs_response.py
+(canonical endpoint-aware DFS response normalize SSOT, Y-02 v1.6-Phase-3
+Tier 1) + scripts/ingestion/dfs_pull.py (budget pre-flight integration).
 """
 
 from __future__ import annotations
@@ -155,65 +156,18 @@ class RowSchemaError(TechAuditError):
 
 
 # ---------------------------------------------------------------------------
-# DFS response shape adapter (pattern from dfs_pull._normalize_dfs_response)
+# DFS response shape adapter — canonical SSOT in scripts.util.dfs_response
+# (Y-02 v1.6-Phase-3 Tier 1 dedup; was a local copy of dfs_pull pattern
+# extended for Lighthouse inline at result-level). The canonical helper
+# accepts an `endpoint_type` discriminator; binding here without one means
+# "broadest tolerance" — the function still inspects Lighthouse inline
+# payloads at the per-result level (preserving the original tech_audit
+# semantic).
 # ---------------------------------------------------------------------------
 
-def _normalize_dfs_response(raw: dict, *, expected_endpoint: str | None = None) -> list[dict]:
-    """
-    Tolerate the two DataForSEO response shapes that surface in production:
-
-      - REST envelope: {"tasks":[{"result":[{"items":[...]}]}]}  (or
-        the result entries themselves carrying the payload directly).
-      - Flat wrapper: {"items":[...]}  (dataforseo-mcp-server@2.8.9
-        flattens labs + on_page endpoints).
-
-    Returns a list of item dicts. Raises ValueError on unrecognised shape.
-    Pure function — no I/O, no state mutation.
-    """
-    if not isinstance(raw, dict):
-        raise ValueError(
-            "Unrecognized DFS response shape: top-level must be a dict, "
-            f"got {type(raw).__name__}"
-        )
-
-    tasks = raw.get("tasks")
-    if isinstance(tasks, list) and tasks:
-        items: list[dict] = []
-        saw_result = False
-        for task in tasks:
-            if not isinstance(task, dict):
-                continue
-            result = task.get("result")
-            if isinstance(result, list):
-                saw_result = True
-                for r in result:
-                    if not isinstance(r, dict):
-                        continue
-                    inner = r.get("items")
-                    if isinstance(inner, list):
-                        items.extend(x for x in inner if isinstance(x, dict))
-                    # Lighthouse responses inline page audits directly on
-                    # result entries — capture when there's a `lighthouse`
-                    # key OR a top-level url+meta block.
-                    if r.get("lighthouse") is not None or r.get("page_metrics") is not None:
-                        items.append(r)
-        if saw_result:
-            return items
-
-    flat_items = raw.get("items")
-    if isinstance(flat_items, list):
-        return [x for x in flat_items if isinstance(x, dict)]
-
-    # Some MCP wrappers return the lighthouse audits directly at the top.
-    if raw.get("lighthouse") is not None or raw.get("audits") is not None:
-        return [raw]
-
-    suffix = f" (endpoint={expected_endpoint!r})" if expected_endpoint else ""
-    raise ValueError(
-        f"Unrecognized DFS response shape{suffix}: expected REST envelope, "
-        f"flat wrapper `items`, or inline payload, "
-        f"got top-level keys={sorted(raw.keys())}"
-    )
+from scripts.util.dfs_response import (  # noqa: E402  (sys.path mutation above)
+    normalize_dfs_response as _normalize_dfs_response,
+)
 
 
 # ---------------------------------------------------------------------------

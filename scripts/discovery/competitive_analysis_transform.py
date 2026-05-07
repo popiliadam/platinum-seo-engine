@@ -45,7 +45,8 @@ Refs:
   - schemas/events.schema.json (source.kind ∈ {scrapling_mcp, dataforseo_mcp},
     target_excel_sheet=null for staging-only)
   - skills/ingestion/scrapling-ops/SKILL.md (Phase 6 generic helper)
-  - scripts/ingestion/dfs_pull.py (`_normalize_dfs_response` re-used here)
+  - scripts/util/dfs_response.py (canonical endpoint-aware DFS response
+    normalize SSOT, Y-02 v1.6-Phase-3 Tier 1)
   - scripts/discovery/cannibalization_transform.py (D-03 normalize_url
     convention)
   - rules/append-only-state.md, rules/schema-first.md
@@ -71,14 +72,13 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-# Soft import — budget pre-flight is mandatory at runtime for paid MCPs but
-# the module must remain importable in test isolation. The check is invoked
-# through `preflight_budget()` below; failure to import → BudgetExceededError
-# with an actionable message (mirrors dfs_pull / on_page_audit).
-try:  # pragma: no cover — import-time wiring
-    from scripts.ingestion.dfs_pull import _normalize_dfs_response  # type: ignore[import-not-found]
-except Exception:  # pragma: no cover
-    _normalize_dfs_response = None  # type: ignore[assignment]
+# Canonical DFS response shape adapter (Y-02 v1.6-Phase-3 Tier 1 dedup,
+# was a try/except dfs_pull import + local fallback). util/dfs_response is
+# import-stable (zero deps) so no soft-import wrapper required.
+from scripts.util.dfs_response import (  # noqa: E402  (sys.path mutation above)
+    DFSResponseError as _DFSResponseError,
+    normalize_dfs_response as _normalize_dfs_response,
+)
 
 # Canonical D-03 URL normalize (K-01 dedup, v1.5-Phase-1 Tier 1).
 from scripts.util.url_normalize import (  # noqa: E402  (sys.path mutation above)
@@ -488,20 +488,22 @@ def validate_s1_row(row: Mapping[str, Any]) -> None:
 def extract_competitor_domains(raw_competitors_domain: dict | None) -> list[str]:
     """Pull the competitor `domain` strings out of a DFS competitors_domain
     response. Tolerates both REST envelope (tasks[0].result[0].items) and
-    flat wrapper (top-level items) via the dfs_pull `_normalize_dfs_response`
-    helper. Returns deduplicated lowercase domains in input order.
+    flat wrapper (top-level items) via the canonical
+    :func:`scripts.util.dfs_response.normalize_dfs_response` helper.
+    Returns deduplicated lowercase domains in input order. Adapt-wraps
+    :class:`DFSResponseError` into :class:`CompetitiveAnalysisError`
+    so callers see a domain-specific exception (paterni K-01 reuse).
     """
     if raw_competitors_domain is None:
         return []
-    if _normalize_dfs_response is None:
-        # Defensive — tests run without scripts.ingestion on path; fall back
-        # to a minimal local extractor mirroring the dfs_pull contract.
-        items = _local_normalize_dfs(raw_competitors_domain)
-    else:
+    try:
         items = _normalize_dfs_response(
             raw_competitors_domain,
+            endpoint_type="keyword",
             expected_endpoint="dataforseo_labs_google_competitors_domain",
         )
+    except _DFSResponseError as exc:
+        raise CompetitiveAnalysisError(str(exc)) from exc
     seen: set[str] = set()
     out: list[str] = []
     for it in items:
@@ -514,40 +516,6 @@ def extract_competitor_domains(raw_competitors_domain: dict | None) -> list[str]
                 seen.add(ds)
                 out.append(ds)
     return out
-
-
-def _local_normalize_dfs(raw: dict) -> list[dict]:
-    """Minimal dfs_pull-shape fallback (REST envelope OR flat wrapper).
-    Only used when scripts.ingestion.dfs_pull cannot be imported (test
-    isolation edge). Mirrors `_normalize_dfs_response` semantics."""
-    if not isinstance(raw, dict):
-        raise CompetitiveAnalysisError(
-            "competitors_domain raw must be a dict, "
-            f"got {type(raw).__name__}"
-        )
-    tasks = raw.get("tasks")
-    if isinstance(tasks, list) and tasks:
-        items: list[dict] = []
-        for task in tasks:
-            if not isinstance(task, dict):
-                continue
-            result = task.get("result")
-            if isinstance(result, list):
-                for r in result:
-                    if not isinstance(r, dict):
-                        continue
-                    inner = r.get("items")
-                    if isinstance(inner, list):
-                        items.extend(x for x in inner if isinstance(x, dict))
-        if items:
-            return items
-    flat = raw.get("items")
-    if isinstance(flat, list):
-        return [x for x in flat if isinstance(x, dict)]
-    raise CompetitiveAnalysisError(
-        "Unrecognized DFS competitors_domain response shape; "
-        f"top-level keys={sorted(raw.keys())}"
-    )
 
 
 # ---------------------------------------------------------------------------
