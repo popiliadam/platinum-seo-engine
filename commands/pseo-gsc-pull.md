@@ -36,6 +36,9 @@ model: sonnet
 
 ## 4. Bağımlılıklar
 
-- `skills/ingestion/gsc-pull/SKILL.md` — Phase 6
-- `mcp__gsc__*` GSC MCP tools (.mcp.json bash wrapper, .env auto-source)
+- `skills/ingestion/gsc-pull/SKILL.md` — Phase 6 W1
+- MCP required: `mcp__gsc__enhanced_search_analytics` + `mcp__gsc__search_analytics`
+- MCP optional: `mcp__gsc__index_inspect` (URL inspection enrichment, indexing status check)
+- `.mcp.json` bash wrapper, `.env` auto-source (`GOOGLE_APPLICATION_CREDENTIALS` service account JSON)
 - `project.config.gsc.site_url` — required input
+- Skill defaults: `days_back=28` (recent + previous window equal length), `dimensions=['page']`

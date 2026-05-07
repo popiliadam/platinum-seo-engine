@@ -3,7 +3,7 @@ description: |
   Use when: kullanıcı "DataForSEO çek", "DFS pull", "keyword overview", "search volume DFS", "dfs ingestion" der ya da `/pseo-dfs-pull` çağırırsa.
   Also use when: aktif projenin keyword listesi var, DFS bütçesi (project.config.dataforseo.budget_credits_per_day) yeterli; staging-only (Phase 8 cluster-map konsume eder).
   Do not use when: GSC ingestion (`pseo-gsc-pull`), Scrapling fetch (`pseo-scrape`), keyword cluster üretimi (Phase 8 `cluster-map` ayrı skill).
-argument-hint: "[project-slug] [keywords-file]"
+argument-hint: "[project-slug] [keywords-file] [--cluster <name>] [--location-code 2792] [--language-code tr]"
 allowed-tools: Bash(jq:*), Read
 model: sonnet
 ---
@@ -41,6 +41,8 @@ model: sonnet
 ## 4. Bağımlılıklar
 
 - `skills/ingestion/dfs-pull/SKILL.md` — Phase 6
-- `mcp__dataforseo__*` DFS MCP tools (.mcp.json bash wrapper, .env auto-source)
-- `project.config.dataforseo.location_code` + `language_code` — required
-- Phase 8 `cluster-map` skill — staging output downstream consumer
+- MCP required: `mcp__dataforseo__keywords_data_google_ads_search_volume` + `mcp__dataforseo__dataforseo_labs_google_keyword_overview`
+- MCP optional: `mcp__dataforseo__dataforseo_labs_google_historical_keyword_data` (historical enrichment, paid +1 credit/keyword)
+- `.mcp.json` bash wrapper, `.env` auto-source (DATAFORSEO_USERNAME + DATAFORSEO_PASSWORD)
+- `project.config.dataforseo.location_code` + `language_code` + `budget_credits_per_day` — required
+- `cluster` argument (default `uncategorized`): cluster_keywords sheet A column'a yazılır (Phase 8 cluster-map downstream consumer)
