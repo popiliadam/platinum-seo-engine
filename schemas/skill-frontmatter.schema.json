@@ -7,6 +7,10 @@
   "required": ["name", "description", "version", "status", "category", "inputs", "outputs", "triggers"],
   "additionalProperties": false,
   "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "description": "Schema version this SKILL.md frontmatter conforms to (rules/schema-versioning-discipline.md). Optional in v1.0 (backwards-compat for 28 skills written pre-Phase 11 without the field); strongly recommended for new skills. Future major bump (2.0) may require it."
+    },
     "name": {
       "type": "string",
       "description": "Skill slug. Must equal the directory name under skills/. kebab-case only.",
