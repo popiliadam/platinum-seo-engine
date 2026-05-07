@@ -12,6 +12,9 @@ History:
   check_excel_writer.py). EXPECTED_DEFERRED reduced 4 → 2.
 - v1.6-Phase-1 Tier 1 (2026-05-07) authored check_naming.py (Y-03);
   EXPECTED_DEFERRED reduced 2 → 1.
+- v1.6-Phase-1 Tier 2 (2026-05-07) authored validate_before_write.py
+  (Y-04); EXPECTED_DEFERRED reduced 1 → 0. Q-V1.5-HOOK-SCRIPTS-MISSING-01
+  RESOLVED final (4-of-4 hooks authored).
 """
 import re
 from pathlib import Path
@@ -24,13 +27,11 @@ HOOKS_DIR = ROOT / "scripts" / "hooks"
 
 HOOK_PATH_RE = re.compile(r"`scripts/hooks/([a-zA-Z0-9_]+\.(?:sh|py))`")
 
-# Per Q-V1.5-HOOK-SCRIPTS-MISSING-01 + v1.6-Phase-1 partial closure:
-# 1 hook script remains deferred — rule body still carries the
-# "Phase 13'te otomatize" qualifier (Y-04, validate_before_write.py).
-# Tier 2 of v1.6-Phase-1 will author it and drop this entry.
-EXPECTED_DEFERRED = {
-    "validate_before_write.py", # rules/schema-first.md:36 "Phase 13'te otomatize"
-}
+# Q-V1.5-HOOK-SCRIPTS-MISSING-01 RESOLVED final 2026-05-07 in v1.6-Phase-1.
+# All 4 cited hooks now authored: check_append_only.sh + check_excel_writer.py
+# + check_naming.py + validate_before_write.py. The set stays empty as a
+# trip-wire: any future cited-but-missing hook causes test failure.
+EXPECTED_DEFERRED: set[str] = set()
 
 
 def _all_cited_hook_scripts():
