@@ -46,7 +46,7 @@
         "source_folder":       { "type": "string", "description": "For sf_csv: the ingest folder relative path (e.g. sf_exports/2026-04/)." },
         "filename_original":   { "type": "string", "description": "Pre-normalization SF filename, Turkish chars preserved." },
         "filename_normalized": { "type": "string", "description": "Post filename_alias normalization (docs/ARCHITECTURE.md §6.4) — ascii + v_/p_ prefix stripped." },
-        "file_hash":           { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "file_hash":           { "$ref": "#/definitions/sha256Hash" },
         "row_count":           { "type": "integer", "minimum": 0 },
         "response_bytes":      { "type": "integer", "minimum": 0, "description": "MCP raw response size; used for storage budget." },
         "mcp_server":          { "type": "string", "description": "Short server name (gsc / dataforseo / scrapling) — matches mcp-tool-registry.json." },
@@ -110,8 +110,8 @@
       "description": "PROVENANCE-only. docs/ARCHITECTURE.md §9.4 L2 Hash Chain — hash at each hand-off must match.",
       "additionalProperties": false,
       "properties": {
-        "intake_hash":  { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
-        "staging_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "intake_hash":  { "$ref": "#/definitions/sha256Hash" },
+        "staging_hash": { "$ref": "#/definitions/sha256Hash" },
         "match":        { "type": "boolean", "description": "Derived: intake_hash == staging_hash (after deterministic re-serialization)." }
       }
     },
@@ -130,8 +130,8 @@
       "description": "PROVENANCE-only. docs/ARCHITECTURE.md §9.4 L7 Diff Verification — pre/post snapshot of target sheet. Only populated when operation=project_excel.",
       "additionalProperties": false,
       "properties": {
-        "pre_hash":  { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
-        "post_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+        "pre_hash":  { "$ref": "#/definitions/sha256Hash" },
+        "post_hash": { "$ref": "#/definitions/sha256Hash" }
       }
     },
     "backup_path": {
@@ -360,6 +360,31 @@
         "faq_count":    { "type": "integer", "minimum": 0 },
         "internal_links_out": { "type": "integer", "minimum": 0 }
       }
+    },
+    "taskIdPattern": {
+      "type": "string",
+      "pattern": "^T-[0-9]{4,}$",
+      "description": "Master task ID format. Authority: rules/master-task-id.md. Mirrors master-excel.schema.json#/definitions/taskIdPattern (per-schema replication, ADR-XXX cross-schema $ref deferred v1.5)."
+    },
+    "sha256Hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "description": "SHA-256 content hash with 'sha256:' prefix (docs/ARCHITECTURE.md §9.4 hash chain). Used by file_hash, params_hash, intake_hash, staging_hash, pre_hash, post_hash."
+    },
+    "slugKebab": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Project/skill slug. kebab-case lowercase + digits + hyphens (rules/naming.md)."
+    },
+    "pillarPattern": {
+      "type": "string",
+      "pattern": "^P[0-9]+_[a-z_]+$",
+      "description": "Pillar key matching project-config.pillars[].key (e.g. P01_sofa_sets, rules/naming.md)."
+    },
+    "workflowRunIdPattern": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*-[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-f0-9]{4}$",
+      "description": "Workflow run ID format ({slug}-{YYYY-MM-DD}-{hash4}, rules/naming.md). Mirrors workflow-run.schema.json $.run_id (per-schema replication)."
     }
   }
 }
