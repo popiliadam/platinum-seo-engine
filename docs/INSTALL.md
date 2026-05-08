@@ -1,6 +1,6 @@
 # Installation
 
-> Status: **v1.5.0** — 43 skills, 15 slash commands, 6 hooks, production-ready (schema-data aligned + drift-check AMBER: F-16 + F-17 PASS, F-13 historical).
+> Status: **v1.6.0** — 43 skills, 15 slash commands, 6 hooks, production-ready (schema-data aligned + drift-check AMBER: F-16 + F-17 PASS, F-13 historical).
 
 ## Requirements
 

@@ -5,7 +5,7 @@
 
 Bir Claude Code plugin'i; SEO operasyonunu schema-locked workflow'larla yöneten motor.
 
-**Status:** v1.5.0 — audit-closure milestone: Phase-1 (K-01+Y-01 url_normalize 10-file dedup) + Phase-2 (K-02 schema sync 20→27 + D-01 missing test coverage + O-04 CI Python sync + O-05 memory reconcile) + Phase-3 (Y-05 version_bump.py 5-file sync automation + Y-07 dump_workspace.py manager session summary + D-02/D-03 orphan archival) — 10 finding RESOLVED + 4 yeni script + 95 yeni test (970→1065 PASS, regression sıfır) — drift-check AMBER (F-16 + F-17 PASS, F-13 historical kalıntı) (2026-05-07) — [Release Notes](docs/RELEASE_NOTES_v1.5.0.md)
+**Status:** v1.6.0 — Süleyman backlog closure milestone: Phase-1 (Y-03+Y-04 hooks + Q-V1.5-HOOK-SCRIPTS-MISSING-01 RESOLVED final 4-of-4) + Phase-2 (H-E events.schema event_type enum 10→12 additive + Q-V1.4-AUDIT-HIGH-01 12/12 HIGH closed final + cleanup wave) + Phase-3 (Y-02 dfs_response.py SSOT + O-03 tech_audit/competitive_analysis dedup + Y-06 profile_aware_defaults.py + 5 transform migrate) — 6 finding/Q-XXX RESOLVED + 4 yeni asset (check_naming.py + validate_before_write.py + dfs_response.py + profile_aware_defaults.py) + 81 yeni test (1066→1147 PASS, regression sıfır) — drift-check AMBER (F-16 + F-17 PASS, F-13 historical kalıntı) (2026-05-08) — [Release Notes](docs/RELEASE_NOTES_v1.6.0.md)
 
 ---
 
