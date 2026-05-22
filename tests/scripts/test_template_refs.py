@@ -50,6 +50,7 @@ EXEMPT_PREFIXES = (
     Path("docs/superpowers"),
     Path("templates"),
     Path(".git"),
+    Path(".claude"),
     Path("__pycache__"),
     Path("node_modules"),
     Path(".pytest_cache"),

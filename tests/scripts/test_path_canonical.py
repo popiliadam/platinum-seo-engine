@@ -32,6 +32,7 @@ FORBIDDEN_PATTERNS = (
 # Files / directories whose contents are exempt from the sweep.
 EXEMPT_PARTS = (
     ".git",
+    ".claude",
     "__pycache__",
     "node_modules",
     ".pytest_cache",
