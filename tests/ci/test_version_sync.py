@@ -38,10 +38,15 @@ def _plugin_json_version() -> str:
 
 
 def _readme_banner_version() -> str:
-    """Extract the **Status:** banner version from README.md."""
+    """Extract the Status: **v<semver>** banner version from README.md.
+
+    README and INSTALL share the same banner format after the public-
+    release README rewrite: ``Status: **v<semver>** — ...`` (plain
+    label, bold version). One regex = one invariant across both files.
+    """
     text = README.read_text(encoding="utf-8")
-    m = re.search(r"\*\*Status:\*\*\s+v(\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?)", text)
-    assert m, "README.md missing **Status:** v<semver> banner"
+    m = re.search(r"Status:\s+\*\*v(\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?)\*\*", text)
+    assert m, "README.md missing Status: **v<semver>** banner"
     return m.group(1)
 
 
