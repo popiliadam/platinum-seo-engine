@@ -44,7 +44,7 @@ Bu doc Phase 10 LLM/AIO görünürlük disiplinini tanımlar (LLMs.txt, per-bot 
 
 **Statement.** Content intro paragraph (R-01) **self-contained** — H1 referansı olmadan anlamlı; her H2 başlangıcında cevap-önce mini paragraf (R-29 reuse). LLM context window'unda izole paragraf parse şansı yüksek.
 
-**Rationale.** LLM/AIO bot full-page parse etmez; izole paragraf citation candidate. Self-contained intro citation şansı 3x.
+**Rationale.** Google'ın 2026-05-15 cümlesi: "You don't need to write in a specific way just for generative AI search." Self-contained intro AI için değil; **helpful content + scannability** için (Google self-assessment kriteri: "Is this content you'd want to bookmark, share, or recommend?"). Kullanıcı sayfada H2'leri tarayıp ilgilendiği bölüme atlar — her bölümün izole faydası olur. AI/LLM citation potansiyeli yan etki, hedef değil.
 
 **Enforcement.** R-01 + R-29 birlikte uygulanır; self-contained check: intro paragraf "yukarıda gördüğünüz gibi" / "bu yazıda" referans regex → AMBER.
 
