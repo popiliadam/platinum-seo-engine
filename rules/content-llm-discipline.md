@@ -54,7 +54,7 @@ Bu doc Phase 10 LLM/AIO görünürlük disiplinini tanımlar (LLMs.txt, per-bot 
 
 **Statement.** Content sonuna (CTA paragraf öncesi) **AI summary footer**: 3-5 bullet point, **başlıksız** (R-05 reuse), `<aside class="pse-key-takeaways">` block.
 
-**Rationale.** AI summary footer AIO citation candidate (özet bullet hızlı extract); başlıksız (R-05) generic AI imza önleme.
+**Rationale.** AI summary footer **insan UX için** — TL;DR formatı + yer imine eklenebilirlik, Google Helpful Content "Is this content you'd want to bookmark, share, or recommend?" kriteri. Başlıksız bullet R-05 sembol yasağıyla uyumlu (brand tone — generic AI imza önleme). AI/LLM bot'un bunu özet olarak alabilmesi yan etki, hedef değil.
 
 **Enforcement.** Skill render time aside block inject; bullet count [3,5].
 
