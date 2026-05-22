@@ -329,6 +329,27 @@ img.save(f"outputs/images/{slug}-{kind}.avif", format="AVIF", quality=70)
 img.save(f"outputs/images/{slug}-{kind}.jpg",  format="JPEG", quality=88)
 ```
 
+### Step 5b — `r78_iptc_disclosure_write` (R-78 AI Image Disclosure)
+
+Format cascade tamamlandıktan sonra (Step 5), WebP + JPG outputs IPTC
+`DigitalSourceType=TrainedAlgorithmicMedia` metadata ile patch edilir
+(Google Merchant Center AI-image disclosure policy + 2026-05-15 AI
+Optimization Guide reaffirmation). AVIF silent skip — piexif format
+desteklemez (R-78 failure_mode AMBER, R-76 cascade'in WebP + JPG
+çıktıları metadata garantisi sağlar).
+
+```python
+from scripts.util.iptc_metadata import write_ai_image_disclosure
+
+# AVIF skip — piexif unsupported (documented R-78 failure_mode)
+for output_path in [webp_path, jpg_path]:
+    write_ai_image_disclosure(output_path)
+```
+
+R-78 enforcement (`rules/content-html-discipline.md`). Utility:
+`scripts/util/iptc_metadata.write_ai_image_disclosure` (5/5 unit test
+PASS — round-trip + idempotent + missing-file + WebP + constant-format).
+
 ### Step 6 — `r75_picture_tag_lcp` (LCP Optimization)
 
 R-75 `<picture>` tag generate (LCP-optimized hero):
@@ -508,7 +529,7 @@ schema authority + intent preservation = doğru fit.
 - `rules/content-html-discipline.md` (R-71 8K ultra realistic,
   R-72 nano-banana default, R-73 manual upload, R-74 multi-skill
   collaborative output, R-75 LCP optimization, R-76 format fallback,
-  R-77 alt text).
+  R-77 alt text, R-78 IPTC DigitalSourceType disclosure).
 - `rules/content-seo-discipline.md` (R-65 LCP < 2.5s ranking signal,
   R-62 CLS preempt).
 - `rules/content-eeat-discipline.md` (R-44 source verify; image

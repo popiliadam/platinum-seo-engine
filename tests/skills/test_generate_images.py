@@ -318,3 +318,60 @@ def test_consumes_contract():
     assert template_count == 1, (
         f"Expected 1 template in consumes, got {template_count}"
     )
+
+
+# --- Test 17: R-78 IPTC disclosure runtime contract (Phase 11 Wave 2 deliverable) ---
+@pytest.mark.skip(
+    reason=(
+        "generate-images runtime — Phase 11 Wave 2 deliverable; "
+        "Phase 2 Task 2.3 locked the contract in SKILL.md Step 5b. "
+        "This test activates when scripts/production/generate_images.run lands."
+    )
+)
+def test_r78_iptc_disclosure_writes_to_non_avif_outputs(tmp_path):
+    """Every WebP/JPG output carries IPTC DigitalSourceType=TrainedAlgorithmicMedia.
+
+    Phase 2 Task 2.3 (G-AI-01) contract: when ``scripts/production/generate_images.run``
+    delivers in Phase 11 Wave 2, each non-AVIF output is patched with the IPTC
+    disclosure via ``write_ai_image_disclosure``. AVIF is skipped — piexif does
+    not support the format (R-78 failure_mode AMBER, R-76 cascade guarantees
+    WebP + JPG carry the tag).
+    """
+    import piexif
+    from scripts.production.generate_images import run
+    from scripts.util.iptc_metadata import DIGITAL_SOURCE_TYPE_AI
+
+    result = run(project_slug="test-project", new_content_plan_id="row-001")
+    assert result["status"] == "success"
+
+    for output_path in result["images"]:
+        if str(output_path).endswith(".avif"):
+            continue
+        exif = piexif.load(str(output_path))
+        assert DIGITAL_SOURCE_TYPE_AI in exif["0th"].get(
+            piexif.ImageIFD.ImageDescription, b""
+        )
+
+
+# --- Test 18: R-78 SKILL.md contract lock (active today, no runtime needed) ---
+def test_r78_iptc_step_5b_present_in_skill_body():
+    """SKILL.md body declares Step 5b IPTC disclosure write protocol.
+
+    Regression guard: if Step 5b is removed before Phase 11 Wave 2 runtime
+    activates the live writer call, the contract lock disappears and the
+    runtime delivery would silently drift away from the R-78 enforcement
+    requirement. This test fires immediately (no runtime needed).
+    """
+    text = _read_skill_text()
+    assert "Step 5b" in text, "Step 5b IPTC disclosure section missing from SKILL.md"
+    assert "write_ai_image_disclosure" in text, (
+        "scripts/util/iptc_metadata.write_ai_image_disclosure reference missing"
+    )
+    assert "TrainedAlgorithmicMedia" in text, (
+        "IPTC DigitalSourceType=TrainedAlgorithmicMedia tag value missing"
+    )
+    assert "AVIF" in text and "skip" in text.lower(), (
+        "AVIF exclusion guidance (piexif unsupported) missing"
+    )
+    # References section must list R-78 alongside R-71..R-77
+    assert "R-78" in text, "R-78 reference missing from SKILL.md References"
