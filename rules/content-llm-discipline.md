@@ -24,7 +24,7 @@ Bu doc Phase 10 LLM/AIO görünürlük disiplinini tanımlar (LLMs.txt, per-bot 
 
 **Statement.** `llms.txt` dosyası project root'unda **opt-in** (init-project skill kullanıcıya sorar). Format: AnswerEngine sitemap (URL list + summary).
 
-**Rationale.** LLMs.txt emerging standard (2024+); opt-in kullanıcı kararı (training data exposure trade-off).
+**Rationale.** Google'ın 2026-05-15 AI Optimization Guide cümlesi: "You don't need to create new machine readable files, AI text files, markup, or Markdown to appear in generative AI search." Yani **Google için gereksiz**. Ancak diğer LLM ecosystem'leri (Anthropic, Perplexity, OpenAI) llms.txt'i tercih edebilir; opt-in mekanizması (default OFF) bu trade-off'u proje sahibine bırakır. PSEO'nun default davranışı (`ai_training_optin: false`) Google'ın eleştirisinden zaten korunmuş haldedir.
 
 **Enforcement.** init-project skill `project.config.json[content_settings.ai_training_optin]` boolean OFF default; kullanıcı ON yaparsa skill llms.txt generate eder.
 
