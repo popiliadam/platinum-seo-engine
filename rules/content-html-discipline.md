@@ -266,6 +266,18 @@ Bu doc Phase 10 HTML/CSS/image disiplinini tanımlar. **Foundational Principles*
 
 **Failure mode.** RED.
 
+### R-78: AI-Image IPTC Disclosure (Merchant Center Compliance)
+
+**Statement.** Tüm AI ile üretilmiş görseller (Higgsfield, nano-banana veya başka model çıktısı) IPTC `DigitalSourceType=TrainedAlgorithmicMedia` metadata içerir. Tag EXIF `UserComment` ve TIFF `ImageDescription` IFD slot'larına yazılır (RFC 9277 IPTC mapping fallback). AVIF format piexif tarafından desteklenmediğinden AVIF çıktısı silent skip (R-76 cascade WebP+JPG metadata garanti).
+
+**Rationale.** Google Merchant Center AI-image disclosure policy (2024+, reaffirmed 2026-05-15 AI Optimization Guide); ürün listingi reddedilmesini önler ve AI-content transparency Principle 1 (Truth-Verifiable) tezahürüdür. Google'ın resmi cümlesi: "AI-generated images must include IPTC `DigitalSourceType` metadata labeled as `TrainedAlgorithmicMedia`."
+
+**Enforcement.** `generate-images` skill `scripts/util/iptc_metadata.write_ai_image_disclosure` çağırır; pre-publish `schema-audit` veya `tech-audit` skill output görselleri için IPTC tag presence verify edebilir (opt-in check).
+
+**Failure mode.** Silent skip — implementation hata atarsa AMBER log; metadata write zorunluluğu RED değil çünkü görsel hala kullanılabilir (Merchant Center reject downstream concern).
+
+**Cross-link.** → R-71 (8K ultra realistic), R-72 (image_model), R-73 (1200x675), R-74 (manual upload), R-75 (LCP `<picture>`), R-76 (format cascade), R-77 (alt text).
+
 ---
 
 ## Cross-References
