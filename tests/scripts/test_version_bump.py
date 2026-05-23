@@ -5,7 +5,9 @@ Target file set (per ADR-036 + tests/ci/test_version_sync.py runtime authority):
   1. .claude-plugin/plugin.json -> top-level "version"
   2. .claude-plugin/marketplace.json -> metadata.version + plugins[0].description
      "v<semver> — ..." prefix
-  3. README.md -> "**Status:** v<semver> — ..." banner (line 8 baseline)
+  3. README.md -> "> Status: **v<semver>** — ..." blockquote banner
+     (unified with INSTALL.md after v1.6 Phase-1.5b — one regex covers
+     both files; see tests/ci/test_version_sync.py)
   4. docs/INSTALL.md -> "> Status: **v<semver>** — ..." blockquote banner
   5. docs/RELEASE_NOTES_v<semver>.md -> existence check (WARN if missing,
      no auto-create — manual authoring required per brief Section "Phase 3"
@@ -23,8 +25,8 @@ Coverage:
   4. apply updates plugin.json version
   5. apply updates marketplace.json metadata.version
   6. apply updates marketplace plugins[0].description "v<semver> — " prefix
-  7. apply updates README **Status:** banner
-  8. apply updates INSTALL > Status: ** banner (blockquote+inline-bold form)
+  7. apply updates README "> Status: **v<semver>**" banner (unified blockquote+inline-bold form)
+  8. apply updates INSTALL "> Status: **v<semver>**" banner (same form)
   9. apply WARNs but does NOT auto-create missing RELEASE_NOTES file
   10. apply is idempotent when target version already matches
   11. apply preserves test_version_sync invariant (4 banner regexes hold)
@@ -103,7 +105,7 @@ def _write_5_file_workspace(root: Path, current_version: str = "1.4.0") -> None:
 
     (root / "README.md").write_text(
         f"# Platinum SEO Engine\n\n"
-        f"**Status:** v{current_version} — fake banner — "
+        f"> Status: **v{current_version}** — fake banner — "
         f"[Release Notes](docs/RELEASE_NOTES_v{current_version}.md)\n",
         encoding="utf-8",
     )
@@ -234,8 +236,8 @@ def test_apply_updates_readme_status_banner(bump_module, tmp_path):
     bump_module.bump(target_version="1.5.0", repo_root=tmp_path, apply=True)
 
     body = (tmp_path / "README.md").read_text("utf-8")
-    assert "**Status:** v1.5.0 —" in body, "README banner not bumped"
-    assert "**Status:** v1.4.0" not in body, "old README banner persists"
+    assert "> Status: **v1.5.0**" in body, "README banner not bumped"
+    assert "**v1.4.0**" not in body, "old README banner version persists"
 
 
 # ---------- 8. apply: INSTALL banner (blockquote + inline-bold) ----------
@@ -314,8 +316,11 @@ def test_apply_preserves_test_version_sync_invariant_format(bump_module, tmp_pat
     install = (tmp_path / "docs" / "INSTALL.md").read_text("utf-8")
 
     plug_v = plugin["version"]
+    # README and INSTALL share the unified blockquote+inline-bold form
+    # after v1.6 Phase-1.5b — one regex covers both files (mirrors
+    # tests/ci/test_version_sync.py — single invariant across both).
     readme_m = re.search(
-        r"\*\*Status:\*\*\s+v(\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?)", readme
+        r"Status:\s+\*\*v(\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?)\*\*", readme
     )
     install_m = re.search(
         r"Status:\s+\*\*v(\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?)\*\*", install
