@@ -221,6 +221,20 @@
         { "col": "F", "name": "priority" }
       ]
     },
+    "gbp_audit": {
+      "header_row": 3,
+      "data_start_row": 4,
+      "description": "GBP discovery skill output — Google Business Profile gap analysis per project. Local-service profile gate; read-only audit per feedback_indexing_api_consent (no autonomous GBP API submit; DFS business_data_business_listings_search + Scrapling fallback). G-AI-02 finding closure (v1.7 Phase 5). Category enum locked per ADR-028; status/severity reuse codebase definitions for cross-sheet consistency (statusEnum 7-value + severityEnum 4-value, not the plan-suggested custom enums).",
+      "required_columns": [
+        { "col": "A", "name": "audit_id" },
+        { "col": "B", "name": "audit_date",         "type": "date" },
+        { "col": "C", "name": "category",           "enum": ["nap", "categories", "photos", "hours", "attributes", "posts", "qa", "reviews"] },
+        { "col": "D", "name": "gap_description" },
+        { "col": "E", "name": "severity",           "ref": "#/definitions/severityEnum" },
+        { "col": "F", "name": "recommended_action" },
+        { "col": "G", "name": "status",             "ref": "#/definitions/statusEnum" }
+      ]
+    },
     "crawl_sitemap": {
       "header_row": 3,
       "data_start_row": 4,
