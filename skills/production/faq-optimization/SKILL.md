@@ -152,6 +152,90 @@ context'inde (R-09 + R-29 + R-118):
 - **Failure mode:** AMBER warning (auto-correct attempt) → RED fail
   (manuel revise gerekir).
 
+## R-121 Bank Selection Logic (Conditional Applicability)
+
+**Conditional applicability is the headline.** FAQ items are typically
+definitional (Q: "What is X?" / A: "X is a Y that does Z."). They
+**often need no bank entry at all**. R-121 fires for FAQ optimization
+**only when** a FAQ answer asserts an experience claim ("we measured
+...", "we tested ...", "in our deployment ...") or a research claim
+("our survey of 200 customers found ..."). For purely definitional
+FAQs, R-105 / R-114 / R-119 are not in scope, and R-121 has nothing to
+filter.
+
+**Cross-skill cap interplay (CRITICAL).** R-121 density is per
+content, not per skill invocation. When `mode == "enhance"` and the
+existing article already cites bank entries in the body (originally
+placed by new-blog), those entries already consume the per-profile
+cap. faq-optimization MUST NOT add bank entries that would push the
+combined count over the cap.
+
+Detection (`mode == "enhance"`): during Step 1 existing-blog parse,
+the skill also extracts current bank citations from the body (same
+two paths as revise-content — `data-bank-entry-id` attribute first,
+text-matching fallback for older articles). The result is
+`bank_entries_pre_body[]`. The FAQ pass treats this as already-
+committed cap consumption.
+
+When R-121 DOES fire (FAQ answer asserts an experience/research
+claim), the same 3-step filter applies, with a FAQ-specific tightening
+on filter 2:
+
+1. **Topic match.** `entry.applicable_topics ∩ (new_content_plan.
+   primary_keyword ∪ faq_question_text_keywords ∪ topical_map[matching
+   _row].cluster) ≠ ∅` → entry remains a candidate; empty intersection
+   → entry skipped.
+2. **Profile density cap, FAQ-tightened.** The article's per-profile
+   cap is the ceiling for the BODY + FAQ combined. FAQ-only additional
+   cap, on top of any body usage:
+   - YMYL: at most 1 experience entry inside the FAQ section (and the
+     combined body+FAQ count still ≤ 2 experience + 1 research).
+   - b2b-saas: 0 experience + 0 research inside FAQ by default
+     (technical FAQ taxonomy rarely cites first-hand or original
+     research — escalate to manual review if a FAQ item genuinely
+     needs one).
+   - e-commerce / local-service / portfolio: 0 inside FAQ by default
+     (the body's 1 experience entry is usually sufficient).
+3. **Rotation (30-day).** For each new candidate, count usage in
+   `master.xlsx[completed_work]` rows where
+   `bank_entry_id == entry.id` AND `timestamp >= now - 30d`. Skip if
+   `count >= entry.max_usage_per_month`. Pre-existing body entries
+   (extracted in `mode == "enhance"`) are exempt from rotation —
+   removing them only to satisfy the cap would be churn and would
+   trigger a needless R-88 freshness-theater audit.
+
+If all candidates fail the filter, the skill emits AMBER, retries with
+`phrasings[]` rotation; 2x AMBER same pass → RED upgrade (the FAQ
+section ships without that particular claim, or the operator manually
+reviews).
+
+**R-110 Anti-Pattern alignment.** R-110 over-citation gate
+(>2 per 500w) and R-121 density cap reinforce each other: a FAQ
+answer that needs more than one bank entry to be credible is usually
+either too broad (split into separate FAQ items) or actually a body
+paragraph in disguise (move to article body via revise-content). The
+two rules together push FAQ items toward atomic, definitional Q&A
+structure.
+
+**Post-publish state mutation** (Step 7 events.jsonl append): for
+each entry **newly introduced** in this FAQ pass, its
+`last_used_in_content_id` is set; the `master.xlsx[completed_work]`
+row carrying this content also records the `bank_entry_id`(s) added.
+Pre-existing body entries are not touched (already counted when
+new-blog or revise-content first shipped them).
+
+**Schema enablement (v1.4, commit `8e07e1c`):** R-121 reads
+`applicable_topics`, `phrasings`, `last_used_in_content_id`,
+`max_usage_per_month` on each bank entry. Stage C of brand-onboarding
+(commit `cb8df43`) populates these via R-44 evidence-gated atomic
+write.
+
+**Runtime integration deferred to Phase 11 Wave 2/3.** This SKILL.md
+section is the spec lock; `scripts/production/faq_optimization.py`
+does not yet exist. When the runtime lands, the conditional
+applicability check (does this FAQ item assert experience/research?)
+runs first; only if YES does the 3-step filter execute.
+
 ## Schema Authority Compliance
 
 - **F-9:** events.jsonl `event_kind=work` (events.schema.json enum
