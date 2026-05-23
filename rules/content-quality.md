@@ -259,6 +259,25 @@ Bu 3 prensip Phase 10 content rules setinin **üst-prensibidir**. Hiçbir alt-ru
 
 **Failure mode.** AMBER → 2x AMBER → RED.
 
+### R-121: Bank Entry Rotation + Density Cap + Topic Relevance
+
+**Statement.** Production skill (new-blog / revise-content / faq-optimization) bank entry (R-105 expert quote / R-114 original research / R-119 first-hand experience) kullanırken 3 koşulu birlikte sağlamak ZORUNLU:
+1. **Topic Relevance.** Entry'nin `applicable_topics` array'i içerik konusuyla örtüşmeli (`master.xlsx[new_content_plan].primary_keyword` + `topical_map.cluster_id` eşleşmesi); örtüşmüyorsa entry kullanılmaz.
+2. **Density Cap (profile-aware).** Per-content max: YMYL = 2 experience + 1 research; b2b-saas = 1 + 1; e-commerce / local-service / portfolio = 1 experience + 0 research.
+3. **Rotation (30-day).** `master.xlsx[completed_work]` son 30 günde aynı entry `id` için `usage_count >= max_usage_per_month` ise entry skip; alternatif `phrasings` array'inden seç veya farklı entry'ye geç.
+
+**Rationale.** Principle 3 + May 2026 Core Update "repetitive content visibility loss" + "automated, ad-bloated content" penalty sinyallerine karşı Engine self-protection. R-118 stilistik tekrarı yakalar; R-121 **semantik** tekrarı yakalar — aynı çekirdek bilgi farklı blog'larda kopya halinde tekrar etmesin (bank entry `phrasings` array'i ile aynı fact farklı cümlelerle aktarılır; "rotation içinde rotation").
+
+**Enforcement (Phase 11 worker pre-publish 3-step filter).**
+1. **Topic match:** `entry.applicable_topics ∩ blog.topics ≠ ∅` → candidate; ∅ → skip.
+2. **Density count:** candidate set'ten profile-aware max sayıda seç.
+3. **Rotation tally:** `completed_work` last-30-day filter; cap üstü entry skip.
+4. **Post-publish:** seçilen entry'nin `last_used_in_content_id` field'ı + `usage_count` master.xlsx[completed_work] row append ile atomic güncellenir.
+
+**Failure mode.** AMBER (3 katmanı geçen entry yoksa skill phrasing rotation dener) → 2x AMBER → RED (yayın blocked, operator review).
+
+**Cross-link.** → R-105 (expert quote bank), R-114 (original research bank), R-119 (first-hand experience bank), R-118 (AI signature humanize — stilistik karşılık), schema v1.4 bank entry format (`applicable_topics` + `phrasings` + `max_usage_per_month` fields).
+
 ---
 
 ## Cross-References
@@ -278,5 +297,5 @@ Bu 3 prensip Phase 10 content rules setinin **üst-prensibidir**. Hiçbir alt-ru
 ## Enforcement (Plugin-Level)
 
 - Phase 11 production skill'ler (new-blog, revise-content, faq-optimization, content-remediation, generate-images) bu rules dosyasını consume eder.
-- Phase 11 acceptance gate'leri Foundational Principles 3 prensibe + R-14/R-15/R-27/R-32/R-44/R-45/R-50/R-51/R-52/R-53/R-54/R-105/R-114/R-116/R-117/R-118/R-119 rule'larına karşı doğrulanır.
+- Phase 11 acceptance gate'leri Foundational Principles 3 prensibe + R-14/R-15/R-27/R-32/R-44/R-45/R-50/R-51/R-52/R-53/R-54/R-105/R-114/R-116/R-117/R-118/R-119/R-121 rule'larına karşı doğrulanır.
 - Cross-skill convention drift catch için `master.xlsx[completed_work]` sheet'inde rule violation event'i flag'lenir (Phase 14+ governance).
