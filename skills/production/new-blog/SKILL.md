@@ -194,6 +194,53 @@ ancak `profile` enum dışı (DURUR #2).
 **Failure mode:** AMBER warning (auto-correct attempt) → RED fail
 (manuel revise). 2x AMBER aynı pass → RED upgrade.
 
+## R-121 Bank Selection Logic (Pre-Publish)
+
+Bank entry (R-105 expert quote / R-114 original research / R-119
+first-hand experience) selection passes a **3-step filter** before any
+template renders. Step 7 (`render_5_templates`) reads the result; Step
+12 (`emit_provenance`) records the chosen entries. R-121 catches
+**semantic** repetition (the same core fact copy-pasted across many
+blogs); R-118 catches **stylistic** repetition (AI signature words
+within one page). The two rules compose — both fire pre-publish.
+
+1. **Topic match.** `entry.applicable_topics ∩
+   (new_content_plan.primary_keyword ∪ new_content_plan.assigned_cluster
+   ∪ topical_map[matching_row].cluster) ≠ ∅` → entry remains a
+   candidate; empty intersection → entry skipped.
+2. **Profile density cap.** From the candidate set, select up to the
+   per-profile maximum:
+   - YMYL: 2 experience + 1 research entry per content
+   - b2b-saas: 1 experience + 1 research entry per content
+   - e-commerce / local-service / portfolio: 1 experience + 0 research
+     entry per content
+3. **Rotation (30-day).** For each remaining candidate, count usage in
+   `master.xlsx[completed_work]` rows where `bank_entry_id == entry.id`
+   AND `timestamp >= now - 30d`. Skip if
+   `count >= entry.max_usage_per_month`; rotate to a different entry or
+   to a different `phrasings[]` form of the same entry.
+
+If all candidates fail the 3-step filter, the skill emits AMBER and
+retries with `phrasings[]` rotation; 2x AMBER same pass → RED upgrade
+(manual review).
+
+**Post-publish state mutation** (atomic with the `events.jsonl` audit
+append in Step 12): each selected entry's `last_used_in_content_id` is
+set to the new blog id; the `master.xlsx[completed_work]` row carrying
+this content also records the `bank_entry_id`(s) used. The rotation
+counter at Step 3 above reads from this same `completed_work` log on
+the next invocation — single source of truth.
+
+**Schema enablement (v1.4, commit `8e07e1c`):** each bank entry exposes
+`applicable_topics`, `phrasings`, `last_used_in_content_id`,
+`max_usage_per_month`. Stage C of brand-onboarding (commit `cb8df43`)
+populates these via R-44 evidence-gated atomic write.
+
+**Runtime integration deferred to Phase 11 Wave 2.** This SKILL.md
+section is the spec lock; `scripts/production/new_blog.py` does not yet
+exist. When Wave 2 lands the runtime, the 3-step filter implements as a
+pre-`render_5_templates` helper consumed by Step 7.
+
 ## Routing — 12-Step Workflow
 
 > Step names are stable identifiers across runs (used as
@@ -465,7 +512,10 @@ Expected: schema_version `"1.2"`, profile.enum array of 5 strings.
 - `rules/content-llm-discipline.md` (R-109..R-111 AIO citation, R-118
   humanize).
 - `rules/content-update-discipline.md` (R-50 counter-argument).
-- `schemas/project-config.schema.json` v1.2 (Phase 11 W-F1 cascade fix).
+- `schemas/project-config.schema.json` v1.4 (Phase 3.1 bank entry
+  schema bump — `applicable_topics`, `phrasings`,
+  `last_used_in_content_id`, `max_usage_per_month` fields R-121 reads;
+  W-F1 v1.2 + Phase 11 cascade still applies for `profile` singular).
 - `schemas/master-excel.schema.json` (18 sheets — `internal_links` and
   `content_gaps` are NOT among them; F-4 schema authority).
 - `schemas/events.schema.json` (event_type enum 10 values, event_kind
