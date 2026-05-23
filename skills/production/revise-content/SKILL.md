@@ -138,6 +138,87 @@ context'inde:
 - **Per-section change quantification:** word delta + structure
   delta + claim delta hesaplama, change_summary.md'ye log.
 
+## R-121 Bank Selection Logic (Pre-Revise + Pre-Publish)
+
+Bank entry (R-105 expert quote / R-114 original research / R-119
+first-hand experience) selection passes a **3-step filter**, with one
+revise-specific addition: the existing article's already-cited bank
+entries count toward the density cap. R-121 is **per content**, not
+per skill invocation — replacing a stale fact with a new bank entry
+adds, removing one subtracts, holding one steady leaves the cap
+unchanged.
+
+**Step 4 (Existing Blog Parse) addition:** during the BeautifulSoup
+parse, also extract pre-revise bank citations. Two detection paths:
+- `<blockquote data-bank-entry-id="exp-..." />` or
+  `<aside data-bank-entry-id="res-..." />` — explicit attribution
+  attribute (preferred; new-blog runtime will emit this once Phase 11
+  Wave 2 lands).
+- Text-matching fallback for older articles without
+  `data-bank-entry-id`: regex against `entry.claim_core` + phrasings
+  of every bank entry in `project.config[content_settings.
+  experience_database] ∪ original_research_database`.
+
+The detected entries form `bank_entries_pre[]`; the revise pass then
+runs the 3-step filter against `bank_entries_pre[] ∪ candidates_new[]`:
+
+1. **Topic match.** `entry.applicable_topics ∩ (decay_row.url_slug ∪
+   decay_row.matched_keywords ∪ topical_map[matching_row].cluster) ≠ ∅`
+   → entry remains a candidate; empty intersection → entry skipped
+   (and if it was a pre-revise entry, the removal is logged in
+   change_summary.md as "bank entry pruned: topic no longer matches
+   revised content").
+2. **Profile density cap.** Apply the per-profile maximum to the
+   union set:
+   - YMYL: 2 experience + 1 research entry per content
+   - b2b-saas: 1 experience + 1 research entry per content
+   - e-commerce / local-service / portfolio: 1 experience + 0 research
+     entry per content
+   If `|bank_entries_pre|` already meets or exceeds the cap, **no new
+   entries are introduced during revise** — the skill rotates phrasings
+   on existing entries instead.
+3. **Rotation (30-day).** For each NEW candidate (not pre-revise),
+   count usage in `master.xlsx[completed_work]` rows where
+   `bank_entry_id == entry.id` AND `timestamp >= now - 30d`. Skip if
+   `count >= entry.max_usage_per_month`. Pre-revise entries are
+   exempted from rotation (they are already on the page; removing them
+   only to satisfy the rotation cap would be churn).
+
+If a pre-revise entry fails topic match (filter 1), the revise drops
+it from the article; this counts as a `claim_delta -= 1` for the R-88
+freshness-theater check (Step 6) — a genuine content delta, not a
+fake bump.
+
+**R-89 canonical interplay.** Bank entry attribution (the
+`data-bank-entry-id` attribute on `<blockquote>` / `<aside>`) is part
+of the article's content signal, not its canonical URL. Changing
+which entries are cited does **not** trigger R-89 canonical change —
+only URL slug changes do (R-91 redirect path).
+
+**Post-publish state mutation** (Step 8 events.jsonl append):
+- For each entry **newly introduced** in this revise, its
+  `last_used_in_content_id` is set; the `master.xlsx[completed_work]`
+  row records the `bank_entry_id`(s) added.
+- For each pre-revise entry **retained**, no change (already counted
+  in a prior `completed_work` row when the article originally
+  shipped).
+- For each pre-revise entry **dropped**, the change_summary.md logs
+  the removal but does NOT touch the original `completed_work` row —
+  historical attribution preserved (append-only state, R-rule
+  events-writer discipline).
+
+**Schema enablement (v1.4, commit `8e07e1c`):** R-121 reads
+`applicable_topics`, `phrasings`, `last_used_in_content_id`,
+`max_usage_per_month` on each bank entry. Stage C of brand-onboarding
+(commit `cb8df43`) populates these via R-44 evidence-gated atomic
+write.
+
+**Runtime integration deferred to Phase 11 Wave 2.** This SKILL.md
+section is the spec lock; `scripts/production/revise_content.py` does
+not yet exist. When Wave 2 lands the runtime, the pre-revise
+extraction lives in Step 4; the 3-step filter runs between Step 5
+(section-targeted detect) and Step 6 (revise generate).
+
 ## Schema Authority Compliance
 
 - **F-2:** `master.xlsx[content_decay].action` schema'da type/enum/
