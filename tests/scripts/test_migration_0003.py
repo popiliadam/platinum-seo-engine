@@ -144,8 +144,17 @@ def test_workspace_fixture_validates_after_migration(
     migration_module, schema_v13: dict
 ) -> None:
     """End-to-end smoke: a doc shaped like the demo-dental workspace
-    (post-eca13c5) migrates to 1.3 and validates clean against the
-    bumped schema."""
+    (post-eca13c5) migrates 1.2 → 1.3 via this script, then 1.3 → 1.4
+    via migration 0004, then validates clean against the bumped schema.
+
+    Phase 3 G-AI-05 bumped the canonical schema to 1.4. Migration 0003
+    still emits 1.3 (its job), so the chain ``0003 → 0004`` is the
+    contract: every 1.2 doc reaches schema-current state through the
+    sequence."""
+    from scripts.migrations.migration_0004_project_config_1_3_to_1_4 import (
+        migrate as migrate_0004,
+    )
+
     fixture = {
         "schema_version": "1.2",
         "project_id": "demo-dental",
@@ -171,9 +180,14 @@ def test_workspace_fixture_validates_after_migration(
             "formality": "semi-pro",
         },
     }
-    migrated = migration_module.migrate(fixture)
-    errors = list(Draft7Validator(schema_v13).iter_errors(migrated))
+    # Chain: 0003 (1.2 → 1.3) then 0004 (1.3 → 1.4)
+    after_0003 = migration_module.migrate(fixture)
+    assert after_0003["schema_version"] == "1.3"
+    after_0004 = migrate_0004(after_0003)
+    assert after_0004["schema_version"] == "1.4"
+
+    errors = list(Draft7Validator(schema_v13).iter_errors(after_0004))
     assert not errors, (
-        "post-migration doc must validate against schema 1.3:\n"
+        "post-migration chain doc must validate against current schema:\n"
         + "\n".join(f"  - {e.message}" for e in errors)
     )

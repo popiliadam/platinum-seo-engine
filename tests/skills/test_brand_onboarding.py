@@ -400,12 +400,13 @@ def test_staging_output_schema_conformance(
     contract that outputs/onboarding/{slug}-staging-config.json
     candidates the skill emits round-trip cleanly into init-project at
     Phase 14."""
-    # schema v1.3 is asserted by the const constraint (ADR-030).
-    assert project_config_schema["properties"]["schema_version"]["const"] == "1.3"
+    # schema v1.4 is asserted by the const constraint (Phase 3 G-AI-05
+    # bank entry enrichment; ADR-030 brand_identity rename remained).
+    assert project_config_schema["properties"]["schema_version"]["const"] == "1.4"
 
     # Minimal-required staging artifact derived from schema.required.
     staging = {
-        "schema_version": "1.3",
+        "schema_version": "1.4",
         "project_id": "demo-dental",
         "domain": "https://example.com/",
         "market": "TR",

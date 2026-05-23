@@ -321,9 +321,10 @@ def test_cascade_fix_schema_1_2() -> None:
               .get("schema_version", {})
               .get("const")
     )
-    assert schema_version == "1.3", (
-        f"schema_version not bumped to 1.3 (got {schema_version!r}); "
-        f"ADR-030 v1.1 P0 brand_identity rename incomplete"
+    assert schema_version == "1.4", (
+        f"schema_version not bumped to 1.4 (got {schema_version!r}); "
+        f"Phase 3 G-AI-05 bank entry enrichment (applicable_topics, phrasings, "
+        f"last_used_in_content_id, max_usage_per_month) requires v1.4 const"
     )
 
     profile = schema.get("properties", {}).get("profile")
@@ -397,15 +398,16 @@ def test_migration_0002_pure_function_idempotent() -> None:
 
 def test_bootstrap_schema_version_sync() -> None:
     """bootstrap_project.py SCHEMA_VERSION constant must equal the current
-    project-config.schema.json const ("1.3" after ADR-030) so newly
-    bootstrapped projects emit schema-valid configs."""
+    project-config.schema.json const ("1.4" after Phase 3 G-AI-05 bank
+    entry enrichment) so newly bootstrapped projects emit schema-valid
+    configs."""
     bootstrap_path = REPO_ROOT / "scripts" / "state" / "bootstrap_project.py"
     text = bootstrap_path.read_text(encoding="utf-8")
     assert (
-        'SCHEMA_VERSION = "1.3"' in text
-        or "SCHEMA_VERSION='1.3'" in text
-        or 'SCHEMA_VERSION="1.3"' in text
-    ), "SCHEMA_VERSION constant not synced to 1.3"
+        'SCHEMA_VERSION = "1.4"' in text
+        or "SCHEMA_VERSION='1.4'" in text
+        or 'SCHEMA_VERSION="1.4"' in text
+    ), "SCHEMA_VERSION constant not synced to 1.4"
 
 
 # ---------------------------------------------------------------------------
