@@ -6,7 +6,9 @@ authoritative for plugin discovery + installer-banner trust:
   1. .claude-plugin/plugin.json         (top-level "version")
   2. .claude-plugin/marketplace.json    (metadata.version
                                          + plugins[0].description "v<semver> — " prefix)
-  3. README.md                          ("**Status:** v<semver>" banner)
+  3. README.md                          ("> Status: **v<semver>**" banner;
+                                         unified with INSTALL.md after v1.6
+                                         Phase-1.5b — see test_version_sync.py)
   4. docs/INSTALL.md                    ("> Status: **v<semver>**" blockquote banner)
   5. docs/RELEASE_NOTES_v<semver>.md    (existence check; WARN if missing,
                                          NEVER auto-create — manual authoring required)
@@ -38,7 +40,11 @@ REPO_ROOT_DEFAULT = Path(__file__).resolve().parents[2]
 SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?$")
 
 README_BANNER_RE = re.compile(
-    r"(\*\*Status:\*\*\s+v)\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?"
+    # Unified with INSTALL_BANNER_RE after v1.6 Phase-1.5b — the README
+    # banner was rewritten to the blockquote+inline-bold form
+    # ("> Status: **v<semver>** — ...") and tests/ci/test_version_sync.py
+    # exercises BOTH files with the same regex. Y-05 must do the same.
+    r"(Status:\s+\*\*v)\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?(\*\*)"
 )
 
 INSTALL_BANNER_RE = re.compile(
@@ -110,16 +116,23 @@ def _bump_marketplace_json(
 def _bump_readme_banner(
     path: Path, target: str, apply: bool
 ) -> Tuple[str, str] | None:
+    """README banner bump — unified with INSTALL handler.
+
+    Both README and INSTALL carry the ``> Status: **v<semver>**`` banner
+    after v1.6 Phase-1.5b unification. The regex captures the prefix in
+    group(1) and the trailing ``**`` in group(2); replace mid-section with
+    the target semver and keep both groups intact.
+    """
     text = path.read_text(encoding="utf-8")
     m = README_BANNER_RE.search(text)
     if m is None:
         return None
     old = m.group(0)
-    new = f"{m.group(1)}{target}"
+    new = f"{m.group(1)}{target}{m.group(2)}"
     if old == new:
         return None
     if apply:
-        new_text = README_BANNER_RE.sub(rf"\g<1>{target}", text, count=1)
+        new_text = README_BANNER_RE.sub(rf"\g<1>{target}\g<2>", text, count=1)
         path.write_text(new_text, encoding="utf-8")
     return (old, new)
 
