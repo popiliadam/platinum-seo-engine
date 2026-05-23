@@ -231,6 +231,62 @@ chosen profile, 18 brand_identity + 14 content_settings field
 özet tablosu, ve "Phase 14 init-project bu staging dosyasını
 input olarak okuyacak" notu raporlanır.
 
+## Bank Seed Pipeline (Stages A + B + C — Phase 3 G-AI-05)
+
+After Step 10, the skill chains into a 3-stage hybrid bank-seed
+pipeline that populates `content_settings.experience_database` and
+`content_settings.original_research_database` so the May 2026 Core
+Update "original, helpful, people-first content" emphasis is met
+with real first-hand signals (R-105, R-114, R-119).
+
+**Stage A — Auto Discovery:**
+`scripts/meta/brand_onboarding_discovery.discover(project_slug)` runs
+DFS + Scrapling probes against the project's public surface (WHOIS
+founding year, /hakkımızda parse, GBP listing for local-service,
+case-study HTML, top-20 keywords). Output: `draft_experience_entries`
++ `draft_research_entries` + `topic_candidates`. F-16 budget
+pre-flight short-circuits to DURUR awaiting_approval if DFS daily
+credits are exhausted.
+
+**Stage B — Operator Review:**
+`scripts/meta/brand_onboarding_review.generate_review_prompt()`
+renders a markdown document listing every draft with a 3-action
+menu (approve / edit / reject); operator fills in decisions; calling
+layer hands the decisions dict to
+`apply_review_decisions(discovery_output, decisions)`. Output:
+`approved_experience` + `approved_research` + `topic_candidates`.
+
+**Stage C — Atomic Bank Write:**
+`scripts/meta/brand_onboarding_write.write_bank_entries(project_slug,
+review_output)` appends approved entries to project.config.json's
+bank arrays. R-44 evidence_url validation fires HERE — every
+experience entry MUST carry non-empty evidence_url; every research
+entry MUST carry non-empty url. Atomic batch contract: if any entry
+fails validation, the file stays untouched.
+
+### 5 Profile-Aware Questions (when Stage A returns empty)
+
+| # | Question | Profile gate | Bank target |
+|---|----------|--------------|-------------|
+| 1 | Sektör tecrübesi (yıl + sertifika + partner) | all profiles | experience_database |
+| 2 | 3 müşteri vaka hikayesi | all profiles | experience_database |
+| 3 | Yönetici sektörel deneyimi | YMYL + b2b-saas | experience_database |
+| 4 | Şirket içi anket / araştırma / case study | all (skip OK) | original_research_database |
+| 5 | First-hand somut olaylar (canlı vaka) | YMYL + b2b-saas | experience_database |
+
+### Bank Seed DURUR Cascades (additive to the 6 below)
+
+- **DURUR #7 — BANK-SEED-DISCOVERY-EMPTY:** Stage A returns 0
+  candidates across all 5 sources → awaiting_approval, operator
+  must supply manually via the 5 questions above.
+- **DURUR #8 — BANK-SEED-EVIDENCE-MISSING:** Stage C rejects an
+  approved entry without evidence_url (R-44). Operator edits to add
+  URL or removes the entry.
+- **DURUR #9 — BANK-SEED-PROFILE-MIN-NOT-MET:** YMYL project with
+  fewer than 3 approved experience entries after Stage C →
+  awaiting_approval. Non-YMYL projects: ≥1 entry or operator
+  explicit-skip.
+
 ## DURUR conditions (6)
 
 Stop and flag the manager — do not patch, do not fall back silently.

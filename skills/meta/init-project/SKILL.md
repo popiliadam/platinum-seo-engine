@@ -266,6 +266,31 @@ All `outputs.*` values are STRING-TYPED artifact paths (workflow-run
 schema constraint; F5 rule). Numeric counts go in events.jsonl, not
 in workflow_run.outputs.
 
+## Mandatory Cascade — brand-onboarding (Phase 3 G-AI-05)
+
+After Step 10 emits `complete`, init-project MUST emit a
+`cascade: brand-onboarding` event to `_state/events.jsonl`. The
+skill auto-runner picks this up and invokes `brand-onboarding`
+with the freshly scaffolded project slug. The 3-stage bank-seed
+pipeline (Stages A + B + C) populates
+`content_settings.experience_database` and
+`content_settings.original_research_database`.
+
+Init is not considered "complete" until brand-onboarding Stage C
+writes successfully:
+- **YMYL profile:** init blocks until ≥3 approved experience
+  entries are seeded (DURUR #9 BANK-SEED-PROFILE-MIN-NOT-MET).
+- **Non-YMYL profile:** init blocks until ≥1 approved experience
+  entry OR operator explicit-skip via decisions map.
+
+Why this cascade exists: the May 2026 Core Update emphasizes
+"original, helpful, people-first content" and penalizes
+"automated, ad-bloated, repetitive content". Empty banks (the
+pre-Phase-3 default state of all 9 projects) trivially pass
+R-105 / R-114 / R-119 — the rules require entries to be USED but
+existing skills produce empty-bank content silently. Bank seed
+is therefore prerequisite to E-E-A-T "Experience" depth signal.
+
 ## Idempotency invariant
 
 Re-running `init-project` against an existing project MUST satisfy:
