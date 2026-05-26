@@ -1,6 +1,6 @@
 # Workflow Catalog (v1 Skills)
 
-> v1.0.0 release **43 skill** — tüm skill'ler implement edildi ve production-ready (Phase 5–13). Status: **active** (2026-05-05).
+> v1.8.0 release **45 skill** — tüm skill'ler implement edildi ve production-ready (Phase 5–13 baseline 43 + v1.7 gbp-audit + v1.8 sf-crawl-orchestrator). Status: **active** (2026-05-27).
 
 Phase 5–13 boyunca parallel worker batch'lerle inşa edildi; pilot dentnotion E2E PASS.
 
