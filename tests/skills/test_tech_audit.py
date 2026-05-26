@@ -630,3 +630,115 @@ def test_transform_does_not_import_excel_transaction() -> None:
     assert "from scripts.excel" not in text
     # And no direct transaction.append calls in the transform.
     assert "transaction.append" not in text
+
+
+# ---------------------------------------------------------------------------
+# Test 14 — v1.8 Phase 5 SF MCP consumer wiring (D-SF-11 opt-in)
+# ---------------------------------------------------------------------------
+
+def test_use_sf_mcp_live_flag_in_frontmatter(
+    skill_frontmatter_schema: dict,
+) -> None:
+    """v1.8 Phase 5 (D-SF-11): the tech-audit SKILL.md frontmatter MUST
+    declare an opt-in `use_sf_mcp_live` boolean input. Default MUST be
+    False so the existing 1184+ pytest baseline (file-based fixtures)
+    remains regression-clean. Required MUST be False (opt-in only).
+
+    Regression case: default False means the new live MCP code path
+    is never triggered by the existing tests in this file, and they
+    all continue to pass unchanged.
+    """
+    text = SKILL_MD.read_text("utf-8")
+    parts = text.split("---", 2)
+    assert len(parts) >= 3, "SKILL.md must open with --- frontmatter ---"
+    fm = yaml.safe_load(parts[1])
+
+    inputs = fm["inputs"]
+    assert "use_sf_mcp_live" in inputs, (
+        "tech-audit frontmatter must declare `use_sf_mcp_live` per "
+        "v1.8 Phase 5 / D-SF-11 (opt-in SF MCP consumer wiring)"
+    )
+    flag = inputs["use_sf_mcp_live"]
+    assert flag["type"] == "boolean"
+    assert flag["required"] is False, (
+        "use_sf_mcp_live MUST be optional (opt-in only); required=true "
+        "would break the 1184+ baseline regression contract"
+    )
+    assert flag["default"] is False, (
+        "use_sf_mcp_live MUST default to False (file-based path stays "
+        "the canonical contract; MCP is augmentation, not replacement)"
+    )
+    # Description must hint at the opt-in / D-SF-11 / SfMcpClient shape.
+    desc = flag["description"]
+    assert "SF MCP" in desc or "sf_mcp" in desc
+
+    # Frontmatter still validates against the canonical schema with the
+    # new flag added — defensive check that the additive change does
+    # not break the Draft 7 contract.
+    validator = Draft7Validator(skill_frontmatter_schema)
+    errs = sorted(
+        validator.iter_errors(fm), key=lambda e: list(e.absolute_path),
+    )
+    assert not errs, (
+        "frontmatter invalid after use_sf_mcp_live added: "
+        f"{[('/'.join(str(p) for p in e.absolute_path) or '<root>', e.message) for e in errs]}"
+    )
+
+
+def test_skill_md_documents_sf_mcp_live_pattern() -> None:
+    """v1.8 Phase 5: the tech-audit SKILL.md body MUST document the
+    SF MCP live mode branch with the 4 required patterns:
+
+      (1) `SfMcpClient` import from `scripts.util.sf_mcp_client`
+      (2) `client.health()` preflight check (R9 mitigation)
+      (3) AMBER fallback semantics ("falling back to file-based path")
+      (4) R12 truncation detection (`response.get("truncated"`)
+
+    This is a stub-mod pattern contract lock: the runtime body branch
+    is in SKILL.md prose (Phase 11+ for runtime impl), but the
+    contract is verified here so a future SKILL.md edit cannot
+    silently drop the R9/R12 mitigation patterns.
+
+    Also asserts the NATIVE tool naming convention is enforced
+    (`"sf_generate_report"`, NOT `"sf__sf_generate_report"` or
+    `"mcp__sf__sf_generate_report"`) per Manager dispatch.
+    """
+    text = SKILL_MD.read_text("utf-8")
+
+    # (1) Import contract.
+    assert "from scripts.util.sf_mcp_client import" in text, (
+        "SKILL.md body must document the SfMcpClient import path"
+    )
+    assert "SfMcpClient" in text
+
+    # (2) Preflight contract (R9 mitigation).
+    assert "client.health()" in text, (
+        "SKILL.md body must document the client.health() preflight "
+        "per R9 mitigation"
+    )
+
+    # (3) AMBER fallback contract.
+    assert "falling back to file-based path" in text, (
+        "SKILL.md body must document the AMBER fallback message per "
+        "R9 mitigation (never hard-fail when SF MCP unreachable)"
+    )
+    assert "amber_warnings" in text.lower() or "AMBER" in text
+
+    # (4) R12 truncation detection.
+    assert 'response.get("truncated"' in text, (
+        "SKILL.md body must document the R12 truncation detection "
+        "(100KB cap per D-SF-05)"
+    )
+
+    # Native tool naming enforcement (no wrapper / registry prefix
+    # inside the call_tool invocation example).
+    assert '"sf_generate_report"' in text, (
+        "SKILL.md body must use the NATIVE SF MCP tool name "
+        '("sf_generate_report"); registry / wrapper forms forbidden '
+        "in script call examples"
+    )
+    # tech-audit specifically calls issues_overview_report.
+    assert '"issues_overview_report"' in text, (
+        "tech-audit SF MCP branch must call the canonical "
+        "issues_overview_report (per spec line 122)"
+    )
