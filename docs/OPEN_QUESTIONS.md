@@ -2,6 +2,18 @@
 
 ## Unresolved
 
+### Q-SF-MCP-PHASE-4-CLOSURE-FOLLOWUPS-01: v1.8 Phase 4 closure — 2 LOW Worker followups [P3] ✅ ALL ACCEPTED 2026-05-26 (Phase 6 docs sweep absorbs)
+**Raised:** 2026-05-26 v1.8 Phase 4 closure (Manager GO decision after cross-check). Worker Output Package §"Worker Open Questions" + Manager review.
+**Context:** Phase 4 Worker (5 SKILL.md edits + F-23 invariant + drift-check expansion + 6 test files) surfaced 2 LOW Open Questions, both deferred to Phase 6 docs sweep where their target files are in scope. Tümü Phase 4 GO kararını ENGELLEMEDİ.
+
+**Worker Open Questions (Manager review table):**
+| ID | Question | Severity | Manager Decision |
+|----|----------|----------|------------------|
+| Q-PHASE-4-WORKER-01 | F-23 dual-namespace collision: cross-sheet-invariants.json:F-23 (SF MCP cross-sheet, v1.8) coexists with drift-check SKILL.md Engine Self-Governance F-23..F-28 (v1.4 deep-audit-fix, doc-only labels). Same F-XX label in disjoint stores. Worker added inline "Naming-namespace note" subsection in drift-check SKILL.md for immediate documentation. Resolution path: renumber engine self-governance F-23..F-28 → F-29..F-34 in Phase 6 docs sweep (SKILL.md narrative labels exempt from ADR-038 persistent-registry renumber-forbidden policy since they don't have audit history references). | LOW | ✅ ACCEPT — non-blocking; both namespaces consumed via disjoint paths (instance JSON vs doc-only narrative). Phase 6 docs sweep renumbers engine self-governance labels. v2.3 spec retrospective note: spec should clarify "F-XX" namespace rules (registry-instance IDs vs SKILL.md narrative IDs) |
+| Q-PHASE-4-WORKER-02 | skills/reporting/monitoring-weekly/SKILL.md lines 115 + 502 cite stale "invariants:20" literal (drift-check now emits invariants:21 post-F-23). Runtime regex consumption (lines 73, 169, 198, 431) uses wildcard `invariants:*` prefix → behavior remains correct; only documentation cites are stale. monitoring-weekly NOT in Phase 4 5-file modification scope so deferred per Manager dispatch ("log new Open Question rather than fixing inline"). | LOW | ✅ ACCEPT — Phase 6 docs sweep updates monitoring-weekly cites (target file in Phase 6 scope alongside other reporting docs); runtime behavior unaffected by stale doc cites |
+
+**Cross-refs:** `docs/PHASE_STATUS.md` Active Phase v1.8.0 Phase 4 DONE section; Phase 4 Worker Output Package; cross-sheet-invariants.json F-23 entry (severity HIGH, category csr_mcp); drift-check SKILL.md "Naming-namespace note" subsection (inline documentation); spec v2.2 line 207 (F-23 spec authority) + lines 208-210 (F-24/25/26 deferred to v1.9 per Manager scope).
+
 ### Q-SF-MCP-PHASE-3-CLOSURE-FOLLOWUPS-01: v1.8 Phase 3 closure — 7 Worker followups (5 LOW + 2 MEDIUM schema-first catches) [P2-P3] ✅ ALL ACCEPTED 2026-05-26
 **Raised:** 2026-05-26 v1.8 Phase 3 closure (Manager GO decision after BIGGEST-PHASE cross-check). Worker Output Package §"Worker Open Questions" + Manager review.
 **Context:** Phase 3 Worker (BIGGEST phase, 1994 LoC) surfaced 7 Open Questions during sf-crawl-orchestrator authoring. **Tümü Phase 3 GO kararını ENGELLEMEDİ + 2'si (Q-06 + Q-07) schema-first catch wins that improved correctness vs spec example shapes.** v2.3 spec retrospective items consolidated.

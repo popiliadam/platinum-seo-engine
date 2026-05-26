@@ -151,6 +151,40 @@ Validates the resulting JSON against `schemas/project-config.schema.json`
 (Draft7) before returning. Idempotent — `--force` overwrites stale
 config, but the file content is fully derived from inputs.
 
+**Schema version default (v1.8 Phase 1):** `bootstrap_project.py` emits
+`schema_version: "1.5"` by default — the SF MCP additive block
+(`sf.mcp.*`) is included in every freshly-bootstrapped project per
+D-SF-12 + D-SF-18 path parameterization. New project packs are
+schema-1.5 native; no migration is invoked.
+
+### Step 4.5 — `cascade_migration_0005` (safety net for legacy 1.4 docs)
+
+For projects re-bootstrapped from a pre-Phase-1 (schema 1.4) snapshot,
+init-project supports an explicit operator opt-in:
+
+```bash
+# Operator-side invocation (CLI):
+#   /pseo-init my-slug --schema-version=1.5
+#
+# Inside the skill protocol: after Step 4, if the operator passed the
+# explicit `--schema-version=1.5` flag AND the resulting
+# project.config.json carries schema_version other than "1.5"
+# (defensive: should never happen with the post-Phase-1 bootstrap,
+# but guards forks/old workspaces), invoke Migration 0005 via
+# subprocess:
+python3 scripts/migrations/migration_0005_project_config_1_4_to_1_5.py \
+    --in projects/{slug}/project.config.json
+# → idempotent: re-running on a 1.5 doc is a no-op (migrate() returns
+#   the input verbatim per migration_0005.migrate signature).
+```
+
+Without the flag, init-project trusts `bootstrap_project.py` as the
+authority (current default emits 1.5). With the flag, the cascade
+ensures schema 1.5 is final-state irrespective of bootstrap CLI
+version. The flag is operator-controlled because cascading a
+migration touches the bytes a Manager may have committed; explicit
+opt-in keeps the audit trail deliberate.
+
 ### Step 5 — `copy_master_xlsx` (IDEMPOTENT, F1 policy)
 
 ```python

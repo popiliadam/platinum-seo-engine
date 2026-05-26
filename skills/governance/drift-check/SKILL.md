@@ -48,13 +48,14 @@ autonomy:
 # drift-check — governance skill (Phase 5 Wave 2)
 
 Read-only consistency engine. Loads `master.xlsx` (data_only=True,
-read_only=True), evaluates **20 hand-coded invariant rules** (5
-CRITICAL + 10 HIGH + 5 MEDIUM), aggregates per §17.2 verdict logic
+read_only=True), evaluates **21 hand-coded invariant rules** (5
+CRITICAL + 11 HIGH + 5 MEDIUM; F-23 added v1.8 Phase 4 SF MCP
+cross-sheet rule), aggregates per §17.2 verdict logic
 (any RED → RED; else any AMBER → AMBER; all PASS → GREEN), emits a
 `consistency-report-{slug}.json` (validated against
 `schemas/consistency-report.schema.json`), renders a human-readable
 markdown report, and appends an `event_kind=audit` row to `events.jsonl`
-with `audit_action="accessed"` and `audit_target="invariants:20"`.
+with `audit_action="accessed"` and `audit_target="invariants:21"`.
 
 The rules are hand-coded Python functions, **not** a DSL — that is a
 deliberate Phase 6+ refactor candidate (§17.2 ADR-TBD). Each rule
@@ -85,7 +86,7 @@ list.
 - `projects/{slug}/outputs/reports/{date}-drift-{slug}.md` — human report.
 - `projects/{slug}/_state/consistency-report-{slug}.json` — schema-valid JSON.
 - `projects/{slug}/_state/events.jsonl` — single `event_kind=audit` entry
-  (`audit_action=accessed`, `audit_target=invariants:20`).
+  (`audit_action=accessed`, `audit_target=invariants:21`).
 
 ## 8-Step Body Protocol
 
@@ -167,12 +168,12 @@ from scripts.validation import validate_invariants
 # (Documented invocation; helper exec leaves results bound from Step 1 init.)
 ```
 
-The 20 rules are partitioned:
+The 21 rules are partitioned:
 
 | Tier      | Count | Verdict on FAIL  |
 |-----------|-------|------------------|
 | CRITICAL  | 5     | RED              |
-| HIGH      | 10    | RED (F-15 AMBER) |
+| HIGH      | 11    | RED (F-15 AMBER) |
 | MEDIUM    | 5     | AMBER            |
 
 ### Step 4 — `aggregate_verdict`
@@ -227,14 +228,14 @@ Template variables: `$project_slug`, `$date`, `$verdict`, `$pass_count`,
 # events_writer.append_audit(
 #     project_id=project_slug,
 #     audit_action="accessed",
-#     audit_target="invariants:20",
+#     audit_target="invariants:21",
 #     actor="drift-check",
 #     notes=f"verdict={agg['overall']} fails={agg['fail_count']}",
 # )
 audit_payload = {
     "event_kind": "audit",
     "audit_action": "accessed",
-    "audit_target": "invariants:20",
+    "audit_target": "invariants:21",
     "actor": "drift-check",
     "notes": f"verdict={agg['overall']} fails={agg['fail_count']}",
 }
@@ -291,7 +292,7 @@ def check_F_XX(workbook, project_slug) -> dict:
 | F-04  | dashboard formula `=AVERAGEIF(...)` drift check                       |
 | F-05  | schema_version field per-sheet present (every schema-known sheet has a header row matching schema column count; header row resolved via schema authority `sheets[sheet].header_row` with row-1 fallback — Phase 14 W3-W2-C-a) |
 
-### HIGH (10)
+### HIGH (11)
 
 | ID    | Rule                                                                  |
 |-------|-----------------------------------------------------------------------|
@@ -305,6 +306,7 @@ def check_F_XX(workbook, project_slug) -> dict:
 | F-15  | manual triage placeholder — populates manual_review_required[] (AMBER, NOT RED) |
 | F-16  | foreign key cross-sheet: quick_wins.url ⊆ opportunity.url             |
 | F-17  | severity column ⊆ severityEnum 4-value (LOW/MEDIUM/HIGH/CRITICAL)     |
+| F-23  | sf-crawl-orchestrator workflow → repo-root mcp-tool-registry.json has 'sf' (v1.8 Phase 4 SF MCP cross-sheet) |
 
 ### MEDIUM (5)
 
@@ -330,6 +332,44 @@ These invariants enforce engine repo discipline (schemas/+rules/+templates/) —
 | F-28  | rules frontmatter validates against rules-frontmatter.schema.json     | tests/rules/test_frontmatter.py             |
 
 Severity: ALL HIGH — engine self-violation breaks SSOT/schema-first discipline at the meta level. Per §17.2, any FAIL → RED (no manual triage placeholder; automated tests are deterministic).
+
+## F-23 — SF MCP cross-sheet invariant (v1.8 Phase 4)
+
+If any project's `_state/workflows/*.json` contains a completed run with
+`skill="sf-crawl-orchestrator"`, then the repo-root
+`mcp-tool-registry.json` MUST list `"sf"` under `servers`. A workspace
+that has produced SF MCP crawl evidence with an engine registry that
+does NOT advertise the `sf` server silently desyncs downstream sf-import
+handoff and tooling discovery (`claude mcp list` cross-check).
+
+Detection logic — `check_F_23()` reads:
+1. Project `_state/workflows/*.json` files (per project_slug). Filters
+   to entries with `skill == "sf-crawl-orchestrator"` AND
+   `status == "done"`.
+2. Repo root `mcp-tool-registry.json` (single instance per F-16
+   plugin-agnostic boundary). Checks if `"sf"` appears as a top-level
+   key under `servers`.
+3. If (1) is non-empty AND (2) is missing the `sf` key → FAIL with
+   severity HIGH (→ RED verdict). Sample violations list the run_ids
+   that produced the evidence.
+4. If `mcp-tool-registry.json` is absent → SKIP (engine state, not
+   workspace; surfaces as AMBER skip).
+
+Severity HIGH (not CRITICAL) per Manager Phase 4 scope: drift produces
+broken provenance lineage but does not corrupt master.xlsx.
+
+### Naming-namespace note (Q-PHASE-4-WORKER-01)
+
+The body subsection "Engine Self-Governance (6, v1.4-deep-audit-fix
+Tier 4)" below uses F-23..F-28 as labels for SCHEMA-LEVEL regression
+rules (e.g. F-23 there = schema $id format). Those labels are
+documentation-only and live in this SKILL.md body — they have never
+been registered in `schemas/cross-sheet-invariants.json`. The Phase 4
+F-23 (SF MCP cross-sheet) is the canonical F-23 for the JSON registry
+and `validate_invariants.py` rule function. The two namespaces collide
+in human label but live in disjoint stores; a Manager renumbering of
+the engine-self-governance labels (F-29..F-34) is queued as future
+follow-up if confusion proves real in practice.
 
 ## F2 flag — F-08 RED is EXPECTED on the pilot workbook
 

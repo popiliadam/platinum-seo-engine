@@ -452,6 +452,78 @@ def test_portfolio_json_valid(tmp_path: Path) -> None:
 # documents the contract via fixture, mirroring quick-wins test 1 pattern)
 # ---------------------------------------------------------------------------
 
+def test_schema_version_1_5_sf_block_present(tmp_path: Path) -> None:
+    """v1.8 Phase 4 init-project extension: a freshly bootstrapped project
+    carries schema_version=1.5 + an additive `sf.mcp.*` block per
+    Migration 0005 defaults (D-SF-12, D-SF-18 path parameterization).
+
+    The Phase 1 bootstrap_project.py CLI emits 1.5 natively; this test
+    locks the contract so future bootstrap-CLI edits cannot silently
+    drop the sf block.
+    """
+    ws = tmp_path
+    slug = "sf-mcp-init-test"
+    cfg_path = _bootstrap(slug, ws)
+    cfg = json.loads(cfg_path.read_text("utf-8"))
+
+    assert cfg["schema_version"] == "1.5", (
+        "bootstrap_project.py must emit schema_version=1.5 by default "
+        "post-v1.8 Phase 1 (D-SF-12)"
+    )
+    assert "sf" in cfg, (
+        "v1.5 project.config.json must carry additive sf block (D-SF-12); "
+        f"actual top-level keys: {sorted(cfg.keys())}"
+    )
+    sf_mcp = cfg["sf"].get("mcp")
+    assert isinstance(sf_mcp, dict), (
+        f"sf.mcp must be a dict; got {type(sf_mcp).__name__}"
+    )
+    # The Migration 0005 default fields (DEFAULT_SF_MCP in
+    # scripts/migrations/migration_0005_project_config_1_4_to_1_5.py).
+    for field in (
+        "enabled", "url", "allowed_directory", "crawl_config_path",
+        "max_wait_minutes", "per_report_timeout_seconds",
+    ):
+        assert field in sf_mcp, (
+            f"sf.mcp.{field} missing (Migration 0005 default contract)"
+        )
+    # Safe defaults: opt-in, no path leaks.
+    assert sf_mcp["enabled"] is False
+    assert sf_mcp["allowed_directory"] in (None, "")
+    assert sf_mcp["crawl_config_path"] in (None, "")
+    assert sf_mcp["max_wait_minutes"] == 180
+    assert sf_mcp["per_report_timeout_seconds"] == 300
+
+
+def test_migration_0005_cascade_idempotent_on_1_5(tmp_path: Path) -> None:
+    """v1.8 Phase 4 — Migration 0005 cascade safety net documented in the
+    init-project SKILL.md Step 4.5. Running Migration 0005 against a 1.5
+    doc must be a no-op (idempotent per migration_0005 doctest).
+
+    The cascade is operator-opt-in (--schema-version=1.5 flag); when
+    invoked against a project that's already at 1.5 (the default post
+    Phase 1), it returns the input verbatim. Locks the contract so a
+    regression in migration_0005.migrate() cannot silently mutate a
+    1.5 project mid-init.
+    """
+    from scripts.migrations.migration_0005_project_config_1_4_to_1_5 import (
+        migrate as migrate_0005,
+    )
+
+    ws = tmp_path
+    slug = "sf-mcp-cascade-test"
+    cfg_path = _bootstrap(slug, ws)
+    cfg = json.loads(cfg_path.read_text("utf-8"))
+    assert cfg["schema_version"] == "1.5"
+
+    # Idempotent invocation: migrate(1.5_doc) → identical 1.5_doc.
+    out = migrate_0005(cfg)
+    assert out == cfg, (
+        "Migration 0005 cascade on a 1.5 doc must be a no-op "
+        "(idempotency invariant — v1.8 Phase 1)"
+    )
+
+
 def test_gsc_list_sites_optional_verify() -> None:
     """The skill's verify_gsc step is OPTIONAL. When gsc_site_url is
     omitted, the step is skipped. When supplied, the skill calls

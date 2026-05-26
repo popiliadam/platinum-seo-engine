@@ -444,3 +444,77 @@ def test_foundational_principles_three_layer() -> None:
     assert re.search(r"suistimal|AI suistimal", body, re.IGNORECASE), (
         "body must reference AI suistimal yasağı"
     )
+
+
+# ---------------------------------------------------------------------------
+# Test 13 — v1.8 Phase 4: sf-mcp-tool-mapping.schema.json picked up by sweep
+# ---------------------------------------------------------------------------
+
+def test_sf_mcp_tool_mapping_in_sweep() -> None:
+    """v1.8 Phase 4 verification (sf-mcp-tool-mapping additive Phase 1):
+    (a) the schema file exists under schemas/ so the runtime glob picks
+        it up automatically (no enumeration code change required —
+        F-13.1 schema-first override);
+    (b) it Draft7-validates as a valid meta-schema;
+    (c) the sample instance at templates/sf-mcp/use-case-example.json
+        validates against it cleanly (positive instance gate).
+    """
+    sf_mcp_schema_path = SCHEMAS / "sf-mcp-tool-mapping.schema.json"
+    assert sf_mcp_schema_path.exists(), (
+        f"v1.8 Phase 1 schema missing: {sf_mcp_schema_path}"
+    )
+
+    # The runtime glob would discover it.
+    discovered = sorted(SCHEMAS.glob("*.schema.json"))
+    assert sf_mcp_schema_path in discovered, (
+        "sf-mcp-tool-mapping.schema.json not in glob() enumerate set"
+    )
+
+    # (a)/(b): Draft7 meta-schema sanity.
+    sf_schema = json.loads(sf_mcp_schema_path.read_text(encoding="utf-8"))
+    Draft7Validator.check_schema(sf_schema)  # raises SchemaError on bad meta
+
+    # (c): positive-instance gate.
+    instance_path = REPO_ROOT / "templates" / "sf-mcp" / "use-case-example.json"
+    assert instance_path.exists(), (
+        f"Phase 1 sample instance missing: {instance_path}"
+    )
+    instance = json.loads(instance_path.read_text(encoding="utf-8"))
+    errors = sorted(
+        Draft7Validator(sf_schema).iter_errors(instance),
+        key=lambda e: list(e.absolute_path),
+    )
+    assert not errors, (
+        "templates/sf-mcp/use-case-example.json fails its own schema: "
+        + "; ".join(
+            f"{'/'.join(str(p) for p in e.absolute_path) or '<root>'}: "
+            f"{e.message}"
+            for e in errors
+        )
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 14 — v1.8 Phase 4: F-23 declared in cross-sheet-invariants.json
+# ---------------------------------------------------------------------------
+
+def test_f23_invariant_registered_in_cross_sheet_json() -> None:
+    """v1.8 Phase 4: cross-sheet-invariants.json carries F-23 entry with
+    the canonical SF MCP cross-sheet rule body + HIGH severity (RED
+    verdict on FAIL per the severity_to_verdict_map at the document
+    root). schema-first override discipline lock — schema authority is
+    the SoT for the rule registry."""
+    csi = json.loads(
+        (SCHEMAS / "cross-sheet-invariants.json").read_text(encoding="utf-8")
+    )
+    rules_by_id = {r["id"]: r for r in csi["rules"]}
+    assert "F-23" in rules_by_id, (
+        "F-23 (v1.8 Phase 4 SF MCP cross-sheet) missing from registry"
+    )
+    f23 = rules_by_id["F-23"]
+    assert f23["severity"] == "HIGH"
+    assert f23["category"] == "csr_mcp"
+    rule_text = f23["rule"]
+    assert "sf-crawl-orchestrator" in rule_text
+    assert "mcp-tool-registry" in rule_text
+    assert "sf" in rule_text.lower()

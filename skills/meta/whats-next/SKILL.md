@@ -154,6 +154,35 @@ approval_meta.subject, approver: approval_meta.approver}`.
 Implementation: `workflow_runner.list_runs(project_slug,
 status_filter="awaiting_approval")`.
 
+### Step 4.5 — `scan_sf_crawl_freshness` (v1.8 Phase 4, non-blocking)
+
+When the project's `project.config.json` carries
+`sf.mcp.enabled == true` (Phase 1 D-SF-12 additive block), inspect
+`_state/workflows/*.json` for the most recent completed
+`sf-crawl-orchestrator` run. If the newest done run is older than
+30 days (or NO done run exists), surface a non-blocking suggestion:
+"consider running /pseo-sf-crawl {slug}".
+
+```python
+from scripts.meta import whats_next
+suggestion = whats_next.suggest_sf_crawl_when_stale(
+    project_slug,
+    workspace_root=workspace_root,
+    threshold_days=30,
+)
+if suggestion:
+    candidates.append(suggestion)
+```
+
+Suggestion shape:
+`{kind: "sf_crawl_stale", row_id: "<sentinel>", suggested_skill:
+"sf-crawl-orchestrator", reason: "last sf-crawl > 30d (or none)"}`.
+
+Score = 30 (below `master_task_medium=40` and `quick_wins_pending=50`)
+so the suggestion never bumps a higher-priority signal off the
+top-K. SF MCP not enabled in the config → helper returns `None` and
+no candidate is added (no surface in suggestions).
+
 ### Step 5 — `scan_quick_wins_pending`
 
 Same workbook. If the sheet `quick_wins` is absent, return empty.
@@ -174,6 +203,7 @@ Each candidate gets a fixed score:
 | `master_task` priority=`CRITICAL`/`HIGH`    | 60    |
 | `quick_wins_pending` (row in `quick_wins`)  | 50    |
 | `master_task` priority=`MEDIUM`             | 40    |
+| `sf_crawl_stale` (v1.8 Phase 4 SF MCP)      | 30    |
 | `master_task` priority=`LOW` / other        | 20    |
 
 Sort `score DESC`, then by stable secondary key (kind alphabetic,

@@ -472,6 +472,113 @@ def test_provenance_event_sf_csv(tmp_path: Path, events_schema: dict) -> None:
 # Bonus — frontmatter contract validation (free, fast, catches drift)
 # ---------------------------------------------------------------------------
 
+def test_source_run_id_frontmatter_present(
+    skill_frontmatter_schema: dict,
+) -> None:
+    """v1.8 Phase 3 D-SF-07 hand-off: sf-import frontmatter declares
+    `source_run_id` as an optional input so the sf-crawl-orchestrator
+    can pass its upstream MCP-crawl run_id into the file-based ingest
+    for provenance correlation. Phase 4 verification gate: Phase 3
+    Worker added this — Phase 4 Worker confirms intact (no body
+    changes per D-SF-07).
+    """
+    text = SKILL_MD.read_text(encoding="utf-8")
+    parts = text.split("---", 2)
+    fm = yaml.safe_load(parts[1])
+
+    inputs = fm.get("inputs", {})
+    assert "source_run_id" in inputs, (
+        "v1.8 Phase 3 D-SF-07: sf-import frontmatter must declare "
+        "`source_run_id` optional input for sf-crawl-orchestrator handoff"
+    )
+    src_def = inputs["source_run_id"]
+    assert src_def["type"] == "string"
+    assert src_def.get("required") is False, (
+        "source_run_id MUST be optional (required=False) — old sf-import "
+        "calls predating Phase 3 must still satisfy the contract"
+    )
+    # Description must reference the upstream skill so the hand-off intent
+    # is self-documenting.
+    desc = src_def.get("description", "")
+    assert "sf-crawl-orchestrator" in desc, (
+        f"source_run_id description must cite sf-crawl-orchestrator; "
+        f"got: {desc!r}"
+    )
+
+
+def test_source_run_id_provenance_chain(tmp_path: Path, events_schema: dict) -> None:
+    """v1.8 Phase 4 verification (D-SF-07 sf-crawl-orchestrator → sf-import
+    provenance chain): when a caller supplies source_run_id, the
+    provenance event written to events.jsonl carries the upstream
+    orchestrator's run id token in the source dict so drift-check can
+    correlate file-based ingest with MCP crawl.
+
+    Implementation note: source dict additionalProperties=false per
+    events.schema (Q-PHASE-3-WORKER-07 catch); the upstream run id is
+    carried in the source_folder string OR a sibling envelope file
+    (inbox/sf-mcp/{date}-sf-crawl-{slug}.json per Phase 3 spec). This
+    test exercises the *event* shape — the workflow link lives at the
+    envelope layer.
+    """
+    slug = "sf-handoff"
+    state_dir = tmp_path / "projects" / slug / "_state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+
+    upstream_run_id = f"{slug}-2026-05-26-orch"
+
+    # Mirror sf-import Step 7 with the Phase 3 handoff: source.source_folder
+    # carries the orchestrator-produced sf-mcp/{date} subdir under inbox.
+    rid = events_writer.next_run_id(slug, workspace_root=tmp_path)
+    sha = "sha256:" + hashlib.sha256(b"orchestrator-handoff").hexdigest()
+    result = events_writer.append_provenance(
+        project_id=slug,
+        run_id=rid,
+        source={
+            "kind": "sf_csv",
+            "source_folder": (
+                f"inbox/sf-mcp/2026-05-26-sf-crawl-{slug}.json#{upstream_run_id}"
+            ),
+            "filename_original": "internal_all.csv",
+            "filename_normalized": "internal_all",
+            "file_hash": sha,
+            "row_count": 192,
+        },
+        operation="ingest",
+        rows_written=192,
+        notes=f"sf-crawl-orchestrator handoff source_run_id={upstream_run_id}",
+        workspace_root=tmp_path,
+    )
+    assert result.event_id
+
+    events_path = state_dir / "events.jsonl"
+    lines = [
+        json.loads(line) for line in events_path.read_text("utf-8").splitlines()
+        if line.strip()
+    ]
+    chained = [
+        e for e in lines
+        if e.get("event_kind") == "provenance"
+        and e.get("source", {}).get("kind") == "sf_csv"
+        and upstream_run_id in str(e.get("source", {}).get("source_folder", ""))
+    ]
+    assert chained, (
+        "no provenance event carries the upstream sf-crawl-orchestrator "
+        f"run_id={upstream_run_id} in source.source_folder"
+    )
+    # Re-validate the chained event against the canonical events schema —
+    # additionalProperties=false on source must still pass (source_folder
+    # is a declared property, not extra).
+    validator = Draft7Validator(events_schema)
+    for evt in chained:
+        errs = sorted(
+            validator.iter_errors(evt), key=lambda e: list(e.absolute_path)
+        )
+        assert not errs, (
+            "chained sf_csv provenance event invalid: "
+            f"{[(list(e.absolute_path), e.message) for e in errs]}"
+        )
+
+
 def test_frontmatter_validates_against_schema(
     skill_frontmatter_schema: dict,
 ) -> None:

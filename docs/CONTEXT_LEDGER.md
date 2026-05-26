@@ -1821,3 +1821,84 @@ Single manager session ~115dk audit of v1.1.0 RELEASED engine plugin. Brief: `do
 - Phase 5 (consumer wiring all-4 skills, ~1.5d) + Phase 6 (commands + manifest + docs, ~1.25d w/ ADR-031→ADR-039 override) + Phase 7 (pilot smoke + release, ~0.75d) = ~3.5d remaining cumulative
 
 **Atomic phase paterni 70'inci kanıt cumulative** (v1.8 Phase 3 = 1 commit per Worker Output Package; **0 NO-GO branches dispatched** despite BIGGEST scope — discipline kanıtı). Lesson 38 v2 cumulative catches ~72 (+2 v1.8 cycle: Q-PHASE-3-WORKER-06 + Q-PHASE-3-WORKER-07 schema-first MEDIUM catches; Worker preserved schema closed-enums + closed-shape via inline comment discipline). **Manager+Worker multi-session pattern proven**: Phase 3's BIGGEST scope landed atomic without same-session Manager context bleed; spec authority preserved end-to-end; Worker Output Package compaction (Worker transcript not read) enabled Manager to focus on titiz cross-check vs raw implementation context.
+
+---
+
+## v1.8 Phase 4 — Existing Skill Extensions + F-23 Invariant DONE (2026-05-26)
+
+**Worker dispatch:** Phase 4 Worker (fresh Claude Code session) executed 8 dispatch tasks per Manager Worker Prompt with 5 inline reminders (no ADR override; Phase 1+2+3 closure followups informational only; sf-import frontmatter verification; F-23 invariant entry format reminder; pytest baseline gap note from Phase 3; test basename collision avoidance lesson). Worker Output Package returned 13-file scope (12 MODIFIED + 1 NEW, +860/-21 cumulative).
+
+**Worker landed CLEAN second consecutive phase (0 NO-GO branches; v1.8 NO-GO rate so far: 1 in 4 phases = 25%, all in Phase 1 W-1 catch):**
+- F-23 land via schema-first chain: JSON instance (cross-sheet-invariants.json) → code (validate_invariants.py check_F_23) → docs (drift-check SKILL.md body + Naming-namespace note)
+- Bidirectional sync test (test_cross_sheet_invariants_sync.py) auto-validates F-23 parity — regression in either direction would FAIL at commit time (governance test paterni reuse from v1.5 Phase 2 K-02 schema sync)
+- suggest_sf_crawl_when_stale read-only by design (advisory router contract preserved; SF MCP not opted-in → helper returns None → zero surface in suggestions)
+- init-project Migration 0005 cascade defensive opt-in (bootstrap_project.py emits 1.5 natively post-Phase-1; cascade is safety net for legacy 1.4 workspace re-bootstraps)
+- 14 new test functions (5 extensions + 1 NEW no-cron file); 0 regression on existing 1222 baseline
+
+**Phase 3 +2 unexplained PASS gap RESOLVED via Phase 4 baseline reconciliation:**
+- Worker session-start = 1222 PASS / 12 SKIP (matches Manager-recorded Phase 3 baseline exactly)
+- Phase 4 post-work = 1236 PASS / 12 SKIP (+14 PASS / 0 SKIP delta)
+- Phase 3 Worker's "+17 functional + 2 mystery = +19 PASS" was a counting ambiguity — actual functional count was +19 from the start (including bonus frontmatter test counted as functional). Manager+Worker counts now converge.
+
+**Phase 4 deliverables (atomic commit):**
+- schemas/cross-sheet-invariants.json (+8L; F-23 entry: severity=HIGH category=csr_mcp computed_by=consistency_check; rules count 27→28; mirrors F-08/F-09/F-15 cross-sheet shape exactly; **schema-first catch**: spec v2.2 line 207 "Severity: RED" was shorthand for verdict outcome; cross-sheet-invariants.json severity field convention is HIGH/CRITICAL/MEDIUM/LOW; HIGH → RED via severity_to_verdict_map)
+- skills/governance/drift-check/SKILL.md (+58L/-11; F-23 row in HIGH tier table + body F-23 detection section + cite update invariants:20→21 in 3 locations + Naming-namespace note subsection documenting Q-PHASE-4-WORKER-01 dual-namespace transparency)
+- scripts/validation/validate_invariants.py (+91L; check_F_23 function 88L with 4 verdict paths SKIP/PASS/SKIP/FAIL per DURUR semantics: no workflow dir → SKIP, no registry → FAIL, registry missing sf → FAIL, registry has sf → PASS; _RULE_FUNCTIONS extended; __all__ exported)
+- skills/governance/schema-validate/SKILL.md (+45L/-10; sf-mcp-tool-mapping.schema.json runtime glob inclusion + positive-instance gate for templates/sf-mcp/use-case-example.json + invariant count cite update for F-23)
+- skills/meta/init-project/SKILL.md (+34L; Step 4 amended with v1.8 Phase 1 schema version default note + NEW Step 4.5 cascade_migration_0005 operator opt-in via --schema-version=1.5 flag; idempotent on already-1.5 docs)
+- skills/meta/whats-next/SKILL.md (+30L; NEW Step 4.5 scan_sf_crawl_freshness non-blocking conditional on sf.mcp.enabled=true; SCORES dict +sf_crawl_stale=30 slots below master_task_medium=40 never displaces higher-priority signals)
+- scripts/meta/whats_next.py (+104L; json+datetime imports + SCORES dict extended + RECOMMENDED_SKILL extended + _SF_CRAWL_STALE_DEFAULT_DAYS=30 constant + score_candidate sf_crawl_stale branch + _candidate_reason formatter + _parse_iso_z helper for tolerant ISO-8601 parsing + suggest_sf_crawl_when_stale() read-only helper returning candidate dict OR None + run() orchestration wires Step 4.5 non-blocking append + __all__ extended)
+- skills/ingestion/sf-import/SKILL.md (VERIFIED INTACT; Phase 3 source_run_id frontmatter present line 31 single occurrence; body 8-step protocol UNCHANGED per D-SF-07)
+- tests/skills/test_drift_check.py (+3 F-23 cases + cascade 20→21 in 3 locations; 11→14 PASS)
+- tests/skills/governance/test_schema_validate.py (+2 cases: sf-mcp-tool-mapping in sweep + F-23 invariant registered; 12→14 PASS)
+- tests/skills/test_init_project.py (+2 cases: schema_version 1.5 sf block present + Migration 0005 idempotent on 1.5; 7→9 PASS + 1 SKIP)
+- tests/skills/test_whats_next.py (+1 case: suggest_sf_crawl_when_stale with 5 sub-cases + SCORES dict cascade; 5→6 PASS)
+- tests/skills/test_sf_import.py (+2 cases: source_run_id frontmatter present + source_run_id provenance chain; 7→9 PASS + 2 SKIP)
+- tests/skills/test_no_cron_for_sf_crawl_orchestrator.py (NEW 4 cases D-SF-09 verification: frontmatter_has_no_cron + no_other_skill_schedules + no_hook_json_targets + spec_d_sf_09_documented w/ structural fallback)
+
+**Manager review of 2 Worker Open Questions (both LOW, both ACCEPTED — Phase 6 docs sweep absorbs):**
+- Q-PHASE-4-WORKER-01 F-23 dual-namespace collision: cross-sheet-invariants.json:F-23 (SF MCP cross-sheet, v1.8) + drift-check SKILL.md Engine Self-Governance F-23..F-28 (v1.4 deep-audit-fix doc-only labels). Worker added inline "Naming-namespace note" subsection. Resolution: Phase 6 docs sweep renumber engine self-governance F-23..F-28 → F-29..F-34 (SKILL.md narrative labels exempt from ADR-038 persistent-registry renumber-forbidden policy).
+- Q-PHASE-4-WORKER-02 monitoring-weekly stale "invariants:20" literal cite (lines 115 + 502): runtime regex (lines 73, 169, 198, 431) uses wildcard `invariants:*` prefix → behavior correct; only doc cites stale. Phase 6 docs sweep updates.
+
+**v2.3 spec retrospective items + Phase 6 docs sweep backlog grows to 4 items:**
+1. (Phase 3 Q-03+Q-05+Q-06+Q-07) — spec example shapes should be schema-validated before publication
+2. (Phase 3 Q-02) — Worker Prompts template basename collision rule
+3. (Phase 3 Q-04) — step count semantics clarification (complete is transition)
+4. (Phase 4 Q-01) — F-XX namespace rules clarification (registry-instance vs SKILL.md narrative)
+
+**Verification gates (all GREEN; expanded Manager cross-check):**
+- test_drift_check 14 PASS (+3 F-23 cases) ✓
+- test_schema_validate 14 PASS (+2 sf-mcp-tool-mapping coverage) ✓
+- test_init_project + test_whats_next + test_sf_import 26 PASS + 3 pre-existing local-fixture SKIP unchanged ✓
+- test_no_cron_for_sf_crawl_orchestrator 4 PASS ✓
+- test_cross_sheet_invariants_sync 4 PASS (bidirectional F-23 sync auto-validated; governance test paterni reuse) ✓
+- drift-check skill helper exec EXIT 0 ✓
+- Full baseline 1222 → 1236 PASS + 12 SKIP unchanged (+14 PASS / 0 SKIP regression sıfır) ✓
+- .mcp.json F-16 post-break baseline preserved 543B / md5 93523d4 (4-commit streak Phase 2+3+4 all preserved) ✓
+- DECISIONS.md unchanged 6067B / 77B headroom (no new ADR Phase 4) ✓
+- Plugin agnostic 0 slug literals in 13 changed files ✓
+
+**Manager cross-check (titiz mode kanıtı):**
+- F-23 severity=HIGH NOT severity=RED (schema-first catch); cross-sheet-invariants.json convention vs spec shorthand reconciled
+- check_F_23 4 verdict paths cover all DURUR-equivalent states (workflow dir absence + registry absence + sf key absence + sf key present)
+- drift-check cite cascade absorbed (20→21 in 3 locations; Lesson 38 v2 same-atomic-commit discipline reuse #8+)
+- bidirectional sync test (test_cross_sheet_invariants_sync.py) auto-validates F-23 parity — no manual cross-check needed for future regressions (governance test paterni reuse from v1.5 Phase 2 K-02 schema sync, lesson 38 v2 catch #36)
+- Phase 3 sf-import frontmatter source_run_id verified intact (NOT re-added per Manager dispatch instruction)
+- suggest_sf_crawl_when_stale read-only design (advisory router contract preserved)
+- F-24/25/26 from spec deferred to v1.9 per Manager scope ("Phase 4 NICE-TO-HAVE only requires F-23"; v1.9 candidate)
+
+**Drift state (post-Phase-4):**
+- pytest 1236 PASS + 12 SKIP (Phase 3 1222 → Phase 4 1236, +14 PASS / 0 SKIP; regression sıfır)
+- .mcp.json 543B unchanged (F-16 post-Phase-2-break baseline preserved 4 commits cumulative; streak count = 3 commits since Phase 2 broke streak)
+- DECISIONS.md 6067B unchanged (no new ADR Phase 4; ADR-038 + ADR-039 active; 77B headroom)
+- plugin.json 1.7.0 unchanged (Phase 6 bumps to 1.8.0)
+- Drift-check verdict: F-23 invariant deployed; F-24/25/26 v1.9 candidates
+
+**Push timing:** Phase 4 commit local-only (Manager bootstrap forbidden actions; cumulative push at v1.8.0 closeout post-Phase-7). 6 commits ahead of origin/main now (a303659 + 4964552 + 203743c + dec2eef + feb68b4 + Phase-4-commit).
+
+**Next agenda:**
+- Phase 5 Worker Prompt dispatch (Optional Consumer Wiring all-4 skills, ~1.5d effort per Q-SF-MCP-07 lock): tech-audit + schema-audit + on-page-audit + internal-links each get `use_sf_mcp_live: bool = False` flag + body branch (preflight + AMBER fallback per R9 + R12 truncation detection) + 8 mock/regression tests (2 per skill)
+- NO Manager override needed Phase 5 (ADR-031 drift only Phase 2 + Phase 6)
+- Phase 6 (commands + manifest + docs, ~1.25d w/ ADR-031→ADR-039 override + docs sweep absorbs 4 v2.3 retro items) + Phase 7 (pilot smoke + release, ~0.75d) = ~2 days remaining cumulative after Phase 5
+
+**Atomic phase paterni 71'inci kanıt cumulative** (v1.8 Phase 4 = 1 commit per Worker Output Package + cascade absorb; 0 NO-GO second consecutive phase). Lesson 38 v2 cumulative catches ~73 (+1 v1.8 cycle: cascade 20→21 sweep across 3 cite locations — drift-check audit_target + test_drift_check len assertions + test_drift_check audit_target cite update — caught same-atomic-commit per discipline). **F-23 deployment**: cross-sheet-invariants.json count 27→28; first v1.8 drift-check expansion (F-24/25/26 deferred v1.9 per Manager scope decision).
