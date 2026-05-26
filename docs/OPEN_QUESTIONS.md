@@ -2,6 +2,19 @@
 
 ## Unresolved
 
+### Q-SF-MCP-PHASE-2-CLOSURE-FOLLOWUPS-01: v1.8 Phase 2 closure — 3 LOW-severity Worker followups [P3] ⏳ DEFERRED to Phase 3/7
+**Raised:** 2026-05-26 v1.8 Phase 2 closure (Manager GO decision after cross-check). Worker Output Package §"Open Questions Surfaced" + Manager review.
+**Context:** Phase 2 Worker Output Package surfaced 3 LOW open questions. Tümü Phase 2 GO kararını ENGELLEMEDİ; Phase 3-7 dispatch'lerinde scope check için ayrı entries.
+
+**Followups table:**
+| ID | Question | Severity | Target Phase | Manager Note |
+|----|----------|----------|--------------|--------------|
+| Q-PHASE-2-WORKER-01 | `scripts/util/sf_mcp_client.py` `call_tool` path implements JSON-RPC error field handling (non-null `error` in response → `SfMcpToolError` with `rpc_error` attribute + stderr log) but no dedicated test case explicitly covers it. Phase 3 orchestrator's end-to-end exercises will surface it naturally. Add explicit test? | LOW | Phase 3 (orchestrator tests will naturally cover) OR Phase 7 (closeout regression-lock) | Defer; Phase 3 Worker can add when wiring orchestrator → client error paths |
+| Q-PHASE-2-WORKER-02 | `python3 -m pip install -r requirements.txt` PEP-668-blocked on Homebrew-managed system Python (venv would fix). Existing `httpx==0.28.1` satisfies pin via system site-packages so all 1203 tests pass. Worker prompt's `pip install` verification step cannot run cleanly on this host. | LOW (operator-side) | Phase 7 (CI matrix step runs install verification on fresh runner) OR pre-Phase-7 dev-setup doc | Defer; recommend operator runs install verification inside venv; CI catches |
+| Q-PHASE-2-WORKER-03 | `scripts/util/sf_mcp_client.py` 326 LoC vs spec's "~150 LoC" hint. Overhead = docstrings (module + class + each public method) + 6-step `_handle_response`. Worker self-flagged for Manager call. | LOW (style/scope) | Resolved this Phase | **Manager ACCEPT** — D-SF-14 "establishes pattern for future HTTP MCPs" framing explicitly justifies verbose self-documentation; runtime correctness unaffected; no trimming requested |
+
+**Cross-refs:** `docs/PHASE_STATUS.md` Active Phase v1.8.0 Phase 2 DONE section; Phase 2 Worker Output Package; ADR-039 (DECISIONS.md:62-66); D-SF-14 pattern-establishment rationale (spec v2.2 line 90).
+
 ### Q-SF-MCP-PHASE-1-CLOSURE-FOLLOWUPS-01: v1.8 Phase 1 closure — 4 LOW-severity followups (3 Worker-surfaced + 1 description polish) [P3] ⏳ DEFERRED to Phase 2/6
 **Raised:** 2026-05-26 v1.8 Phase 1 closure (Manager session GO decision after Fix Worker round). Worker Output Package §"Open Questions Surfaced" + Manager post-Fix cross-check polish note.
 **Context:** Phase 1 Worker Output Package surfaced 3 LOW open questions; Manager Fix Worker round surfaced 1 additional polish item. Tümü Phase 1 GO kararını ENGELLEMEDİ (LOW + no runtime impact); ayrı entries ile track edilirler ki Phase 2/6 dispatch'lerinde scope check'inde gözden kaçmasınlar.

@@ -3,7 +3,7 @@
 Platinum SEO Engine plugin için mimari kararların kaydı.
 Append-only — superseded entry'ler işaretlenir, silinmez.
 
-> **Rotation:** ADR-001..036 archive'da (gap: 015) → [DECISIONS_ARCHIVE.md](DECISIONS_ARCHIVE.md). ADR-026 cap 6144B (ADR-022 supersede). Wave 3 cycle 19/20/21: ADR-034/035/036 → archive. Active: ADR-037 + ADR-038.
+> **Rotation:** ADR-001..037 archive'da (gap: 015) → [DECISIONS_ARCHIVE.md](DECISIONS_ARCHIVE.md). ADR-026 cap 6144B (ADR-022 supersede). v1.8 cycle 22: ADR-037 → archive (ADR-039 SF MCP eklendi). Active: ADR-038 + ADR-039.
 
 ## Summary Table
 
@@ -44,17 +44,9 @@ Append-only — superseded entry'ler işaretlenir, silinmez.
 | ADR-034 | check_secrets.sh Scope Policy: 4 patterns + 7 exclude paths | accepted | DECISIONS_ARCHIVE.md |
 | ADR-035 | Workspace Env Var: PSEO_WORKSPACE_ROOT Canonical (1-Year Shim) | accepted | DECISIONS_ARCHIVE.md |
 | ADR-036 | Version Sync Invariant: plugin.json + README + RELEASE_NOTES + git tag | accepted | DECISIONS_ARCHIVE.md |
-| ADR-037 | Data Hygiene Policy: code-driven script + dry-run + audit trail | accepted | (below) |
+| ADR-037 | Data Hygiene Policy: code-driven script + dry-run + audit trail | accepted | DECISIONS_ARCHIVE.md |
 | ADR-038 | R-XX Numbering: gap-tolerant, future renumber YASAK | accepted | (below) |
-
----
-
-## ADR-037 — Data Hygiene Policy: code-driven script + dry-run + audit trail
-**Date:** 2026-05-06
-**Status:** accepted
-**Context:** Wave 3 surfaced F-17 drift (4 `master_task.priority` cells = legacy P1/P2 outside severityEnum). Manual Excel edit forfeits provenance + breaks `rules/append-only-state.md`. Validator's `_resolve_header_row` (Phase 14 W3-W2-C-a) already handles dup-header artifacts.
-**Decision:** Pilot data fixes via `scripts/maintenance/*.py` ONLY (transaction.py sole writer). Each run: `--dry-run` → audit trail `outputs/reports/{date}-data-hygiene-*.md` → Süleyman approval → `--apply`. Idempotent. F-17 mapping: P1→HIGH, P2→MEDIUM, P3→LOW. F-16 36-URL coverage deferred v1.2 (Q-V1.2-OPP-COVERAGE-01, SEO domain). Validator behavior regression-locked: `tests/scripts/test_header_echo_defense.py`.
-**Consequences:** `tests/maintenance/test_data_hygiene_master_xlsx.py` enforces idempotency + audit emission + dry-run/apply parity. Workspace commits: `fix(data): ...(ADR-037)`.
+| ADR-039 | v1.8 SF MCP: HTTP Transport + Controlled F-16 Break | accepted | (below) |
 
 ---
 
@@ -64,3 +56,12 @@ Append-only — superseded entry'ler işaretlenir, silinmez.
 **Context:** Audit across `rules/` + `skills/` + `docs/` finds 102 unique `R-XX` rule references with max R-122. Numbering carries gaps from rule mergers + supersedes (R-15, etc.). No spec defines hard count.
 **Decision:** Numbering policy: monotonic-but-gap-tolerant. Once an R-XX number is assigned, **renumber FORBIDDEN** (history-stable, like ADR gap-015). New rules pick the next-unused number; superseded entries keep their number with a `(superseded)` marker.
 **Consequences:** Q-PHASE15-RXX-COUNT-01 closure (gap by-design); K-01 closure 2026-05-07: undefined R-XX cited in templates = MUST-FIX (test_r_xx_resolution.py lock; R-26 inserted).
+
+---
+
+## ADR-039 — v1.8 SF MCP: HTTP Transport + Controlled F-16 Break
+**Date:** 2026-05-26
+**Status:** accepted
+**Context:** v1.8 SF MCP Hybrid Integration adds 4th MCP server `sf` to `.mcp.json` over HTTP transport (first HTTP MCP; existing 3 use stdio). 482B byte invariant F-16 (47+ commits since v1.5) requires controlled break.
+**Decision:** Append `"sf":{"url":"http://127.0.0.1:11435/mcp"}` to mcpServers. First deliberate F-16 break since v1.5; invariant resumes from new baseline (543B + new md5) post-v1.8. `scripts/util/sf_mcp_client.py` = reusable HTTP MCP client pattern per D-SF-14 (httpx; 3-retry exp backoff 1s/2s; 100KB cap per D-SF-05).
+**Consequences:** `tests/skills/{test_brand_onboarding,test_generate_images}.py` baselines rebased (v1.8 cite inline). Phase 3-7 Workers use `SfMcpClient`. Future HTTP MCPs reuse the pattern.

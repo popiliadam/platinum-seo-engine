@@ -17,6 +17,9 @@
     "ScraplingServer": {
       "command": "${SCRAPLING_BIN:-scrapling}",
       "args": ["mcp"]
+    },
+    "sf": {
+      "url": "http://127.0.0.1:11435/mcp"
     }
   }
 }

@@ -345,3 +345,13 @@ ADR-011 rotation kararıyla `DECISIONS.md`'den taşınmış eski kararlar. Appen
 **Context:** v1.0.0 release left `.claude-plugin/plugin.json` at `0.1.0-alpha`; README banner read `v1.0.0`; git tag was `v1.0.0`. Three-way drift risks "which one is canonical" confusion at install time and breaks Claude Code's `/plugin add` discovery surface.
 **Decision:** plugin.json `version`, README banner semver, latest `docs/RELEASE_NOTES_v*.md` filename, and the most recent annotated git tag MUST agree exactly. v1.1.0 release synchronizes all four. `tests/ci/test_version_sync.py` enforces three-way parity (plugin.json + README + RELEASE_NOTES file presence); git-tag parity asserted at release time only (CI skip when tag absent).
 **Consequences:** Future bumps require coordinated edit + matching RELEASE_NOTES file + tag. Pre-release tags (e.g., `1.2.0-rc1`) must follow the same trio.
+
+---
+
+## ADR-037 — Data Hygiene Policy: code-driven script + dry-run + audit trail
+**Date:** 2026-05-06
+**Status:** accepted
+**Context:** Wave 3 surfaced F-17 drift (4 `master_task.priority` cells = legacy P1/P2 outside severityEnum). Manual Excel edit forfeits provenance + breaks `rules/append-only-state.md`. Validator's `_resolve_header_row` (Phase 14 W3-W2-C-a) already handles dup-header artifacts.
+**Decision:** Pilot data fixes via `scripts/maintenance/*.py` ONLY (transaction.py sole writer). Each run: `--dry-run` → audit trail `outputs/reports/{date}-data-hygiene-*.md` → Süleyman approval → `--apply`. Idempotent. F-17 mapping: P1→HIGH, P2→MEDIUM, P3→LOW. F-16 36-URL coverage deferred v1.2 (Q-V1.2-OPP-COVERAGE-01, SEO domain). Validator behavior regression-locked: `tests/scripts/test_header_echo_defense.py`.
+**Consequences:** `tests/maintenance/test_data_hygiene_master_xlsx.py` enforces idempotency + audit emission + dry-run/apply parity. Workspace commits: `fix(data): ...(ADR-037)`.
+**Archived:** 2026-05-26 — v1.8 Phase 2 rotation cycle 22 (ADR-039 v1.8 SF MCP integration ekleme ile DECISIONS.md cap tetiklemesi sonrası en eski active cut; data hygiene policy detayı `tests/maintenance/test_data_hygiene_master_xlsx.py` + `scripts/maintenance/*.py` body'sinde de korunur).

@@ -208,15 +208,16 @@ def test_events_jsonl_compliance():
 def test_plugin_agnostic_mcp_boundary_higgsfield_not_in_mcp_json():
     """F-16 + Süleyman Seçenek D: Higgsfield MCP user-level VS Code
     config; plugin agnostik korunur. Worker DOES NOT write Higgsfield
-    server entry into `.mcp.json`. Beklenen 3 server intact:
-    `gsc`, `dataforseo`, `ScraplingServer`."""
+    server entry into `.mcp.json`. Beklenen 4 server intact (v1.8 Phase 2
+    sf added per ADR-039 controlled F-16 break; pre-v1.8 baseline was 3):
+    `gsc`, `dataforseo`, `ScraplingServer`, `sf`."""
     mcp = json.loads(MCP_JSON_PATH.read_text(encoding="utf-8"))
     servers = list(mcp.get("mcpServers", {}).keys())
     assert "higgsfield" not in [s.lower() for s in servers], (
         f"Plugin agnostik violation (F-16): Higgsfield `.mcp.json`'da "
         f"bulunmamalı (Süleyman Seçenek D). Mevcut servers: {servers}"
     )
-    expected = {"gsc", "dataforseo", "ScraplingServer"}
+    expected = {"gsc", "dataforseo", "ScraplingServer", "sf"}
     assert set(servers) == expected, (
         f"Beklenmeyen `.mcp.json` mcpServers (F-16 boundary drift): {servers}"
     )

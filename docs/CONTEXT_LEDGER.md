@@ -1680,3 +1680,77 @@ Single manager session ~115dk audit of v1.1.0 RELEASED engine plugin. Brief: `do
 - 5 sf_mcp_client tests + .mcp.json sf entry + ADR-039 manual authoring (~+300B DECISIONS.md headroom check)
 
 **Atomic phase paterni 68'inci kanıt cumulative** (v1.8 Phase 1 = 1 commit per Worker Output Package per Manager workflow §13.5). Lesson 38 v2 cumulative catches ~69 (+2 v1.8 cycle: W-1 convention drift catch + Fix Worker schema-coupling scope expansion). v2.3 spec retrospective backlog item: rephrase spec line 472-474 tool inventory + add registry convention clarification "tool_name = {server}__{native_tool_name_verbatim}" example block to prevent future Workers tripping over the same analogy.
+
+---
+
+## v1.8 Phase 2 — MCP Utility + .mcp.json DONE (2026-05-26)
+
+**Worker dispatch:** Phase 2 Worker (fresh Claude Code session) executed 6 dispatch tasks + 4 cascade fixes per Manager Worker Prompt with **inline ADR-031 → ADR-039 override note** (Manager Decision from Q-SF-MCP-PRE-PHASE-1-DECISIONS-01). Worker Output Package returned 9-file scope (2 NEW + 7 MODIFIED).
+
+**ADR override executed correctly (Manager Decision validation):**
+- Worker used ADR-039 in all 4 mentions (rotation note + summary table + body header + body text); zero ADR-031 leakage (only ADR-031 reference in DECISIONS.md is summary table pointing to its pre-existing archive entry "events.jsonl Legacy Archive 2026-05-06", correct).
+- Pre-write `grep "ADR-039"` returned 0 hits across DECISIONS.md + DECISIONS_ARCHIVE.md (Worker reported); Manager re-verified same.
+
+**DECISIONS.md headroom protocol executed (rotation cycle 22):**
+- Pre-Phase-2 baseline: 6126B / 18B headroom (Phase 1 carry-over from v1.7 cycle).
+- First ADR-039 append attempt: 6378B / -234B BREACH on first try.
+- Rotation step (b) — ADR-037 "Data Hygiene Policy" relocated to DECISIONS_ARCHIVE.md with archival cite (matches ADR-035/036 cite paterni).
+- Rotation step (c) — Summary Table updated: "ADR-001..037 archive'da" + "v1.8 cycle 22: ADR-037 → archive (ADR-039 SF MCP eklendi). Active: ADR-038 + ADR-039".
+- Rotation step (d) — ADR-039 body trimmed (numbering meta-context line moved to Worker Output Package, NOT lost — preserved for future readers in package).
+- Final state: 6067B / 77B GREEN headroom (under 6144B hard cap). Protocol step (e) not triggered — no Manager escalation needed.
+
+**F-16 invariant intentional break (documented per ADR-039):**
+- .mcp.json 482B → 543B (+61B); md5 906183032322a97254579f453705c182 → 93523d41e14f90916fefb86d346bd702.
+- 48-commit F-16 streak (since v1.4 sealed v1.5) ENDED at Phase 2 — first deliberate break since v1.5.
+- ADR-039 body explicitly cites "first deliberate F-16 break since v1.5; invariant resumes from new baseline (543B + new md5) post-v1.8".
+- Cascade tests rebased: tests/skills/test_brand_onboarding.py md5+bytes constants + tests/skills/test_generate_images.py expected mcpServers set {gsc,dataforseo,ScraplingServer} → {...,sf} + docstring v1.8 cite per ADR-039.
+
+**Phase 2 deliverables (atomic commit):**
+- `scripts/util/sf_mcp_client.py` (NEW 326L; D-SF-14 reusable HTTP MCP client + 4 typed exceptions [SfMcpConnectionError + SfMcpTimeoutError + SfMcpResponseTooLargeError + SfMcpToolError] + 3-attempt retry exp backoff [1s, 2s, 4s documented next-step] + Content-Length + body bytes two-stage 100KB cap + stderr logging per call; LoC overhead vs ~150 hint justified by D-SF-14 "establishes pattern for future HTTP MCPs" framing per Manager Q-PHASE-2-WORKER-03 ACCEPT).
+- `tests/scripts/test_sf_mcp_client.py` (NEW 252L, 5 cases: JSON-RPC envelope + timeout-after-3-attempts + retry-schedule + size-cap + 307-redirect POST preservation per RFC 7231 — Worker chose 307 because 301/302/303 silently downgrade POST→GET, only 307/308 preserve method+body for MCP calls).
+- `.mcp.json` (+3 lines, 4th sf server HTTP entry per D-SF-01; F-16 controlled break per ADR-039).
+- `requirements.txt` (httpx>=0.27,<1.0 appended; verified pip-installable; existing httpx 0.28.1 satisfies via system site-packages on Homebrew Python — Q-PHASE-2-WORKER-02 surfaced PEP-668 venv-only install constraint, operator-side).
+- `docs/DECISIONS.md` (ADR-039 inline 5L body + summary table update + rotation cite update; net -59B via ADR-037 archival cycle 22).
+- 4 cascade fixes: DECISIONS_ARCHIVE.md ADR-037 archival cite (+10L) + test_brand_onboarding md5/byte rebase + test_generate_images server set update + requirements-lock.txt httpx==0.28.1 + transitive (httpcore==1.0.9 + h11==0.16.0) pins per existing lock-subset-of-floor pattern.
+
+**Verification gates (5/5 automated GREEN; 2 operator-side smokes deferred):**
+- test_sf_mcp_client 5/5 PASS in 0.04s
+- .mcp.json valid JSON + 4 servers ['gsc', 'dataforseo', 'ScraplingServer', 'sf']
+- Full baseline 1198 → 1203 PASS + 11 SKIP (+5 net positive drift = exactly 5 new sf_mcp_client tests, zero regression; 3 cascades caught + fixed BEFORE composing package per Lesson 38 v2 same-atomic-commit discipline)
+- httpx 0.28.1 (satisfies >=0.27,<1.0)
+- DECISIONS.md 6067B / 77B headroom (under 6144B cap)
+- ⏳ Operator-side: `claude mcp list` after Claude Code restart (expected: 4 servers incl sf)
+- ⏳ CI-side: `pip install -r requirements.txt` (PEP-668 blocked on Homebrew dev machine; CI runner handles)
+
+**Manager cross-check (titiz mode kanıtı):**
+- ADR-039 used 4 places, no ADR-031 leakage (only summary-table cite of pre-existing ADR-031 archive entry)
+- "first deliberate F-16 break since v1.5" cite confirmed in ADR-039 body
+- ADR-037 properly relocated DECISIONS.md → DECISIONS_ARCHIVE.md per ADR-011 + ADR-026 protocol
+- httpx pin: requirements.txt floor `>=0.27,<1.0` + requirements-lock.txt exact `==0.28.1` + transitive deps (lock-subset-of-floor invariant intact, no orphan transitive)
+- .mcp.json valid JSON 4 servers via `python3 -c "import json; ..."` parse
+
+**Worker Decisions review:**
+| W-# | Decision | Manager review |
+|-----|----------|----------------|
+| W-1 | ADR-039 (NOT ADR-031) per Manager override | ✅ Correctly applied; pre-write grep verified 0 hits |
+| W-2 | DECISIONS.md headroom rotation cycle 22 (ADR-037 archive) | ✅ Protocol executed cleanly; 77B headroom preserved |
+| W-3 | Cascade scope-expansion to 4 files (F-16 anticipated consequences) | ✅ Lesson 38 v2 same-atomic-commit discipline correctly applied; not opportunistic |
+| W-4 | Test #5 redirect = 307 (RFC 7231 POST preservation) | ✅ Defensible; only redirect class for JSON-RPC POST + body |
+
+**3 LOW Worker Open Questions filed** (Q-SF-MCP-PHASE-2-CLOSURE-FOLLOWUPS-01 umbrella in OPEN_QUESTIONS.md): JSON-RPC error field test missing + PEP-668 install constraint + 326L vs ~150L hint (Manager ACCEPT). Tümü Phase 3-7 target; Phase 2 GO kararını ENGELLEMEDİ.
+
+**Drift state (post-Phase-2):**
+- pytest 1203 PASS + 11 SKIP (1198 → 1203, +5 net positive drift, regression sıfır)
+- .mcp.json 543B (F-16 controlled break baseline NEW; 48-commit streak ENDED; future F-16 resumes from this baseline post-v1.8)
+- DECISIONS.md 6067B / 77B headroom (rotation cycle 22 applied; ADR-038 + ADR-039 active)
+- plugin.json 1.7.0 unchanged (Phase 6 bumps to 1.8.0)
+- Drift-check verdict: F-23/24/25/26 invariants land Phase 4 (drift-check skill extension); no F-XX violations from Phase 2 work expected
+
+**Push timing:** Phase 2 commit local-only (Manager bootstrap forbidden actions; cumulative push at v1.8.0 closeout post-Phase-7).
+
+**Next agenda:**
+- Phase 3 Worker Prompt dispatch — **BIGGEST PHASE** (~2.5 days effort): NEW sf-crawl-orchestrator skill + script + 6+10 tests + 1 smoke + sf-crawl.template.md report template + sf-import frontmatter source_run_id (body UNCHANGED per D-SF-07)
+- Manager NO additional inline injection needed (Phase 3 prompt has no spec drift; ADR-031 override only applied Phase 2 + Phase 6)
+- Acceptance Criteria Phase 3: AC-8 sf-crawl-orchestrator with 8 DURURs + AC-9 sf-import body UNCHANGED + AC-10 end-to-end smoke (deferred Phase 7 actual run)
+
+**Atomic phase paterni 69'uncu kanıt cumulative** (v1.8 Phase 2 = 1 commit per Worker Output Package + cascade absorb). Lesson 38 v2 cumulative catches ~70 (+1 v1.8 cycle: 3 cascade fixes anticipated by spec + caught via full pytest -q BEFORE composing package, not "fix in Phase 3" deferral). **DECISIONS.md rotation cycle 22 cumulative** (Wave 3 cycle 19-21 = ADR-034/035/036 archive; v1.8 cycle 22 = ADR-037 archive; pattern stable).

@@ -25,8 +25,10 @@ Discipline:
     (Lesson 7+23 worker override).
   - STAGING-ONLY contract: skill never references projects/{slug}/config/
     project.config.json as a write target.
-  - .mcp.json byte sentinel pinned at 482 bytes / md5
-    906183032322a97254579f453705c182 (v1.1: npm packages pinned to semver).
+  - .mcp.json byte sentinel pinned at 543 bytes / md5
+    93523d41e14f90916fefb86d346bd702 (v1.8: sf MCP server added per ADR-039
+    controlled F-16 break; previously 482B / 906183032322a97254579f453705c182
+    pinned at v1.1 when npm packages were pinned to semver).
 """
 
 from __future__ import annotations
@@ -45,11 +47,13 @@ SKILL_PATH = REPO_ROOT / "skills" / "meta" / "brand-onboarding" / "SKILL.md"
 SCHEMAS = REPO_ROOT / "schemas"
 MCP_JSON = REPO_ROOT / ".mcp.json"
 
-# Baseline .mcp.json bytes captured at SKILL creation time (W-G2).
-# Any drift from this hash means the skill — or unrelated plugin work —
-# touched the MCP boundary, which the F-16 invariant forbids.
-MCP_JSON_MD5_BASELINE = "906183032322a97254579f453705c182"
-MCP_JSON_BYTES_BASELINE = 482
+# Baseline .mcp.json bytes captured at v1.8 Phase 2 (ADR-039 controlled
+# F-16 break: sf MCP server added). Pre-v1.8 baseline (W-G2 origin):
+# 482B / 906183032322a97254579f453705c182. Any drift from THIS hash means
+# the skill — or unrelated plugin work — touched the MCP boundary, which
+# the F-16 invariant still forbids outside an ADR-documented change.
+MCP_JSON_MD5_BASELINE = "93523d41e14f90916fefb86d346bd702"
+MCP_JSON_BYTES_BASELINE = 543
 
 
 def _parse_frontmatter(skill_path: Path) -> dict:
