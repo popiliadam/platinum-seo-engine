@@ -1582,3 +1582,42 @@ Single manager session ~115dk audit of v1.1.0 RELEASED engine plugin. Brief: `do
 **Next agenda (next session):**
 - v1.2 SEO domain milestone (Q-V1.2-OPP-COVERAGE-01 [HIGH] + Q-V1.2-MASTER-TASK-PRIMARY-SOURCE-01 [HIGH]) — separate session, ayrı agenda
 - ADR-004 + ADR-005 closure 2026-05-12 soak window (engine + workspace eski repo silme onayı)
+
+---
+
+## v1.8 Pre-Phase-1 — Decisions Locked (2026-05-26)
+
+**Manager session bootstrap (Süleyman dispatch "en iyi senaryo + cross-check + titiz"):** Spec v2.2 (`docs/superpowers/specs/2026-05-26-sf-mcp-hybrid-integration-design.md`, 937 lines) + Worker Prompts companion (`docs/superpowers/plans/2026-05-26-sf-mcp-worker-prompts.md`, 666 lines) authority. Manager (this session) = karar verici; 7 fresh Worker sessions to dispatch serially over ~8 days.
+
+**Pre-Phase-1 actions:**
+- Bootstrap reading sequence COMPLETE (7 files: spec + worker prompts + PHASE_STATUS + OPEN_QUESTIONS + DECISIONS + SESSION_PROTOCOL + WORKER_PROMPTS, ~85KB total)
+- Cross-check ADR-039 müsait — `grep ADR-039 DECISIONS.md DECISIONS_ARCHIVE.md` 0 hit confirmed (next-unused per ADR-038 numbering policy)
+- Cross-check ADR-031 conflict surfaced — spec line 69 + 421 + Worker Prompts line 146 + 188 + 472 cite "ADR-031" but DECISIONS.md:42 shows ADR-031 = events.jsonl Legacy Archive (2026-05-06)
+- Manager Decision: ADR-031 → ADR-039 override (renumber forbidden per ADR-038; Worker Prompts file dokunulmuyor per Manager bootstrap §Forbidden Actions; override Phase 2 + Phase 6 dispatch'lerinde inline conversational injection)
+- 8 decisions locked (7 spec defaults Q-09/02/04/05/07/10/11 + 1 Manager Decision ADR override) → Q-SF-MCP-PRE-PHASE-1-DECISIONS-01 umbrella RESOLVED in OPEN_QUESTIONS.md
+- 4 deferred-by-design (Q-01 Node.js OFF + Q-03 max_wait 180min + Q-06 cross-project lock v1.2+ + Q-08 stop.json NO previously resolved)
+
+**Acceptance criteria status (Pre-Phase-1 scope):**
+1. ✅ 8 Pre-Phase-1 decisions LOCKED in OPEN_QUESTIONS.md
+2. ✅ PHASE_STATUS.md Active Phase advanced v1.7.0 SHIPPED → v1.8.0 Pre-Phase-1 LOCKED
+3. ✅ CONTEXT_LEDGER append (this entry)
+4. ✅ ADR-031 numerasyon collision detected + Manager Decision override path documented (ADR-039 lock)
+5. ⏳ Atomic commit "v1.8 Pre-Phase-1: operator decisions locked" (next step, this transaction)
+6. ⏳ Phase 1 Worker Prompt extracted + presented to operator (next step, this transaction)
+
+**Drift state:**
+- pytest 1184 PASS + 11 SKIP (v1.7 baseline carry — Manager session yazılı kod 0, state docs only)
+- .mcp.json 482B byte-byte korundu (F-16 invariant 47+ commit cumulative; **intentional break expected Phase 2 with sf entry add per ADR-039**)
+- DECISIONS.md 6126B unchanged (18B headroom under 6144B cap; ADR-039 append Phase 2 ~+300B estimated → headroom check + possible rotation candidate per ADR-026 protocol)
+- plugin.json 1.7.0 unchanged (Phase 6 will bump → 1.8.0 via `scripts/release/version_bump.py --to 1.8.0 --apply` ADR-036 5-file sync)
+
+**Push timing:** Pre-Phase-1 commit local-only; push deferred to v1.8.0 closeout (post-Phase-7 + explicit operator approval per Manager bootstrap forbidden actions — no automatic git tag push).
+
+**Next agenda (this session continuation):**
+- Atomic commit Pre-Phase-1 decisions (3 files: OPEN_QUESTIONS + PHASE_STATUS + CONTEXT_LEDGER)
+- Extract Phase 1 Worker Prompt from companion file (lines 28-108)
+- Present paste-ready prompt block to operator
+- Wait for operator to dispatch into fresh Claude Code session + return Worker Output Package
+- Manager reviews package + verifies vs spec Phase 1 ACs + atomic commit Phase 1 work + advances PHASE_STATUS → Phase 2 dispatch
+
+**Pattern note:** Manager+Worker multi-session pattern doğum belgesi v1.8 (D-SF-17). Önceki v1.7 + v1.6 + v1.5 cycles same-session multi-phase paterni kullanıyordu (Manager + Worker aynı session); v1.8 ile context efficiency için fresh-session-per-Phase paterni adapted. Bu ledger entry'si Manager state checkpoint olacak between-phase recovery için.
