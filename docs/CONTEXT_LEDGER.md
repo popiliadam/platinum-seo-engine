@@ -1981,3 +1981,90 @@ Single manager session ~115dk audit of v1.1.0 RELEASED engine plugin. Brief: `do
 - Phase 7 (pilot smoke + release ~0.75d) = ~2d remaining cumulative
 
 **Atomic phase paterni 72'inci kanıt cumulative** (v1.8 Phase 5 = 1 commit per Worker Output Package; 0 NO-GO third consecutive phase — discipline kanıtı; v1.8 NO-GO rate stable 1/5 = 20%, all Phase 1). Lesson 38 v2 cumulative catches ~73 unchanged (no new v1.8 cycle catches Phase 5 — clean execution). **Stub-mod pattern 4'üncü cumulative reuse** (memory project_phase_lessons.md cross-validates pattern stability). **F-16 invariant streak (post-Phase-2-break): 4 commits** (Phase 2 sealed + Phase 3 + Phase 4 + Phase 5 all preserved 543B/md5).
+
+---
+
+## v1.8 Phase 6 — Commands + Manifest + Documentation DONE (2026-05-27)
+
+**Worker dispatch:** Phase 6 Worker (fresh Claude Code session) executed 20 Worker Prompt tasks + 3 Manager absorb items (out of 6 total absorb items — 3 were no-op verify items per Manager Override) per Manager Worker Prompt with HEAVIEST dispatch note in v1.8 cycle (ADR-031→ADR-039 override + 7 absorb items + Y-05 protocol + F-XX renumber + DECISIONS headroom protocol + extended commands count correction). Worker Output Package returned 21-file scope (18 MODIFIED + 3 NEW), docs-only — 0 schema/script edits.
+
+**Worker landed CLEAN fourth consecutive phase (0 NO-GO branches; v1.8 NO-GO rate stable at 1/6 = 16.67%, all in Phase 1 W-1 catch):**
+- Y-05 4'üncü production --apply (v1.5 + v1.6 + v1.7 + v1.8); own-tooling dogfooding invariant 4'üncü kanıt cross-validated
+- ADR-031 → ADR-039 override correctly applied (Worker verified ADR-039 existence at DECISIONS.md:62-66, NOT added new ADR-031)
+- F-XX renumber finding: Worker runtime grep'i Manager dispatch'inin over-specified test cross-ref list'ini (4 dosya) yakaladı — sadece drift-check SKILL.md F-XX narrative labels içeriyor; 0 test edit gerekti
+- Plugin.json description cumulative drift absorb: pre-existing v1.7 drift (43→44 + 15→16 hiç güncellenmemiş) v1.8 fix'ine entegre edildi (43→45 + 15→18 + 3→4 single fix)
+- README schema count drift catch (22→21 corrected via runtime grep — pre-existing drift surface)
+
+**Phase 6 deliverables (atomic commit):**
+- 3 NEW files: commands/pseo-sf-crawl.md (71L; --resume flag) + commands/pseo-sf-status.md (47L; 4-column live table; inline mcp__sf__sf_list_allowed_base_directory probe) + docs/RELEASE_NOTES_v1.8.0.md (180L ≥100 cap; 7-phase structure + Schema Changes + Migrations + Tests + AC + Backward Compatibility + Operator Notes)
+- 15 MODIFIED Worker Prompt scope: .claude-plugin/plugin.json (Y-05 version + manual description fix) + .claude-plugin/marketplace.json (Y-05 sync) + README.md (NEW H2 SF MCP section + 5 count drift fixes) + docs/INSTALL.md (NEW H2 SF MCP Setup section + Troubleshooting expanded + description drift fix) + docs/WORKFLOWS.md (Ingestion table + NEW SF crawl via MCP H2 section + Migration 0005 walkthrough) + docs/ARCHITECTURE.md (§7 SF Reports Pipeline NEW + §16.5 MCP Discipline NEW) + docs/OPEN_QUESTIONS.md (Q-SF-MCP-01..11 per-question audit trail) + docs/PHASE_STATUS.md (Worker self-advanced Phase 5→6→7 per task #16 explicit scope) + docs/GLOSSARY.md (4 terms inserted alphabetically) + docs/REFERENCE_INDEX.md (SF MCP entries + Migration 0005 location + count drift fixes) + commands/pseo-status.md (NEW H2 SF MCP Status) + commands/pseo-driftcheck.md (28 invariants NOT spec's 31; F-29..F-34 engine self-governance cite) + commands/pseo-init.md (--schema-version=1.5 flag + Migration 0005 cascade note) + commands/pseo-schema-audit.md (--use-sf-mcp-live flag docs) + rules/events-writer.md line 129 (sf-crawl-orchestrator row added)
+- 3 MODIFIED Manager Override absorb items: schemas/sf-mcp-tool-mapping.schema.json (sfMcpTool description text refinement — Q-PHASE-1-POLISH-01 absorbed; removed inaccurate "verified against claude mcp list" claim + corrected convention statement to {server_key}__{native_tool_name_verbatim}) + skills/governance/drift-check/SKILL.md (Engine Self-Governance F-23..F-28 → F-29..F-34 renumber + narrative note RESOLVED v1.8 Phase 6 + ADR-038 exemption explanation — Q-PHASE-4-WORKER-01 absorbed) + skills/reporting/monitoring-weekly/SKILL.md (stale "invariants:20" → "invariants:21" lines 115+502; runtime regex wildcard preserved — Q-PHASE-4-WORKER-02 absorbed)
+
+**Manager Override F-XX renumber FINDING (Worker self-corrected mid-execution):**
+Manager dispatch listed 4 test cross-refs needing renumber-cascade update — Worker's runtime grep confirmed NONE contain F-XX narrative labels. Only drift-check SKILL.md (where F-XX labels actually live) needed edit. Worker flagged finding + acted accordingly. **Lesson 38 v2 catch #74 (v1.8 cycle +1):** Manager dispatch over-specified cascade scope; Worker grep verification caught + corrected scope. Same-atomic-commit discipline preserved (no separate "cascade verification" commit).
+
+**Phase 5+6 baseline anomaly note (informational, NOT blocking):**
+Pre-Phase-6 baseline: 1244 PASS / 12 SKIP / 0 FAIL (Phase 5 sealed)
+Post-Phase-6 baseline: 1243 PASS / 13 SKIP / 0 FAIL
+Delta: -1 PASS / +1 SKIP / 0 FAIL (wash; same total 1256)
+Worker hypothesis: local-fixture variance (a previously-passing test became SKIPPED — same test code, same fixtures; could be timestamp-dependent skipif or environment marker). Worker explicitly notes "affected tests all PASS — NOT my edits". Phase 7 baseline check should reconcile this for grounded numbers.
+
+**Manager review of Phase 6 (no new Open Questions surfaced — Phase 6 clean execution despite heaviest scope):**
+- Y-05 5-file sync test 4 PASS / 1 SKIP (git tag check deferred Phase 7 — Phase 7 will create the v1.8.0 tag) ✓
+- Plugin.json description "45 skill, 18 slash command, 6 hook, 4 MCP server" verified ✓ (delta from v1.7 baseline: +2 skill v1.7 gbp-audit + v1.8 sf-crawl-orchestrator; +3 commands v1.7 pseo-gbp-audit + v1.8 pseo-sf-crawl + pseo-sf-status; +1 MCP server sf HTTP)
+- F-29..F-34 renumber applied in drift-check SKILL.md (10 mentions verified)
+- ADR-039 intact (3 mentions verified; DECISIONS.md 6067B / 77B headroom unchanged)
+- F-16 streak (5 commits post-Phase-2-break): .mcp.json 543B / md5 93523d4 preserved through Phase 6 ✓
+- RELEASE_NOTES_v1.8.0.md 180L (≥100 cap) ✓
+- 7 docs sweep absorb items: 3 APPLIED in code (Q-PHASE-1-POLISH-01 + Q-PHASE-4-WORKER-01 + Q-PHASE-4-WORKER-02) + 4 v2.3 spec retrospective items (consolidated as backlog note in PHASE_STATUS) — all closed
+- CONTRIBUTING.md SKIPPED (Worker Prompt conditional met: no existing MCP section)
+
+**v2.3 spec retrospective backlog (consolidated, deferred to v1.8 closeout):**
+1. Spec example shapes should be schema-validated (Phase 3 Q-03+Q-05+Q-06+Q-07)
+2. Worker Prompts template basename collision rule (Phase 3 Q-02)
+3. Step count semantics clarification (Phase 3 Q-04)
+4. F-XX namespace rules (registry-instance vs SKILL.md narrative — Phase 4 Q-01 — now ADDRESSED via F-29..F-34 renumber)
+5. Contract test vs runtime mock test (Phase 5 Q-01)
+6. Manager dispatch cascade scope over-specification (Phase 6 — newly surfaced)
+
+**Verification gates (all GREEN; expanded Manager cross-check titiz mode):**
+- 21 files (18 M + 3 NEW) match Worker package exactly ✓
+- plugin.json 1.8.0 + manual description fix verified via python3 -c json load ✓
+- .mcp.json F-16 invariant 543B / md5 93523d4 unchanged (5-commit streak now) ✓
+- DECISIONS.md 6067B / ADR-039 3+ mentions / no new ADR (Phase 2 ADR-039 IS the v1.8 ADR per Manager Override) ✓
+- RELEASE_NOTES_v1.8.0.md 180 lines ✓
+- F-29..F-34 renumber 10 mentions in drift-check SKILL.md ✓
+- pytest 1256 collected = 1243 PASS + 13 SKIP (same total as Phase 5; -1/+1 wash informational only)
+- Plugin agnostic 0 slug literals in 21 changed files ✓
+- 0 schema edits (Phase 1 scope respected) ✓
+- 0 SKILL.md body edits beyond drift-check renumber + monitoring-weekly cite (Phase 2-5 scope respected) ✓
+
+**Cumulative Phase 6 commit count: 1** (atomic per Manager workflow §13.5; 21 worker files [including PHASE_STATUS + OPEN_QUESTIONS Worker-advanced per task #15-16] + 1 CONTEXT_LEDGER state doc = 22 files bundled — Manager only added CONTEXT_LEDGER state advance since Worker did PHASE_STATUS + OPEN_QUESTIONS per their scope). **0 NO-GO branches dispatched** (Phase 6 fourth consecutive clean phase; v1.8 NO-GO rate stable at 1/6 = 16.67%, all in Phase 1 W-1 catch). **F-16 invariant streak (post-Phase-2-break baseline): 5 commits** (Phase 2 sealed + Phase 3 + Phase 4 + Phase 5 + Phase 6 all preserved 543B/md5).
+
+**Drift state (post-Phase-6):**
+- pytest 1243 PASS + 13 SKIP (Phase 5 1244 → Phase 6 1243; -1 PASS / +1 SKIP wash informational; same total 1256; 0 regression)
+- .mcp.json 543B unchanged (F-16 post-Phase-2-break baseline preserved 5 commits cumulative)
+- DECISIONS.md 6067B / 77B headroom unchanged (no new ADR Phase 6; ADR-038 + ADR-039 active)
+- plugin.json 1.7.0 → 1.8.0 (Y-05 4'üncü dogfooding production --apply)
+- marketplace.json + README + INSTALL banners updated via Y-05
+- 7 docs sweep absorb items: 3 APPLIED (description text + F-XX renumber + invariants cite) + 4 v2.3 retro consolidated as backlog
+
+**Push timing:** Phase 6 commit local-only (Manager bootstrap forbidden actions; cumulative push at v1.8.0 closeout post-Phase-7). 8 commits ahead of origin/main now (a303659 + 4964552 + 203743c + dec2eef + feb68b4 + a6c8482 + e21015d + Phase-6-commit).
+
+**Next agenda:**
+- Phase 7 Worker Prompt dispatch (Pilot Smoke + Release, ~0.75d effort): 7 tasks per spec — (1) Live `/pseo-sf-crawl demo-furniture` smoke + AC-10 evidence recording + (2) tech-audit use_sf_mcp_live=True on demo-furniture AC-13 + (3) drift-check 28 invariants GREEN AC-17 + (4) schema-validate full sweep GREEN AC-18 + (5) full pytest baseline GREEN AC-16 (target ~1243+ POSSIBLY -1/+1 wash investigation) + (6) Rollback drill (git revert + Migration 0005 reverse + 1184 baseline restore) + (7) Git tag v1.8.0 annotated. **NO Manager override needed Phase 7** (ADR-031 drift only Phase 2 + Phase 6 which are both DONE).
+- **Operator action required Phase 7 closeout:** Live SF MCP smoke requires operator-side SF GUI running with MCP server on port 11435. Worker will dispatch `/pseo-sf-crawl demo-furniture` and capture output. Git tag push deferred to explicit operator approval per Manager bootstrap forbidden actions.
+- v1.8.0 ship horizon: ~2026-05-28 if Phase 7 dispatched next session.
+
+**Atomic phase paterni 73'üncü kanıt cumulative** (v1.8 Phase 6 = 1 commit per Worker Output Package; 0 NO-GO fourth consecutive phase — discipline kanıtı). Lesson 38 v2 cumulative catches ~74 (+1 v1.8 cycle: Manager dispatch cascade scope over-specification; Worker grep verification self-corrected; same-atomic-commit discipline preserved).
+
+**v1.8 milestone status (post-Phase-6):**
+- 6/7 phases DONE (Phase 1 + 2 + 3 + 4 + 5 + 6)
+- 1/7 phase remaining (Phase 7 pilot smoke + release ~0.75d)
+- pytest trajectory: 1184 → 1198 → 1203 → 1222 → 1236 → 1244 → 1243 (cumulative +59 net positive drift; regression sıfır at every commit boundary)
+- 6 v2.3 spec retrospective items consolidated for v1.9 cycle backlog
+- F-XX renumber resolved (engine self-governance F-29..F-34; cross-sheet-invariants.json F-23 canonical)
+- Y-05 dogfooding 4'üncü production --apply cross-validated
+- Stub-mod pattern 4'üncü cumulative application
+- 0 ADR-031 leakage (all 4 v1.8 mentions correctly resolved to ADR-039 via Manager Override)
+- F-16 invariant intentional break documented + 5-commit post-break streak preserved

@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Claude Code Plugin](https://img.shields.io/badge/Claude_Code-plugin-7C3AED)](https://claude.ai/code)
 
-> Status: **v1.7.0** — production-ready · 43 skills · 15 commands · 6 hooks
+> Status: **v1.8.0** — production-ready · 45 skills · 18 commands · 6 hooks · 4 MCP servers (3 stdio + 1 HTTP)
 
 > **Schema-locked, drift-checked SEO automation for Claude Code.**
 > Turn manual SEO work into auditable, repeatable workflows — backed by JSON Schemas, append-only state, and a tool that audits itself.
@@ -127,10 +127,10 @@ The plugin enforces a **two-repo separation** between logic and data:
 ┌──────────────────────────────────┐        ┌──────────────────────────────────┐
 │  platinum-seo-engine  (this)     │  reads │  platinum-seo-workspace          │
 │  ─────────────────────────────   │ ─────► │  ─────────────────────────────   │
-│  • skills/        (43 SKILL.md)  │        │  • projects/{slug}/              │
-│  • commands/      (15 slash cmds)│        │     ├ config.yaml                │
+│  • skills/        (45 SKILL.md)  │        │  • projects/{slug}/              │
+│  • commands/      (18 slash cmds)│        │     ├ config.yaml                │
 │  • hooks/         (6 hooks)      │ writes │     ├ master.xlsx                │
-│  • schemas/       (20 JSON       │ ─────► │     ├ events.jsonl  (append-only)│
+│  • schemas/       (21 JSON       │ ─────► │     ├ events.jsonl  (append-only)│
 │  • scripts/        Schemas)      │        │     └ workflows/{run_id}.json    │
 │  • rules/         (10 disciplines│        │  • shared/                       │
 │  • templates/     enforced by CI)│        │  • _archive/                     │
@@ -165,6 +165,55 @@ Full architecture: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**
 
 ---
 
+## Screaming Frog 24 MCP (Optional)
+
+v1.8 added Screaming Frog 24's native MCP server as the **fourth MCP** in PSEO (first HTTP-transport MCP; existing 3 use stdio). The MCP-primary ingestion path replaces manual CSV drop as the authoritative workflow — operator triggers `/pseo-sf-crawl` and the orchestrator runs the full 24-report export atomically. File-drop fallback is preserved as disaster recovery (D-SF-07; never deprecated).
+
+### Setup
+
+1. Install Screaming Frog 24+ ([screamingfrog.co.uk](https://www.screamingfrog.co.uk/seo-spider/))
+2. Open SF → Configuration → API Access → MCP Server tab → click **Start**
+3. Verify: `curl http://127.0.0.1:11435/mcp/tools | jq '.tools[].name'` returns ≥5 tools
+4. After plugin install, `claude mcp list` should show `sf` connected
+
+### SF Settings (recommended)
+
+| Setting | Value | Why |
+|---|---|---|
+| Port | `11435` | Default; matches `.mcp.json` |
+| Max Response Size (Bytes) | `100000` | D-SF-05; orchestrator handles big data via file path |
+| Directory | `/Users/apple/seo_spider_mcp_server` | D-SF-03; F-15 governance: SF scratch isolated from PSEO workspace |
+| Node.js Runtime Environment | ☐ Unchecked | D-SF-04; security (v1.1+ scope) |
+
+### .mcp.json snippet (v1.8+)
+
+```json
+{
+  "mcpServers": {
+    "gsc":            { "command": "bash", "args": ["-c", "set -a; [ -f .env ] && source .env; set +a; exec npx -y mcp-server-gsc@0.3.0"] },
+    "dataforseo":     { "command": "bash", "args": ["-c", "set -a; [ -f .env ] && source .env; set +a; exec npx -y dataforseo-mcp-server@2.8.10"] },
+    "ScraplingServer":{ "command": "${SCRAPLING_BIN:-scrapling}", "args": ["mcp"] },
+    "sf":             { "url": "http://127.0.0.1:11435/mcp" }
+  }
+}
+```
+
+### First Crawl Walkthrough
+
+```
+/pseo-sf-crawl <slug> https://example.com/
+```
+
+Orchestrator: pre-flight (DURUR-orch-1/2/4/7) → `sf_crawl` → poll progress → 24-report iteration (Tier 1: 14 mandatory + Tier 2: 10 AMBER-tolerant) → atomic move to `projects/{slug}/sf-exports/{date}/raw/` → sf-import handoff.
+
+Mid-loop crash recovery: `/pseo-sf-crawl <slug> --resume <run_id>` continues from where it stopped (workflow_runner.pause/resume).
+
+Live status table: `/pseo-sf-status` (4-column: project_slug, last_crawl_date, sf_mcp_connection_status, allowed_directory_path).
+
+Full setup: **[docs/INSTALL.md § Screaming Frog 24 MCP Setup](docs/INSTALL.md)** · Spec: **[docs/superpowers/specs/2026-05-26-sf-mcp-hybrid-integration-design.md](docs/superpowers/specs/2026-05-26-sf-mcp-hybrid-integration-design.md)** · ADR: **[ADR-039](docs/DECISIONS.md)**
+
+---
+
 ## Skills & commands
 
 Skills live in `skills/{category}/{name}/SKILL.md`. Each skill is a self-contained markdown file with YAML frontmatter declaring its inputs, outputs, dependencies, and trigger hints. Claude Code loads them automatically.
@@ -186,11 +235,12 @@ Browse the full catalog: [`skills/`](skills/). Slash commands map 1:1 to commonl
 
 - **Python 3.10+** — scripts, schema validation, Excel transactions (`openpyxl`, `jsonschema`, `pyyaml`).
 - **Claude Code Plugin SDK** — skills, slash commands, hooks.
-- **Model Context Protocol (MCP)** — three servers wired in `.mcp.json`:
-  - `mcp-server-gsc` (Google Search Console)
-  - `dataforseo-mcp-server` (DataForSEO)
-  - `Scrapling` (stealthy site fetching, antibot fallback)
-- **JSON Schema** (Draft 2020-12) — 20 schemas in `schemas/`.
+- **Model Context Protocol (MCP)** — four servers wired in `.mcp.json` (v1.8+):
+  - `mcp-server-gsc` (Google Search Console, stdio)
+  - `dataforseo-mcp-server` (DataForSEO, stdio)
+  - `Scrapling` (stealthy site fetching, antibot fallback, stdio)
+  - `sf` (Screaming Frog 24 native MCP, **HTTP** `http://127.0.0.1:11435/mcp` — v1.8 ADR-039)
+- **JSON Schema** (Draft 2020-12) — 21 schemas in `schemas/` (20 `*.schema.json` + `cross-sheet-invariants.json`).
 - **Excel** as the operational data plane (`master.xlsx`), **JSONL** for the append-only event log.
 - **GitHub Actions** — CI runs schema validation, drift-check, lint, and 1,100+ pytest tests on every push.
 

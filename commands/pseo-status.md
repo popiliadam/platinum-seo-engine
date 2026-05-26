@@ -67,3 +67,17 @@ Hiç run yoksa: `whats-next` skill'inin önereceği başlangıç noktasını sun
 ## 4. Sonraki adım önerisi (whats-next skill chain)
 
 Hiç run yoksa veya kullanıcı "şimdi ne yapayım" sorduğunda `skills/meta/whats-next/SKILL.md` (Phase 5, aktif) `scripts/meta/whats_next.py` üzerinden T-9NNNN router band ile Top-3 ranking üretir. Bu komut listeyi sunduktan sonra whats-next çıktısını yorumlamak için doğrudan skill'i çağırabilir.
+
+## 5. SF MCP Status
+
+> **v1.8 NEW** — Screaming Frog 24 MCP server bağlantı durumu + son sf-crawl-orchestrator run özeti.
+
+SF MCP server health probe (v1.8 ADR-039: HTTP transport `http://127.0.0.1:11435/mcp`):
+
+!`curl -sf -m 3 -X POST http://127.0.0.1:11435/mcp -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"sf_list_allowed_base_directory","arguments":{}}}' 2>/dev/null | jq -r '.result.content[0].text // "DOWN — SF GUI MCP Server kapalı veya port 11435 unreachable"' || echo "DOWN — SF GUI MCP Server kapalı veya port 11435 unreachable"`
+
+Aktif projenin son SF crawl özeti (`_state/workflows/*.json` filter by skill=sf-crawl-orchestrator):
+
+!`if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "skip: PSEO_WORKSPACE_ROOT set edilmemiş"; else PROJECT="${1:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/active.json" 2>/dev/null)}"; WF_DIR="$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/workflows"; if [ -d "$WF_DIR" ]; then grep -l '"skill": "sf-crawl-orchestrator"' "$WF_DIR"/*.json 2>/dev/null | xargs -I{} jq -r '[.run_id, .status, (.updated_at // "n/a")] | @tsv' {} 2>/dev/null | sort -k3 | tail -1 || echo "NO_SF_CRAWL"; else echo "skip: workflow dizini yok"; fi; fi`
+
+Detaylı SF MCP status tablosu için: `/pseo-sf-status [<slug>]` (4-kolonlu: project_slug, last_crawl_date, sf_mcp_connection_status, allowed_directory_path).

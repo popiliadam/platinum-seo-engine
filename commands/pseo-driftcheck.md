@@ -1,7 +1,7 @@
 ---
 description: |
   Use when: kullanıcı "drift", "drift kontrol", "tutarsızlık", "schema kontrol", "cross-sheet invariant", "tutarlılık raporu" der ya da `/pseo-driftcheck` çağırırsa.
-  Also use when: master.xlsx'e büyük bir ingestion (sf-import, gsc-pull, dfs-pull) sonrası logical sheet'ler arasındaki 20 invariant kuralı (cross-sheet-invariants.json) doğrulanmak isteniyor; rule pack veya plugin yükseltmesi sonrası schema sürüm hizalaması test ediliyor.
+  Also use when: master.xlsx'e büyük bir ingestion (sf-import, gsc-pull, dfs-pull, sf-crawl-orchestrator) sonrası logical sheet'ler arasındaki 28 invariant kuralı (cross-sheet-invariants.json) doğrulanmak isteniyor; rule pack veya plugin yükseltmesi sonrası schema sürüm hizalaması test ediliyor.
   Do not use when: tek bir JSON dosyası schema'ya uyuyor mu kontrolü (`scripts/validation/validate_schema.py` direkt CLI), rapor üretimi (`/pseo-monthly`), aktif workflow durumu (`/pseo-status`) gerekiyorsa.
 argument-hint: "[project-slug]"
 allowed-tools: Bash(python3:*), Bash(jq:*), Bash(ls:*), Read
@@ -10,8 +10,8 @@ model: sonnet
 
 # /pseo-driftcheck — Cross-Sheet Invariants & Schema Validation
 
-> **Skill:** `skills/governance/drift-check/SKILL.md` (Phase 5, aktif).
-> Master.xlsx full sweep + 20 cross-sheet invariant + consistency raporu üretir.
+> **Skill:** `skills/governance/drift-check/SKILL.md` (Phase 5, aktif; v1.8 Phase 4 F-23 land).
+> Master.xlsx full sweep + 28 cross-sheet invariant + consistency raporu üretir.
 
 ## 1. Aktif proje
 
@@ -22,9 +22,11 @@ model: sonnet
 `skills/governance/drift-check/SKILL.md` şu adımları koşar (spec §11.2 + §7):
 
 1. Aktif projenin `master.xlsx` dosyasını `schemas/master-excel.schema.json`'a karşı validate et
-2. `schemas/cross-sheet-invariants.json`'daki 20 governance kuralını `scripts/validation/validate_invariants.py` ile koştur (referential integrity, sayım eşitlikleri, durum tutarlılığı)
+2. `schemas/cross-sheet-invariants.json`'daki 28 governance kuralını `scripts/validation/validate_invariants.py` ile koştur (referential integrity, sayım eşitlikleri, durum tutarlılığı; v1.8 Phase 4'te F-23 SF MCP cross-sheet invariant eklendi: sf-crawl-orchestrator run varsa `mcp-tool-registry.json`'da `sf` entry zorunlu)
 3. `consistency-report.schema.json` formatında rapor üret (`outputs/reports/{date}-drift.md` + `_state/reports/{date}-drift.json`)
 4. RED → uyarı + auto-fix önerisi; AMBER → not + rapor; GREEN → `events.jsonl` → `drift_clean`
+
+**Örnek F-23 ihlali:** `_state/workflows/2026-05-27-abc123.json` `skill=sf-crawl-orchestrator` ama `mcp-tool-registry.json` `sf` entry içermiyor → severity=HIGH RED, drift-check raporu "F-23: SF MCP registry mismatch — workflow detected but server not registered".
 
 ## 3. Tek-dosya schema validation (helper)
 
@@ -37,6 +39,6 @@ Quick check — aktif projenin `project.config.json`'unun schema'ya uyup uymadı
 ## 4. Bağımlılıklar
 
 - `skills/governance/drift-check/SKILL.md` — aktif (Phase 5)
-- `scripts/validation/validate_invariants.py` — 20 cross-sheet kuralı (5 CRITICAL + 10 HIGH + 5 MEDIUM) + `build_consistency_report()` (consistency-report.schema.json üretimi, Draft7Validator inline)
+- `scripts/validation/validate_invariants.py` — 28 cross-sheet kuralı (5 CRITICAL + 11 HIGH + 5 MEDIUM + F-23 SF MCP cross-sheet HIGH + engine self-governance F-29..F-34 narrative labels) + `build_consistency_report()` (consistency-report.schema.json üretimi, Draft7Validator inline)
 - `scripts/reporting/render_template.py` — drift markdown render
 - `templates/reports/drift.template.md` — markdown template
