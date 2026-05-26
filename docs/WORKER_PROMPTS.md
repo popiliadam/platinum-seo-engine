@@ -54,7 +54,7 @@ Her worker dispatch'i:
 - `schemas/skill-frontmatter.schema.json`
 
 **Do NOT read:**
-- Full §11 catalog (43 skill)
+- Full §11 catalog (45 skill)
 - Diğer skill dosyaları
 - Migration scripts
 

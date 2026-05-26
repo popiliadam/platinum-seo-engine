@@ -68,7 +68,7 @@ Her biri `rules/*.md`'de tanımlı; drift-check ve CI otomatik denetler.
 | 13 | Governance Final | planned | 3 |
 | 14 | Workspace + CI + Pilot End-to-End | planned | — |
 
-**Toplam v1: ~43 skill**, 9 batch phase'e yayılmış. Foundation (Phase 0–4) tamamlanmadan skill phase'leri başlamaz. Phase 5 **GO/NO-GO gateway**: geçemezse foundation'a dönülür.
+**Toplam v1.8: ~45 skill**, 9 batch phase'e yayılmış (v1.7'de +1 gbp-audit; v1.8'de +1 sf-crawl-orchestrator). Foundation (Phase 0–4) tamamlanmadan skill phase'leri başlamaz. Phase 5 **GO/NO-GO gateway**: geçemezse foundation'a dönülür.
 
 ---
 
@@ -77,7 +77,7 @@ Her biri `rules/*.md`'de tanımlı; drift-check ve CI otomatik denetler.
 v1 release için TÜM şunlar geçmeli:
 
 1. Plugin Claude Code'da yükleniyor.
-2. ~43 skill çalışıyor (her kategori için en az 1 happy-path test).
+2. ~45 skill çalışıyor (her kategori için en az 1 happy-path test).
 3. 6 command (`/pseo-*`) çalışıyor.
 4. 4 hook (session-start, pre/post-tool-use, user-prompt-submit) tetikleniyor.
 5. 20+ schema validation PASS (17 taşınan + 3 yeni).

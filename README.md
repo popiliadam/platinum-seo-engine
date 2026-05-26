@@ -37,12 +37,12 @@ You will get the most out of this if you are comfortable with a CLI, JSON, and t
 
 ## What it does
 
-Out of the box, **43 skills** across 8 categories cover an end-to-end SEO loop:
+Out of the box, **45 skills** across 8 categories cover an end-to-end SEO loop:
 
 | Category | What it covers | Skills |
 |---|---|---|
-| **Ingestion** | Pull data from Google Search Console, DataForSEO, Screaming Frog, Scrapling | 4 |
-| **Discovery** | Quick wins, content gaps, cannibalization, content decay, on-page audit, schema audit, tech audit, geo analysis, competitive analysis, AIO competitor map | 10 |
+| **Ingestion** | Pull data from Google Search Console, DataForSEO, Screaming Frog (file-drop + native MCP-primary orchestrator), Scrapling | 5 |
+| **Discovery** | Quick wins, content gaps, cannibalization, content decay, on-page audit, schema audit, tech audit, geo analysis, competitive analysis, AIO competitor map, GBP audit | 11 |
 | **Planning** | Topical map, cluster map, new content plan, internal links, master task sync | 5 |
 | **Production** | New blog drafting, content revision, FAQ optimization, content remediation, image generation | 5 |
 | **Publishing** | Indexing ping (URL Indexing API), index status verification | 2 |
@@ -50,7 +50,7 @@ Out of the box, **43 skills** across 8 categories cover an end-to-end SEO loop:
 | **Meta** | Init project, brand onboarding, whats-next router, mark-done | 4 |
 | **Governance** | Schema validation, glossary audit, drift-check, context loader | 4 |
 
-Plus **15 slash commands** (`/pseo-init`, `/pseo-quickwin`, `/pseo-driftcheck`, …), **6 hooks** that fire on session start, prompt submit, and tool use, and **3 MCP servers** wired up automatically (GSC, DataForSEO, Scrapling).
+Plus **18 slash commands** (`/pseo-init`, `/pseo-quickwin`, `/pseo-driftcheck`, `/pseo-sf-crawl`, `/pseo-sf-status`, …), **6 hooks** that fire on session start, prompt submit, and tool use, and **4 MCP servers** wired up automatically (GSC, DataForSEO, Scrapling, SF — the last over HTTP `http://127.0.0.1:11435/mcp`).
 
 A typical workflow looks like:
 
@@ -250,7 +250,7 @@ Browse the full catalog: [`skills/`](skills/). Slash commands map 1:1 to commonl
 
 **Current:** v1.6.0 — backlog closure milestone (1,147 tests passing, drift-check AMBER).
 
-The plugin is delivered in **15 phases**. Foundation phases (0–4) are complete; skill phases (5–13) deliver the ~43 skills in batches; phase 14 covers the workspace + CI + a full pilot run end-to-end. Phase 5 is the **GO/NO-GO gateway** — failing it sends the project back to foundation work rather than papering over gaps.
+The plugin is delivered in **15 phases**. Foundation phases (0–4) are complete; skill phases (5–13) deliver the ~45 skills in batches; phase 14 covers the workspace + CI + a full pilot run end-to-end. Phase 5 is the **GO/NO-GO gateway** — failing it sends the project back to foundation work rather than papering over gaps.
 
 | Phase | Title | Status | Skills |
 |---|---|---|---|
