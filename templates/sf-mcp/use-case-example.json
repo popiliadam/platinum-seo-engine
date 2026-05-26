@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.0",
+  "contract_for": "Screaming Frog 24 native MCP integration",
+  "execution_mode": "mcp_tool_call",
+  "mcp_server_name": "sf",
+  "url_normalization": {
+    "mandatory": true,
+    "policy_source": "project.config.url_policy",
+    "staging_fields": ["url_original", "url_normalized"]
+  },
+  "use_cases": {
+    "crawl_trigger": {
+      "mcp_tool": "sf__sf_crawl",
+      "description": "Example use-case: trigger a new Screaming Frog crawl on the project's primary domain with an optional .seospiderconfig override. The orchestrator captures the returned crawl_id and proceeds to crawl_progress_poll.",
+      "input_schema": {
+        "url_list": {
+          "type": "array",
+          "items": { "type": "object" },
+          "source": "project.config.gsc.site_url"
+        },
+        "crawl_config_file_path": {
+          "type": "string",
+          "source": "project.config.sf.mcp.crawl_config_path"
+        }
+      },
+      "output_fields": ["crawl_id", "status"],
+      "staging_table": "sf_crawl_runs",
+      "excel_target_sheet": null,
+      "cache_policy": { "ttl_hours": 0 },
+      "tier": "meta",
+      "note": "Example/scaffold instance. Phase 3 sf-crawl-orchestrator skill ships the production registry covering all 6 use-cases. This file proves the schema accepts a minimal valid instance + serves as a copy-paste starting point for new use-case authoring."
+    }
+  }
+}

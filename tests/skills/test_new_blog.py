@@ -311,8 +311,8 @@ def test_wcag_referenced() -> None:
 def test_cascade_fix_schema_1_2() -> None:
     """W-F1 cascade fix: project-config.schema.json declares the singular
     `profile` field with the 5-enum.  The const schema_version tracks the
-    current spec version (v1.2 was W-F1 introduction, v1.3 is ADR-030
-    brand_identity field rename — pronoun_preference + formality)."""
+    current spec version (v1.2 was W-F1 introduction, v1.3 ADR-030 rename,
+    v1.4 Phase 3 G-AI-05 bank enrichment, v1.5 v1.8 Phase 1 D-SF-12 sf block)."""
     schema_path = SCHEMAS / "project-config.schema.json"
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
 
@@ -321,10 +321,10 @@ def test_cascade_fix_schema_1_2() -> None:
               .get("schema_version", {})
               .get("const")
     )
-    assert schema_version == "1.4", (
-        f"schema_version not bumped to 1.4 (got {schema_version!r}); "
-        f"Phase 3 G-AI-05 bank entry enrichment (applicable_topics, phrasings, "
-        f"last_used_in_content_id, max_usage_per_month) requires v1.4 const"
+    assert schema_version == "1.5", (
+        f"schema_version not bumped to 1.5 (got {schema_version!r}); "
+        f"v1.8 Phase 1 D-SF-12 sf-block additive requires v1.5 const "
+        f"(Migration 0005 carries the upgrade path from 1.4)"
     )
 
     profile = schema.get("properties", {}).get("profile")
@@ -398,16 +398,15 @@ def test_migration_0002_pure_function_idempotent() -> None:
 
 def test_bootstrap_schema_version_sync() -> None:
     """bootstrap_project.py SCHEMA_VERSION constant must equal the current
-    project-config.schema.json const ("1.4" after Phase 3 G-AI-05 bank
-    entry enrichment) so newly bootstrapped projects emit schema-valid
-    configs."""
+    project-config.schema.json const ("1.5" after v1.8 Phase 1 D-SF-12 sf
+    block additive) so newly bootstrapped projects emit schema-valid configs."""
     bootstrap_path = REPO_ROOT / "scripts" / "state" / "bootstrap_project.py"
     text = bootstrap_path.read_text(encoding="utf-8")
     assert (
-        'SCHEMA_VERSION = "1.4"' in text
-        or "SCHEMA_VERSION='1.4'" in text
-        or 'SCHEMA_VERSION="1.4"' in text
-    ), "SCHEMA_VERSION constant not synced to 1.4"
+        'SCHEMA_VERSION = "1.5"' in text
+        or "SCHEMA_VERSION='1.5'" in text
+        or 'SCHEMA_VERSION="1.5"' in text
+    ), "SCHEMA_VERSION constant not synced to 1.5"
 
 
 # ---------------------------------------------------------------------------

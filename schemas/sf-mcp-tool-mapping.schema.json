@@ -1,0 +1,155 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "http://platinum-seo-engine/schemas/sf-mcp-tool-mapping",
+  "title": "Screaming Frog 24 MCP Tool Mapping Contract v1.0",
+  "description": "Meta-schema for the Screaming Frog 24 native MCP integration contract (v1.8 §SF). Validates a use-case registry document that maps 6 canonical SF MCP use-cases to MCP tool calls, staging tables, projection modes, cache policy, and Tier 1/2 report bundles. D-SF-01: HTTP transport (only HTTP MCP in registry currently). D-SF-08: separate mapping file (NOT embedded in mcp-tool-registry) — mirrors gsc-tool-mapping + dataforseo-endpoint-mapping + scrapling-output-mapping pattern. The orchestrator (skills/ingestion/sf-crawl-orchestrator, Phase 3) reads this registry to plan the 24-report Tier 1+2 loop. URL normalization is inherited from the global pipeline — Tier 1 reports that contain url-bearing rows write both url_original and url_normalized at projection time (handled by existing sf-import skill, not the orchestrator). Canonical use-case keys and mcp_tool names are carried in enums as the single source of truth.",
+  "type": "object",
+  "required": ["schema_version", "contract_for", "execution_mode", "use_cases"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "contract_for":   { "const": "Screaming Frog 24 native MCP integration" },
+    "execution_mode": { "const": "mcp_tool_call" },
+    "mcp_server_name": {
+      "type": "string",
+      "description": "MCP server short name carrying these tools; must match the key used in .mcp.json + mcp-tool-registry.json (D-SF-02 short name 'sf', 3 chars matches gsc 3-char convention).",
+      "default": "sf"
+    },
+    "url_normalization": {
+      "type": "object",
+      "description": "Inherited from global pipeline. The orchestrator does not normalize URLs directly — it writes raw CSV files to sf-exports/{date}/raw/ and hands off to the existing sf-import skill, which applies project.config.url_policy at projection time. Recorded here for cross-MCP contract symmetry.",
+      "required": ["mandatory", "policy_source", "staging_fields"],
+      "properties": {
+        "mandatory":      { "const": true },
+        "policy_source":  { "const": "project.config.url_policy" },
+        "staging_fields": {
+          "type": "array",
+          "items": { "enum": ["url_original", "url_normalized"] },
+          "minItems": 2,
+          "uniqueItems": true
+        }
+      }
+    },
+    "use_cases": {
+      "type": "object",
+      "description": "The 6 canonical SF MCP use-cases. Keys are fixed vocabulary; values conform to #/definitions/useCase.",
+      "propertyNames": { "$ref": "#/definitions/useCaseKey" },
+      "additionalProperties": { "$ref": "#/definitions/useCase" },
+      "minProperties": 1
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "useCaseKey": {
+      "type": "string",
+      "description": "Canonical SF MCP use-case keys. crawl_trigger initiates a new crawl; crawl_progress_poll watches in-flight; report_export_inline returns CSV-as-string in MCP response (small reports); report_export_save writes CSV to allowed_directory (large reports, default for Tier 1/2 loop); crawl_list enumerates active crawl ids; allowed_dir_discovery probes the SF GUI for runtime base directory (pre-flight check).",
+      "enum": [
+        "crawl_trigger",
+        "crawl_progress_poll",
+        "report_export_inline",
+        "report_export_save",
+        "crawl_list",
+        "allowed_dir_discovery"
+      ]
+    },
+    "sfMcpTool": {
+      "type": "string",
+      "description": "SF MCP tool identifier (short form without mcp__sf__ prefix). Convention: sf__<verb>. The 5 tools the native SF 24 MCP exposes (verified against `claude mcp list` for sf server).",
+      "enum": [
+        "sf__sf_crawl",
+        "sf__sf_crawl_progress",
+        "sf__sf_generate_report",
+        "sf__sf_list_crawls",
+        "sf__sf_list_allowed_base_directory"
+      ]
+    },
+    "projectionMode": {
+      "type": "string",
+      "description": "Mirrors staging-to-excel-map projection_mode enum. Null means the orchestrator writes a raw file and hands off to sf-import (no direct Excel projection from the orchestrator).",
+      "enum": [
+        "row_match_by_url",
+        "aggregate_by_page",
+        "append_with_is_brand_column",
+        "merge_by_keyword_url",
+        "merge_with_gsc_by_url_normalized",
+        "issue_summary",
+        "nap_consistency_audit",
+        "kpi_cells"
+      ]
+    },
+    "logicalSheet": {
+      "type": "string",
+      "enum": [
+        "dashboard", "topical_map", "cluster_keywords", "cannibalization",
+        "quick_wins", "new_content_plan", "content_improve", "gsc_performance",
+        "content_decay", "on_page_audit", "opportunity", "tech_seo",
+        "crawl_sitemap", "robots_txt", "schema", "redirect_404",
+        "completed_work", "master_task"
+      ]
+    },
+    "cachePolicy": {
+      "type": "object",
+      "required": ["ttl_hours"],
+      "properties": {
+        "ttl_hours": { "type": "integer", "minimum": 0, "maximum": 8760 },
+        "key":       { "type": "string" }
+      }
+    },
+    "inputField": {
+      "type": "object",
+      "description": "One input parameter; either declares a static type (with optional format/default/enum/const) or binds to a project.config source path. Mirrors gsc-tool-mapping inputField shape exactly for cross-MCP symmetry.",
+      "properties": {
+        "type":    { "enum": ["string", "integer", "number", "boolean", "array", "object"] },
+        "format":  { "type": "string" },
+        "default": {},
+        "const":   {},
+        "enum":    { "type": "array" },
+        "items":   { "type": "object" },
+        "source":  {
+          "type": "string",
+          "description": "Dot-path into project.config.* for runtime binding (e.g. project.config.sf.mcp.url, project.config.sf.mcp.allowed_directory).",
+          "pattern": "^project\\.config(\\.[a-z][a-z0-9_]*)+$"
+        }
+      }
+    },
+    "useCase": {
+      "type": "object",
+      "required": ["mcp_tool", "staging_table"],
+      "properties": {
+        "mcp_tool":    { "$ref": "#/definitions/sfMcpTool" },
+        "description": { "type": "string" },
+        "input_schema": {
+          "type": "object",
+          "description": "Map of parameter name → #/definitions/inputField.",
+          "additionalProperties": { "$ref": "#/definitions/inputField" }
+        },
+        "output_fields": {
+          "type": "array",
+          "description": "Canonical staging columns preserved from the MCP response (pre-projection). For report_export_save the response carries metadata (file path, row count, truncated flag); the actual report rows land on disk and are read by sf-import.",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "staging_table": {
+          "type": "string",
+          "description": "SQLite staging table (§6.2). Convention: sf_*. For orchestrator-level meta-tracking (e.g. sf_crawl_runs); the actual report data lands in sf-export-mapping-driven tables via sf-import.",
+          "pattern": "^sf_[a-z][a-z0-9_]*$"
+        },
+        "excel_target_sheet": {
+          "oneOf": [
+            { "$ref": "#/definitions/logicalSheet" },
+            { "type": "null", "description": "Orchestrator-level use-cases never write Excel directly (handoff to sf-import)." }
+          ]
+        },
+        "projection_mode":  { "$ref": "#/definitions/projectionMode" },
+        "cache_policy": { "$ref": "#/definitions/cachePolicy" },
+        "rate_limit":   { "type": "string" },
+        "tier": {
+          "type": "string",
+          "description": "Which sf-required-reports tier this use-case feeds. Tier 1 = 14 mandatory reports; Tier 2 = 10 recommended; Tier 3 = optional (Q-SF-MCP-10 default OFF). Orchestrator-only use-cases (crawl_trigger, crawl_list, allowed_dir_discovery) are tagged 'meta' — they don't map to a tier.",
+          "enum": ["tier_1", "tier_2", "tier_3", "meta"]
+        },
+        "note":         { "type": "string" }
+      }
+    }
+  }
+}

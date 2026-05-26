@@ -38,12 +38,28 @@ JSON when --dry-run is set.
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import os
 import sys
 from pathlib import Path
 
-SCHEMA_VERSION = "1.4"
+SCHEMA_VERSION = "1.5"
+
+#: Default sf block emitted by bootstrap when schema_version >= 1.5
+#: (v1.8 Phase 1 D-SF-12). Matches Migration 0005 DEFAULT_SF_MCP — kept in
+#: sync so a freshly bootstrapped project and a migrated project produce
+#: byte-identical sf blocks. Operator overrides per-project (D-SF-18).
+DEFAULT_SF_MCP_BLOCK: dict = {
+    "mcp": {
+        "enabled": False,
+        "url": "http://127.0.0.1:11435/mcp",
+        "allowed_directory": None,
+        "crawl_config_path": None,
+        "max_wait_minutes": 180,
+        "per_report_timeout_seconds": 300,
+    }
+}
 
 DEFAULT_AI_BOTS = [
     "Googlebot", "Bingbot",
@@ -97,6 +113,7 @@ def build_project_config(args: argparse.Namespace) -> dict:
             "language_code": args.dfs_language_code,
             "budget_credits_per_day": 500,
         },
+        "sf": copy.deepcopy(DEFAULT_SF_MCP_BLOCK),
         "brand": {
             "patterns": [slug],
             "mention_range": {"min": 4, "max": 7},

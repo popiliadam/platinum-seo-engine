@@ -40,8 +40,8 @@
       "properties": {
         "kind": {
           "type": "string",
-          "description": "sf_csv → filename_original + filename_normalized + file_hash + row_count; *_mcp → response_bytes + row_count; manual/tool_computed → neither.",
-          "enum": ["sf_csv", "gsc_mcp", "dataforseo_mcp", "scrapling_local", "scrapling_mcp", "manual", "tool_computed"]
+          "description": "sf_csv → filename_original + filename_normalized + file_hash + row_count; *_mcp → response_bytes + row_count; manual/tool_computed → neither. sf_mcp → same pattern (response_bytes + row_count + mcp_server + mcp_tool). sf_mcp added v1.8 Phase 1 D-SF-13 for Screaming Frog 24 native MCP, parallel to existing gsc_mcp / dataforseo_mcp.",
+          "enum": ["sf_csv", "gsc_mcp", "dataforseo_mcp", "scrapling_local", "scrapling_mcp", "sf_mcp", "manual", "tool_computed"]
         },
         "source_folder":       { "type": "string", "description": "For sf_csv: the ingest folder relative path (e.g. sf_exports/2026-04/)." },
         "filename_original":   { "type": "string", "description": "Pre-normalization SF filename, Turkish chars preserved." },
@@ -49,7 +49,7 @@
         "file_hash":           { "$ref": "#/definitions/sha256Hash" },
         "row_count":           { "type": "integer", "minimum": 0 },
         "response_bytes":      { "type": "integer", "minimum": 0, "description": "MCP raw response size; used for storage budget." },
-        "mcp_server":          { "type": "string", "description": "Short server name (gsc / dataforseo / scrapling) — matches mcp-tool-registry.json." },
+        "mcp_server":          { "type": "string", "description": "Short server name (gsc / dataforseo / scrapling / sf) — matches mcp-tool-registry.json." },
         "mcp_tool":            { "type": "string", "description": "Fully-qualified tool name (gsc__search_analytics, dataforseo__serp_organic_live_advanced, ...)." }
       }
     },

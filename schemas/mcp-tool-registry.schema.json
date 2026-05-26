@@ -36,8 +36,8 @@
   "definitions": {
     "serverName": {
       "type": "string",
-      "description": "Canonical short server name. gsc + dataforseo + scrapling are the three external feeds; platinum_seo_core is the plugin's own server; project_local is the escape hatch for per-project-only servers.",
-      "enum": ["gsc", "dataforseo", "scrapling", "platinum_seo_core", "project_local"]
+      "description": "Canonical short server name. gsc + dataforseo + scrapling + sf are the four external feeds (sf added v1.8 Phase 1 D-SF-02 for Screaming Frog 24 native MCP, HTTP transport); platinum_seo_core is the plugin's own server; project_local is the escape hatch for per-project-only servers.",
+      "enum": ["gsc", "dataforseo", "scrapling", "sf", "platinum_seo_core", "project_local"]
     },
     "authMethod": {
       "type": "string",

@@ -85,9 +85,12 @@ def test_dry_run_emits_valid_json() -> None:
     assert result.returncode == 0, result.stderr
     cfg = json.loads(result.stdout)
     assert cfg["project_id"] == "test-slug"
-    assert cfg["schema_version"] == "1.4"
+    assert cfg["schema_version"] == "1.5"
     assert "paths" in cfg and "gsc" in cfg and "dataforseo" in cfg
     assert cfg["profiles"] == ["local-service"]
+    # v1.8 Phase 1 D-SF-12: bootstrap emits the sf block alongside dataforseo.
+    assert cfg["sf"]["mcp"]["enabled"] is False
+    assert cfg["sf"]["mcp"]["url"] == "http://127.0.0.1:11435/mcp"
 
 
 def test_missing_project_arg_fails() -> None:

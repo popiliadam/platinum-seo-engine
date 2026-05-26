@@ -1621,3 +1621,62 @@ Single manager session ~115dk audit of v1.1.0 RELEASED engine plugin. Brief: `do
 - Manager reviews package + verifies vs spec Phase 1 ACs + atomic commit Phase 1 work + advances PHASE_STATUS → Phase 2 dispatch
 
 **Pattern note:** Manager+Worker multi-session pattern doğum belgesi v1.8 (D-SF-17). Önceki v1.7 + v1.6 + v1.5 cycles same-session multi-phase paterni kullanıyordu (Manager + Worker aynı session); v1.8 ile context efficiency için fresh-session-per-Phase paterni adapted. Bu ledger entry'si Manager state checkpoint olacak between-phase recovery için.
+
+---
+
+## v1.8 Phase 1 — Schema-First Foundation DONE (2026-05-26)
+
+**Worker dispatch:** Phase 1 Worker (fresh Claude Code session) executed 9 dispatch tasks + 6 cascade fixes per Manager Worker Prompt extracted from `docs/superpowers/plans/2026-05-26-sf-mcp-worker-prompts.md:28-108`. Worker Output Package returned 16-file scope (6 NEW + 10 MODIFIED, +991/-44 cumulative).
+
+**Manager NO-GO branch exercised (titiz cross-check kazancı):**
+- W-1 convention drift caught: Worker chose `sf__crawl` form per schema regex `^[a-z][a-z0-9_]*__[a-z][a-z0-9_]*$` (over-applied schema-first analogy); cross-check via spec runtime grep (11/11 `mcp__sf__sf_*` references) + gsc/dfs/scrapling registry convention (server prefix + double-underscore + NATIVE tool name verbatim including any `sf_` prefix the server itself uses) revealed the correct form is `sf__sf_crawl` (registry stores `{server_key}__{native_mcp_tool_name_verbatim}`).
+- Narrow Fix Worker dispatched via Agent tool (general-purpose subagent, fresh context per Manager forbidden actions "always delegate to fresh Worker"); 2-file fix scope expanded to 3rd file (sf-mcp-tool-mapping.schema.json `sfMcpTool` enum 5 values) — Fix Worker correctly identified the schema enum as coupled drift cluster (NEW Phase 1 artifact, not pre-existing schema), validation gate `EXAMPLE OK` would have failed without it. Defensible scope expansion within v1.8 NEW artifact cluster.
+- Manager GO decision: 1198 PASS + 11 SKIP + all validation gates GREEN + 0 stragglers via repo-wide grep `sf__<bare>` references.
+
+**Phase 1 deliverables (atomic commit):**
+- `schemas/sf-mcp-tool-mapping.schema.json` (NEW 155L; 6 use-case keys: crawl_trigger + crawl_progress_poll + report_export_inline + report_export_save + crawl_list + allowed_dir_discovery; sfMcpTool enum 5 native SF MCP tools)
+- `scripts/migrations/migration_0005_project_config_1_4_to_1_5.py` (NEW 148L; mirrors migration_0004 line-for-line: idempotent + strict + dry-run + .bak; adds sf block default per D-SF-12 spec + Q-SF-MCP-11 per_report_timeout_seconds=300 lock)
+- `./mcp-tool-registry.json` (NEW 294L instance at repo root per Q-SF-MCP-09; 4 servers cumulative: gsc 8 + dataforseo 9 + scrapling 9 + sf 5 = 31 tools)
+- `templates/sf-mcp/` scaffold (.gitkeep + use-case-example.json)
+- `tests/scripts/test_migration_0005.py` (NEW 145L, 7 cases — extended brief's 5-case set with no_mutate + preserves_unrelated)
+- `tests/schemas/test_sf_mcp_tool_mapping_schema.py` (NEW 97L, 3 cases)
+- 4 schemas edited (mcp-tool-registry serverName +sf; events source.kind +sf_mcp; project-config v1.4→v1.5 + sf block; sf-mcp-tool-mapping enum post-Fix-Worker)
+- bootstrap_project.py SCHEMA_VERSION 1.4→1.5 + DEFAULT_SF_MCP_BLOCK emit
+- 6 cascade test fixes (Lesson 38 v2 same-atomic-commit discipline paterni reuse #6+: conftest + 5 test files schema_version literal sweep)
+
+**Verification gates (6/6 GREEN):**
+- schema-validate full sweep EXIT 0
+- test_migration_0005 7/7 PASS
+- test_sf_mcp_tool_mapping_schema 3/3 PASS
+- test_events_schema_event_type_enum_v1_1 11/11 PASS (regression intact)
+- Full baseline 1184 → 1198 PASS + 11 SKIP (+14 net positive drift)
+- mcp-tool-registry.json validates against schema OK
+
+**Manager Worker Decisions (W-1..W-5) review:**
+| W-# | Decision | Manager review |
+|-----|----------|----------------|
+| W-1 | sf__crawl tool naming (schema-first) | ⚠️ Over-correction — drift Fix Worker round corrected to sf__sf_crawl per spec runtime evidence |
+| W-2 | unmapped_tools_policy: "permissive" | ✅ Accepted — Phase 1 foundation; future Phase tightens after full inventory audit |
+| W-3 | per_report_timeout_seconds: 300 in migration default | ✅ Accepted — Q-SF-MCP-11 Pre-Phase-1 lock applied |
+| W-4 | Schema title v1.3→v1.5 (skip v1.4 jump) | ✅ Accepted — pre-existing drift surfacing; v1.5 aligned current state |
+| W-5 | Bootstrap unconditionally v1.5 (no --schema-version flag) | ✅ Accepted — matches prior bump conventions; "v1.4 fallback" interpreted as migration path FROM v1.4 (works via 0005), not bootstrap EMITTING v1.4 |
+
+**Drift state (post-Phase-1):**
+- pytest 1198 PASS + 11 SKIP (1184 → 1198, +14 net positive drift, regression sıfır)
+- .mcp.json 482B byte-byte korundu (F-16 invariant 48+ commit cumulative; **intentional break Phase 2 next per ADR-039**)
+- DECISIONS.md 6126B unchanged (Phase 2 will append ADR-039 ~+300B; cap 6144B → headroom check critical)
+- plugin.json 1.7.0 unchanged (Phase 6 bump → 1.8.0 via Y-05)
+- Drift-check verdict expected GREEN post-Phase-1 (no F-XX violations from Phase 1 work; F-23/24/25/26 invariants land Phase 4)
+
+**3 LOW Worker Open Questions + 1 polish item filed** (Q-SF-MCP-PHASE-1-CLOSURE-FOLLOWUPS-01 umbrella in OPEN_QUESTIONS.md): source.kind dedicated test + test_migration_0004 idempotency edge case + test_brand_onboarding legacy paths + sf-mcp-tool-mapping.schema description text polish. Tümü Phase 2-7 target; Phase 1 GO kararını ENGELLEMEDİ.
+
+**Push timing:** Phase 1 commit local-only (Manager bootstrap forbidden actions: no git tag push without operator approval; cumulative push at v1.8.0 closeout post-Phase-7).
+
+**Next agenda:**
+- Phase 2 Worker Prompt dispatch (MCP Utility + .mcp.json: 6 tasks, ~0.5d effort)
+- Manager inline injection: ADR-031 → ADR-039 override note (spec/worker-prompts file forbidden edits; conversational injection only)
+- F-16 .mcp.json byte invariant intentional break documented in ADR-039 controlled additive diff
+- httpx>=0.27 dependency add to requirements.txt
+- 5 sf_mcp_client tests + .mcp.json sf entry + ADR-039 manual authoring (~+300B DECISIONS.md headroom check)
+
+**Atomic phase paterni 68'inci kanıt cumulative** (v1.8 Phase 1 = 1 commit per Worker Output Package per Manager workflow §13.5). Lesson 38 v2 cumulative catches ~69 (+2 v1.8 cycle: W-1 convention drift catch + Fix Worker schema-coupling scope expansion). v2.3 spec retrospective backlog item: rephrase spec line 472-474 tool inventory + add registry convention clarification "tool_name = {server}__{native_tool_name_verbatim}" example block to prevent future Workers tripping over the same analogy.
