@@ -2,6 +2,31 @@
 
 ## Unresolved
 
+### Q-SF-MCP-PRE-PHASE-1-DECISIONS-01: v1.8 SF MCP Hybrid Integration — 8 Pre-Phase-1 operator decisions [P1] ✅ RESOLVED 2026-05-26
+**→ RESOLVED 2026-05-26 Manager session bootstrap (operator approval "en iyi senaryo + cross-check + titiz"):** Süleyman'ın "hepsi default + 1 manager override (ADR-031→ADR-039)" kabulü ile 8 karar lock'landı. Tüm default'lar spec v2.2 "Open Questions for Operator Review" tablosundan; 1 Manager Decision spec drift catch'i (ADR-031 zaten archive'da alınmış, DECISIONS.md:42 events.jsonl Legacy Archive 2026-05-06; ADR-038 numbering policy renumber YASAK → next-unused ADR-039 lock'landı). Worker Prompts file edit edilmeyecek (forbidden, Workers may have been read it); ADR-039 override Manager-side, Phase 2 + Phase 6 dispatch'lerinde Worker prompt'a inline "Manager Override" note olarak verilecek (spec/worker-prompts file dokunulmaz, override conversational injection ile). v2.3 spec retrospective notu Phase 7 closeout'a deferred (post-ship retro item).
+
+**Resolutions table:**
+| # | Q | Default Applied | Lock'ladığı yer | Status |
+|---|---|------------------|-----------------|--------|
+| 1 | Q-SF-MCP-09 (registry instance konum) | `./mcp-tool-registry.json` (engine-wide repo root) | Phase 1 task #6 | ✅ |
+| 2 | Q-SF-MCP-02 (requires_approval) | YES (orchestrator approval prompt) | Phase 3 SKILL frontmatter | ✅ |
+| 3 | Q-SF-MCP-04 (Move vs Copy) | Move (atomic-friendly, D-SF-16 alignment) | Phase 3 file move logic | ✅ |
+| 4 | Q-SF-MCP-05 (auto-invoke sf-import) | YES (full pipeline single command) | Phase 3 handoff step | ✅ |
+| 5 | Q-SF-MCP-07 (consumer rollout) | All-4 in v1.8 (tech+schema+on-page+internal-links) | Phase 5 scope (1.5d effort) | ✅ |
+| 6 | Q-SF-MCP-10 (Tier 3 in default loop) | NO (24 reports only — Tier 1 + Tier 2) | Phase 3 24-vs-40 enumeration | ✅ |
+| 7 | Q-SF-MCP-11 (per_report_timeout_seconds) | 300 (5min × 24 = 2h export budget) | Phase 3 `sf_generate_report` timeout | ✅ |
+| 8 | **Manager Decision: ADR override** | **ADR-031 → ADR-039** (cross-check: 031 taken by events.jsonl Legacy Archive 2026-05-06; archive grep ADR-039 0 hit → müsait) | Phase 2 + Phase 6 Worker prompt override notu | ✅ |
+
+**Deferred (by-design, NOT decided in Pre-Phase-1; defaults apply for v1.8):**
+- Q-SF-MCP-01 Node.js Runtime → OFF (security; embeddings deferred v1.1+)
+- Q-SF-MCP-03 max_wait_minutes → 180 (3h; Q-SF-MCP-11 tuned together)
+- Q-SF-MCP-06 Cross-project SF lock → DURUR-orch-7 (R13 v1 guard); full fcntl lock deferred v1.2+
+- Q-SF-MCP-08 stop.json hook validate sf entry → **previously RESOLVED → NO** (perf budget; drift-check skill catches it instead)
+
+**Raised:** 2026-05-26 Manager session bootstrap (operator initial v1.8 dispatch). Spec authority: `docs/superpowers/specs/2026-05-26-sf-mcp-hybrid-integration-design.md` (v2.2, 937 lines, ~50KB) + companion `docs/superpowers/plans/2026-05-26-sf-mcp-worker-prompts.md` (666 lines, 7 Worker Prompts).
+**Context:** Spec v2.2 Open Questions table (lines 879-892) listed 11 Q-SF-MCP-XX questions with defaults. Worker Prompts file (lines 14-23) listed 7 Pre-Phase-1 decisions to lock before Phase 1 dispatch. Manager bootstrap cross-check'i 8'inci kararı surface etti: spec satır 69 + 421 + Worker Prompts satır 146 + 188 + 472 "ADR-031" cite ediyor ama mevcut DECISIONS_ARCHIVE.md zaten ADR-031 = events.jsonl Legacy Archive olarak kayıtlı (2026-05-06 commit). Spec drift catch: spec authoring time (2026-05-26) ile current repo state arasında ADR numerasyon collision. ADR-038 "monotonic-but-gap-tolerant + renumber FORBIDDEN" policy gereği next-unused ADR-039 lock'landı. Worker Prompts file edit forbidden (Manager bootstrap §Forbidden Actions: "Workers may have already read it") → Phase 2 + Phase 6 dispatch'lerinde Manager override notu inline injection.
+**Cross-refs:** Spec v2.2 lines 879-892 (11 Q table) + Worker Prompts lines 14-23 (7 decision table) + DECISIONS.md:42 (ADR-031 archive entry) + ADR-038 numbering policy + Manager bootstrap §Pre-Phase-1 Operator Decisions.
+
 ### Q-V1.4-AUDIT-CRITICAL-01: Deep audit 9 CRITICAL findings — rules/+schemas/+templates/ engine self-violation [P1] ✅ RESOLVED 2026-05-07
 **→ RESOLVED 2026-05-07 v1.4-deep-audit-fix milestone (engine 14 atomic commit T1+T2+T3+T4 + closeout):** Option (a) applied — full milestone scope. **9/9 CRITICAL closed:** K-01 R-26 CTA Zorunlu definition + ADR-038 K-01 clarification (T2 Step 2 `07f317b`); K-02 14 schema $id HTTP/path/suffix mass-fix (T1 Step 2); K-03 master-excel.schema.json $id+title+definitions (T1 Step 3 `48553f5`); K-04 master_task col A taskIdPattern $ref (T1 Step 3 `48553f5`); K-05 events.primary_source enum sync 9→11 (T1 Step 4 `de1efb0`); K-06 11/26 reports run_id placeholder (T3 Step 1 `b20b58b`); K-07 7/26 reports `## Kanıt zinciri` H2 (T3 Step 1 `b20b58b`); K-08 (downgraded MEDIUM in audit, no separate fix); K-09 content-update-discipline.md broken URL (T2 Step 4 `5412827`). Plus T2 Step 1 `475bec4` rules-frontmatter.schema.json + 7 rule frontmatter normalize (H-A + K-09 alt-fix). pytest 825 → 949 PASS + 11 SKIP cumulative (+124 yeni test cumulative). .mcp.json 482B byte-byte korundu (F-16 28+ commit cumulative). DECISIONS.md 6112 → 6126B (cap 6144B intact, 18B headroom). plugin.json 1.3.0 unchanged (ADR-036 5-file sync intact). Brief premise revize 5x (Lesson 38 v2 24-28th cumulative catches: json round-trip drift T1, file structure varsayımı T1, R-25/R-27 yer iddiası T2, lesson counter line :31 → lesson 8 not 38 T2, F-19..F-24 numbering çakışma T4 → F-23..F-28 next available). Atomic phase paterni 49'uncu kanıt cumulative 53 phase consecutive convergent invariant intact.
 **Raised:** 2026-05-07 manager session "rules/+schemas/+templates/ deep audit" (4 paralel general-purpose agent dispatch + manager runtime cross-check 10/78 finding doğrulandı, 2 finding düzeltildi). Audit artifact: `docs/audits/v1.4-rules-schemas-templates-2026-05-07.md`.
