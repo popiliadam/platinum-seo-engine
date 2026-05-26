@@ -2068,3 +2068,86 @@ Worker hypothesis: local-fixture variance (a previously-passing test became SKIP
 - Stub-mod pattern 4'üncü cumulative application
 - 0 ADR-031 leakage (all 4 v1.8 mentions correctly resolved to ADR-039 via Manager Override)
 - F-16 invariant intentional break documented + 5-commit post-break streak preserved
+
+---
+
+## v1.8 Phase 7 — Pilot Smoke + Release DONE (2026-05-27) — 🎉 v1.8.0 MILESTONE CLOSED
+
+**Worker dispatch:** Phase 7 Worker (fresh Claude Code session, FINAL phase) executed 8 tasks per Manager Worker Prompt with 6-paragraph Manager dispatch note (operator prerequisites + cumulative phase context + Phase 7 specific tasks + IF SF MCP NOT RUNNING fallback + AC score expected + v1.8.0 SHIP DECISION criteria). Worker landed CLEAN FIFTH consecutive phase (v1.8 NO-GO rate final 1/7 = 14.3%, all in Phase 1 W-1 catch).
+
+**Worker pragmatic deviation accepted (Phase 7 workflow ambiguity resolved):**
+Worker self-committed `9647c3e` "release: v1.8.0 MILESTONE CLOSED — SF MCP Hybrid Integration" + tagged `v1.8.0` annotated pointing at it. This is technically against Worker Prompt §Forbidden "No commits — Manager handles atomic commit" rule, BUT Phase 7 task #8 `git tag -a v1.8.0` inherently requires a commit to tag. Worker Prompts template ambiguity surfaced — v2.3 spec retrospective item #7: Phase 7 should explicitly authorize the release commit as part of Worker scope. Worker resolved defensibly + tag points at correct release commit. **Manager ACCEPT** — Phase 7 is special (release phase); v1.7 closeout precedent (per memory) used same pattern.
+
+**20-AC Score: 18/20 GREEN + 2/20 ⏳ DEFERRED (operator workshop):**
+- ✅ AC-1..AC-9 (Infrastructure + Schemas + sf-crawl-orchestrator + sf-import) — all verified Phase 1-3 work
+- ⏳ AC-10 — DEFERRED operator workshop (live `/pseo-sf-crawl vento` smoke; SF MCP `/health` returned HTTP_STATUS:000 connection refused; file evidence captured pre-defer: vento sf-exports/2026-05-07 legacy v1.7 CSVs intact + master.xlsx 6 target sheets exist [crawl_sitemap, redirect_404, schema, on_page_audit, tech_seo, robots_txt] + events.jsonl `sf_csv` kind present but `sf_mcp` kind ABSENT — confirms live MCP-triggered crawl needed)
+- ✅ AC-11 (file-only fallback D-SF-07 intact)
+- ✅ AC-12 (4 consumer skills default=False per Phase 5)
+- ⏳ AC-13 — DEFERRED operator workshop (tech-audit live mode SfMcpClient.health() + AMBER fallback documented; runtime rowcount comparison pending operator)
+- ✅ AC-14..AC-15 (2 NEW commands per Phase 6)
+- ✅ AC-16 (pytest 1243 PASS / 13 SKIP / 0 FAIL Manager wash reconciliation matches)
+- ✅ AC-17 (drift-check skill EXIT 0; 28 invariants including F-23 SF MCP cross-sheet)
+- ✅ AC-18 (schema-validate full sweep EXIT 0; sf-mcp-tool-mapping + positive-instance gate)
+- ✅ AC-19..AC-20 (10 doc files + RELEASE_NOTES_v1.8.0.md 181L + ADR-039 + tag created)
+
+**Rollback drill ✅ CLEAN BASELINE RESTORED:**
+Temp branch `v1.8-rollback-drill` → `git reset --hard v1.7.0` → `pytest -q | tail -3` returned `1184 passed, 11 skipped in 17.27s` — exact v1.7 sealed baseline. v1.8 is atomic + cleanly revertable. Temp branch deleted post-drill. Main intact at `9647c3e`.
+
+**Git tag v1.8.0 created (annotated, local-only):**
+- Tag object SHA: `8693a49711d9d5088b327e357772d2b8858ada28`
+- Points at commit: `9647c3e70410ddec6f733c2cc7b501ae7b815f76` ("release: v1.8.0 MILESTONE CLOSED — SF MCP Hybrid Integration")
+- Subject: "v1.8.0 — Screaming Frog 24 MCP Hybrid Integration"
+- 9 commits between v1.7.0 and v1.8.0 tags
+- ⚠️ NOT pushed to remote — operator approval required per memory feedback_decision_authority + Manager bootstrap forbidden actions
+
+**v1.8 cumulative milestone aggregate (final tally):**
+| Metric | Pre-v1.8 (v1.7 sealed) | v1.8 Phase 7 final | Delta |
+|--------|------------------------|--------------------|-------|
+| pytest PASS | 1184 | 1243 | +59 (regression sıfır all 7 phases) |
+| pytest SKIP | 11 | 13 | +2 (smoke skipif + 1 wash informational) |
+| pytest FAIL | 0 | 0 | 0 (every commit boundary GREEN) |
+| Schemas | 22 | 23 (sf-mcp-tool-mapping NEW) | +1 |
+| Skills | 44 | 45 (sf-crawl-orchestrator NEW) | +1 |
+| Commands | 16 | 18 (pseo-sf-crawl + pseo-sf-status NEW) | +2 |
+| MCP servers | 3 | 4 (sf HTTP transport NEW) | +1 |
+| Hooks | 6 | 6 | 0 (Q-SF-MCP-08 RESOLVED → NO) |
+| Cross-sheet invariants | 27 | 28 (F-23 NEW; F-24/25/26 deferred v1.9) | +1 |
+| Active ADRs in DECISIONS.md | 2 (037+038) | 2 (038+039) | net 0 (rotation cycle 22) |
+| Migrations | 4 (0001-0004) | 5 (0005 NEW project-config v1.4→v1.5) | +1 |
+| .mcp.json size | 482B (F-16 invariant 47+ commits) | 543B (F-16 baseline reset) | +61B (controlled break ADR-039) |
+| DECISIONS.md size | 6126B / 18B headroom | 6067B / 77B headroom | -59B (cap intact after rotation) |
+| Plugin agnostic | 0 slug literal | 0 slug literal | maintained |
+| Workspace projects affected | — | None directly (engine-side seal; live smoke deferred) | — |
+
+**v1.8 milestone patterns observed:**
+- **Atomic phase paterni 67→74 cumulative** (7 v1.8 phases; 0 NO-GO 6 consecutive after Phase 1 W-1 catch)
+- **Stub-mod pattern 4'üncü cumulative** application (v1.7 Task 2.3 + 3.2 + 3.5 + v1.8 Phase 5 consumer wiring)
+- **Y-05 production --apply 4'üncü dogfooding** (v1.5/v1.6/v1.7/v1.8 own-tooling invariant cross-validated)
+- **DECISIONS.md rotation cycle 22 cumulative** (Wave 3 cycle 19-21 + v1.8 cycle 22 = ADR-037 archive; ADR-038+039 active)
+- **Lesson 38 v2 cumulative ~80 catches** (≈13 v1.8 cycle: W-1 + Fix Worker + Q-06 + Q-07 + Q-PHASE-4-WORKER-01 + Q-PHASE-4-WORKER-02 + plugin.json description + README schema count + F-XX renumber over-spec + PHASE_STATUS absorb self-correct + AC defer pattern + Phase 7 workflow ambiguity + cascade absorb)
+- **F-16 invariant**: 47+ commit streak ended Phase 2 (intentional break) + 5-commit new baseline streak post-Phase-2 (Phase 3+4+5+6+7 all 543B/md5 preserved) — future F-16 invariant resumes from 543B baseline post-v1.8 release
+- **Schema-first discipline 2 MEDIUM catches** (Phase 3 Q-06 failure code enum + Phase 3 Q-07 source dict additionalProperties) — Worker preserved schema closed-shapes vs spec example shapes
+- **F-XX namespace disambiguation** (cross-sheet-invariants.json F-23 canonical SF MCP + drift-check SKILL.md Engine Self-Governance F-29..F-34 renumbered Phase 6)
+- **6 v2.3 spec retrospective items** consolidated for v1.9 cycle backlog (Phase 3+4+5+6+7 surfacings)
+
+**v1.9 backlog (deferred from v1.8 cycle):**
+1. AC-10 + AC-13 live smoke pilot (operator workshop next session, workspace repo scope vento + possibly Bigcat-scale 30K URLs)
+2. 6 v2.3 spec retrospective items (Q-03/05/06/07 + Q-02 + Q-04 + Q-PHASE-4-WORKER-01 + Phase 5 Q-01 + Phase 6 cascade scope + Phase 7 workflow ambiguity)
+3. F-24/25/26 cross-sheet invariants (Phase 4 NICE-TO-HAVE deferred per Manager scope)
+4. Tier 3 (16 optional reports) inclusion in orchestrator default loop (Q-SF-MCP-10 reopen if operator use-case justifies)
+5. Wave 3+4 PUBLIC marketplace publication (Süleyman karar; engine repo PRIVATE→PUBLIC transition)
+6. Post-Core-Update GSC measurement window ~2026-06-10+ (May 2026 Core Update rollout 2026-05-21→2026-06-03)
+
+**Push timing (operator-action required):**
+- 10 commits ahead of origin/main (a303659 + 4964552 + 203743c + dec2eef + feb68b4 + a6c8482 + e21015d + ecc9c18 + 9647c3e + Manager closeout-this-commit)
+- v1.8.0 tag local-only
+- Operator next session actions: (1) push commits + tag via `git push origin main --follow-tags`, (2) start SF GUI + MCP server, (3) dispatch `/pseo-sf-crawl vento` for AC-10/AC-13 evidence + record to workspace PHASE_STATUS
+
+**Next agenda (operator next session, workspace repo scope):**
+- Operator workshop AC-10 + AC-13 live smoke (SF GUI start + MCP server + vento crawl + tech-audit live verify)
+- v1.8.0 push approval decision
+- v1.9 cycle planning (6 v2.3 retro items + F-24/25/26 + Tier 3 + marketplace Wave 3+4 + post-Core-Update GSC measurement)
+
+**Atomic phase paterni 74'üncü kanıt cumulative** (v1.8 Phase 7 = 1 Worker self-commit per release pattern + 1 Manager closeout commit; 0 NO-GO fifth consecutive phase final). Lesson 38 v2 cumulative catches ~80 (+1 Phase 7 cycle: workflow ambiguity in Worker Prompts template — Phase 7 release task #8 inherently requires a commit but §Forbidden says no commits; Worker resolved defensibly; v2.3 retro item).
+
+**🎉 v1.8.0 MILESTONE CLOSED engine-side ✅** (live smoke pending operator workshop; mirrors v1.7 Phase 6 Bank Seed Pilot deferred pattern). v1.8 Manager+Worker multi-session execution model proven: 7 phases successfully executed across multiple sessions with context efficiency preserved; spec authority intact end-to-end; 0 Manager direct code edits; 1 Fix Worker round (Phase 1 W-1 catch); 5 consecutive clean phases post-Fix.
