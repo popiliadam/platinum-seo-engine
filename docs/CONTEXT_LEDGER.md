@@ -1754,3 +1754,70 @@ Single manager session ~115dk audit of v1.1.0 RELEASED engine plugin. Brief: `do
 - Acceptance Criteria Phase 3: AC-8 sf-crawl-orchestrator with 8 DURURs + AC-9 sf-import body UNCHANGED + AC-10 end-to-end smoke (deferred Phase 7 actual run)
 
 **Atomic phase paterni 69'uncu kanıt cumulative** (v1.8 Phase 2 = 1 commit per Worker Output Package + cascade absorb). Lesson 38 v2 cumulative catches ~70 (+1 v1.8 cycle: 3 cascade fixes anticipated by spec + caught via full pytest -q BEFORE composing package, not "fix in Phase 3" deferral). **DECISIONS.md rotation cycle 22 cumulative** (Wave 3 cycle 19-21 = ADR-034/035/036 archive; v1.8 cycle 22 = ADR-037 archive; pattern stable).
+
+---
+
+## v1.8 Phase 3 — sf-crawl-orchestrator BIGGEST PHASE DONE (2026-05-26)
+
+**Worker dispatch:** Phase 3 Worker (fresh Claude Code session) executed 8 dispatch tasks per Manager Worker Prompt + light Manager dispatch note (NO ADR override needed — Phase 3 clean of ADR-031 drift). Worker Output Package returned 7-file scope (6 NEW + 1 MODIFIED, 1994 LoC cumulative — BIGGEST single Phase output in v1.8).
+
+**Manager dispatched Phase 3 with 5 inline reminders:**
+- Tool naming convention from Phase 1 W-1 catch (SF MCP native: sf_crawl, sf_crawl_progress, etc.; SKILL.md body uses mcp__sf__sf_* wrapper; sf_mcp_client NOT used in Phase 3)
+- Phase 1 + Phase 2 closure followups (informational, no action required)
+- 24-report enumeration SSoT (sf-required-reports.schema canonicalName enum + sf_import.py frozensets — import, NOT inline)
+- Q-SF-MCP-11 per_report_timeout_seconds=300 + Q-SF-MCP-02 requires_approval=true + Q-SF-MCP-04 Move + Q-SF-MCP-05 auto-invoke YES + Q-SF-MCP-10 24 reports only locks
+- D-SF-07 sf-import body UNCHANGED reminder
+
+**Worker landed clean on first try (0 NO-GO branches dispatched) — discipline kanıtı:**
+- SKILL.md frontmatter validates against schema (bonus test_frontmatter_validates_against_schema as effective gate)
+- 8 DURURs distinguished (orch-1..orch-8); 24-report enumeration imports from sf_import frozensets (SSoT ✓)
+- Pure transform script (no MCP HTTP calls; sf_mcp_client NOT imported per Phase 3 scope)
+- 17 PASS + 1 SKIPPED new tests; 0 regression on sf-import (5 PASS + 2 pre-existing local-fixture SKIP)
+
+**Phase 3 deliverables (atomic commit):**
+- `skills/ingestion/sf-crawl-orchestrator/SKILL.md` (NEW 647L; 9-step body protocol = create_run init + 7 workflow steps in steps[] [preflight + crawl_trigger + poll + export_24_reports + atomic_move + invoke_sf_import + emit_provenance_and_report] + complete transition; 8 DURURs orch-1..orch-8 mapped to workflow-run.schema 6-value enum per Q-PHASE-3-WORKER-06 schema-first catch; requires_approval=true per Q-SF-MCP-02 lock; include_tier3=false per Q-SF-MCP-10 lock; SSoT import from sf_import.TIER1_REQUIRED + TIER2_RECOMMENDED)
+- `scripts/ingestion/sf_crawl_orchestrator.py` (NEW 225L pure transform; 3 helpers — enumerate_reports(include_tier3=False)→list[str] sourced from sf_import frozensets, move_with_rollback(temp_dir, target_dir)→bool, parse_progress_response(response)→ProgressState namedtuple; NO MCP HTTP calls per Phase 3 scope discipline; mirrors gsc_pull.py + dfs_pull.py pure-function paterni)
+- `tests/skills/test_sf_crawl_orchestrator.py` (NEW 801L; 11 cases — happy_path_24_reports + 8 DURUR cases [orch-1..orch-8] + sf_import_handoff_success + frontmatter_validates_against_schema bonus per Q-PHASE-3-WORKER-01)
+- `tests/scripts/test_sf_crawl_orchestrator_helpers.py` (NEW 187L; 6 cases; basename collision rename per Q-PHASE-3-WORKER-02 — pytest namespace-package import mode conflict avoided without __init__.py addition)
+- `tests/smoke/test_sf_mcp_smoke.py` (NEW 69L; 1 case test_sf_mcp_live_list_allowed_base_directory with `@pytest.mark.skipif(not _is_sf_mcp_running())` — SKIPPED in CI per design)
+- `templates/reports/sf-crawl.template.md` (NEW 65L; 7 sections per v2.2 spec mirror dfs-pull/gsc-pull paterni: Summary + 24 Reports Status + Tier Counts + AMBER Warnings + sf-import Handoff + Total Duration + Recommendations)
+- `skills/ingestion/sf-import/SKILL.md` (MODIFIED +4L only — frontmatter inputs.source_run_id optional input; body 8-step protocol UNCHANGED per D-SF-07 + DURUR list UNCHANGED; git diff --stat verified 4 insertions)
+
+**Manager review of 7 Worker Open Questions (ALL ACCEPTED — see OPEN_QUESTIONS.md Q-SF-MCP-PHASE-3-CLOSURE-FOLLOWUPS-01):**
+- Q-01..Q-05 LOW — pattern/template improvements, all defensible Worker decisions
+- **Q-06 + Q-07 MEDIUM schema-first catch wins** — would have FAILED runtime validation if implemented per spec example shapes literally. Worker preserved DURUR identity in human-readable message + crawl_id in envelope JSON. Highest-value Phase 3 output.
+
+**v2.3 spec retrospective items consolidated (3 themes from 7 Q's):**
+1. Spec example accuracy (4 issues: validate_schema.py command + sf_crawl_progress R13 tool + custom failure codes + source dict shape) → spec examples should be schema-validated before publication
+2. Worker Prompts template basename collision rule (skill-tests vs script-tests suffix differentiation)
+3. Step count semantics clarification (complete is transition, not step in steps[])
+
+**Verification gates (all GREEN; expanded Manager cross-check vs Phase 1+2):**
+- sf-crawl-orchestrator SKILL.md frontmatter Draft7 validates (bonus pytest test) ✓
+- test_sf_crawl_orchestrator 11/11 PASS ✓
+- test_sf_crawl_orchestrator_helpers 6/6 PASS ✓
+- test_sf_mcp_smoke 1 SKIPPED (SF MCP /health unreachable, expected) ✓
+- sf-import regression 5 PASS + 2 pre-existing SKIP unchanged (D-SF-07 body invariant intact) ✓
+- Full baseline 1203 → 1222 PASS + 11 → 12 SKIP (+19 PASS / +1 SKIP; +2 unexplained PASS gap flagged for Phase 4 baseline reconcile — positive drift, no regression)
+- .mcp.json F-16 post-break baseline preserved 543B / md5 93523d4 (Phase 2 baseline; v1.8 post-break F-16 streak count = 2 commits)
+- DECISIONS.md unchanged 6067B / 77B headroom (ADR-039 + ADR-038 active; no new ADR Phase 3)
+- Plugin agnostic 0 slug literals in 7 changed files (F-16 invariant intact)
+- failure_reason.code 9 invocations all canonical 6-value enum (mcp_error 5x + validation_error 2x + timeout 1x + internal_error 1x — verified via grep)
+- source dict schema-compliant (events.schema source.additionalProperties=false; explicit inline comment in SKILL.md documents constraint)
+- SSoT discipline verified: `from scripts.ingestion.sf_import import TIER1_REQUIRED, TIER2_RECOMMENDED` (NOT inline 24-report list)
+
+**Drift state (post-Phase-3):**
+- pytest 1222 PASS + 12 SKIP (Phase 2 1203 → Phase 3 1222, +19 PASS / +1 SKIP; regression sıfır + positive drift)
+- .mcp.json 543B unchanged (F-16 post-Phase-2-break baseline preserved through Phase 3; streak count 2 commits)
+- DECISIONS.md 6067B unchanged (no new ADR Phase 3; ADR-038 + ADR-039 active; 77B headroom)
+- plugin.json 1.7.0 unchanged (Phase 6 bumps to 1.8.0)
+- Drift-check verdict: F-23/24/25/26 invariants land Phase 4 (drift-check skill extension); no F-XX violations from Phase 3 expected
+
+**Push timing:** Phase 3 commit local-only (Manager bootstrap forbidden actions; cumulative push at v1.8.0 closeout post-Phase-7). 5 commits ahead of origin/main now (a303659 + 4964552 + 203743c + dec2eef + Phase-3-commit).
+
+**Next agenda:**
+- Phase 4 Worker Prompt dispatch (Existing Skill Extensions, ~1d effort): 8 tasks — sf-import frontmatter (already done in Phase 3, verify) + drift-check F-23 invariant SKILL.md edit + F-23 actual JSON entry in cross-sheet-invariants.json + schema-validate skill extension to validate sf-mcp-tool-mapping schema + init-project Migration 0005 cascade + whats-next routing logic + 5+ test extensions + D-SF-09 no-cron verification test
+- NO Manager override needed Phase 4 (ADR-031 drift only Phase 2 + Phase 6)
+- Phase 5 (consumer wiring all-4 skills, ~1.5d) + Phase 6 (commands + manifest + docs, ~1.25d w/ ADR-031→ADR-039 override) + Phase 7 (pilot smoke + release, ~0.75d) = ~3.5d remaining cumulative
+
+**Atomic phase paterni 70'inci kanıt cumulative** (v1.8 Phase 3 = 1 commit per Worker Output Package; **0 NO-GO branches dispatched** despite BIGGEST scope — discipline kanıtı). Lesson 38 v2 cumulative catches ~72 (+2 v1.8 cycle: Q-PHASE-3-WORKER-06 + Q-PHASE-3-WORKER-07 schema-first MEDIUM catches; Worker preserved schema closed-enums + closed-shape via inline comment discipline). **Manager+Worker multi-session pattern proven**: Phase 3's BIGGEST scope landed atomic without same-session Manager context bleed; spec authority preserved end-to-end; Worker Output Package compaction (Worker transcript not read) enabled Manager to focus on titiz cross-check vs raw implementation context.
