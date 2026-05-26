@@ -53,7 +53,7 @@
     },
     "sfMcpTool": {
       "type": "string",
-      "description": "SF MCP tool identifier (short form without mcp__sf__ prefix). Convention: sf__<verb>. The 5 tools the native SF 24 MCP exposes (verified against `claude mcp list` for sf server).",
+      "description": "SF MCP tool identifier in the mcp-tool-registry.json naming convention `{server_key}__{native_tool_name_verbatim}`. Post-Phase-1 Fix Worker correction (Q-PHASE-1-POLISH-01): native SF 24 MCP tools carry the `sf_` prefix verbatim (sf_crawl, sf_crawl_progress, ...), so the registry-side identifier is `sf__sf_<name>` (server_key + double underscore + verbatim native name). The original 'sf__<verb>' shorthand was an analogy error; corrected here post v1.8 Phase 1 Fix Worker round. The 5 entries are the production tool surface advertised by SF 24's native MCP server at port 11435.",
       "enum": [
         "sf__sf_crawl",
         "sf__sf_crawl_progress",

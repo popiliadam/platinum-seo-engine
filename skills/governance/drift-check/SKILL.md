@@ -324,12 +324,14 @@ These invariants enforce engine repo discipline (schemas/+rules/+templates/) —
 
 | ID    | Rule                                                                  | Regression Test                            |
 |-------|-----------------------------------------------------------------------|--------------------------------------------|
-| F-23  | schema $id format HTTP + slug + no .schema.json suffix (ADR-012)      | tests/schemas/test_id_format.py             |
-| F-24  | schema_version coverage (every schema declares; const not pattern)    | tests/schemas/test_version_field.py         |
-| F-25  | cross-schema enums sync (events.primary_source ⊆ master_task)         | tests/schemas/test_cross_schema_enums.py    |
-| F-26  | R-XX resolution (every R-XX cited in templates defined or superseded) | tests/rules/test_r_xx_resolution.py         |
-| F-27  | report run_id + Kanıt zinciri H2 (every templates/reports/*.md)       | tests/templates/test_run_id_coverage.py     |
-| F-28  | rules frontmatter validates against rules-frontmatter.schema.json     | tests/rules/test_frontmatter.py             |
+| F-29  | schema $id format HTTP + slug + no .schema.json suffix (ADR-012)      | tests/schemas/test_id_format.py             |
+| F-30  | schema_version coverage (every schema declares; const not pattern)    | tests/schemas/test_version_field.py         |
+| F-31  | cross-schema enums sync (events.primary_source ⊆ master_task)         | tests/schemas/test_cross_schema_enums.py    |
+| F-32  | R-XX resolution (every R-XX cited in templates defined or superseded) | tests/rules/test_r_xx_resolution.py         |
+| F-33  | report run_id + Kanıt zinciri H2 (every templates/reports/*.md)       | tests/templates/test_run_id_coverage.py     |
+| F-34  | rules frontmatter validates against rules-frontmatter.schema.json     | tests/rules/test_frontmatter.py             |
+
+> **v1.8 Phase 6 renumber note:** v1.4 engine self-governance F-23..F-28 renumbered F-29..F-34 in v1.8 Phase 6 to disambiguate from `cross-sheet-invariants.json` F-23 SF MCP instance entry (2026-05-27). SKILL.md narrative labels exempt from ADR-038 persistent-registry renumber-forbidden policy (no audit history references them; they are document-only narrative anchors, never persisted in the JSON registry). Cross-refs verified: tests in the regression-test column point to actual test files by path (e.g. `tests/schemas/test_id_format.py`) — those test files do NOT reference the SKILL.md F-XX narrative labels, so no test edit required.
 
 Severity: ALL HIGH — engine self-violation breaks SSOT/schema-first discipline at the meta level. Per §17.2, any FAIL → RED (no manual triage placeholder; automated tests are deterministic).
 
@@ -358,18 +360,19 @@ Detection logic — `check_F_23()` reads:
 Severity HIGH (not CRITICAL) per Manager Phase 4 scope: drift produces
 broken provenance lineage but does not corrupt master.xlsx.
 
-### Naming-namespace note (Q-PHASE-4-WORKER-01)
+### Naming-namespace note (Q-PHASE-4-WORKER-01, RESOLVED v1.8 Phase 6)
 
 The body subsection "Engine Self-Governance (6, v1.4-deep-audit-fix
-Tier 4)" below uses F-23..F-28 as labels for SCHEMA-LEVEL regression
-rules (e.g. F-23 there = schema $id format). Those labels are
+Tier 4)" above now uses F-29..F-34 as labels for SCHEMA-LEVEL regression
+rules (e.g. F-29 there = schema $id format). Those labels are
 documentation-only and live in this SKILL.md body — they have never
 been registered in `schemas/cross-sheet-invariants.json`. The Phase 4
 F-23 (SF MCP cross-sheet) is the canonical F-23 for the JSON registry
-and `validate_invariants.py` rule function. The two namespaces collide
-in human label but live in disjoint stores; a Manager renumbering of
-the engine-self-governance labels (F-29..F-34) is queued as future
-follow-up if confusion proves real in practice.
+and `validate_invariants.py` rule function. Pre-v1.8 these labels were
+F-23..F-28 and collided with the canonical F-23; v1.8 Phase 6 renumbered
+the engine-self-governance labels to F-29..F-34 to remove the human-label
+collision. Both namespaces still live in disjoint stores (JSON registry
+vs SKILL.md narrative).
 
 ## F2 flag — F-08 RED is EXPECTED on the pilot workbook
 

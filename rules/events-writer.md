@@ -127,6 +127,7 @@ Worker schema-first override paterni: schema'da olmayan kind kullanmak YASAK. Ye
 | gsc-pull | ingest | gsc_mcp | GSC search_analytics ingestion |
 | scrapling-ops | ingest | scrapling | Stealthy fetch raw inventory |
 | sf-import | normalize, project_excel | local_xlsx | Screaming Frog Excel transform |
+| sf-crawl-orchestrator | ingest, staging | sf_mcp | Screaming Frog MCP-triggered crawl ingest (v1.8) |
 | init-project | cascade_done | local_template | Project bootstrap cascade close |
 | aio-competitor-map | ingest | scrapling | Competitor pages staging (LLM-native) |
 | cannibalization | ingest | gsc_mcp | Raw GSC pivot 5000-row query×page |

@@ -3,7 +3,7 @@ description: |
   Use when: kullanıcı "schema audit", "structured data", "JSON-LD denetim", "schema.org doğrulama", "rich result eksik", "Product schema hatası", "BreadcrumbList itemListElement", "FAQPage validation" der ya da `/pseo-schema-audit` çağırırsa.
   Also use when: aktif projenin Screaming Frog export'u alındı (`projects/{slug}/sf-exports/{date}/raw/structured_data_all.csv`); sf-import skill çalışmış; on-page-audit / tech-audit ile birlikte triage; rich result eligibility kontrol; opsiyonel DFS content_parsing ile canlı schema cross-validate.
   Do not use when: SF export henüz yok (`sf-import` skill önce, DURUR #1); cannibalization (`/pseo-cannibalization`), quick-wins (`/pseo-quickwin`), tech-audit (`tech-audit` skill, ayrı); master.xlsx yokken (`/pseo-init` önce).
-argument-hint: "<project-slug> [--sf-export-date YYYY-MM-DD] [--cross-validate-dfs] [--strict-parse]"
+argument-hint: "<project-slug> [--sf-export-date YYYY-MM-DD] [--cross-validate-dfs] [--use-sf-mcp-live] [--strict-parse]"
 allowed-tools: Bash(jq:*), Bash(python3:*), Bash(ls:*), Read
 model: sonnet
 ---
@@ -34,6 +34,7 @@ DURUR (6 sentinel): SF export yok / strict_parse=true ile malformed JSON-LD / DF
 ## 3. Çalıştırma notları
 
 - `--cross-validate-dfs` paid MCP (~3 credit/URL); budget pre-flight `scripts/budget/check_budget.py` zorunlu.
+- `--use-sf-mcp-live` (v1.8 NEW; Phase 5 D-SF-11) — skill'in `use_sf_mcp_live=true` flag'ini açar. Aktif olduğunda Step 3'te file CSV yerine `mcp__sf__sf_generate_report(report_name="structured_data_all")` çağrılır (inline 100KB cap; SF MCP /health preflight; AMBER fallback NEVER hard fail). SF GUI + MCP Server açık olmalı (DURUR-orch-1). Default: kapalı (file-based path; regression preservation).
 - `--strict-parse` malformed JSON-LD'de `JsonLdParseError` raise (default: drop row, devam).
 - Cron `0 9 * * 3` Çarşamba 09:00 UTC report-only mode (HIGH confidence + requires_approval=true).
 - `--sf-export-date` belirtilmezse en son `sf-exports/{date}/` dizini default.
