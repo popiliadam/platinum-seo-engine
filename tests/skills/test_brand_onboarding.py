@@ -396,17 +396,18 @@ def test_staging_output_schema_conformance(
     project_config_schema: dict, tmp_path: Path,
 ) -> None:
     """Build a representative staging artifact in-memory, validate it
-    against project-config.schema.json v1.2 (Draft7). This locks the
+    against project-config.schema.json v1.5 (Draft7). This locks the
     contract that outputs/onboarding/{slug}-staging-config.json
     candidates the skill emits round-trip cleanly into init-project at
     Phase 14."""
-    # schema v1.4 is asserted by the const constraint (Phase 3 G-AI-05
-    # bank entry enrichment; ADR-030 brand_identity rename remained).
-    assert project_config_schema["properties"]["schema_version"]["const"] == "1.4"
+    # schema v1.5 is asserted by the const constraint (v1.8 Phase 1 D-SF-12
+    # sf block additive; Phase 3 G-AI-05 bank entry enrichment retained;
+    # ADR-030 brand_identity rename remained).
+    assert project_config_schema["properties"]["schema_version"]["const"] == "1.5"
 
     # Minimal-required staging artifact derived from schema.required.
     staging = {
-        "schema_version": "1.4",
+        "schema_version": "1.5",
         "project_id": "dentnotion",
         "domain": "https://example.com/",
         "market": "TR",

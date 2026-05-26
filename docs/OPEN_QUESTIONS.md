@@ -2,6 +2,20 @@
 
 ## Unresolved
 
+### Q-SF-MCP-PHASE-1-CLOSURE-FOLLOWUPS-01: v1.8 Phase 1 closure — 4 LOW-severity followups (3 Worker-surfaced + 1 description polish) [P3] ⏳ DEFERRED to Phase 2/6
+**Raised:** 2026-05-26 v1.8 Phase 1 closure (Manager session GO decision after Fix Worker round). Worker Output Package §"Open Questions Surfaced" + Manager post-Fix cross-check polish note.
+**Context:** Phase 1 Worker Output Package surfaced 3 LOW open questions; Manager Fix Worker round surfaced 1 additional polish item. Tümü Phase 1 GO kararını ENGELLEMEDİ (LOW + no runtime impact); ayrı entries ile track edilirler ki Phase 2/6 dispatch'lerinde scope check'inde gözden kaçmasınlar.
+
+**Followups table:**
+| ID | Question | Severity | Target Phase |
+|----|----------|----------|--------------|
+| Q-SF-MCP-PHASE-1-WORKER-01 | Should `test_events_schema_source_kind_enum_v1_1.py` mirror the event_type enum test pattern for the source.kind enum (sf_mcp added there)? Current state: schema-validate full sweep covers it indirectly; no dedicated test. v1.6 H-E paterni would prescribe a dedicated test for the enum bump. | LOW | Phase 2 nice-to-have OR Phase 7 closeout regression-lock |
+| Q-SF-MCP-PHASE-1-WORKER-02 | `tests/migrations/test_0004_project_config_1_3_to_1_4.py::test_migration_idempotent_on_v1_4` constructs a v1.4 doc + asserts migration_0004 returns it unchanged. Still works (migration_0004 idempotent), but the constructed doc would NOT validate against the new v1.5 schema. Should the test be amended to validate-against-schema OR scope it migration-only (current state)? | LOW (behavior-correct) | Phase 7 closeout when rollback drill exercises v1.4→v1.5→v1.4 reverse |
+| Q-SF-MCP-PHASE-1-WORKER-03 | `tests/skills/test_brand_onboarding.py:418-424` staging artifact uses `sf_exports_dir: "sf_exports"` + `staging_dir: "staging"` (legacy flat paths, not modern `inbox/sf` + `_state/cache`). Pre-existing drift unrelated to Phase 1. Should a Phase 2/3 cascade fix update? | LOW (pre-existing) | Phase 5 or Phase 7 code-review pass |
+| Q-SF-MCP-PHASE-1-POLISH-01 | `schemas/sf-mcp-tool-mapping.schema.json` `sfMcpTool` description text still cites "Convention: sf__&lt;verb&gt;" + "verified against `claude mcp list` for sf server" — both inaccurate post-Fix-Worker correction. Native form is `sf__sf_<verb>` (server prefix + native tool name kept verbatim); the `claude mcp list` verification was never actually performed by Phase 1 Worker. Description text-only polish. | LOW (description, no behavior) | Phase 6 docs sweep (alongside README + WORKFLOWS + GLOSSARY edits) |
+
+**Cross-refs:** `docs/PHASE_STATUS.md` Active Phase v1.8.0 Phase 1 DONE section; Phase 1 Worker Output Package; Manager Fix Worker dispatch + cross-check; spec v2.2 lines 469-474 (SF MCP native tool inventory) + 11 spec runtime references `mcp__sf__sf_*` verified via grep.
+
 ### Q-SF-MCP-PRE-PHASE-1-DECISIONS-01: v1.8 SF MCP Hybrid Integration — 8 Pre-Phase-1 operator decisions [P1] ✅ RESOLVED 2026-05-26
 **→ RESOLVED 2026-05-26 Manager session bootstrap (operator approval "en iyi senaryo + cross-check + titiz"):** Süleyman'ın "hepsi default + 1 manager override (ADR-031→ADR-039)" kabulü ile 8 karar lock'landı. Tüm default'lar spec v2.2 "Open Questions for Operator Review" tablosundan; 1 Manager Decision spec drift catch'i (ADR-031 zaten archive'da alınmış, DECISIONS.md:42 events.jsonl Legacy Archive 2026-05-06; ADR-038 numbering policy renumber YASAK → next-unused ADR-039 lock'landı). Worker Prompts file edit edilmeyecek (forbidden, Workers may have been read it); ADR-039 override Manager-side, Phase 2 + Phase 6 dispatch'lerinde Worker prompt'a inline "Manager Override" note olarak verilecek (spec/worker-prompts file dokunulmaz, override conversational injection ile). v2.3 spec retrospective notu Phase 7 closeout'a deferred (post-ship retro item).
 

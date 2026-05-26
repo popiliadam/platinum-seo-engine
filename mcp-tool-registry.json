@@ -1,0 +1,294 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-05-26T00:00:00Z",
+  "reconcile_sla_hours": 168,
+  "unmapped_tools_policy": "permissive",
+  "servers": {
+    "gsc": {
+      "display_name": "Google Search Console MCP",
+      "runtime": "stdio",
+      "version_lock": "none",
+      "auth_method": "keychain",
+      "auth_config": {
+        "keychain_service": "seo-core-gsc"
+      },
+      "capabilities": ["read", "rate_limited", "cached"],
+      "rate_limit": "200 queries per 100 seconds (GSC API quota)",
+      "docs_url": "https://developers.google.com/webmaster-tools",
+      "tools": [
+        {
+          "tool_name": "gsc__search_analytics",
+          "description": "Query GSC Search Analytics with dimension/filter/aggregation arguments. Canonical use-case: search_analytics_query_page_daily.",
+          "category": "search_analytics",
+          "used_by_mappings": ["gsc-tool-mapping.json"],
+          "cost_credits_per_call": 0,
+          "cache_ttl_hours": 24
+        },
+        {
+          "tool_name": "gsc__enhanced_search_analytics",
+          "description": "Enhanced search analytics with rolling 16-month window + brand split. CTR returned as fraction (0-1); see gsc-tool-mapping.json gscMcpTool description.",
+          "category": "search_analytics",
+          "used_by_mappings": ["gsc-tool-mapping.json"],
+          "cost_credits_per_call": 0,
+          "cache_ttl_hours": 24
+        },
+        {
+          "tool_name": "gsc__detect_quick_wins",
+          "description": "Detect queries ranking 8-20 with sufficient impression volume. CTR returned as percent (0-100); see gsc-tool-mapping.json CTR units note.",
+          "category": "search_analytics",
+          "used_by_mappings": ["gsc-tool-mapping.json"],
+          "cost_credits_per_call": 0,
+          "cache_ttl_hours": 24
+        },
+        {
+          "tool_name": "gsc__index_inspect",
+          "description": "Per-URL Index Inspection API.",
+          "category": "index_inspect",
+          "used_by_mappings": ["gsc-tool-mapping.json"],
+          "cost_credits_per_call": 0,
+          "cache_ttl_hours": 168
+        },
+        {
+          "tool_name": "gsc__list_sitemaps",
+          "description": "List sitemaps registered for the site.",
+          "category": "sitemap",
+          "used_by_mappings": ["gsc-tool-mapping.json"],
+          "cost_credits_per_call": 0,
+          "cache_ttl_hours": 168
+        },
+        {
+          "tool_name": "gsc__submit_sitemap",
+          "description": "Submit a sitemap URL to GSC for re-crawl.",
+          "category": "sitemap",
+          "used_by_mappings": ["gsc-tool-mapping.json"],
+          "cost_credits_per_call": 0,
+          "cache_ttl_hours": 0
+        },
+        {
+          "tool_name": "gsc__get_sitemap",
+          "description": "Fetch sitemap details for a single sitemap URL.",
+          "category": "sitemap",
+          "used_by_mappings": ["gsc-tool-mapping.json"],
+          "cost_credits_per_call": 0,
+          "cache_ttl_hours": 168
+        },
+        {
+          "tool_name": "gsc__list_sites",
+          "description": "List all GSC sites the authenticated principal has access to.",
+          "category": "search_analytics",
+          "used_by_mappings": ["gsc-tool-mapping.json"],
+          "cost_credits_per_call": 0,
+          "cache_ttl_hours": 720
+        }
+      ]
+    },
+    "dataforseo": {
+      "display_name": "DataForSEO MCP Server",
+      "runtime": "npx",
+      "package": "dataforseo-mcp-server",
+      "version_lock": "2.8.9",
+      "auth_method": "env_var",
+      "auth_config": {
+        "env_vars": ["DATAFORSEO_USERNAME", "DATAFORSEO_PASSWORD"]
+      },
+      "capabilities": ["read", "paid", "rate_limited", "cached"],
+      "rate_limit": "30 qps account aggregate (SERP); per-endpoint quotas in DFS docs",
+      "docs_url": "https://docs.dataforseo.com/",
+      "tools": [
+        {
+          "tool_name": "dataforseo__serp_organic_live_advanced",
+          "description": "SERP organic results live (advanced). One of the most cost-heavy DFS endpoints; gated by budget_policy.",
+          "category": "serp_scrape",
+          "used_by_mappings": ["dataforseo-endpoint-mapping.json"],
+          "cost_credits_per_call": 0.0035,
+          "cache_ttl_hours": 24
+        },
+        {
+          "tool_name": "dataforseo__dataforseo_labs_google_keyword_overview",
+          "description": "Labs keyword overview — search volume, KD, CPC, SERP info per keyword.",
+          "category": "keyword_research",
+          "used_by_mappings": ["dataforseo-endpoint-mapping.json"],
+          "cost_credits_per_call": 0.0001,
+          "cache_ttl_hours": 168
+        },
+        {
+          "tool_name": "dataforseo__dataforseo_labs_google_keywords_for_site",
+          "description": "Labs keywords-for-site — list of keywords a domain ranks for.",
+          "category": "keyword_research",
+          "used_by_mappings": ["dataforseo-endpoint-mapping.json"],
+          "cost_credits_per_call": 0.0001,
+          "cache_ttl_hours": 168
+        },
+        {
+          "tool_name": "dataforseo__keywords_data_google_ads_search_volume",
+          "description": "Google Ads search volume per keyword (with locale).",
+          "category": "keyword_research",
+          "used_by_mappings": ["dataforseo-endpoint-mapping.json"],
+          "cost_credits_per_call": 0.0001,
+          "cache_ttl_hours": 168
+        },
+        {
+          "tool_name": "dataforseo__backlinks_summary",
+          "description": "Domain-level backlinks summary (referring domains, rank, organic keywords).",
+          "category": "backlinks",
+          "used_by_mappings": ["dataforseo-endpoint-mapping.json"],
+          "cost_credits_per_call": 0.0002,
+          "cache_ttl_hours": 168
+        },
+        {
+          "tool_name": "dataforseo__on_page_lighthouse",
+          "description": "Lighthouse audit for a single page (paid).",
+          "category": "page_audit",
+          "used_by_mappings": ["dataforseo-endpoint-mapping.json"],
+          "cost_credits_per_call": 0.0050,
+          "cache_ttl_hours": 24
+        },
+        {
+          "tool_name": "dataforseo__on_page_instant_pages",
+          "description": "On-page instant analysis (cheaper than full crawl).",
+          "category": "page_audit",
+          "used_by_mappings": ["dataforseo-endpoint-mapping.json"],
+          "cost_credits_per_call": 0.0010,
+          "cache_ttl_hours": 24
+        },
+        {
+          "tool_name": "dataforseo__business_data_business_listings_search",
+          "description": "Business listings search — local pack / GBP audit data source.",
+          "category": "domain_analytics",
+          "used_by_mappings": ["dataforseo-endpoint-mapping.json"],
+          "cost_credits_per_call": 0.0010,
+          "cache_ttl_hours": 168
+        },
+        {
+          "tool_name": "dataforseo__ai_optimization_llm_response",
+          "description": "Cross-LLM response query (ChatGPT/Claude/Gemini/Perplexity citations).",
+          "category": "ai_optimization",
+          "used_by_mappings": ["dataforseo-endpoint-mapping.json"],
+          "cost_credits_per_call": 0.0020,
+          "cache_ttl_hours": 168
+        }
+      ]
+    },
+    "scrapling": {
+      "display_name": "Scrapling MCP Server",
+      "runtime": "stdio",
+      "version_lock": "none",
+      "auth_method": "none",
+      "capabilities": ["read", "rate_limited"],
+      "rate_limit": "Tier-escalation managed: get → fetch → stealthy_fetch (§14.5)",
+      "docs_url": "https://github.com/D4Vinci/Scrapling",
+      "tools": [
+        {
+          "tool_name": "scrapling__get",
+          "description": "Tier 1 fetch — plain HTTP GET (fast, no JS).",
+          "category": "scrapling_fetch",
+          "used_by_mappings": ["scrapling-output-mapping.json"],
+          "cache_ttl_hours": 24
+        },
+        {
+          "tool_name": "scrapling__fetch",
+          "description": "Tier 2 fetch — HTTP with browser-like headers / cookies.",
+          "category": "scrapling_fetch",
+          "used_by_mappings": ["scrapling-output-mapping.json"],
+          "cache_ttl_hours": 24
+        },
+        {
+          "tool_name": "scrapling__stealthy_fetch",
+          "description": "Tier 3 fetch — full headless browser with anti-bot evasion.",
+          "category": "scrapling_fetch",
+          "used_by_mappings": ["scrapling-output-mapping.json"],
+          "cache_ttl_hours": 24
+        },
+        {
+          "tool_name": "scrapling__bulk_get",
+          "description": "Bulk Tier 1 — many URLs in one call.",
+          "category": "scrapling_fetch",
+          "used_by_mappings": ["scrapling-output-mapping.json"],
+          "cache_ttl_hours": 24
+        },
+        {
+          "tool_name": "scrapling__bulk_fetch",
+          "description": "Bulk Tier 2.",
+          "category": "scrapling_fetch",
+          "used_by_mappings": ["scrapling-output-mapping.json"],
+          "cache_ttl_hours": 24
+        },
+        {
+          "tool_name": "scrapling__bulk_stealthy_fetch",
+          "description": "Bulk Tier 3 — most expensive in runtime cost.",
+          "category": "scrapling_fetch",
+          "used_by_mappings": ["scrapling-output-mapping.json"],
+          "cache_ttl_hours": 24
+        },
+        {
+          "tool_name": "scrapling__open_session",
+          "description": "Open a persistent browser session for multi-request flows.",
+          "category": "scrapling_fetch",
+          "used_by_mappings": ["scrapling-output-mapping.json"],
+          "cache_ttl_hours": 0
+        },
+        {
+          "tool_name": "scrapling__close_session",
+          "description": "Close a session opened via open_session.",
+          "category": "scrapling_fetch",
+          "used_by_mappings": ["scrapling-output-mapping.json"],
+          "cache_ttl_hours": 0
+        },
+        {
+          "tool_name": "scrapling__list_sessions",
+          "description": "List currently-open scrapling sessions.",
+          "category": "scrapling_fetch",
+          "used_by_mappings": ["scrapling-output-mapping.json"],
+          "cache_ttl_hours": 0
+        }
+      ]
+    },
+    "sf": {
+      "display_name": "Screaming Frog 24 native MCP Server",
+      "runtime": "http",
+      "version_lock": "24.0.0",
+      "endpoint_url": "http://127.0.0.1:11435/mcp",
+      "auth_method": "none",
+      "capabilities": ["read", "write", "rate_limited"],
+      "rate_limit": "Single concurrent crawl per SF GUI (D-SF-10 pre-flight check enforces)",
+      "docs_url": "https://www.screamingfrog.co.uk/seo-spider/",
+      "tools": [
+        {
+          "tool_name": "sf__sf_crawl",
+          "description": "Trigger a new SF crawl. Accepts URL list + optional crawl_config_file_path. Returns crawl_id for progress polling. v1.8 Phase 1 D-SF-12.",
+          "category": "platform_detection",
+          "used_by_mappings": ["internal"],
+          "cache_ttl_hours": 0
+        },
+        {
+          "tool_name": "sf__sf_crawl_progress",
+          "description": "Poll progress of an in-flight crawl by crawl_id. Returns percent + URL count + IN_PROGRESS/COMPLETED/FAILED state.",
+          "category": "platform_detection",
+          "used_by_mappings": ["internal"],
+          "cache_ttl_hours": 0
+        },
+        {
+          "tool_name": "sf__sf_generate_report",
+          "description": "Generate one of SF's 24 Tier-1/Tier-2 reports. save_report=true writes CSV to allowed_directory (preferred for large reports); save_report=false returns CSV-as-string in the MCP response (small reports only).",
+          "category": "platform_detection",
+          "used_by_mappings": ["internal"],
+          "cache_ttl_hours": 0
+        },
+        {
+          "tool_name": "sf__sf_list_crawls",
+          "description": "List currently-tracked crawls (running + recently-completed). Used by orchestrator for resume semantics.",
+          "category": "platform_detection",
+          "used_by_mappings": ["internal"],
+          "cache_ttl_hours": 0
+        },
+        {
+          "tool_name": "sf__sf_list_allowed_base_directory",
+          "description": "Pre-flight probe — returns the SF GUI's currently-configured allowed_directory. Orchestrator compares against project.config.sf.mcp.allowed_directory for drift detection.",
+          "category": "platform_detection",
+          "used_by_mappings": ["internal"],
+          "cache_ttl_hours": 24
+        }
+      ]
+    }
+  }
+}

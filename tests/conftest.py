@@ -26,8 +26,9 @@ if str(_REPO_ROOT) not in sys.path:
 
 
 # --------------------------------------------------------------------------
-# Workspace factory — builds a minimal but schema-valid v1.4 project pack
-# under a tmp_path. Used by Phase 3 brand-onboarding tests.
+# Workspace factory — builds a minimal but schema-valid v1.5 project pack
+# under a tmp_path. Used by Phase 3 brand-onboarding tests. v1.8 Phase 1
+# bumped 1.4 → 1.5 alongside the project-config schema's sf-block addition.
 # --------------------------------------------------------------------------
 
 @pytest.fixture
@@ -43,7 +44,7 @@ def tmp_workspace_factory(
 
     Side effects:
         - Sets PSEO_WORKSPACE_ROOT env var to the freshly created root.
-        - Writes a v1.4 project.config.json with the four required-ish
+        - Writes a v1.5 project.config.json with the four required-ish
           fields populated to satisfy ``brand-onboarding`` lookups.
 
     Returns the ``projects/{slug}/`` directory.
@@ -61,7 +62,7 @@ def tmp_workspace_factory(
         project_dir = workspace_root / "projects" / slug
         project_dir.mkdir(parents=True, exist_ok=True)
         config = {
-            "schema_version": "1.4",
+            "schema_version": "1.5",
             "project_id": slug,
             "domain": domain,
             "market": market,
