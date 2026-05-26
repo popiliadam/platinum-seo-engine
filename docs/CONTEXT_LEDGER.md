@@ -1902,3 +1902,82 @@ Single manager session ~115dk audit of v1.1.0 RELEASED engine plugin. Brief: `do
 - Phase 6 (commands + manifest + docs, ~1.25d w/ ADR-031→ADR-039 override + docs sweep absorbs 4 v2.3 retro items) + Phase 7 (pilot smoke + release, ~0.75d) = ~2 days remaining cumulative after Phase 5
 
 **Atomic phase paterni 71'inci kanıt cumulative** (v1.8 Phase 4 = 1 commit per Worker Output Package + cascade absorb; 0 NO-GO second consecutive phase). Lesson 38 v2 cumulative catches ~73 (+1 v1.8 cycle: cascade 20→21 sweep across 3 cite locations — drift-check audit_target + test_drift_check len assertions + test_drift_check audit_target cite update — caught same-atomic-commit per discipline). **F-23 deployment**: cross-sheet-invariants.json count 27→28; first v1.8 drift-check expansion (F-24/25/26 deferred v1.9 per Manager scope decision).
+
+---
+
+## v1.8 Phase 5 — Optional Consumer Wiring (All-4 Skills) DONE (2026-05-27)
+
+**Worker dispatch:** Phase 5 Worker (fresh Claude Code session) executed 4 SKILL.md edits + 4 test extensions per Manager Worker Prompt with 6 inline reminders (no ADR override needed; Phase 1-4 closure followups informational; sf_mcp_client native tool naming pattern; Q-SF-MCP-07 lock all-4; R9+R12 mitigation requirements; F-16 invariant preservation; pytest baseline target +8). Worker Output Package returned 8-file scope (all MODIFIED, no NEW files), +706/-0 LoC additive only.
+
+**Worker landed CLEAN third consecutive phase (0 NO-GO branches; v1.8 NO-GO rate stable at 1/5 = 20%, all in Phase 1 W-1 catch):**
+- All 4 consumer skills uniform 5-pattern body branch (SfMcpClient import + client.health() preflight + AMBER fallback + sf_generate_report NATIVE tool naming + response.get('truncated') R12 check)
+- Per-skill report_name diversity per spec: issues_overview_report (tech-audit) + structured_data_all (schema-audit) + page_titles_all (on-page-audit) + all_inlinks (internal-links)
+- Worker resisted per-skill customization (Manager risk #1 mitigated)
+- Native tool naming enforced — every body branch + every test asserts `sf_generate_report` NOT registry/wrapper forms (Manager risk #2 mitigated)
+- R9+R12 mitigation in CODE — every body branch has both client.health() preflight + response.get('truncated') check + AMBER policy section + SfMcpToolError exception path (Manager risk #4 mitigated)
+
+**Stub-mod pattern 4'üncü cumulative application:** Phase 5 deviated from Manager dispatch's "mock path + regression path" suggestion (which would have required transform script changes for runtime test). Worker correctly chose stub-mod contract lock approach:
+- Runtime wiring documented in SKILL.md prose (executed by skill body interpreter Phase 11/14 operator workshop)
+- Paired tests lock contract via (a) frontmatter shape test [default=False = regression preservation invariant] + (b) SKILL.md body pattern docs test [4 R9/R12 patterns grep-locked]
+- Pure-transform scripts (tech_audit_transform.py + schema_audit_transform.py + on_page_audit_transform.py + internal_links_transform.py) intentionally unchanged
+- AC-13 (Phase 7 pilot smoke) covers actual runtime verification per spec
+- Stub-mod cumulative count: v1.7 generate-images + v1.7 brand-onboarding discovery + v1.7 init-project cascade + v1.8 Phase 5 = 4 cumulative applications
+
+**Phase 5 deliverables (atomic commit):**
+- skills/discovery/tech-audit/SKILL.md (+L41-45 frontmatter `use_sf_mcp_live: bool = False` + L350-410 `## SF MCP Live Mode (Optional, use_sf_mcp_live=true — D-SF-11)` body subsection; Step 5 transform branch; report_name=issues_overview_report)
+- skills/discovery/schema-audit/SKILL.md (+L46-50 frontmatter + L338-398 body branch; Step 3 parse_sf_structured_data; report_name=structured_data_all)
+- skills/discovery/on-page-audit/SKILL.md (+L38-42 frontmatter + L327-391 body branch; Step 4 transform; report_name=page_titles_all)
+- skills/planning/internal-links/SKILL.md (+L47-51 frontmatter + L384-448 body branch; Step 2 load_sf_csvs; report_name=all_inlinks)
+- tests/skills/test_tech_audit.py (+2 cases at L639 + L688: test_use_sf_mcp_live_flag_in_frontmatter + test_skill_md_documents_sf_mcp_live_pattern)
+- tests/skills/test_schema_audit.py (+2 cases at L547 + L590)
+- tests/skills/test_on_page_audit.py (+2 cases at L530 + L573)
+- tests/skills/test_internal_links.py (+2 cases at L654 + L697)
+
+**Manager review of 1 Worker Open Question (LOW, ACCEPTED):**
+- Q-PHASE-5-WORKER-01 test name convention deviation: Manager dispatch's `test_default_behavior_no_mcp` was illustrative; Worker's stub-mod pattern test names (`test_use_sf_mcp_live_flag_in_frontmatter` + `test_skill_md_documents_sf_mcp_live_pattern`) architecturally more correct + functionally equivalent. v2.3 spec retrospective: Manager Worker Prompt template should clarify "contract test" vs "runtime mock test" expectations.
+
+**v2.3 spec retrospective + Phase 6 docs sweep backlog NOW 7 items:**
+1. (Phase 3 Q-03+Q-05+Q-06+Q-07) — spec example shapes should be schema-validated before publication
+2. (Phase 3 Q-02) — Worker Prompts template basename collision rule
+3. (Phase 3 Q-04) — step count semantics clarification
+4. (Phase 4 Q-01) — F-XX namespace rules clarification (registry-instance vs SKILL.md narrative)
+5. (Phase 1 Polish-01) — sf-mcp-tool-mapping schema description text
+6. (Phase 4 Q-02) — monitoring-weekly stale invariants:20 cite
+7. (Phase 5 Q-01) — Worker Prompt template "contract test" vs "runtime mock test" clarification
+
+**Verification gates (all GREEN; Manager titiz cross-check 5 patterns × 4 skills = 20 spot checks):**
+- All 4 SKILL.md frontmatter default=False ✓
+- All 4 SKILL.md SfMcpClient import + client.health() preflight ✓
+- All 4 SKILL.md native tool `sf_generate_report` ✓
+- All 4 SKILL.md AMBER fallback (NEVER hard fail) + response.get('truncated') R12 check ✓
+- Per-skill report_name correct vs spec ✓
+- Per-skill body Step index correct (5/3/4/2) ✓
+- 4 target test files 73→81 PASS (+8 new) zero regression on target ✓
+- Full baseline 1236 → 1244 PASS + 12 SKIP unchanged (+8 PASS / 0 SKIP / 0 regression) ✓
+- .mcp.json F-16 post-break baseline preserved 543B / md5 93523d4 (5-commit streak: Phase 2 sealed + Phase 3 + Phase 4 + Phase 5) ✓
+- DECISIONS.md unchanged 6067B / 77B headroom ✓
+- 0 NEW skill REQUIRES SF MCP (all 4 default OFF; opt-in only) ✓
+- 0 orchestrator/sf-import body edits ✓
+- 0 hook/command/schema/script edits ✓
+
+**Manager cross-check (titiz mode kanıtı):**
+- Worker stub-mod deviation from Manager dispatch was correct architectural choice (defended by 4 cumulative project applications)
+- Native tool naming (sf_generate_report) enforced across all 4 skills — no registry form (sf__sf_generate_report) or wrapper form (mcp__sf__sf_generate_report) leakage
+- Pattern uniformity confirmed via grep cross-check (5 elements identical across 4 skills; only report_name + Step index differ)
+- Q-SF-MCP-07 all-4 lock verified (no skill dropped to 2+2 staging)
+
+**Drift state (post-Phase-5):**
+- pytest 1244 PASS + 12 SKIP (Phase 4 1236 → Phase 5 1244, +8 PASS / 0 SKIP; regression sıfır)
+- .mcp.json 543B unchanged (F-16 post-Phase-2-break baseline preserved 5 commits cumulative; streak count = 4 commits since Phase 2 broke streak)
+- DECISIONS.md 6067B unchanged (no new ADR Phase 5; ADR-038 + ADR-039 active; 77B headroom)
+- plugin.json 1.7.0 unchanged (Phase 6 bumps to 1.8.0 via Y-05 5-file sync)
+- Drift-check verdict: F-23 deployed Phase 4; F-24/25/26 v1.9 candidates
+
+**Push timing:** Phase 5 commit local-only (Manager bootstrap forbidden actions; cumulative push at v1.8.0 closeout post-Phase-7). 7 commits ahead of origin/main now (a303659 + 4964552 + 203743c + dec2eef + feb68b4 + a6c8482 + Phase-5-commit).
+
+**Next agenda:**
+- Phase 6 Worker Prompt dispatch (Commands + Manifest + Docs, ~1.25d effort + 7 docs sweep absorb items): 20 tasks per spec — 2 NEW commands (pseo-sf-crawl + pseo-sf-status) + 4 EXTENDED commands per v2.2 audit (pseo-status + pseo-driftcheck + pseo-init + pseo-schema-audit) + version_bump.py 5-file sync 1.7.0→1.8.0 + plugin.json description manual fix (43→45 skill + 15→18 command + 3→4 MCP server) + 10 doc files (README + INSTALL + WORKFLOWS + ARCHITECTURE §7 + §16.5 + OPEN_QUESTIONS Q-SF-MCP-01..11 + DECISIONS verify ADR-039 + RELEASE_NOTES_v1.8.0.md NEW ≥100 lines + PHASE_STATUS + REFERENCE_INDEX + GLOSSARY) + rules/events-writer.md line 129 edit + 7 docs sweep absorb items
+- **Manager ADR-031→ADR-039 OVERRIDE NOTE** required Phase 6 dispatch (Worker Prompt task #4 says "ADR-031 should already exist (Phase 2 added it); you'll verify" — needs override to read ADR-039)
+- Phase 7 (pilot smoke + release ~0.75d) = ~2d remaining cumulative
+
+**Atomic phase paterni 72'inci kanıt cumulative** (v1.8 Phase 5 = 1 commit per Worker Output Package; 0 NO-GO third consecutive phase — discipline kanıtı; v1.8 NO-GO rate stable 1/5 = 20%, all Phase 1). Lesson 38 v2 cumulative catches ~73 unchanged (no new v1.8 cycle catches Phase 5 — clean execution). **Stub-mod pattern 4'üncü cumulative reuse** (memory project_phase_lessons.md cross-validates pattern stability). **F-16 invariant streak (post-Phase-2-break): 4 commits** (Phase 2 sealed + Phase 3 + Phase 4 + Phase 5 all preserved 543B/md5).

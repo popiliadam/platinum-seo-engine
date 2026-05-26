@@ -35,6 +35,11 @@ inputs:
     required: false
     default: false
     description: "true ise DFS/GSC URL set'leri D-03 sonrası disjoint olduğunda CrossRefMismatchError (DURUR #4); false → graceful fall-back."
+  use_sf_mcp_live:
+    type: boolean
+    required: false
+    default: false
+    description: "Opt-in (D-SF-11): when true, calls SF MCP via scripts/util/sf_mcp_client.SfMcpClient for live page_titles_all cross-check (title/meta/h1 freshness vs SF crawl truth). Requires SF GUI + MCP server running (preflight via client.health(); on FAIL → AMBER fallback to file-based path, NEVER hard fail). R12 truncation detection via response.get('truncated', False)."
 outputs:
   - "master.xlsx#on_page_audit"
   - "outputs/reports/{date}-on-page-audit.md"
@@ -318,6 +323,76 @@ workflow_runner.complete(handle.run_id, project_slug=project_slug, outputs={
     "raw_gsc":            str(gsc_inbox) if use_gsc_cross_ref else "",
 })
 ```
+
+## SF MCP Live Mode (Optional, `use_sf_mcp_live=true` — D-SF-11)
+
+**Default: `use_sf_mcp_live=false`** — DFS `on_page_content_parsing` is
+the canonical on-page evidence source (paid; required tool). The SF MCP
+live cross-check is opt-in only and gated by a `client.health()`
+preflight; on probe failure the run AMBER-warns and continues without
+the SF cross-check (never hard-fail per R9 mitigation).
+
+When `use_sf_mcp_live=true`, the SKILL body branches at Step 4
+(`transform`) to optionally cross-check the per-URL title/meta/h1
+signals against SF MCP's `page_titles_all` report:
+
+```python
+amber_warnings: list[str] = []
+if use_sf_mcp_live:
+    from scripts.util.sf_mcp_client import SfMcpClient, SfMcpToolError
+    client = SfMcpClient(base_url=project_config["sf"]["mcp"]["url"])
+    if not client.health():
+        # R9 AMBER fallback — SF MCP unreachable, continue without
+        # the SF cross-check (DFS evidence is still authoritative).
+        amber_warnings.append(
+            "SF MCP unavailable; falling back to file-based path"
+        )
+    else:
+        try:
+            response = client.call_tool(
+                "sf_generate_report",          # native MCP tool name
+                crawl_id=sf_crawl_id,          # from orchestrator handoff
+                report_name="page_titles_all",
+                save_report=False,             # inline response, no disk write
+            )
+            # R12 truncation detection (100KB cap per D-SF-05).
+            if response.get("truncated", False):
+                amber_warnings.append(
+                    "SF MCP response truncated at 100KB cap for "
+                    "page_titles_all"
+                )
+            # Live SF rows are passed to the transform as an optional
+            # third source for in_title/in_meta/in_h1 cross-validation.
+            # The transform decorates `action` with "(SF disagrees: ...)"
+            # notes; default behavior unchanged when this kwarg is None.
+            sf_live_rows = response.get("rows", [])
+        except SfMcpToolError as exc:
+            # R9 AMBER fallback — call failed.
+            amber_warnings.append(
+                f"SF MCP tool error: {exc}; falling back to file-based path"
+            )
+```
+
+**AMBER vs RED policy (R9 / R12 contract):**
+
+- `client.health()` returns False → AMBER warning, continue without
+  SF cross-check (DFS evidence remains the on_page_audit truth).
+- `SfMcpToolError` raised → AMBER warning, continue without SF.
+- `response.get("truncated", False) is True` → AMBER warning, continue
+  with partial SF data.
+- NEVER raise `SystemExit` from this branch. RED reserved for the
+  existing DURUR set (budget, DFS schema drift, etc.).
+
+**Tool naming reminder:** `call_tool(tool_name=...)` takes the **native**
+SF MCP tool name (`"sf_generate_report"`), NOT the registry form
+(`"sf__sf_generate_report"`) or the Claude Code wrapper form
+(`"mcp__sf__sf_generate_report"`). JSON-RPC `params.name` follows
+the native form per MCP spec.
+
+`amber_warnings` is surfaced via the existing provenance event
+(an additional `source.kind=sf_mcp` event is emitted alongside the
+DFS+GSC events at Step 9) and the rendered report template
+variable `$amber_warnings`.
 
 ## URL canonicalization (D-03 invariant)
 

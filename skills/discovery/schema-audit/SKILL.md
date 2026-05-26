@@ -43,6 +43,11 @@ inputs:
     required: false
     default: false
     description: "When true, malformed JSON-LD raises JsonLdParseError (default: drop row, keep going)."
+  use_sf_mcp_live:
+    type: boolean
+    required: false
+    default: false
+    description: "Opt-in (D-SF-11): when true, calls SF MCP via scripts/util/sf_mcp_client.SfMcpClient for live structured_data_all rows (bypasses file requirement for fresh JSON-LD). Requires SF GUI + MCP server running (preflight via client.health(); on FAIL → AMBER fallback to file-based path, NEVER hard fail). R12 truncation detection via response.get('truncated', False)."
 outputs:
   - "master.xlsx#schema"
   - "outputs/reports/{date}-schema-audit.md"
@@ -329,6 +334,73 @@ workflow_runner.complete(handle.run_id, project_slug=project_slug, outputs={
     "raw_inbox":     str(inbox_path),
 })
 ```
+
+## SF MCP Live Mode (Optional, `use_sf_mcp_live=true` — D-SF-11)
+
+**Default: `use_sf_mcp_live=false`** — file-based ingestion (SF CSV via
+sf-import) is the canonical contract. The flag is opt-in only and gated
+by a `client.health()` preflight; on probe failure the run AMBER-warns
+and continues with the file-based path (never hard-fail per R9
+mitigation).
+
+When `use_sf_mcp_live=true`, the SKILL body branches at Step 3
+(`parse_sf_structured_data`) to optionally bypass the on-disk SF CSV
+requirement and pull `structured_data_all` rows inline from SF MCP:
+
+```python
+amber_warnings: list[str] = []
+if use_sf_mcp_live:
+    from scripts.util.sf_mcp_client import SfMcpClient, SfMcpToolError
+    client = SfMcpClient(base_url=project_config["sf"]["mcp"]["url"])
+    if not client.health():
+        # R9 AMBER fallback — SF MCP unreachable, continue file-based.
+        amber_warnings.append(
+            "SF MCP unavailable; falling back to file-based path"
+        )
+    else:
+        try:
+            response = client.call_tool(
+                "sf_generate_report",         # native MCP tool name
+                crawl_id=sf_crawl_id,         # from orchestrator handoff
+                report_name="structured_data_all",
+                save_report=False,            # inline response, no disk write
+            )
+            # R12 truncation detection (100KB cap per D-SF-05).
+            if response.get("truncated", False):
+                amber_warnings.append(
+                    "SF MCP response truncated at 100KB cap for "
+                    "structured_data_all"
+                )
+            # When MCP path succeeds, use inline rows in place of
+            # sf-exports/{date}/raw/structured_data_all.csv (file path
+            # check at Step 2 is bypassed; transform consumes the same
+            # flat envelope shape).
+            flat_envelope = {"rows": response.get("rows", [])}
+        except SfMcpToolError as exc:
+            # R9 AMBER fallback — call failed.
+            amber_warnings.append(
+                f"SF MCP tool error: {exc}; falling back to file-based path"
+            )
+```
+
+**AMBER vs RED policy (R9 / R12 contract):**
+
+- `client.health()` returns False → AMBER warning, continue file-based.
+- `SfMcpToolError` raised → AMBER warning, continue file-based.
+- `response.get("truncated", False) is True` → AMBER warning, continue
+  with partial structured_data_all rows.
+- NEVER raise `SystemExit` from this branch. RED reserved for the
+  existing DURUR set (SF data missing in BOTH paths, schema drift, etc.).
+
+**Tool naming reminder:** `call_tool(tool_name=...)` takes the **native**
+SF MCP tool name (`"sf_generate_report"`), NOT the registry form
+(`"sf__sf_generate_report"`) or the Claude Code wrapper form
+(`"mcp__sf__sf_generate_report"`). JSON-RPC `params.name` follows
+the native form per MCP spec.
+
+`amber_warnings` is surfaced via the existing provenance event
+`source.kind=sf_mcp` (Step 9) and the rendered report template
+variable `$amber_warnings`.
 
 ## Schema-validity heuristic (transform domain)
 

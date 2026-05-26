@@ -538,3 +538,102 @@ def test_smoke_e2e_cli_output(tmp_path: Path,
     assert first_bytes == second_bytes, (
         "transform is not byte-idempotent under re-run"
     )
+
+
+# ---------------------------------------------------------------------------
+# Test 16 — v1.8 Phase 5 SF MCP consumer wiring (D-SF-11 opt-in)
+# ---------------------------------------------------------------------------
+
+def test_use_sf_mcp_live_flag_in_frontmatter(
+    skill_frontmatter: dict,
+    skill_frontmatter_schema: dict,
+) -> None:
+    """v1.8 Phase 5 (D-SF-11): the schema-audit SKILL.md frontmatter
+    MUST declare an opt-in `use_sf_mcp_live` boolean input. Default
+    MUST be False so the existing 1184+ pytest baseline (file-based
+    SF CSV fixtures) remains regression-clean.
+
+    Regression case: default False means the new live MCP code path
+    is never triggered by the existing tests in this file, and they
+    all continue to pass unchanged.
+    """
+    fm = skill_frontmatter
+    inputs = fm["inputs"]
+    assert "use_sf_mcp_live" in inputs, (
+        "schema-audit frontmatter must declare `use_sf_mcp_live` per "
+        "v1.8 Phase 5 / D-SF-11 (opt-in SF MCP consumer wiring)"
+    )
+    flag = inputs["use_sf_mcp_live"]
+    assert flag["type"] == "boolean"
+    assert flag["required"] is False, (
+        "use_sf_mcp_live MUST be optional (opt-in only); required=true "
+        "would break the 1184+ baseline regression contract"
+    )
+    assert flag["default"] is False, (
+        "use_sf_mcp_live MUST default to False (file-based path stays "
+        "the canonical contract; MCP is augmentation, not replacement)"
+    )
+    desc = flag["description"]
+    assert "SF MCP" in desc or "sf_mcp" in desc
+
+    # Frontmatter still validates against the canonical schema.
+    validator = Draft7Validator(skill_frontmatter_schema)
+    errs = sorted(
+        validator.iter_errors(fm), key=lambda e: list(e.absolute_path),
+    )
+    assert not errs, (
+        "frontmatter invalid after use_sf_mcp_live added: "
+        f"{[(list(e.absolute_path), e.message) for e in errs]}"
+    )
+
+
+def test_skill_md_documents_sf_mcp_live_pattern() -> None:
+    """v1.8 Phase 5: the schema-audit SKILL.md body MUST document the
+    SF MCP live mode branch with the 4 required patterns:
+
+      (1) `SfMcpClient` import from `scripts.util.sf_mcp_client`
+      (2) `client.health()` preflight check (R9 mitigation)
+      (3) AMBER fallback semantics ("falling back to file-based path")
+      (4) R12 truncation detection (`response.get("truncated"`)
+
+    This is a stub-mod pattern contract lock: the runtime body branch
+    is in SKILL.md prose, but the contract is verified here so a
+    future SKILL.md edit cannot silently drop the R9/R12 mitigations.
+    """
+    text = SKILL_PATH.read_text(encoding="utf-8")
+
+    # (1) Import contract.
+    assert "from scripts.util.sf_mcp_client import" in text, (
+        "SKILL.md body must document the SfMcpClient import path"
+    )
+    assert "SfMcpClient" in text
+
+    # (2) Preflight contract (R9 mitigation).
+    assert "client.health()" in text, (
+        "SKILL.md body must document the client.health() preflight "
+        "per R9 mitigation"
+    )
+
+    # (3) AMBER fallback contract.
+    assert "falling back to file-based path" in text, (
+        "SKILL.md body must document the AMBER fallback message per "
+        "R9 mitigation (never hard-fail when SF MCP unreachable)"
+    )
+    assert "amber_warnings" in text.lower() or "AMBER" in text
+
+    # (4) R12 truncation detection.
+    assert 'response.get("truncated"' in text, (
+        "SKILL.md body must document the R12 truncation detection "
+        "(100KB cap per D-SF-05)"
+    )
+
+    # Native tool naming enforcement.
+    assert '"sf_generate_report"' in text, (
+        "SKILL.md body must use the NATIVE SF MCP tool name; "
+        "registry / wrapper forms forbidden in script call examples"
+    )
+    # schema-audit specifically calls structured_data_all.
+    assert '"structured_data_all"' in text, (
+        "schema-audit SF MCP branch must call the canonical "
+        "structured_data_all report (per spec line 123)"
+    )

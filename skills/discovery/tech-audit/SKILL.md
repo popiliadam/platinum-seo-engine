@@ -38,6 +38,11 @@ inputs:
     required: false
     default: "desktop"
     description: "Lighthouse cihaz profili (desktop|mobile)."
+  use_sf_mcp_live:
+    type: boolean
+    required: false
+    default: false
+    description: "Opt-in (D-SF-11): when true, calls SF MCP via scripts/util/sf_mcp_client.SfMcpClient for live JS/render issues (sf_generate_report issues_overview_report) before merging into tech_seo. Requires SF GUI + MCP server running (preflight via client.health(); on FAIL → AMBER fallback to file-based path, NEVER hard fail). R12 truncation detection via response.get('truncated', False)."
 outputs:
   - "master.xlsx#tech_seo"
   - "outputs/reports/{date}-tech-audit.md"
@@ -341,6 +346,74 @@ workflow_runner.complete(handle.run_id, project_slug=project_slug, outputs={
     "raw_jsons": ";".join([str(lh_inbox), str(cp_inbox)]),
 })
 ```
+
+## SF MCP Live Mode (Optional, `use_sf_mcp_live=true` — D-SF-11)
+
+**Default: `use_sf_mcp_live=false`** — file-based ingestion path is the
+canonical contract (1184+ pytest regression baseline). MCP is augmentation,
+not replacement. The flag is opt-in only and gated by a `client.health()`
+preflight; on probe failure the run AMBER-warns and continues file-based
+(never hard-fail per R9 mitigation).
+
+When `use_sf_mcp_live=true`, the SKILL body branches at Step 5 (transform)
+to optionally enrich the tech_seo rows with live SF MCP signals before
+the transform aggregates per `issue_category`:
+
+```python
+amber_warnings: list[str] = []
+if use_sf_mcp_live:
+    from scripts.util.sf_mcp_client import SfMcpClient, SfMcpToolError
+    client = SfMcpClient(base_url=project_config["sf"]["mcp"]["url"])
+    if not client.health():
+        # R9 AMBER fallback — SF MCP unreachable, continue file-based.
+        amber_warnings.append(
+            "SF MCP unavailable; falling back to file-based path"
+        )
+    else:
+        try:
+            response = client.call_tool(
+                "sf_generate_report",     # native MCP tool name (no prefix)
+                crawl_id=sf_crawl_id,     # from orchestrator handoff or sf-import meta
+                report_name="issues_overview_report",
+                save_report=False,        # inline response, do NOT write to disk
+            )
+            # R12 truncation detection (100KB cap per D-SF-05).
+            if response.get("truncated", False):
+                amber_warnings.append(
+                    "SF MCP response truncated at 100KB cap for "
+                    "issues_overview_report"
+                )
+            # Merge live rows into tech_seo aggregation (additive only;
+            # transform's per-category severity reducer handles the merge).
+            live_findings = response.get("rows", [])
+            # tech_audit_transform.transform() accepts an optional
+            # `live_findings` kwarg in this branch.
+        except SfMcpToolError as exc:
+            # R9 AMBER fallback — call failed (4xx/5xx or JSON-RPC error).
+            amber_warnings.append(
+                f"SF MCP tool error: {exc}; falling back to file-based path"
+            )
+```
+
+**AMBER vs RED policy (R9 / R12 contract):**
+
+- `client.health()` returns False → AMBER warning, continue file-based.
+- `SfMcpToolError` raised → AMBER warning, continue file-based.
+- `response.get("truncated", False) is True` → AMBER warning, continue
+  with partial data (transform handles missing rows gracefully).
+- NEVER raise `SystemExit` from this branch. RED reserved for the
+  existing DURUR set (budget, schema drift, etc.).
+
+**Tool naming reminder (per Manager dispatch):** `call_tool(tool_name=...)`
+takes the **native** SF MCP tool name (`"sf_generate_report"`), NOT the
+registry form (`"sf__sf_generate_report"`) or the Claude Code wrapper
+form (`"mcp__sf__sf_generate_report"`). JSON-RPC `params.name` follows
+the native form per MCP spec.
+
+`amber_warnings` is surfaced via the existing provenance event payload
+(Step 9 — `events_writer.append_provenance` accepts a `notes` field
+when present) and the rendered report (Step 9 — render_template
+template variable `$amber_warnings`).
 
 ## Issue detection rules — severityEnum coverage
 

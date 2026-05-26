@@ -2,6 +2,23 @@
 
 ## Unresolved
 
+### Q-SF-MCP-PHASE-5-CLOSURE-FOLLOWUPS-01: v1.8 Phase 5 closure — 1 LOW Worker followup (test name convention) [P3] ✅ ACCEPTED 2026-05-26
+**Raised:** 2026-05-27 v1.8 Phase 5 closure (Manager GO decision after cross-check). Worker Output Package §"Open Questions Surfaced" + Manager review.
+**Context:** Phase 5 Worker (4 SKILL.md + 4 test files; +706 LoC additive only; stub-mod pattern 4'üncü cumulative reuse) surfaced 1 LOW Open Question about test name convention deviation from Manager dispatch example.
+
+**Worker Open Question (Manager review):**
+| ID | Question | Severity | Manager Decision |
+|----|----------|----------|------------------|
+| Q-PHASE-5-WORKER-01 | Manager dispatch example test name `test_default_behavior_no_mcp` was illustrative ("mock path + regression path"). Worker chose `test_use_sf_mcp_live_flag_in_frontmatter` (asserts default=False which IS the regression-preservation contract) + `test_skill_md_documents_sf_mcp_live_pattern` (stub-mod contract lock for the 4 R9/R12 patterns). Defensible Worker interpretation; functionally equivalent to Manager's "mock path + regression path" pair. v2.3 spec retrospective could update example name. | LOW | ✅ ACCEPT — Worker's stub-mod test pattern architecturally more correct than Manager dispatch's runtime-mock suggestion. Aligned with project's stub-mod 4'üncü cumulative reuse (memory project_phase_lessons.md: v1.7 Task 2.3 generate-images + Task 3.2 brand-onboarding discovery + Task 3.5 init-project cascade + Phase 5 consumer wiring = 4 cumulative applications). Runtime wiring lives in SKILL.md prose (executed by skill body interpreter Phase 11/14 operator workshop); pure-transform scripts intentionally unchanged; AC-13 (Phase 7 pilot smoke) covers actual runtime verification. v2.3 retrospective: Manager Worker Prompt template should clarify "contract test" vs "runtime mock test" expectations |
+
+**Stub-mod pattern verification (post-Phase-5):** 4 cumulative applications across v1.7 + v1.8:
+1. v1.7 Task 2.3 generate-images skill (IPTC writer runtime impl deferred Phase 11/14; SKILL.md contract Step 5b + paired test_generate_images.py contract test)
+2. v1.7 Task 3.2 brand-onboarding discovery stage (Stage A DFS+Scrapling runtime impl Phase 11; SKILL.md contract + paired test)
+3. v1.7 Task 3.5 init-project cascade (Migration 0005 cascade contract; init-project SKILL.md + paired test_init_project.py contract; runtime cascade Phase 11/14 operator workshop)
+4. v1.8 Phase 5 consumer wiring (4 skills × use_sf_mcp_live runtime branch impl Phase 11/14; SKILL.md prose contract + paired test pattern lock)
+
+**Cross-refs:** `docs/PHASE_STATUS.md` Active Phase v1.8.0 Phase 5 DONE section; Phase 5 Worker Output Package; D-SF-11 (consumer skill opt-in flag spec); Q-SF-MCP-07 Pre-Phase-1 lock (all-4 in v1.8); spec v2.2 Skills Integration Matrix Category C lines 122-125 (canonical report_name per skill); AC-13 (Phase 7 pilot smoke for tech-audit live verification); memory project_phase_lessons.md "Stub-mod pattern".
+
 ### Q-SF-MCP-PHASE-4-CLOSURE-FOLLOWUPS-01: v1.8 Phase 4 closure — 2 LOW Worker followups [P3] ✅ ALL ACCEPTED 2026-05-26 (Phase 6 docs sweep absorbs)
 **Raised:** 2026-05-26 v1.8 Phase 4 closure (Manager GO decision after cross-check). Worker Output Package §"Worker Open Questions" + Manager review.
 **Context:** Phase 4 Worker (5 SKILL.md edits + F-23 invariant + drift-check expansion + 6 test files) surfaced 2 LOW Open Questions, both deferred to Phase 6 docs sweep where their target files are in scope. Tümü Phase 4 GO kararını ENGELLEMEDİ.
