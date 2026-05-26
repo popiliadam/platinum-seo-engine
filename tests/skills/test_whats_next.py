@@ -314,12 +314,15 @@ def test_top_k_ranked_output() -> None:
     assert top10[-1]["score"] == 20
 
     # Heuristic table itself is the SSoT — assert it matches the spec.
+    # v1.8 Phase 4: sf_crawl_stale=30 additive (slots below master_task_medium
+    # so it never displaces a higher-priority signal in top-K).
     assert whats_next.SCORES == {
         "pending_approval":   100,
         "content_decay_red":   80,
         "master_task_high":    60,
         "quick_wins_pending":  50,
         "master_task_medium":  40,
+        "sf_crawl_stale":      30,
         "master_task_other":   20,
     }
 
@@ -327,6 +330,116 @@ def test_top_k_ranked_output() -> None:
 # ---------------------------------------------------------------------------
 # Test 5 — full router run emits a schema-valid events.jsonl row + F5 outputs
 # ---------------------------------------------------------------------------
+
+def test_suggest_sf_crawl_when_stale(tmp_path: Path, slug: str) -> None:
+    """v1.8 Phase 4 (D-SF-04): the helper surfaces a non-blocking
+    sf_crawl_stale candidate when:
+      (a) project.config.sf.mcp.enabled == True, AND
+      (b) no completed sf-crawl-orchestrator workflow run exists, OR
+          the newest completed run is older than `threshold_days`.
+
+    When sf.mcp.enabled is False / absent → helper returns None
+    regardless of workflow state. When a fresh run exists (today) →
+    helper returns None.
+    """
+    proj = _setup_ws(tmp_path, slug)
+
+    # Case 1 — sf.mcp not opted-in: helper returns None.
+    cfg_path = proj / "project.config.json"
+    cfg_path.write_text(
+        json.dumps({
+            "schema_version": "1.5",
+            "project_id": slug,
+            "domain": "https://example.com/",
+            "market": "TR",
+            "language": {"content_locale": "tr-TR"},
+            "sf": {"mcp": {"enabled": False}},
+        }, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    assert whats_next.suggest_sf_crawl_when_stale(
+        slug, workspace_root=tmp_path,
+    ) is None
+
+    # Case 2 — sf.mcp opted-in, no workflow runs → STALE suggestion.
+    cfg_path.write_text(
+        json.dumps({
+            "schema_version": "1.5",
+            "project_id": slug,
+            "domain": "https://example.com/",
+            "market": "TR",
+            "language": {"content_locale": "tr-TR"},
+            "sf": {"mcp": {"enabled": True, "url": "http://127.0.0.1:11435/mcp"}},
+        }, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    sug = whats_next.suggest_sf_crawl_when_stale(
+        slug, workspace_root=tmp_path,
+    )
+    assert sug is not None, (
+        "sf.mcp.enabled=True + no workflow runs must surface a stale suggestion"
+    )
+    assert sug["kind"] == "sf_crawl_stale"
+    assert sug["project_slug"] == slug
+    assert sug["last_seen"] is None
+    assert sug["threshold_days"] == 30
+
+    # Case 3 — sf.mcp opted-in, FRESH run (today) → None.
+    wf_dir = proj / "_state" / "workflows"
+    wf_dir.mkdir(parents=True, exist_ok=True)
+    fresh_run = {
+        "schema_version": "1.0",
+        "run_id": f"{slug}-2026-05-26-fre1",
+        "skill": "sf-crawl-orchestrator",
+        "project_slug": slug,
+        "status": "done",
+        "created_at": "2026-05-26T10:00:00Z",
+        "updated_at": "2026-05-26T11:00:00Z",
+        "completed_at": "2026-05-26T11:00:00Z",
+        "steps": [{"name": "complete", "status": "done"}],
+    }
+    (wf_dir / f"{fresh_run['run_id']}.json").write_text(
+        json.dumps(fresh_run, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    # Use a very generous threshold so the test isn't time-fragile.
+    sug = whats_next.suggest_sf_crawl_when_stale(
+        slug, workspace_root=tmp_path, threshold_days=365_000,
+    )
+    assert sug is None, (
+        f"fresh sf-crawl-orchestrator run + huge threshold must suppress "
+        f"the suggestion; got {sug}"
+    )
+
+    # Case 4 — sf.mcp opted-in, STALE run (>30d ago) → STALE suggestion.
+    stale_run = {
+        "schema_version": "1.0",
+        "run_id": f"{slug}-2024-01-01-stal",
+        "skill": "sf-crawl-orchestrator",
+        "project_slug": slug,
+        "status": "done",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T01:00:00Z",
+        "completed_at": "2024-01-01T01:00:00Z",
+        "steps": [{"name": "complete", "status": "done"}],
+    }
+    # Wipe fresh fixture, replace with stale-only state.
+    (wf_dir / f"{fresh_run['run_id']}.json").unlink()
+    (wf_dir / f"{stale_run['run_id']}.json").write_text(
+        json.dumps(stale_run, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    sug = whats_next.suggest_sf_crawl_when_stale(
+        slug, workspace_root=tmp_path,
+    )
+    assert sug is not None
+    assert sug["last_seen"] == "2024-01-01"
+
+    # Case 5 — score for the sf_crawl_stale kind = 30 (below master_task_medium
+    # but above master_task_other), as documented in the SCORES table.
+    assert whats_next.SCORES["sf_crawl_stale"] == 30
+    assert whats_next.score_candidate({"kind": "sf_crawl_stale"}) == 30
+
 
 def test_router_event_emitted(
     tmp_path: Path,

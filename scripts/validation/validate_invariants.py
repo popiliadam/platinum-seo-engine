@@ -889,6 +889,95 @@ def check_F_16(workbook: Any, project_slug: str, **_) -> dict:
     )
 
 
+def check_F_23(workbook: Any, project_slug: str, *,
+               workspace_root: Path | None = None, **_) -> dict:
+    """SF MCP cross-sheet invariant (v1.8 Phase 4):
+    if any _state/workflows/*.json shows a completed sf-crawl-orchestrator
+    run, the repo-root mcp-tool-registry.json MUST list 'sf' under servers.
+
+    Detection logic:
+      1. Walk projects/{slug}/_state/workflows/*.json.
+      2. Filter to skill=='sf-crawl-orchestrator' AND status=='done'.
+      3. Read engine repo-root mcp-tool-registry.json; check 'sf' key in
+         servers.
+      4. Non-empty evidence + missing 'sf' → FAIL HIGH (RED).
+      5. Registry absent (fresh engine checkout) → SKIP (AMBER).
+    """
+    rule = (
+        "if any project's _state/workflows/ has a completed "
+        "sf-crawl-orchestrator run, mcp-tool-registry.json MUST list 'sf' "
+        "under servers"
+    )
+    pdir = _project_dir(project_slug, workspace_root)
+    wf_dir = pdir / "_state" / "workflows"
+    if not wf_dir.is_dir():
+        return _make_result(
+            id_="F-23", severity="HIGH", verdict="SKIP",
+            evidence="_state/workflows/ missing — no SF crawl evidence yet",
+            rule=rule, category="csr_mcp",
+        )
+    sf_runs: list[str] = []
+    for p in sorted(wf_dir.glob("*.json")):
+        try:
+            obj = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if obj.get("skill") != "sf-crawl-orchestrator":
+            continue
+        if obj.get("status") != "done":
+            continue
+        rid = obj.get("run_id") or p.stem
+        sf_runs.append(str(rid))
+    if not sf_runs:
+        return _make_result(
+            id_="F-23", severity="HIGH", verdict="PASS",
+            evidence="no completed sf-crawl-orchestrator runs found — invariant vacuous",
+            rule=rule, category="csr_mcp",
+        )
+    registry_path = _REPO_ROOT / "mcp-tool-registry.json"
+    if not registry_path.exists():
+        return _make_result(
+            id_="F-23", severity="HIGH", verdict="SKIP",
+            evidence=(
+                f"mcp-tool-registry.json missing at {registry_path} but "
+                f"{len(sf_runs)} sf-crawl-orchestrator run(s) present — "
+                "engine state ambiguous, surfaces AMBER"
+            ),
+            rule=rule, category="csr_mcp",
+            sample_violations=sf_runs[:_SAMPLE_CAP],
+        )
+    try:
+        registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return _make_result(
+            id_="F-23", severity="HIGH", verdict="FAIL",
+            evidence=f"mcp-tool-registry.json unparseable: {exc}",
+            rule=rule, category="csr_mcp",
+            sample_violations=sf_runs[:_SAMPLE_CAP],
+            affected_rows=len(sf_runs),
+        )
+    servers = registry.get("servers") or {}
+    if "sf" not in servers:
+        return _make_result(
+            id_="F-23", severity="HIGH", verdict="FAIL",
+            evidence=(
+                f"{len(sf_runs)} completed sf-crawl-orchestrator run(s) "
+                f"but mcp-tool-registry.json servers missing 'sf' key"
+            ),
+            rule=rule, category="csr_mcp",
+            sample_violations=sf_runs[:_SAMPLE_CAP],
+            affected_rows=len(sf_runs),
+        )
+    return _make_result(
+        id_="F-23", severity="HIGH", verdict="PASS",
+        evidence=(
+            f"{len(sf_runs)} sf-crawl-orchestrator run(s) backed by "
+            "mcp-tool-registry.json servers['sf'] entry"
+        ),
+        rule=rule, category="csr_mcp",
+    )
+
+
 def check_F_17(workbook: Any, project_slug: str, **_) -> dict:
     """severity column ⊆ severityEnum 4-value (LOW/MEDIUM/HIGH/CRITICAL).
 
@@ -1163,6 +1252,7 @@ _RULE_FUNCTIONS = (
     # HIGH
     check_F_08, check_F_09, check_F_10, check_F_11, check_F_12,
     check_F_13, check_F_14, check_F_15, check_F_16, check_F_17,
+    check_F_23,  # v1.8 Phase 4 SF MCP cross-sheet
     # MEDIUM
     check_F_18, check_F_19, check_F_20, check_F_21, check_F_22,
 )
@@ -1385,4 +1475,5 @@ __all__: Iterable[str] = (
     "check_F_08", "check_F_09", "check_F_10", "check_F_11", "check_F_12",
     "check_F_13", "check_F_14", "check_F_15", "check_F_16", "check_F_17",
     "check_F_18", "check_F_19", "check_F_20", "check_F_21", "check_F_22",
+    "check_F_23",
 )

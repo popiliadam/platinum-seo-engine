@@ -316,7 +316,8 @@ def test_consistency_report_schema_valid(clean_wb_path: Path, tmp_path: Path,
     # but we double-check end-to-end).
     Draft7Validator(consistency_schema).validate(report)
     assert report["schema_version"] == "1.0"
-    assert len(report["checks"]) == 20
+    # 20 baseline + F-23 (v1.8 Phase 4 SF MCP cross-sheet) = 21.
+    assert len(report["checks"]) == 21
     assert report["verdict"] in ("GREEN", "AMBER", "RED")
 
 
@@ -348,7 +349,7 @@ def test_provenance_event_emitted(clean_wb_path: Path, tmp_path: Path,
     events_writer.append_audit(
         project_id=slug,
         audit_action="accessed",
-        audit_target="invariants:20",
+        audit_target="invariants:21",
         actor="drift-check",
         notes="verdict=GREEN fails=0",
         workspace_root=tmp_path,
@@ -361,7 +362,7 @@ def test_provenance_event_emitted(clean_wb_path: Path, tmp_path: Path,
     assert audits, "no event_kind=audit emitted"
     rec = audits[-1]
     assert rec["audit_action"] == "accessed"
-    assert rec["audit_target"] == "invariants:20"
+    assert rec["audit_target"] == "invariants:21"
     # Re-validate with the canonical events schema.
     Draft7Validator(events_schema).validate(rec)
 
@@ -449,3 +450,141 @@ def test_auto_repair_available_flag(clean_wb_path: Path, tmp_path: Path) -> None
     # And the aggregator surfaces it as an auto_repair_available rule id.
     agg = vi.aggregate_verdicts(results)
     assert "F-22" in agg["auto_repair_available"]
+
+
+# ---------------------------------------------------------------------------
+# Test 12 — F-23 (v1.8 Phase 4): sf-crawl-orchestrator workflow + registry sync
+# ---------------------------------------------------------------------------
+
+def test_f23_sf_crawl_orchestrator_registry_mismatch_fail(
+    clean_wb_path: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F-23 violation: a project has a completed sf-crawl-orchestrator
+    workflow run, BUT the engine repo-root mcp-tool-registry.json is
+    swapped to a synthetic copy that does NOT list 'sf' under servers.
+
+    Expected: check_F_23 → FAIL HIGH → aggregator RED.
+    """
+    slug = "drifttest"
+    # Write a synthetic completed sf-crawl-orchestrator workflow run.
+    wf_dir = tmp_path / "projects" / slug / "_state" / "workflows"
+    wf_dir.mkdir(parents=True, exist_ok=True)
+    run_payload = {
+        "schema_version": "1.0",
+        "run_id": f"{slug}-2026-05-26-deaf",
+        "skill": "sf-crawl-orchestrator",
+        "project_slug": slug,
+        "status": "done",
+        "created_at": "2026-05-26T10:00:00Z",
+        "updated_at": "2026-05-26T11:00:00Z",
+        "completed_at": "2026-05-26T11:00:00Z",
+        "steps": [{"name": "complete", "status": "done"}],
+    }
+    (wf_dir / f"{run_payload['run_id']}.json").write_text(
+        json.dumps(run_payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    # Monkey-patch _REPO_ROOT to a tmp_path/engine fixture that ships a
+    # registry WITHOUT the 'sf' server.
+    engine_root = tmp_path / "engine"
+    engine_root.mkdir(parents=True, exist_ok=True)
+    bogus_registry = {
+        "schema_version": "1.0",
+        "servers": {
+            "gsc": {"display_name": "GSC", "tools": []},
+            "dataforseo": {"display_name": "DFS", "tools": []},
+            "scrapling": {"display_name": "Scrapling", "tools": []},
+        },
+    }
+    (engine_root / "mcp-tool-registry.json").write_text(
+        json.dumps(bogus_registry, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(vi, "_REPO_ROOT", engine_root)
+
+    wb = load_workbook(str(clean_wb_path), data_only=True, read_only=True)
+    try:
+        results = vi.evaluate_all(wb, slug, workspace_root=tmp_path)
+    finally:
+        wb.close()
+    by_id = {r["id"]: r for r in results}
+    assert by_id["F-23"]["verdict"] == "FAIL", (
+        f"F-23 must FAIL when sf-crawl-orchestrator run exists "
+        f"but registry missing 'sf'; got {by_id['F-23']}"
+    )
+    assert by_id["F-23"]["severity"] == "HIGH"
+    # FAIL HIGH (no manual_triage) → aggregator RED.
+    agg = vi.aggregate_verdicts(results)
+    assert agg["overall"] == "RED", (
+        f"F-23 FAIL HIGH must drive aggregator RED; got {agg['overall']}"
+    )
+
+
+def test_f23_no_orchestrator_runs_pass(
+    clean_wb_path: Path, tmp_path: Path,
+) -> None:
+    """F-23 vacuously PASS when no sf-crawl-orchestrator workflow runs
+    exist — the invariant is conditional, no evidence means no demand
+    on the registry."""
+    slug = "drifttest"
+    # No workflow runs exist for this slug (clean fixture).
+    wb = load_workbook(str(clean_wb_path), data_only=True, read_only=True)
+    try:
+        results = vi.evaluate_all(wb, slug, workspace_root=tmp_path)
+    finally:
+        wb.close()
+    by_id = {r["id"]: r for r in results}
+    assert by_id["F-23"]["verdict"] == "PASS"
+    assert "vacuous" in by_id["F-23"]["evidence"].lower() or \
+           "no completed" in by_id["F-23"]["evidence"].lower()
+
+
+def test_f23_orchestrator_runs_with_sf_registry_pass(
+    clean_wb_path: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F-23 PASS when sf-crawl-orchestrator runs exist AND registry has
+    'sf' under servers (the current engine baseline post-Phase 1)."""
+    slug = "drifttest"
+    wf_dir = tmp_path / "projects" / slug / "_state" / "workflows"
+    wf_dir.mkdir(parents=True, exist_ok=True)
+    run_payload = {
+        "schema_version": "1.0",
+        "run_id": f"{slug}-2026-05-26-cafe",
+        "skill": "sf-crawl-orchestrator",
+        "project_slug": slug,
+        "status": "done",
+        "created_at": "2026-05-26T10:00:00Z",
+        "updated_at": "2026-05-26T11:00:00Z",
+        "completed_at": "2026-05-26T11:00:00Z",
+        "steps": [{"name": "complete", "status": "done"}],
+    }
+    (wf_dir / f"{run_payload['run_id']}.json").write_text(
+        json.dumps(run_payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    # Synthesize a registry that DOES list 'sf' (mirrors live engine).
+    engine_root = tmp_path / "engine"
+    engine_root.mkdir(parents=True, exist_ok=True)
+    good_registry = {
+        "schema_version": "1.0",
+        "servers": {
+            "gsc": {"display_name": "GSC", "tools": []},
+            "sf": {"display_name": "SF 24 MCP", "tools": []},
+        },
+    }
+    (engine_root / "mcp-tool-registry.json").write_text(
+        json.dumps(good_registry, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(vi, "_REPO_ROOT", engine_root)
+
+    wb = load_workbook(str(clean_wb_path), data_only=True, read_only=True)
+    try:
+        results = vi.evaluate_all(wb, slug, workspace_root=tmp_path)
+    finally:
+        wb.close()
+    by_id = {r["id"]: r for r in results}
+    assert by_id["F-23"]["verdict"] == "PASS"
+    assert "sf-crawl-orchestrator" in by_id["F-23"]["evidence"]

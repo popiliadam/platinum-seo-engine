@@ -36,7 +36,9 @@ Cross-references
 
 from __future__ import annotations
 
+import json
 import os
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -55,6 +57,7 @@ SCORES: dict[str, int] = {
     "master_task_high":       60,   # CRITICAL or HIGH
     "quick_wins_pending":     50,
     "master_task_medium":     40,
+    "sf_crawl_stale":         30,   # v1.8 Phase 4: SF MCP non-blocking
     "master_task_other":      20,   # LOW or unset
 }
 
@@ -63,7 +66,11 @@ RECOMMENDED_SKILL: dict[str, str] = {
     "content_decay_red":  "content-decay",
     "master_task":        "done-protocol",
     "quick_wins_pending": "apply-quickwin",
+    "sf_crawl_stale":     "sf-crawl-orchestrator",
 }
+
+# v1.8 Phase 4 SF MCP staleness threshold (operator-tunable via call).
+_SF_CRAWL_STALE_DEFAULT_DAYS: int = 30
 
 SUGGESTED_NONE: str = "(none)"
 
@@ -260,6 +267,8 @@ def score_candidate(candidate: dict[str, Any]) -> int:
         return SCORES["content_decay_red"]
     if kind == "quick_wins_pending":
         return SCORES["quick_wins_pending"]
+    if kind == "sf_crawl_stale":
+        return SCORES["sf_crawl_stale"]
     if kind == "master_task":
         prio = (candidate.get("priority") or "").upper()
         if prio in ("CRITICAL", "HIGH"):
@@ -287,7 +296,95 @@ def _candidate_reason(c: dict[str, Any]) -> str:
         return f"{c.get('task_id')} priority={c.get('priority')} \"{c.get('task')}\"; done-protocol başlat."
     if kind == "quick_wins_pending":
         return f"{c.get('query')} → {c.get('url')} (opportunity={c.get('opportunity')}); apply-quickwin."
+    if kind == "sf_crawl_stale":
+        return f"last SF crawl {c.get('last_seen') or '<none>'}; consider /pseo-sf-crawl {c.get('project_slug')}."
     return "(unknown)"
+
+
+def _parse_iso_z(s: Any) -> datetime | None:
+    """Parse an ISO 8601 string (possibly with Z) to an aware datetime.
+    Returns None on parse failure."""
+    if not isinstance(s, str) or not s:
+        return None
+    try:
+        return datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return None
+
+
+def suggest_sf_crawl_when_stale(
+    project_slug: str,
+    workspace_root: Path | None = None,
+    threshold_days: int = _SF_CRAWL_STALE_DEFAULT_DAYS,
+) -> dict[str, Any] | None:
+    """v1.8 Phase 4 (D-SF-04 helper): if project has sf.mcp.enabled=true
+    and the newest completed sf-crawl-orchestrator workflow run is older
+    than ``threshold_days`` (or no run exists), return a non-blocking
+    candidate suggestion for the whats-next router. Otherwise return None.
+
+    The helper is read-only: it never invokes a skill nor mutates state.
+    Caller (whats-next.run) decides whether to append it to the candidate
+    list.
+    """
+    try:
+        ws = _resolve_workspace_root(workspace_root)
+    except WhatsNextError:
+        return None
+    cfg_path = ws / "projects" / project_slug / "project.config.json"
+    if not cfg_path.exists():
+        return None
+    try:
+        cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    sf_block = cfg.get("sf") or {}
+    mcp_block = sf_block.get("mcp") or {}
+    if not mcp_block.get("enabled"):
+        # SF MCP not opted-in for this project — no suggestion surface.
+        return None
+
+    wf_dir = ws / "projects" / project_slug / "_state" / "workflows"
+    newest: datetime | None = None
+    if wf_dir.is_dir():
+        for p in sorted(wf_dir.glob("*.json")):
+            try:
+                obj = json.loads(p.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            if obj.get("skill") != "sf-crawl-orchestrator":
+                continue
+            if obj.get("status") != "done":
+                continue
+            # Prefer completed_at; fall back to updated_at then created_at.
+            ts = (
+                _parse_iso_z(obj.get("completed_at"))
+                or _parse_iso_z(obj.get("updated_at"))
+                or _parse_iso_z(obj.get("created_at"))
+            )
+            if ts is None:
+                continue
+            if newest is None or ts > newest:
+                newest = ts
+
+    now = datetime.now(timezone.utc)
+    if newest is None:
+        last_seen_label: str | None = None
+        stale = True
+    else:
+        delta = now - newest
+        stale = delta > timedelta(days=threshold_days)
+        last_seen_label = newest.strftime("%Y-%m-%d")
+
+    if not stale:
+        return None
+
+    return {
+        "kind": "sf_crawl_stale",
+        "row_id": f"sf-mcp-{project_slug}",
+        "project_slug": project_slug,
+        "last_seen": last_seen_label,
+        "threshold_days": threshold_days,
+    }
 
 
 def rank_candidates(
@@ -431,6 +528,12 @@ def run(
     candidates += scan_content_decay_red(project_slug, workspace_root=workspace_root)
     candidates += scan_pending_approvals(project_slug, workspace_root=workspace_root)
     candidates += scan_quick_wins_pending(project_slug, workspace_root=workspace_root)
+    # Step 4.5 — v1.8 Phase 4 SF MCP staleness non-blocking suggestion.
+    sf_stale = suggest_sf_crawl_when_stale(
+        project_slug, workspace_root=workspace_root
+    )
+    if sf_stale is not None:
+        candidates.append(sf_stale)
 
     # Steps 6-7: score, rank, build top-K.
     ranked = rank_candidates(candidates, top_k=top_k)
@@ -474,6 +577,7 @@ __all__: Iterable[str] = (
     "scan_content_decay_red",
     "scan_pending_approvals",
     "scan_quick_wins_pending",
+    "suggest_sf_crawl_when_stale",
     "score_candidate",
     "rank_candidates",
     "render_summary",

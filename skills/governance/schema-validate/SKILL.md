@@ -8,8 +8,12 @@ description: |
   (F-01..F-15 + D-01..D-03 + M-01..M-02 baseline; F-16..F-22 additive
   K-02 v1.5-Phase-2 = 27), and SKILL.md frontmatter compliance under
   skills/**/.
+  cross-sheet-invariants ≥21 rules baseline post v1.8 Phase 4
+  (F-23 SF MCP additive K-02 paterni reuse #N+1).
   Also use when: yeni schema eklendi (additive bump), frontmatter
-  drift şüphesi, CI quality gate, drift-check öncesi pre-flight.
+  drift şüphesi, CI quality gate, drift-check öncesi pre-flight,
+  Phase 4 sf-mcp-tool-mapping.schema.json + templates/sf-mcp/
+  use-case-example.json drift kontrolü.
   Do not use when: master.xlsx invariants (drift-check'in işi),
   glossary terim drift'i (glossary-audit'in işi), build error
   (build-error-resolver). schema-validate read-only audit, master.xlsx
@@ -194,15 +198,15 @@ for entry in rules:
     assert not missing, f"rule {entry.get('id', '?')} missing keys: {missing}"
 ```
 
-The cross-sheet-invariants instance document carries ≥20 rules
+The cross-sheet-invariants instance document carries ≥21 rules
 (F-01..F-15 + D-01..D-03 + M-01..M-02 baseline = 20; F-16..F-22 additive
-K-02 v1.5-Phase-2 = 27) per spec §7. Per-rule F-NN ↔
-`validate_invariants.py` parity is enforced separately by
-`tests/schemas/test_cross_sheet_invariants_sync.py` (bidirectional +
-`KNOWN_SCHEMA_ONLY` known-deferred for F-06/F-07). The top-level key
-is `rules` per S3.5 pivot — NOT `invariants`. This skill explicitly
-exercises that key so a memory-drift typo (the natural mistake) is
-caught at the audit step, not silently masked.
+K-02 v1.5-Phase-2 = 27; F-23 additive v1.8 Phase 4 SF MCP cross-sheet
+= 28) per spec §7. Per-rule F-NN ↔ `validate_invariants.py` parity is
+enforced separately by `tests/schemas/test_cross_sheet_invariants_sync.py`
+(bidirectional + `KNOWN_SCHEMA_ONLY` known-deferred for F-06/F-07). The
+top-level key is `rules` per S3.5 pivot — NOT `invariants`. This skill
+explicitly exercises that key so a memory-drift typo (the natural
+mistake) is caught at the audit step, not silently masked.
 
 ### Step 5 — `validate_skill_frontmatter_compliance`
 
@@ -279,6 +283,29 @@ triple per `events.schema.json` allOf rule. `event_type` (the WORK-only
 closed 10-value enum) is NOT used here; that field is reserved for
 work-tracking events (DONE protocol §21.4) and the schema-first
 override (lesson 31+34) directs governance signals to the audit kind.
+
+## v1.8 Phase 1 — sf-mcp-tool-mapping.schema.json (additive enumerate)
+
+The Phase 1 schema `schemas/sf-mcp-tool-mapping.schema.json` (155L,
+Screaming Frog 24 native MCP integration contract) is picked up by the
+runtime `glob('schemas/*.schema.json')` enumerate (Step 2) automatically
+— no enumeration code change required (F-13.1 schema-first override
+discipline: count is runtime, not hardcoded).
+
+The companion instance document
+`templates/sf-mcp/use-case-example.json` is a SAMPLE instance (Phase 1
+scaffold demonstrating the contract). Phase 4 verification: that
+sample MUST `Draft7Validator(schema).validate(instance)` cleanly,
+otherwise the schema contract is broken. The schema-validate skill
+covers this implicitly via the meta-schema gate (Step 3); the dedicated
+positive-instance assertion lives in
+`tests/skills/test_schema_validate.py::test_sf_mcp_tool_mapping_in_sweep`
+(Phase 4 test extension).
+
+The Phase 1 baseline schemas/ count was 18 (per F-13.1); Phase 1
+added `sf-mcp-tool-mapping.schema.json` → 19+ depending on prior
+additions. The exact number is reported by the runtime glob at every
+run — never asserted as a constant.
 
 ## Master.xlsx WRITE forbidden
 
