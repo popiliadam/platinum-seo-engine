@@ -28,6 +28,10 @@ inputs:
     type: string
     required: true
     description: "SF export dizini path (mutlak veya workspace-relative). raw/ subfolder zorunlu."
+  source_run_id:
+    type: string
+    required: false
+    description: "v1.8 Phase 3 D-SF-07: optional upstream run_id from sf-crawl-orchestrator. When present, chained into the provenance event so drift-check can correlate the orchestrator MCP crawl with this file-based ingest. Body 8-step protocol UNCHANGED."
 outputs:
   - "master.xlsx#crawl_sitemap"
   - "master.xlsx#redirect_404"
