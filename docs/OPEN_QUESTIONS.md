@@ -2,6 +2,21 @@
 
 ## Unresolved
 
+### Q-V1.9-PHASE-7-CLOSURE-FOLLOWUPS-01: v1.9 Phase 7 / MILESTONE CLOSED — 20/20 AC GREEN, 1 LOW deferred to v1.10 [P3] ✅ 2026-06-01
+**Raised:** 2026-06-01 v1.9 Phase 7 closure (Manager GO after final release verification: tag annotated→de075e7, 8 unpushed, F-16 543B, DECISIONS 6067B, Y-05 sync 1.9.0, 2 MEDIUM fixes landed, 31 declared). Worker Output Package (FINAL) + Manager post-release closeout.
+**Context:** Phase 7 (FINAL) = pilot smoke + release. Worker made the release commit `de075e7` + annotated tag `v1.9.0` (R-9 AUTHORIZED — the one Worker that commits) + wrote PHASE_STATUS "v1.9.0 MILESTONE CLOSED" §13.2 exception. 20/20 AC GREEN; pytest 1286/12/0; rollback drill restored 1244; Y-05 5'inci dogfooding; pre-push audit 0 CRITICAL / 2 MEDIUM (both FIXED pre-release) / 1 LOW (deferred).
+
+**OQ disposition (carried from prior phases + Phase 7 audit):**
+| ID | Status | Resolution |
+|----|--------|------------|
+| OQ-LC5-RESIDUAL (Phase 6) | ✅ **CLOSED** | Phase 7 pre-push audit MEDIUM #1 fixed marketplace.json plugins[0].description body (`pytest 1147 … v1.6 cycle` → `1286 … v1.9 cycle`). Y-05's prefix-only sync couldn't reach the body; the audit did. |
+| (Phase-7 audit MEDIUM #2, NEW) | ✅ **FIXED pre-release** | README.md:251 `Current: v1.6.0 (1,147 tests)` → `v1.9.0 (1,286 tests)` + :273 release link `v1.6.0`→`v1.9.0` (pre-existing 3-cycle staleness, Y-05-regex-unreachable; README is a Y-05 target so in-scope). |
+| OQ-LC4-DATE (Phase 6) | ⏳ **DEFER v1.10** | ADR-004/005 closure-date: DECISIONS.md summary index 2026-05-06 (repo-deletion event) vs DECISIONS_ARCHIVE.md footer 2026-06-01 (formal soak-closure documentation). Both accurate; NOT a contradiction. D-V1.9-06 forbids DECISIONS.md edits + 6067B invariant → reconciliation (if any) is a v1.10 retro item. |
+
+**v1.9 cycle OQ ledger (all resolved/dispositioned):** Pre-Phase-1 (6 decisions default-locked) + P1 (2 twins fixed + 1 deferred OQ-W-03→v1.10) + P2 (2 schema-first ACCEPTED) + P3 (1 deferred→Phase 6) + P4 (1 deferred→Phase 6) + P5 (0 OQs) + P6 (4 source-Q resolved + 3 schema-first + 2 OQs) + P7 (milestone). **v1.10 retro backlog:** OQ-W-03 (worker-prompts:599 rollback-drill migration --reverse methodology reword) + OQ-LC4-DATE (closure-date index/footer reconciliation). Both LOW, zero runtime impact.
+
+**Cross-refs:** `docs/PHASE_STATUS.md` v1.9.0 MILESTONE CLOSED entry (20-AC block); Phase 7 Worker Output Package; `docs/RELEASE_NOTES_v1.9.0.md` (181 lines); git tag v1.9.0 (de075e7); Q-V1.9-PHASE-1-CLOSURE-FOLLOWUPS-01 (OQ-W-03) + Q-V1.9-PHASE-6-CLOSURE-FOLLOWUPS-01 (OQ-LC4-DATE).
+
 ### Q-V1.9-PHASE-6-CLOSURE-FOLLOWUPS-01: v1.9 Phase 6 closure — 4 source-Q RESOLVED + 3 schema-first catches + 2 LOW OQs [P3] ✅ 2026-06-01
 **Raised:** 2026-06-01 v1.9 Phase 6 closure (Manager GO after rigorous verification: git scope, F-16 md5, DECISIONS.md preservation, invariant-logic-untouched diff-grep, count mis-map spot-check, LC-4 date). Worker Output Package §"Open Questions" + §"Decisions made".
 **Context:** Phase 6 landed LC-1..LC-5 + Manager-added LC-6 (count-reconciliation) across 13 work files; pytest 1260→1286 (+26); 3 schema-first catches; 4 v1.2-era source Q items resolved.
