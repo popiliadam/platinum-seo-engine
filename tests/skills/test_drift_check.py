@@ -316,8 +316,8 @@ def test_consistency_report_schema_valid(clean_wb_path: Path, tmp_path: Path,
     # but we double-check end-to-end).
     Draft7Validator(consistency_schema).validate(report)
     assert report["schema_version"] == "1.0"
-    # 20 baseline + F-23 (v1.8 Phase 4 SF MCP cross-sheet) = 21.
-    assert len(report["checks"]) == 21
+    # 20 baseline + F-23 (v1.8 Phase 4) + F-24 (v1.9 Phase 2) = 22.
+    assert len(report["checks"]) == 22
     assert report["verdict"] in ("GREEN", "AMBER", "RED")
 
 
@@ -588,3 +588,161 @@ def test_f23_orchestrator_runs_with_sf_registry_pass(
     by_id = {r["id"]: r for r in results}
     assert by_id["F-23"]["verdict"] == "PASS"
     assert "sf-crawl-orchestrator" in by_id["F-23"]["evidence"]
+
+
+# ---------------------------------------------------------------------------
+# Test 13 — F-24 (v1.9 Phase 2): .mcp.json ↔ mcp-tool-registry.json key sync
+# ---------------------------------------------------------------------------
+
+def _write_engine_mcp_pair(
+    engine_root: Path,
+    mcp_servers: list[str] | None,
+    registry_servers: list[str] | None,
+) -> None:
+    """Write synthetic .mcp.json (mcpServers) + mcp-tool-registry.json
+    (servers) into a fixture engine root. F-16 safe: only ever touches
+    tmp_path, NEVER the real repo-root .mcp.json. Pass None to omit a file
+    (exercises the SKIP branch)."""
+    engine_root.mkdir(parents=True, exist_ok=True)
+    if mcp_servers is not None:
+        (engine_root / ".mcp.json").write_text(
+            json.dumps({"mcpServers": {s: {} for s in mcp_servers}}, indent=2),
+            encoding="utf-8",
+        )
+    if registry_servers is not None:
+        (engine_root / "mcp-tool-registry.json").write_text(
+            json.dumps(
+                {"schema_version": "1.0",
+                 "servers": {s: {"display_name": s, "tools": []}
+                             for s in registry_servers}},
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+
+
+def test_f24_match_pass(
+    clean_wb_path: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F-24 PASS when the .mcp.json mcpServers key set equals the registry
+    servers key set AFTER the D-SF-02 ScraplingServer→scrapling alias.
+
+    .mcp.json carries 'ScraplingServer' (capital), the registry carries
+    'scrapling' (lowercase). The EXPLICIT alias normalizes them to the same
+    key, so {gsc, dataforseo, scrapling, sf} == {gsc, dataforseo, scrapling,
+    sf} → PASS. A naive .lower() would yield 'scraplingserver' != 'scrapling'
+    and false-FAIL — this case is the regression guard for the D-SF-02
+    case-fold (spec risk R3).
+    """
+    slug = "drifttest"
+    engine_root = tmp_path / "engine"
+    _write_engine_mcp_pair(
+        engine_root,
+        mcp_servers=["gsc", "dataforseo", "ScraplingServer", "sf"],
+        registry_servers=["gsc", "dataforseo", "scrapling", "sf"],
+    )
+    monkeypatch.setattr(vi, "_REPO_ROOT", engine_root)
+
+    wb = load_workbook(str(clean_wb_path), data_only=True, read_only=True)
+    try:
+        results = vi.evaluate_all(wb, slug, workspace_root=tmp_path)
+    finally:
+        wb.close()
+    by_id = {r["id"]: r for r in results}
+    assert by_id["F-24"]["verdict"] == "PASS", (
+        f"F-24 must PASS when key sets match post ScraplingServer→scrapling "
+        f"normalization; got {by_id['F-24']}"
+    )
+    assert by_id["F-24"]["severity"] == "HIGH"
+
+
+def test_f24_orphan_transport_fail(
+    clean_wb_path: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F-24 FAIL when .mcp.json declares a server absent from the registry
+    (orphan transport): .mcp.json +'newserver' → FAIL HIGH → aggregator RED."""
+    slug = "drifttest"
+    engine_root = tmp_path / "engine"
+    _write_engine_mcp_pair(
+        engine_root,
+        mcp_servers=["gsc", "dataforseo", "scrapling", "sf", "newserver"],
+        registry_servers=["gsc", "dataforseo", "scrapling", "sf"],
+    )
+    monkeypatch.setattr(vi, "_REPO_ROOT", engine_root)
+
+    wb = load_workbook(str(clean_wb_path), data_only=True, read_only=True)
+    try:
+        results = vi.evaluate_all(wb, slug, workspace_root=tmp_path)
+    finally:
+        wb.close()
+    by_id = {r["id"]: r for r in results}
+    assert by_id["F-24"]["verdict"] == "FAIL", (
+        f"F-24 must FAIL on orphan transport 'newserver'; got {by_id['F-24']}"
+    )
+    assert by_id["F-24"]["severity"] == "HIGH"
+    assert any(
+        "newserver" in v for v in by_id["F-24"].get("sample_violations", [])
+    ), f"orphan_transport:newserver expected in violations; got {by_id['F-24']}"
+    # FAIL HIGH (no manual_triage) → aggregator RED.
+    agg = vi.aggregate_verdicts(results)
+    assert agg["overall"] == "RED", (
+        f"F-24 FAIL HIGH must drive aggregator RED; got {agg['overall']}"
+    )
+
+
+def test_f24_orphan_inventory_fail(
+    clean_wb_path: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F-24 FAIL when the registry inventories a server absent from .mcp.json
+    (orphan inventory): registry +'legacy' → FAIL HIGH."""
+    slug = "drifttest"
+    engine_root = tmp_path / "engine"
+    _write_engine_mcp_pair(
+        engine_root,
+        mcp_servers=["gsc", "dataforseo", "scrapling", "sf"],
+        registry_servers=["gsc", "dataforseo", "scrapling", "sf", "legacy"],
+    )
+    monkeypatch.setattr(vi, "_REPO_ROOT", engine_root)
+
+    wb = load_workbook(str(clean_wb_path), data_only=True, read_only=True)
+    try:
+        results = vi.evaluate_all(wb, slug, workspace_root=tmp_path)
+    finally:
+        wb.close()
+    by_id = {r["id"]: r for r in results}
+    assert by_id["F-24"]["verdict"] == "FAIL", (
+        f"F-24 must FAIL on orphan inventory 'legacy'; got {by_id['F-24']}"
+    )
+    assert by_id["F-24"]["severity"] == "HIGH"
+    assert any(
+        "legacy" in v for v in by_id["F-24"].get("sample_violations", [])
+    ), f"orphan_inventory:legacy expected in violations; got {by_id['F-24']}"
+
+
+def test_f24_either_file_missing_skip(
+    clean_wb_path: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F-24 SKIP when either engine file is missing (engine state ambiguous).
+
+    Here the registry exists but .mcp.json is absent → SKIP (NOT FAIL):
+    drift-check must not hard-fail on an incomplete engine checkout. Mirrors
+    the spec FE-1 'SKIP cases: Either file missing' contract.
+    """
+    slug = "drifttest"
+    engine_root = tmp_path / "engine"
+    # Write ONLY the registry; .mcp.json deliberately omitted.
+    _write_engine_mcp_pair(
+        engine_root, mcp_servers=None, registry_servers=["gsc", "sf"],
+    )
+    monkeypatch.setattr(vi, "_REPO_ROOT", engine_root)
+
+    wb = load_workbook(str(clean_wb_path), data_only=True, read_only=True)
+    try:
+        results = vi.evaluate_all(wb, slug, workspace_root=tmp_path)
+    finally:
+        wb.close()
+    by_id = {r["id"]: r for r in results}
+    assert by_id["F-24"]["verdict"] == "SKIP", (
+        f"F-24 must SKIP when .mcp.json is missing; got {by_id['F-24']}"
+    )
+    assert ".mcp.json" in by_id["F-24"]["evidence"]

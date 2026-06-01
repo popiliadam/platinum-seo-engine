@@ -978,6 +978,93 @@ def check_F_23(workbook: Any, project_slug: str, *,
     )
 
 
+# D-SF-02 (naming.md) alignment: .mcp.json carries the legacy capitalized
+# transport label "ScraplingServer" while mcp-tool-registry.json uses the
+# canonical lowercase server key "scrapling". Normalize the .mcp.json side to
+# the registry's canonical key before the set comparison. This is an EXPLICIT
+# alias map, NOT a blanket .lower() — a generic casefold would yield
+# "scraplingserver" != "scrapling" and raise a false-positive FAIL (spec R3).
+_MCP_JSON_KEY_ALIASES = {"ScraplingServer": "scrapling"}
+
+
+def check_F_24(workbook: Any, project_slug: str, *,
+               workspace_root: Path | None = None, **_) -> dict:
+    """`.mcp.json` ↔ `mcp-tool-registry.json` servers-key sync (v1.9 Phase 2):
+    the set of `.mcp.json` mcpServers keys MUST equal the set of
+    mcp-tool-registry.json servers keys, after the ScraplingServer→scrapling
+    alias (D-SF-02). Engine-level invariant — ignores workspace_root; reads
+    the two repo-root engine files only (never mutates them, F-16 safe).
+
+    Detection logic:
+      1. Read engine repo-root .mcp.json + mcp-tool-registry.json.
+      2. Either file missing → SKIP (engine state ambiguous → AMBER).
+      3. Either file unparseable → FAIL HIGH.
+      4. Normalize .mcp.json keys via _MCP_JSON_KEY_ALIASES; compare sets.
+      5. Server in .mcp.json but not registry (orphan transport) OR in
+         registry but not .mcp.json (orphan inventory) → FAIL HIGH (RED).
+      6. Sets equal → PASS.
+    """
+    rule = (
+        ".mcp.json mcpServers keys MUST equal mcp-tool-registry.json servers "
+        "keys (sets comparison; ScraplingServer↔scrapling case-fold per "
+        "D-SF-02 alignment)"
+    )
+    mcp_path = _REPO_ROOT / ".mcp.json"
+    registry_path = _REPO_ROOT / "mcp-tool-registry.json"
+    missing = [p.name for p in (mcp_path, registry_path) if not p.exists()]
+    if missing:
+        return _make_result(
+            id_="F-24", severity="HIGH", verdict="SKIP",
+            evidence=(
+                f"{', '.join(missing)} missing at engine repo root — "
+                "engine state ambiguous, surfaces AMBER"
+            ),
+            rule=rule, category="csr_mcp",
+        )
+    try:
+        mcp_config = json.loads(mcp_path.read_text(encoding="utf-8"))
+        registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return _make_result(
+            id_="F-24", severity="HIGH", verdict="FAIL",
+            evidence=f".mcp.json or mcp-tool-registry.json unparseable: {exc}",
+            rule=rule, category="csr_mcp",
+        )
+    # ScraplingServer→scrapling normalization applied to the transport side.
+    transport_keys = {
+        _MCP_JSON_KEY_ALIASES.get(k, k)
+        for k in (mcp_config.get("mcpServers") or {})
+    }
+    inventory_keys = set(registry.get("servers") or {})
+    orphan_transport = sorted(transport_keys - inventory_keys)
+    orphan_inventory = sorted(inventory_keys - transport_keys)
+    if orphan_transport or orphan_inventory:
+        violations = (
+            [f"orphan_transport:{k}" for k in orphan_transport]
+            + [f"orphan_inventory:{k}" for k in orphan_inventory]
+        )
+        return _make_result(
+            id_="F-24", severity="HIGH", verdict="FAIL",
+            evidence=(
+                ".mcp.json↔mcp-tool-registry.json server-key delta "
+                "(post ScraplingServer→scrapling normalization): "
+                f"orphan_transport={orphan_transport or '∅'} "
+                f"orphan_inventory={orphan_inventory or '∅'}"
+            ),
+            rule=rule, category="csr_mcp",
+            sample_violations=violations,
+            affected_rows=len(violations),
+        )
+    return _make_result(
+        id_="F-24", severity="HIGH", verdict="PASS",
+        evidence=(
+            f"{len(transport_keys)} server keys aligned across .mcp.json + "
+            f"mcp-tool-registry.json: {sorted(transport_keys)}"
+        ),
+        rule=rule, category="csr_mcp",
+    )
+
+
 def check_F_17(workbook: Any, project_slug: str, **_) -> dict:
     """severity column ⊆ severityEnum 4-value (LOW/MEDIUM/HIGH/CRITICAL).
 
@@ -1253,6 +1340,7 @@ _RULE_FUNCTIONS = (
     check_F_08, check_F_09, check_F_10, check_F_11, check_F_12,
     check_F_13, check_F_14, check_F_15, check_F_16, check_F_17,
     check_F_23,  # v1.8 Phase 4 SF MCP cross-sheet
+    check_F_24,  # v1.9 Phase 2 .mcp.json↔registry key sync
     # MEDIUM
     check_F_18, check_F_19, check_F_20, check_F_21, check_F_22,
 )
@@ -1476,4 +1564,5 @@ __all__: Iterable[str] = (
     "check_F_13", "check_F_14", "check_F_15", "check_F_16", "check_F_17",
     "check_F_18", "check_F_19", "check_F_20", "check_F_21", "check_F_22",
     "check_F_23",
+    "check_F_24",
 )
