@@ -244,6 +244,14 @@
       "category": "csr_mcp",
       "rationale": "v1.9 Phase 2 D-V1.9-02 cross-sheet invariant — detects drift between .mcp.json transport config + mcp-tool-registry.json tool inventory. Orphan transport (.mcp.json server missing from registry) OR orphan inventory (registry server missing from .mcp.json) → FAIL. ScraplingServer (capital) in .mcp.json normalizes to scrapling (lowercase) in registry per D-SF-02 naming.md alignment. Category csr_mcp mirrors F-23 (the analogous .mcp.json↔registry MCP invariant): spec FE-1 proposed 'engine_consistency' but that value is NOT in consistency-report.schema.json's 8-category enum, so check_F_24 emits csr_mcp to keep the JSON registry aligned with the code's report category — see Q-V1.9-PHASE-2-WORKER-01.",
       "computed_by": "consistency_check"
+    },
+    {
+      "id": "F-25",
+      "rule": "if project.config.sf.mcp.enabled=true, project.config.schema_version MUST be >= '1.5' (Migration 0005 prerequisite)",
+      "severity": "HIGH",
+      "category": "csr_mcp",
+      "rationale": "v1.9 Phase 3 D-V1.9-10 — defensive check enforcing schema version coherence. Migration 0005 (v1.4→v1.5) adds sf block; enabled=true on v1.4 is impossible per Migration 0005 lock but defensive check catches manual misconfiguration. Category csr_mcp (mirrors F-23/F-24, the analogous MCP invariants): the consistency-report.schema.json 8-category enum has no SF-specific bucket, so check_F_25 emits csr_mcp. Version comparison is integer-tuple (split on '.'), NOT lexicographic — correct past '1.10' (D-V1.9-10).",
+      "computed_by": "consistency_check"
     }
   ]
 }

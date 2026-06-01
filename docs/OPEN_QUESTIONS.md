@@ -2,6 +2,23 @@
 
 ## Unresolved
 
+### Q-V1.9-PHASE-3-CLOSURE-FOLLOWUPS-01: v1.9 Phase 3 closure — 1 LOW pre-existing-drift OQ (DEFERRED to Phase 6) [P3] ✅ LOGGED 2026-06-01
+**Raised:** 2026-06-01 v1.9 Phase 3 closure (Manager GO after independent verification: F-16 md5, F-25 entry/registration, version-compare logic, cascade, 5 tests). Worker Output Package §"Open Question".
+**Context:** Phase 3 Worker implemented F-25 (`sf.mcp.enabled`⇒`schema_version≥1.5`; check_F_25 + integer-tuple `_version_tuple` + JSON 29→30 + drift-check + 5 tests; pytest 1253/12/0; F-16 .mcp.json md5 unchanged). Honored ALL dispatch-note overlays (count 22→23, integer version compare, 5th SKIP test, csr_mcp, F-16 proof). Surfaced 1 LOW pre-existing-drift OQ; did NOT block GO.
+
+**OQ table:**
+| ID | Drift | Severity | Manager Decision |
+|----|-------|----------|------------------|
+| Q-V1.9-PHASE-3-WORKER-01 | `skills/governance/drift-check/SKILL.md` carries **pre-existing stale narrative counts** that predate F-24 (untouched by the per-phase cite/table updates): line 162 "`evaluate_invariants` (20 rules)", 171 "The 21 rules are partitioned", 176 tier table "HIGH \| 11", 266 "## 20 Invariant Rules", 464 "(11 cases incl. live pilot)". Actual now = 23 implemented rules / 13 HIGH / 23 drift-check test cases. Narrative-body only (NOT the 4 `invariants:NN` cite spots or the `### HIGH (NN)` heading that the phases DO update). | LOW (narrative; zero runtime impact) | ⏳ **DEFER to Phase 6 EXPANDED count-reconciliation sweep.** Counts still moving (Phase 4 F-26 → implemented 24); reconcile ONCE at final stable value. **CONVERGES with Q-V1.9-PHASE-2-WORKER-02** (monitoring-weekly:115/502=21, events-writer:156=20) into a single Phase 6 task. **⚠️ Phase 6 LC-5's grep targets skill/command/MCP counts ONLY (`43 skill`/`3 MCP server` etc.) — it would NOT catch invariant counts. Phase 6 dispatch MUST expand scope** to reconcile ALL invariant-count references (drift-check SKILL.md narrative 162/171/176/266/464 + sibling-file cites) to the FINAL implemented count (24) / declared count (31) after F-26 lands. |
+
+**Consolidated Phase 6 count-reconciliation backlog (Manager tracking):**
+1. drift-check SKILL.md narrative: lines 162/171/176/266/464 (this OQ) → 24 implemented / 13 HIGH / 6 MEDIUM / actual test count
+2. monitoring-weekly/SKILL.md:115,502 (`invariants:21`) → final implemented count (Phase-2 W-02)
+3. rules/events-writer.md:156 (`invariants:20`) → final implemented count (Phase-2 W-02)
+→ All reconcile to drift-check's FINAL implemented `invariants:24` (after Phase 4 F-26) + declared 31.
+
+**Cross-refs:** `docs/PHASE_STATUS.md` v1.9 Phase 3 DONE entry; Phase 3 Worker Output Package; Q-V1.9-PHASE-2-CLOSURE-FOLLOWUPS-01 (W-02 convergence); spec Phase 6 LC-5 (grep scope expansion needed); `skills/governance/drift-check/SKILL.md` lines 162/171/176/266/464.
+
 ### Q-V1.9-PHASE-2-CLOSURE-FOLLOWUPS-01: v1.9 Phase 2 closure — 2 LOW schema-first deviations (both ACCEPTED) [P3] ✅ ACCEPTED 2026-06-01
 **Raised:** 2026-06-01 v1.9 Phase 2 closure (Manager GO after independent verification). Worker Output Package §"Open Questions" + Manager cross-check (F-16 md5, schema entry, registration, cascade).
 **Context:** Phase 2 Worker implemented F-24 (`.mcp.json`↔`mcp-tool-registry.json` servers-key sync; check_F_24 + JSON entry + drift-check + 4 tests; pytest 1248/12/0; F-16 .mcp.json md5 unchanged). Surfaced 2 LOW schema-first deviations from the dispatch — both genuine ground-truth catches, both improve correctness, neither blocked GO. Schema-first-wins paterni reuse (v1.8 Q-PHASE-3-WORKER-06/07).
