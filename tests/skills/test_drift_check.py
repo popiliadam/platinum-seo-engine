@@ -592,6 +592,203 @@ def test_f23_orchestrator_runs_with_sf_registry_pass(
 
 
 # ---------------------------------------------------------------------------
+# Test 12b — F-23 (v1.9 Phase 5): workspace-aware dual-registry enhancement
+# (Q-V1.9-03 additive fallback; engine-repo registry PRIMARY, workspace
+# registry secondary; FAIL if EITHER existing registry missing 'sf').
+# ---------------------------------------------------------------------------
+
+def test_f23_workspace_registry_only_pass(
+    clean_wb_path: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F-23 PASS when the engine repo-root registry is ABSENT but a
+    workspace-level mcp-tool-registry.json (PSEO_WORKSPACE_ROOT deployment)
+    lists 'sf'. v1.9 Phase 5: the workspace registry can satisfy the
+    invariant on its own when the engine registry is missing."""
+    slug = "drifttest"
+    wf_dir = tmp_path / "projects" / slug / "_state" / "workflows"
+    wf_dir.mkdir(parents=True, exist_ok=True)
+    run_payload = {
+        "schema_version": "1.0",
+        "run_id": f"{slug}-2026-05-26-feed",
+        "skill": "sf-crawl-orchestrator",
+        "project_slug": slug,
+        "status": "done",
+        "created_at": "2026-05-26T10:00:00Z",
+        "updated_at": "2026-05-26T11:00:00Z",
+        "completed_at": "2026-05-26T11:00:00Z",
+        "steps": [{"name": "complete", "status": "done"}],
+    }
+    (wf_dir / f"{run_payload['run_id']}.json").write_text(
+        json.dumps(run_payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    # Engine repo-root has NO registry (fresh checkout); _REPO_ROOT points at
+    # an empty engine dir so the PRIMARY registry path does not exist.
+    engine_root = tmp_path / "engine"
+    engine_root.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(vi, "_REPO_ROOT", engine_root)
+
+    # Workspace-level registry (sibling of projects/) DOES list 'sf'.
+    workspace_registry = {
+        "schema_version": "1.0",
+        "servers": {
+            "gsc": {"display_name": "GSC", "tools": []},
+            "sf": {"display_name": "SF 24 MCP", "tools": []},
+        },
+    }
+    (tmp_path / "mcp-tool-registry.json").write_text(
+        json.dumps(workspace_registry, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    wb = load_workbook(str(clean_wb_path), data_only=True, read_only=True)
+    try:
+        results = vi.evaluate_all(wb, slug, workspace_root=tmp_path)
+    finally:
+        wb.close()
+    by_id = {r["id"]: r for r in results}
+    assert by_id["F-23"]["verdict"] == "PASS", (
+        f"F-23 must PASS when workspace registry has 'sf' even though the "
+        f"engine registry is absent; got {by_id['F-23']}"
+    )
+    assert by_id["F-23"]["severity"] == "HIGH"
+    assert "workspace" in by_id["F-23"]["evidence"]
+    assert "sf-crawl-orchestrator" in by_id["F-23"]["evidence"]
+
+
+def test_f23_workspace_registry_missing_sf_fail(
+    clean_wb_path: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F-23 FAIL (broad enforcement) when the engine registry HAS 'sf' but a
+    workspace-level registry is MISSING 'sf'. v1.9 Phase 5: the invariant
+    fails if EITHER existing registry is missing 'sf'."""
+    slug = "drifttest"
+    wf_dir = tmp_path / "projects" / slug / "_state" / "workflows"
+    wf_dir.mkdir(parents=True, exist_ok=True)
+    run_payload = {
+        "schema_version": "1.0",
+        "run_id": f"{slug}-2026-05-26-beef",
+        "skill": "sf-crawl-orchestrator",
+        "project_slug": slug,
+        "status": "done",
+        "created_at": "2026-05-26T10:00:00Z",
+        "updated_at": "2026-05-26T11:00:00Z",
+        "completed_at": "2026-05-26T11:00:00Z",
+        "steps": [{"name": "complete", "status": "done"}],
+    }
+    (wf_dir / f"{run_payload['run_id']}.json").write_text(
+        json.dumps(run_payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    # Engine repo-root registry DOES list 'sf' (healthy primary).
+    engine_root = tmp_path / "engine"
+    engine_root.mkdir(parents=True, exist_ok=True)
+    good_registry = {
+        "schema_version": "1.0",
+        "servers": {
+            "gsc": {"display_name": "GSC", "tools": []},
+            "sf": {"display_name": "SF 24 MCP", "tools": []},
+        },
+    }
+    (engine_root / "mcp-tool-registry.json").write_text(
+        json.dumps(good_registry, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(vi, "_REPO_ROOT", engine_root)
+
+    # Workspace-level registry is MISSING 'sf' — broad enforcement must
+    # surface this even though the engine side is clean.
+    workspace_registry = {
+        "schema_version": "1.0",
+        "servers": {
+            "gsc": {"display_name": "GSC", "tools": []},
+            "dataforseo": {"display_name": "DFS", "tools": []},
+        },
+    }
+    (tmp_path / "mcp-tool-registry.json").write_text(
+        json.dumps(workspace_registry, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    wb = load_workbook(str(clean_wb_path), data_only=True, read_only=True)
+    try:
+        results = vi.evaluate_all(wb, slug, workspace_root=tmp_path)
+    finally:
+        wb.close()
+    by_id = {r["id"]: r for r in results}
+    assert by_id["F-23"]["verdict"] == "FAIL", (
+        f"F-23 must FAIL when the workspace registry is missing 'sf' even "
+        f"though the engine registry has it (broad enforcement); "
+        f"got {by_id['F-23']}"
+    )
+    assert by_id["F-23"]["severity"] == "HIGH"
+    assert "workspace" in by_id["F-23"]["evidence"]
+    agg = vi.aggregate_verdicts(results)
+    assert agg["overall"] == "RED", (
+        f"F-23 FAIL HIGH must drive aggregator RED; got {agg['overall']}"
+    )
+
+
+def test_f23_dual_registry_both_pass(
+    clean_wb_path: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F-23 PASS when BOTH the engine repo-root registry and the
+    workspace-level registry list 'sf'. v1.9 Phase 5: dual-registry happy
+    path — both sources advertise the 'sf' server."""
+    slug = "drifttest"
+    wf_dir = tmp_path / "projects" / slug / "_state" / "workflows"
+    wf_dir.mkdir(parents=True, exist_ok=True)
+    run_payload = {
+        "schema_version": "1.0",
+        "run_id": f"{slug}-2026-05-26-d00d",
+        "skill": "sf-crawl-orchestrator",
+        "project_slug": slug,
+        "status": "done",
+        "created_at": "2026-05-26T10:00:00Z",
+        "updated_at": "2026-05-26T11:00:00Z",
+        "completed_at": "2026-05-26T11:00:00Z",
+        "steps": [{"name": "complete", "status": "done"}],
+    }
+    (wf_dir / f"{run_payload['run_id']}.json").write_text(
+        json.dumps(run_payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    registry = {
+        "schema_version": "1.0",
+        "servers": {
+            "gsc": {"display_name": "GSC", "tools": []},
+            "sf": {"display_name": "SF 24 MCP", "tools": []},
+        },
+    }
+    engine_root = tmp_path / "engine"
+    engine_root.mkdir(parents=True, exist_ok=True)
+    (engine_root / "mcp-tool-registry.json").write_text(
+        json.dumps(registry, ensure_ascii=False, indent=2), encoding="utf-8",
+    )
+    monkeypatch.setattr(vi, "_REPO_ROOT", engine_root)
+    (tmp_path / "mcp-tool-registry.json").write_text(
+        json.dumps(registry, ensure_ascii=False, indent=2), encoding="utf-8",
+    )
+
+    wb = load_workbook(str(clean_wb_path), data_only=True, read_only=True)
+    try:
+        results = vi.evaluate_all(wb, slug, workspace_root=tmp_path)
+    finally:
+        wb.close()
+    by_id = {r["id"]: r for r in results}
+    assert by_id["F-23"]["verdict"] == "PASS", (
+        f"F-23 must PASS when both engine + workspace registries have 'sf'; "
+        f"got {by_id['F-23']}"
+    )
+    assert by_id["F-23"]["severity"] == "HIGH"
+    assert "engine" in by_id["F-23"]["evidence"]
+    assert "workspace" in by_id["F-23"]["evidence"]
+
+
+# ---------------------------------------------------------------------------
 # Test 13 — F-24 (v1.9 Phase 2): .mcp.json ↔ mcp-tool-registry.json key sync
 # ---------------------------------------------------------------------------
 

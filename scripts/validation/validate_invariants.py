@@ -891,17 +891,26 @@ def check_F_16(workbook: Any, project_slug: str, **_) -> dict:
 
 def check_F_23(workbook: Any, project_slug: str, *,
                workspace_root: Path | None = None, **_) -> dict:
-    """SF MCP cross-sheet invariant (v1.8 Phase 4):
+    """SF MCP cross-sheet invariant (v1.8 Phase 4; v1.9 Phase 5 enhancement):
     if any _state/workflows/*.json shows a completed sf-crawl-orchestrator
     run, the repo-root mcp-tool-registry.json MUST list 'sf' under servers.
 
     Detection logic:
       1. Walk projects/{slug}/_state/workflows/*.json.
       2. Filter to skill=='sf-crawl-orchestrator' AND status=='done'.
-      3. Read engine repo-root mcp-tool-registry.json; check 'sf' key in
-         servers.
+      3. Read engine repo-root mcp-tool-registry.json (PRIMARY); check 'sf'
+         key in servers.
       4. Non-empty evidence + missing 'sf' → FAIL HIGH (RED).
-      5. Registry absent (fresh engine checkout) → SKIP (AMBER).
+      5. Both registries absent (fresh engine checkout) → SKIP (AMBER).
+
+    v1.9 Phase 5 (Q-V1.9-03 — ADDITIVE workspace-aware fallback, NOT a
+    breaking refactor): when a workspace-level mcp-tool-registry.json exists
+    at {workspace_root}/mcp-tool-registry.json (PSEO_WORKSPACE_ROOT
+    deployments, spec FE-5), it is checked IN ADDITION to the engine
+    registry. The invariant FAILs if EITHER existing registry is missing
+    'sf' (broad enforcement — orphan crawl evidence OR missing inventory both
+    surface). Engine-repo-only deployments (the default — no workspace
+    registry) behave identically to v1.8.
     """
     rule = (
         "if any project's _state/workflows/ has a completed "
@@ -934,35 +943,62 @@ def check_F_23(workbook: Any, project_slug: str, *,
             evidence="no completed sf-crawl-orchestrator runs found — invariant vacuous",
             rule=rule, category="csr_mcp",
         )
-    registry_path = _REPO_ROOT / "mcp-tool-registry.json"
-    if not registry_path.exists():
+    # v1.9 Phase 5 (Q-V1.9-03): ADDITIVE dual-registry check. The engine
+    # repo-root registry stays the PRIMARY source; a workspace-level
+    # mcp-tool-registry.json (PSEO_WORKSPACE_ROOT deployments, spec FE-5) is
+    # checked IN ADDITION when present. The workspace root is already
+    # resolvable here (else _project_dir above would have raised).
+    engine_registry_path = _REPO_ROOT / "mcp-tool-registry.json"
+    workspace_registry_path = (
+        _resolve_workspace_root(workspace_root) / "mcp-tool-registry.json"
+    )
+    candidate_registries = [("engine", engine_registry_path)]
+    if (workspace_registry_path != engine_registry_path
+            and workspace_registry_path.exists()):
+        candidate_registries.append(("workspace", workspace_registry_path))
+
+    present: list[tuple[str, dict]] = []
+    for label, path in candidate_registries:
+        if not path.exists():
+            continue
+        try:
+            present.append(
+                (label, json.loads(path.read_text(encoding="utf-8")))
+            )
+        except (OSError, json.JSONDecodeError) as exc:
+            return _make_result(
+                id_="F-23", severity="HIGH", verdict="FAIL",
+                evidence=f"{label} mcp-tool-registry.json unparseable: {exc}",
+                rule=rule, category="csr_mcp",
+                sample_violations=sf_runs[:_SAMPLE_CAP],
+                affected_rows=len(sf_runs),
+            )
+
+    if not present:
+        # Neither engine nor workspace registry present — engine state
+        # ambiguous (preserves the v1.8 SKIP/AMBER path verbatim).
         return _make_result(
             id_="F-23", severity="HIGH", verdict="SKIP",
             evidence=(
-                f"mcp-tool-registry.json missing at {registry_path} but "
-                f"{len(sf_runs)} sf-crawl-orchestrator run(s) present — "
+                f"mcp-tool-registry.json missing at {engine_registry_path} "
+                f"but {len(sf_runs)} sf-crawl-orchestrator run(s) present — "
                 "engine state ambiguous, surfaces AMBER"
             ),
             rule=rule, category="csr_mcp",
             sample_violations=sf_runs[:_SAMPLE_CAP],
         )
-    try:
-        registry = json.loads(registry_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        return _make_result(
-            id_="F-23", severity="HIGH", verdict="FAIL",
-            evidence=f"mcp-tool-registry.json unparseable: {exc}",
-            rule=rule, category="csr_mcp",
-            sample_violations=sf_runs[:_SAMPLE_CAP],
-            affected_rows=len(sf_runs),
-        )
-    servers = registry.get("servers") or {}
-    if "sf" not in servers:
+
+    missing = [
+        label for label, reg in present
+        if "sf" not in (reg.get("servers") or {})
+    ]
+    if missing:
         return _make_result(
             id_="F-23", severity="HIGH", verdict="FAIL",
             evidence=(
-                f"{len(sf_runs)} completed sf-crawl-orchestrator run(s) "
-                f"but mcp-tool-registry.json servers missing 'sf' key"
+                f"{len(sf_runs)} completed sf-crawl-orchestrator run(s) but "
+                f"{', '.join(missing)} mcp-tool-registry.json servers "
+                "missing 'sf' key"
             ),
             rule=rule, category="csr_mcp",
             sample_violations=sf_runs[:_SAMPLE_CAP],
@@ -972,6 +1008,7 @@ def check_F_23(workbook: Any, project_slug: str, *,
         id_="F-23", severity="HIGH", verdict="PASS",
         evidence=(
             f"{len(sf_runs)} sf-crawl-orchestrator run(s) backed by "
+            f"{', '.join(label for label, _ in present)} "
             "mcp-tool-registry.json servers['sf'] entry"
         ),
         rule=rule, category="csr_mcp",

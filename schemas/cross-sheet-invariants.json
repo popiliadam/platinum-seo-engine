@@ -234,7 +234,7 @@
       "rule": "if any project's _state/workflows/ has a completed sf-crawl-orchestrator run, mcp-tool-registry.json MUST list 'sf' under servers",
       "severity": "HIGH",
       "category": "csr_mcp",
-      "rationale": "v1.8 Phase 4 D-SF-01/D-SF-02 cross-sheet invariant: a workspace that has produced SF MCP crawl evidence MUST have the engine's tool registry advertising the 'sf' server, otherwise downstream sf-import handoff and tooling discovery (claude mcp list cross-check) silently desync. Mirrors Q-SF-MCP-PHASE-3-CLOSURE-FOLLOWUPS-01 schema-first catch — workflow state and registry advertisement must stay aligned. severity HIGH (not CRITICAL) per Manager spec — drift produces broken provenance lineage but does not corrupt master.xlsx.",
+      "rationale": "v1.8 Phase 4 D-SF-01/D-SF-02 cross-sheet invariant: a workspace that has produced SF MCP crawl evidence MUST have the engine's tool registry advertising the 'sf' server, otherwise downstream sf-import handoff and tooling discovery (claude mcp list cross-check) silently desync. Mirrors Q-SF-MCP-PHASE-3-CLOSURE-FOLLOWUPS-01 schema-first catch — workflow state and registry advertisement must stay aligned. severity HIGH (not CRITICAL) per Manager spec — drift produces broken provenance lineage but does not corrupt master.xlsx. v1.9 Phase 5 enhancement: dual-registry check (engine-repo primary + workspace-registry fallback when PSEO_WORKSPACE_ROOT set). Backward compat: engine-repo only deployments work unchanged.",
       "computed_by": "consistency_check"
     },
     {

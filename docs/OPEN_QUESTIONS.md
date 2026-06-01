@@ -2,6 +2,16 @@
 
 ## Unresolved
 
+### Q-V1.9-PHASE-5-CLOSURE-FOLLOWUPS-01: v1.9 Phase 5 closure — 0 OQs (regression-free additive enhancement) [P3] ✅ CLEAN 2026-06-01
+**Raised:** 2026-06-01 v1.9 Phase 5 closure (Manager GO after rigorous regression verification). Worker Output Package §"Open Questions: None".
+**Context:** Phase 5 enhanced check_F_23 (additive workspace-aware dual-registry fallback, Q-V1.9-03) — the ONLY v1.9 phase modifying an existing v1.8 function (highest regression risk, R1). Worker followed TDD (RED→GREEN: 3 new tests FAIL against v1.8 code, then PASS after enhancement). **0 OQs surfaced — cleanest phase.**
+**Manager regression verification (titiz, the diff was read line-by-line):**
+- BEFORE 3 F-23 PASS → AFTER 6 PASS; test file numstat **+197/-0** (ZERO deletions → existing 3 tests byte-unchanged = the regression proof).
+- check_F_23 diff confirmed ADDITIVE: engine-repo registry stays PRIMARY; the engine-only path (no workspace registry — the default) reduces to EXACT v1.8 logic → identical verdicts. Workspace branch is dead code for the existing fixtures (they never create a workspace registry). `workspace!=engine` guard prevents double-count; `if not present→SKIP` preserves v1.8 ambiguous path verbatim.
+- **ZERO count drift:** declared 31, implemented 24 (no _RULE_FUNCTIONS/__all__ in diff), cascade ==24 untouched, HIGH 13, cites :24 (SKILL.md absent from diff). F-16 .mcp.json md5 unchanged. pytest 1257→1260 (+3). severity="HIGH" preserved.
+**No action needed.** Carry-forward = the consolidated Phase 6 count-reconciliation backlog (below in Q-V1.9-PHASE-4-CLOSURE-FOLLOWUPS-01), now with the test count FINAL (Phase 5 was the last test-adding phase).
+**Cross-refs:** `docs/PHASE_STATUS.md` v1.9 Phase 5 DONE entry; Phase 5 Worker Output Package; `scripts/validation/validate_invariants.py` check_F_23 (additive dual-registry diff); Q-V1.9-PHASE-4-CLOSURE-FOLLOWUPS-01 (Phase 6 count-reconciliation backlog).
+
 ### Q-V1.9-PHASE-4-CLOSURE-FOLLOWUPS-01: v1.9 Phase 4 closure — 1 LOW pre-existing-drift OQ (DEFERRED to Phase 6) [P3] ✅ LOGGED 2026-06-01
 **Raised:** 2026-06-01 v1.9 Phase 4 closure (Manager GO after rigorous verification: F-16 md5, F-26 entry, csr_mcp-trap grep, check_F_26 R2 logic read line-by-line, cascade, 4 tests, test_sf_mcp_client unbroken). Worker Output Package §"OQ logged".
 **Context:** Phase 4 Worker implemented F-26 (orphan SF crawl detection, MCP-aware MEDIUM→AMBER) via TDD — declared count hit 31 (AC-4/AC-16 target). Honored ALL dispatch overlays: csr_mcp alone (mcp_runtime trap avoided), MEDIUM→AMBER, cite 23→24 / MEDIUM 5→6 / HIGH stays 13, cascade ==24, 1s health-probe-gate (R2), DI seam (F-16 safe), real crawl_id shape (steps[].output_ref). Surfaced 1 LOW pre-existing-drift OQ; did NOT block GO.
