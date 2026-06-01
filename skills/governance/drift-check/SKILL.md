@@ -48,14 +48,14 @@ autonomy:
 # drift-check — governance skill (Phase 5 Wave 2)
 
 Read-only consistency engine. Loads `master.xlsx` (data_only=True,
-read_only=True), evaluates **21 hand-coded invariant rules** (5
-CRITICAL + 11 HIGH + 5 MEDIUM; F-23 added v1.8 Phase 4 SF MCP
-cross-sheet rule), aggregates per §17.2 verdict logic
+read_only=True), evaluates **22 hand-coded invariant rules** (5
+CRITICAL + 12 HIGH + 5 MEDIUM; F-23 added v1.8 Phase 4, F-24 added
+v1.9 Phase 2), aggregates per §17.2 verdict logic
 (any RED → RED; else any AMBER → AMBER; all PASS → GREEN), emits a
 `consistency-report-{slug}.json` (validated against
 `schemas/consistency-report.schema.json`), renders a human-readable
 markdown report, and appends an `event_kind=audit` row to `events.jsonl`
-with `audit_action="accessed"` and `audit_target="invariants:21"`.
+with `audit_action="accessed"` and `audit_target="invariants:22"`.
 
 The rules are hand-coded Python functions, **not** a DSL — that is a
 deliberate Phase 6+ refactor candidate (§17.2 ADR-TBD). Each rule
@@ -86,7 +86,7 @@ list.
 - `projects/{slug}/outputs/reports/{date}-drift-{slug}.md` — human report.
 - `projects/{slug}/_state/consistency-report-{slug}.json` — schema-valid JSON.
 - `projects/{slug}/_state/events.jsonl` — single `event_kind=audit` entry
-  (`audit_action=accessed`, `audit_target=invariants:21`).
+  (`audit_action=accessed`, `audit_target=invariants:22`).
 
 ## 8-Step Body Protocol
 
@@ -228,14 +228,14 @@ Template variables: `$project_slug`, `$date`, `$verdict`, `$pass_count`,
 # events_writer.append_audit(
 #     project_id=project_slug,
 #     audit_action="accessed",
-#     audit_target="invariants:21",
+#     audit_target="invariants:22",
 #     actor="drift-check",
 #     notes=f"verdict={agg['overall']} fails={agg['fail_count']}",
 # )
 audit_payload = {
     "event_kind": "audit",
     "audit_action": "accessed",
-    "audit_target": "invariants:21",
+    "audit_target": "invariants:22",
     "actor": "drift-check",
     "notes": f"verdict={agg['overall']} fails={agg['fail_count']}",
 }
@@ -292,7 +292,7 @@ def check_F_XX(workbook, project_slug) -> dict:
 | F-04  | dashboard formula `=AVERAGEIF(...)` drift check                       |
 | F-05  | schema_version field per-sheet present (every schema-known sheet has a header row matching schema column count; header row resolved via schema authority `sheets[sheet].header_row` with row-1 fallback — Phase 14 W3-W2-C-a) |
 
-### HIGH (11)
+### HIGH (12)
 
 | ID    | Rule                                                                  |
 |-------|-----------------------------------------------------------------------|
@@ -307,6 +307,7 @@ def check_F_XX(workbook, project_slug) -> dict:
 | F-16  | foreign key cross-sheet: quick_wins.url ⊆ opportunity.url             |
 | F-17  | severity column ⊆ severityEnum 4-value (LOW/MEDIUM/HIGH/CRITICAL)     |
 | F-23  | sf-crawl-orchestrator workflow → repo-root mcp-tool-registry.json has 'sf' (v1.8 Phase 4 SF MCP cross-sheet) |
+| F-24  | .mcp.json mcpServers keys == mcp-tool-registry.json servers keys (ScraplingServer↔scrapling case-fold; v1.9 Phase 2 engine transport↔inventory sync) |
 
 ### MEDIUM (5)
 
@@ -373,6 +374,35 @@ F-23..F-28 and collided with the canonical F-23; v1.8 Phase 6 renumbered
 the engine-self-governance labels to F-29..F-34 to remove the human-label
 collision. Both namespaces still live in disjoint stores (JSON registry
 vs SKILL.md narrative).
+
+## F-24 — `.mcp.json` ↔ `mcp-tool-registry.json` key sync (v1.9 Phase 2)
+
+The set of `.mcp.json` `mcpServers` keys MUST equal the set of
+`mcp-tool-registry.json` `servers` keys. `.mcp.json` is the MCP **transport**
+config (how each server is launched); `mcp-tool-registry.json` is the **tool
+inventory** (what each server advertises). If the two desync — a server
+configured for transport but absent from the inventory (**orphan transport**),
+or inventoried but not configured (**orphan inventory**) — tooling discovery
+and `claude mcp list` cross-checks silently disagree.
+
+Detection logic — `check_F_24()` reads (engine-level; ignores `workspace_root`,
+never mutates the files, F-16 safe):
+1. Engine repo-root `.mcp.json` → `mcpServers` keys.
+2. Engine repo-root `mcp-tool-registry.json` → `servers` keys.
+3. Normalizes the `.mcp.json` side via the **explicit** alias
+   `ScraplingServer → scrapling` (D-SF-02: `.mcp.json` carries the legacy
+   capitalized transport label, the registry the canonical lowercase key).
+   This is an explicit alias, **not** a blanket `.lower()` — a generic casefold
+   would yield `scraplingserver ≠ scrapling` and false-FAIL (spec risk R3).
+4. Non-empty set delta → FAIL HIGH (→ RED). Sample violations are tagged
+   `orphan_transport:<key>` / `orphan_inventory:<key>`.
+5. Either file missing → SKIP (engine state ambiguous; surfaces AMBER).
+
+Category `csr_mcp` (mirrors F-23). Severity HIGH (→ RED on FAIL): a
+transport/inventory desync breaks tooling-discovery provenance but does not
+corrupt `master.xlsx`. (Spec FE-1 proposed category `engine_consistency`; that
+value is not in `consistency-report.schema.json`'s 8-category enum, so
+`check_F_24` emits `csr_mcp` — see Q-V1.9-PHASE-2-WORKER-01.)
 
 ## F2 flag — F-08 RED is EXPECTED on the pilot workbook
 
