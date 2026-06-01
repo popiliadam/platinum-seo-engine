@@ -252,6 +252,14 @@
       "category": "csr_mcp",
       "rationale": "v1.9 Phase 3 D-V1.9-10 — defensive check enforcing schema version coherence. Migration 0005 (v1.4→v1.5) adds sf block; enabled=true on v1.4 is impossible per Migration 0005 lock but defensive check catches manual misconfiguration. Category csr_mcp (mirrors F-23/F-24, the analogous MCP invariants): the consistency-report.schema.json 8-category enum has no SF-specific bucket, so check_F_25 emits csr_mcp. Version comparison is integer-tuple (split on '.'), NOT lexicographic — correct past '1.10' (D-V1.9-10).",
       "computed_by": "consistency_check"
+    },
+    {
+      "id": "F-26",
+      "rule": "if _state/workflows/{run_id}.json shows sf-crawl-orchestrator status=paused|failed AND mcp__sf__sf_crawl_progress({crawl_id}) returns IN_PROGRESS, surface AMBER warning (orphan: workflow state + GUI state disagree)",
+      "severity": "MEDIUM",
+      "category": "csr_mcp",
+      "rationale": "v1.9 Phase 4 D-V1.9-11 — operator-level cleanup hint NOT blocking (AMBER not RED per spec v2.2 line 210). Optional MCP-aware check runs only when sf MCP responding within 1s health probe. SKIP if MCP unreachable (avoid blocking drift-check on MCP downtime). FIRST MEDIUM-severity v1.9 invariant (F-24/F-25 are HIGH). Category csr_mcp (mirrors F-23/F-24/F-25): the consistency-report.schema.json 8-category enum has no SF-specific bucket and spec FE-3's 'mcp_runtime' is narrative only (not in the closed enum), so check_F_26 emits csr_mcp.",
+      "computed_by": "consistency_check"
     }
   ]
 }

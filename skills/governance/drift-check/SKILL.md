@@ -48,14 +48,14 @@ autonomy:
 # drift-check — governance skill (Phase 5 Wave 2)
 
 Read-only consistency engine. Loads `master.xlsx` (data_only=True,
-read_only=True), evaluates **23 hand-coded invariant rules** (5
-CRITICAL + 13 HIGH + 5 MEDIUM; F-23 added v1.8 Phase 4, F-24 + F-25
-added v1.9 Phase 2/3), aggregates per §17.2 verdict logic
-(any RED → RED; else any AMBER → AMBER; all PASS → GREEN), emits a
-`consistency-report-{slug}.json` (validated against
+read_only=True), evaluates **24 hand-coded invariant rules** (5
+CRITICAL + 13 HIGH + 6 MEDIUM; F-23 added v1.8 Phase 4, F-24 + F-25
+added v1.9 Phase 2/3, F-26 added v1.9 Phase 4), aggregates per §17.2
+verdict logic (any RED → RED; else any AMBER → AMBER; all PASS → GREEN),
+emits a `consistency-report-{slug}.json` (validated against
 `schemas/consistency-report.schema.json`), renders a human-readable
 markdown report, and appends an `event_kind=audit` row to `events.jsonl`
-with `audit_action="accessed"` and `audit_target="invariants:23"`.
+with `audit_action="accessed"` and `audit_target="invariants:24"`.
 
 The rules are hand-coded Python functions, **not** a DSL — that is a
 deliberate Phase 6+ refactor candidate (§17.2 ADR-TBD). Each rule
@@ -86,7 +86,7 @@ list.
 - `projects/{slug}/outputs/reports/{date}-drift-{slug}.md` — human report.
 - `projects/{slug}/_state/consistency-report-{slug}.json` — schema-valid JSON.
 - `projects/{slug}/_state/events.jsonl` — single `event_kind=audit` entry
-  (`audit_action=accessed`, `audit_target=invariants:23`).
+  (`audit_action=accessed`, `audit_target=invariants:24`).
 
 ## 8-Step Body Protocol
 
@@ -228,14 +228,14 @@ Template variables: `$project_slug`, `$date`, `$verdict`, `$pass_count`,
 # events_writer.append_audit(
 #     project_id=project_slug,
 #     audit_action="accessed",
-#     audit_target="invariants:23",
+#     audit_target="invariants:24",
 #     actor="drift-check",
 #     notes=f"verdict={agg['overall']} fails={agg['fail_count']}",
 # )
 audit_payload = {
     "event_kind": "audit",
     "audit_action": "accessed",
-    "audit_target": "invariants:23",
+    "audit_target": "invariants:24",
     "actor": "drift-check",
     "notes": f"verdict={agg['overall']} fails={agg['fail_count']}",
 }
@@ -310,7 +310,7 @@ def check_F_XX(workbook, project_slug) -> dict:
 | F-24  | .mcp.json mcpServers keys == mcp-tool-registry.json servers keys (ScraplingServer↔scrapling case-fold; v1.9 Phase 2 engine transport↔inventory sync) |
 | F-25  | sf.mcp.enabled=true ⇒ project.config.schema_version >= '1.5' (Migration 0005 prerequisite; v1.9 Phase 3 schema-version coupling) |
 
-### MEDIUM (5)
+### MEDIUM (6)
 
 | ID    | Rule                                                                  |
 |-------|-----------------------------------------------------------------------|
@@ -319,6 +319,7 @@ def check_F_XX(workbook, project_slug) -> dict:
 | F-20  | events.jsonl per-line size <64 KB cap                                 |
 | F-21  | every cell value <32767 chars (Excel hard limit)                      |
 | F-22  | backup directory FIFO 7 (transaction.py keep-7 rotation)              |
+| F-26  | orphan SF crawl: paused/failed sf-crawl-orchestrator run + SF GUI still IN_PROGRESS (MCP-aware → AMBER not RED; v1.9 Phase 4; SKIP if MCP unreachable within 1s) |
 
 ### Engine Self-Governance (6, v1.4-deep-audit-fix Tier 4)
 
@@ -434,6 +435,42 @@ Severity HIGH (→ RED on FAIL): a version/coupling mismatch signals a migration
 bypass but does not corrupt `master.xlsx`. Migration 0005's idempotent lock
 makes case 6 unreachable in normal operation; the check is a defensive net for
 hand-edited configs (D-V1.9-10).
+
+## F-26 — orphan SF GUI crawl detection (v1.9 Phase 4, MCP-aware → AMBER)
+
+If a project's `_state/workflows/*.json` has an `sf-crawl-orchestrator` run that
+is **paused** or **failed**, but the SF GUI still reports that crawl
+`IN_PROGRESS`, the workflow state and the live GUI disagree — an *orphan* crawl
+the operator should reconcile (stop it, or resume/clean the run). This is an
+operator cleanup hint, **not** a data-integrity break, so F-26 is severity
+**MEDIUM → AMBER** (never RED) per D-V1.9-11 / spec v2.2 line 210. It is the
+first MEDIUM-severity v1.9 invariant (F-24/F-25 are HIGH).
+
+Detection logic — `check_F_26()` (OPTIONAL, MCP-aware; Risk R2 — never hang
+drift-check on MCP downtime):
+1. Walk `projects/{slug}/_state/workflows/*.json`; collect runs with
+   `skill == "sf-crawl-orchestrator"` AND `status ∈ {paused, failed}`. The
+   `crawl_id` is read from a step's `output_ref` (`crawl_id=<value>`) — the
+   orchestrator's persistence point, since `workflow-run.schema.json` is
+   `additionalProperties:false` at root.
+2. No such runs → **PASS** (vacuous; the common case — NO MCP call is made).
+3. 1s `SfMcpClient.health()` probe **before** any `sf_crawl_progress` call. Probe
+   fails (or the client can't be built) → **SKIP** (→ AMBER): drift-check must
+   never block waiting on a down SF MCP, and no progress call fires.
+4. MCP responding → for each stalled run with a `crawl_id`, call
+   `sf_crawl_progress(crawl_id)`; a result reporting `IN_PROGRESS` is an orphan.
+   A call/parse failure on an individual run is swallowed (≠ orphan; AMBER-only
+   ethos — a flaky query never manufactures a false positive).
+5. Any orphan → **FAIL MEDIUM** (→ AMBER), with run_id + crawl_id in
+   `sample_violations`. No orphans → **PASS**.
+
+F-16 safe: F-26 NEVER reads `.mcp.json` (it builds its own client at the
+canonical local SF MCP endpoint `http://127.0.0.1:11435/mcp`, or uses an
+injected client in tests) and NEVER lets an MCP error escalate past AMBER.
+Category `csr_mcp` (mirrors F-23/F-24/F-25): the `consistency-report.schema.json`
+8-category enum has no SF-specific bucket, and spec FE-3's `mcp_runtime` is
+narrative only (not in the closed enum), so `check_F_26` emits `csr_mcp` — see
+Q-V1.9-PHASE-2-WORKER-01 (the same trap that bit F-24).
 
 ## F2 flag — F-08 RED is EXPECTED on the pilot workbook
 

@@ -2,6 +2,26 @@
 
 ## Unresolved
 
+### Q-V1.9-PHASE-4-CLOSURE-FOLLOWUPS-01: v1.9 Phase 4 closure — 1 LOW pre-existing-drift OQ (DEFERRED to Phase 6) [P3] ✅ LOGGED 2026-06-01
+**Raised:** 2026-06-01 v1.9 Phase 4 closure (Manager GO after rigorous verification: F-16 md5, F-26 entry, csr_mcp-trap grep, check_F_26 R2 logic read line-by-line, cascade, 4 tests, test_sf_mcp_client unbroken). Worker Output Package §"OQ logged".
+**Context:** Phase 4 Worker implemented F-26 (orphan SF crawl detection, MCP-aware MEDIUM→AMBER) via TDD — declared count hit 31 (AC-4/AC-16 target). Honored ALL dispatch overlays: csr_mcp alone (mcp_runtime trap avoided), MEDIUM→AMBER, cite 23→24 / MEDIUM 5→6 / HIGH stays 13, cascade ==24, 1s health-probe-gate (R2), DI seam (F-16 safe), real crawl_id shape (steps[].output_ref). Surfaced 1 LOW pre-existing-drift OQ; did NOT block GO.
+
+**OQ table:**
+| ID | Drift | Severity | Manager Decision |
+|----|-------|----------|------------------|
+| Q-V1.9-PHASE-4-WORKER-01 | MORE pre-existing stale counts (predate v1.9; section comments demonstrably NOT maintained when F-23/24/25 landed): `validate_invariants.py` docstring "20 hand-coded invariant rules" (×2, lines 3/7) + `# HIGH (10)` section comment (actual 13) + `# MEDIUM (5)` (now 6) + `aggregate_verdicts` "20-rule registry" docstring; `cross-sheet-invariants.json` title/description "20 CSR Registry"/"20 Cross-Sheet Rules" (array now 31); `drift-check/SKILL.md:464` "(11 cases…)" (now 27 test functions). | LOW (narrative/comment; zero runtime impact) | ⏳ **DEFER to Phase 6 EXPANDED count-reconciliation sweep.** Count is now STABLE (Phase 5 F-23 enhancement adds NO new function → implemented stays 24, declared stays 31). Merges into the consolidated Phase 6 backlog below. |
+
+**CONSOLIDATED Phase 6 count-reconciliation backlog (Manager tracking — ALL converge to ONE sweep at FINAL stable values):**
+Target after Phase 5: **implemented 24 / declared 31 / CRITICAL 5 / HIGH 13 / MEDIUM 6 / drift-check test count (final, ~30 after Phase-5 +3 F-23 tests)**.
+1. `validate_invariants.py` — module docstring "20 hand-coded" ×2 (lines 3/7) + `# HIGH (10)` + `# MEDIUM (5)` section comments + `aggregate_verdicts` "20-rule registry" docstring (Phase-4 W-01)
+2. `cross-sheet-invariants.json` — title/description "20 CSR Registry"/"20 Cross-Sheet Rules" (Phase-4 W-01)
+3. `skills/governance/drift-check/SKILL.md` — narrative lines 162/171/176/266/464 (Phase-3 W-01 + Phase-4 W-01)
+4. `skills/reporting/monitoring-weekly/SKILL.md:115,502` = `invariants:21` (Phase-2 W-02)
+5. `rules/events-writer.md:156` = `invariants:20` (Phase-2 W-02)
+⚠️ **Phase 6 LC-5's grep targets skill/command/MCP counts ONLY** (`43 skill`/`3 MCP server`) — it would NOT catch any of these invariant counts. **Phase 6 dispatch MUST add an explicit invariant-count-reconciliation task** (this 5-item list) on top of LC-1..LC-5. Do the reconciliation AFTER Phase 5 (test count stabilizes there).
+
+**Cross-refs:** `docs/PHASE_STATUS.md` v1.9 Phase 4 DONE entry; Phase 4 Worker Output Package; `scripts/validation/validate_invariants.py:1492` check_F_26 (R2 health-probe-gate verified); Q-V1.9-PHASE-2/3-CLOSURE-FOLLOWUPS-01 (backlog convergence); spec Phase 6 LC-5 (grep scope expansion needed).
+
 ### Q-V1.9-PHASE-3-CLOSURE-FOLLOWUPS-01: v1.9 Phase 3 closure — 1 LOW pre-existing-drift OQ (DEFERRED to Phase 6) [P3] ✅ LOGGED 2026-06-01
 **Raised:** 2026-06-01 v1.9 Phase 3 closure (Manager GO after independent verification: F-16 md5, F-25 entry/registration, version-compare logic, cascade, 5 tests). Worker Output Package §"Open Question".
 **Context:** Phase 3 Worker implemented F-25 (`sf.mcp.enabled`⇒`schema_version≥1.5`; check_F_25 + integer-tuple `_version_tuple` + JSON 29→30 + drift-check + 5 tests; pytest 1253/12/0; F-16 .mcp.json md5 unchanged). Honored ALL dispatch-note overlays (count 22→23, integer version compare, 5th SKIP test, csr_mcp, F-16 proof). Surfaced 1 LOW pre-existing-drift OQ; did NOT block GO.

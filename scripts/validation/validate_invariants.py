@@ -1433,6 +1433,184 @@ def check_F_22(workbook: Any, project_slug: str, *,
     )
 
 
+# Canonical local SF MCP endpoint (D-SF-14 / .mcp.json `sf` server entry). F-26
+# builds its OWN client against this default rather than reading `.mcp.json`, so
+# the F-16 byte-for-byte `.mcp.json` guard is never touched. Overridable via the
+# injected `mcp_client` arg (tests pass a stub; never a live socket).
+_SF_MCP_DEFAULT_URL = "http://127.0.0.1:11435/mcp"
+# Risk R2 mitigation: drift-check must never block on SF MCP downtime, so the
+# health probe (and the follow-up progress calls on the same client) use a tight
+# 1s timeout and the check SKIPs rather than hangs when the probe fails.
+_SF_MCP_PROBE_TIMEOUT_S = 1.0
+# Workflow run statuses that leave a crawl potentially orphaned: the orchestrator
+# gave up (failed) or was paused, yet the SF GUI crawl may still be running.
+_SF_CRAWL_ORPHAN_STATUSES: frozenset[str] = frozenset({"paused", "failed"})
+
+
+def _extract_crawl_id(run_obj: dict) -> str | None:
+    """Pull the SF crawl_id out of a workflow-run JSON.
+
+    `workflow-run.schema.json` is additionalProperties:false at root, so the
+    orchestrator records the crawl_id inside a step's `output_ref` as the string
+    `crawl_id=<value>` (sf-crawl-orchestrator SKILL.md trigger step). We check a
+    top-level `crawl_id` first (forward-compat / convenience), then scan
+    `steps[].output_ref`. Returns None when no crawl_id is recorded — such a run
+    cannot be probed and is therefore NOT counted as an orphan."""
+    top = run_obj.get("crawl_id")
+    if isinstance(top, str) and top.strip():
+        return top.strip()
+    for step in run_obj.get("steps") or []:
+        if not isinstance(step, dict):
+            continue
+        ref = step.get("output_ref")
+        if isinstance(ref, str) and ref.startswith("crawl_id="):
+            val = ref.split("=", 1)[1].strip()
+            if val:
+                return val
+    return None
+
+
+def _progress_is_in_progress(raw: Any) -> bool:
+    """True iff a `sf_crawl_progress` result reports an in-flight crawl.
+
+    Mirrors scripts.ingestion.sf_crawl_orchestrator.parse_progress_response's
+    shape contract (flat `{"status": ...}` OR nested `{"progress": {"status":
+    ...}}`; canonical tokens IN_PROGRESS / DONE / FAILED) — kept inline to avoid
+    a governance→ingestion module import. NEVER raises: a malformed/empty
+    payload is treated as "not in progress" so a flaky GUI response cannot
+    manufacture a false orphan (AMBER-only ethos)."""
+    if not isinstance(raw, dict):
+        return False
+    nested = raw.get("progress") if isinstance(raw.get("progress"), dict) else None
+    src = nested or raw
+    status = src.get("status")
+    if not isinstance(status, str):
+        return False
+    return status.strip().upper() == "IN_PROGRESS"
+
+
+def check_F_26(workbook: Any, project_slug: str, *,
+               workspace_root: Path | None = None,
+               mcp_client: Any = None, **_) -> dict:
+    """Orphan SF GUI crawl detection (v1.9 Phase 4, MCP-aware → AMBER).
+
+    If a project's `_state/workflows/` has an sf-crawl-orchestrator run that is
+    paused/failed, BUT the SF GUI still reports that crawl IN_PROGRESS, the
+    workflow state and the GUI disagree — an orphan crawl the operator should
+    clean up. This is an operator hint, NOT a data-integrity break, so it is
+    severity MEDIUM → AMBER (never RED) per D-V1.9-11 / spec v2.2 line 210.
+
+    Detection logic (Risk R2 — never hang drift-check on MCP downtime):
+      1. Walk projects/{slug}/_state/workflows/*.json; collect
+         skill=='sf-crawl-orchestrator' AND status ∈ {paused, failed}.
+      2. No such runs → PASS (vacuous; the common case, NO MCP call made).
+      3. 1s health probe via SfMcpClient.health(); probe False → SKIP (MCP down;
+         surfaces AMBER but never blocks, and no progress call is made).
+      4. For each paused/failed run with a recorded crawl_id, call
+         sf_crawl_progress(crawl_id); a result reporting IN_PROGRESS is an
+         orphan. call/parse failures are swallowed (not counted as orphans).
+      5. Any orphan → FAIL MEDIUM (AMBER). No orphans → PASS.
+
+    OPTIONAL / best-effort: never reads `.mcp.json` (F-16 safe — builds its own
+    client at `_SF_MCP_DEFAULT_URL`, or uses the injected `mcp_client`) and never
+    lets an MCP error escalate past AMBER. `workbook` is unused (this is a
+    workflow + MCP check, like F-11/F-23)."""
+    rule = (
+        "if a project's _state/workflows/ has a paused/failed "
+        "sf-crawl-orchestrator run whose crawl_id still reports IN_PROGRESS via "
+        "sf_crawl_progress, surface AMBER (workflow state vs SF GUI disagree)"
+    )
+    pdir = _project_dir(project_slug, workspace_root)
+    wf_dir = pdir / "_state" / "workflows"
+    # Collect paused/failed sf-crawl-orchestrator runs (+ their crawl_ids).
+    # glob on a missing dir yields nothing → vacuous PASS below (no is_dir guard
+    # needed; keeps the "nothing to reconcile" path single).
+    stalled: list[tuple[str, str | None]] = []  # (run_id, crawl_id|None)
+    for p in sorted(wf_dir.glob("*.json")):
+        try:
+            obj = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if obj.get("skill") != "sf-crawl-orchestrator":
+            continue
+        if obj.get("status") not in _SF_CRAWL_ORPHAN_STATUSES:
+            continue
+        rid = str(obj.get("run_id") or p.stem)
+        stalled.append((rid, _extract_crawl_id(obj)))
+    if not stalled:
+        return _make_result(
+            id_="F-26", severity="MEDIUM", verdict="PASS",
+            evidence=(
+                "no paused/failed sf-crawl-orchestrator runs — "
+                "orphan-crawl invariant vacuous"
+            ),
+            rule=rule, category="csr_mcp",
+        )
+    # MCP-aware path. Build a client if one was not injected; a missing
+    # sf_mcp_client dependency must SKIP, never crash drift-check.
+    client = mcp_client
+    if client is None:
+        try:
+            from scripts.util.sf_mcp_client import SfMcpClient
+            client = SfMcpClient(_SF_MCP_DEFAULT_URL,
+                                 timeout_seconds=_SF_MCP_PROBE_TIMEOUT_S)
+        except Exception as exc:  # noqa: BLE001 — optional dep; never block
+            return _make_result(
+                id_="F-26", severity="MEDIUM", verdict="SKIP",
+                evidence=(
+                    f"SF MCP client unavailable ({type(exc).__name__}) — "
+                    f"{len(stalled)} paused/failed run(s) left unverified"
+                ),
+                rule=rule, category="csr_mcp",
+                sample_violations=[rid for rid, _ in stalled[:_SAMPLE_CAP]],
+            )
+    # 1s health probe BEFORE any sf_crawl_progress call (Risk R2).
+    try:
+        healthy = bool(client.health())
+    except Exception:  # noqa: BLE001 — a flaky probe is treated as "down"
+        healthy = False
+    if not healthy:
+        return _make_result(
+            id_="F-26", severity="MEDIUM", verdict="SKIP",
+            evidence=(
+                "SF MCP health probe failed within 1s — "
+                f"{len(stalled)} paused/failed run(s) left unverified (MCP down)"
+            ),
+            rule=rule, category="csr_mcp",
+            sample_violations=[rid for rid, _ in stalled[:_SAMPLE_CAP]],
+        )
+    # MCP responding — reconcile each stalled run against live SF GUI state.
+    orphans: list[str] = []
+    for rid, crawl_id in stalled:
+        if not crawl_id:
+            continue  # no crawl_id recorded → cannot probe → not an orphan
+        try:
+            raw = client.call_tool("sf_crawl_progress", crawl_id=crawl_id)
+        except Exception:  # noqa: BLE001 — query failure ≠ orphan; AMBER-only
+            continue
+        if _progress_is_in_progress(raw):
+            orphans.append(f"{rid} (crawl_id={crawl_id} still IN_PROGRESS)")
+    if orphans:
+        return _make_result(
+            id_="F-26", severity="MEDIUM", verdict="FAIL",
+            evidence=(
+                f"{len(orphans)} orphan SF crawl(s): workflow paused/failed but "
+                "SF GUI still reports IN_PROGRESS — operator cleanup hint (AMBER)"
+            ),
+            rule=rule, category="csr_mcp",
+            sample_violations=orphans,
+            affected_rows=len(orphans),
+        )
+    return _make_result(
+        id_="F-26", severity="MEDIUM", verdict="PASS",
+        evidence=(
+            f"{len(stalled)} paused/failed sf-crawl-orchestrator run(s) "
+            "reconciled — SF GUI reports none still IN_PROGRESS"
+        ),
+        rule=rule, category="csr_mcp",
+    )
+
+
 # ---------------------------------------------------------------------------
 # Rule registry
 # ---------------------------------------------------------------------------
@@ -1448,6 +1626,7 @@ _RULE_FUNCTIONS = (
     check_F_25,  # v1.9 Phase 3 sf.mcp.enabled ⇒ schema_version >= 1.5
     # MEDIUM
     check_F_18, check_F_19, check_F_20, check_F_21, check_F_22,
+    check_F_26,  # v1.9 Phase 4 orphan SF crawl detection (MCP-aware AMBER)
 )
 
 
@@ -1671,4 +1850,5 @@ __all__: Iterable[str] = (
     "check_F_23",
     "check_F_24",
     "check_F_25",
+    "check_F_26",
 )
