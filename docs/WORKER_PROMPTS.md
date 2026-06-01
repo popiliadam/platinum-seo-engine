@@ -72,6 +72,14 @@ Her worker dispatch'i:
 - Birden fazla skill yazma (1 worker = 1 skill)
 - Hook / command yazma
 
+### Stub-Mod vs Runtime Test Pattern (v2.3 retro — R-8 / Q-PHASE-5-WORKER-01)
+
+When runtime wiring is documented in SKILL.md body prose (executed by the skill body interpreter — Phase 11+/14 operator workshop) but the pure-transform scripts are intentionally left unchanged: use **stub-mod contract tests** —
+- (a) a frontmatter shape test (default value, opt-in flag, schema validation), AND
+- (b) a SKILL.md body pattern-docs test (grep-locked patterns for the required body sections).
+
+DO NOT write runtime mock tests that would require modifying the transform script. Runtime verification happens at the Phase 7 pilot smoke (AC-13 paterni reuse). v1.8 Phase 5 used the stub-mod paterni for 4 consumer skills; the Phase 11+/14 workshop covers actual runtime.
+
 **Return:** Worker Output Package.
 
 ---
@@ -103,6 +111,10 @@ Her worker dispatch'i:
 - Implementation kodunu mutate etme (sadece test ekle)
 - Yeni feature ekleme
 - Mevcut test'i silme (manager onayı olmadan)
+
+### Basename Collision Rule (v2.3 retro — R-5 / Q-PHASE-3-WORKER-02)
+
+If the same test file basename appears in BOTH `tests/skills/` and `tests/scripts/` (or any two namespace-package directories), pytest's default import mode treats them as the same module → collection error. **Convention:** rename the script-side test to `test_<X>_helpers.py` (a semantic distinction: helper-layer tests vs skill body tests). DO NOT add `__init__.py` to test dirs — that broadens the pytest config scope. v1.8 Phase 3 resolved exactly this via the rename `test_sf_crawl_orchestrator_helpers.py`.
 
 **Return:** Worker Output Package + PASS/FAIL özeti.
 

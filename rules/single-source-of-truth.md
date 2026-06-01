@@ -60,3 +60,14 @@ Drift, çoğunlukla iyi niyetli kopyala-yapıştırla başlar: aynı kural spec'
 - Bu blok skill orchestrator'un hangi rule'ları enforce ettiğini deklarasyondur; SSOT cross-link rapor kullanım context'inde explicit kalır.
 
 **Why:** 9 multi-project rapor schema-validated → frontmatter zaten authority; 17 single-project descriptive rapor frontmatter eksikti (H-F audit finding) — HTML comment block lightweight çözüm, render output'unu etkilemez (HTML comments markdown'da invisible).
+
+## F-XX Namespace Rules (v2.3 retro — R-7 / Q-PHASE-4-WORKER-01)
+
+`F-XX` cross-sheet invariant labels can appear in TWO disjoint stores; both may use the same `F-XX` numerals **if** their contexts are disjoint:
+
+1. **`schemas/cross-sheet-invariants.json` instance entries** — persistent registry. Audit history references these IDs, so ADR-038 applies: numbering is monotonic-but-gap-tolerant and **renumbering is FORBIDDEN**.
+2. **`skills/governance/drift-check/SKILL.md` Engine Self-Governance subsection narrative labels** — doc-only pedagogical labels with NO audit-history references. These are **EXEMPT** from the ADR-038 renumber-forbidden policy (they are teaching labels, not registry IDs).
+
+**v1.8 Phase 6 reconciliation:** the engine self-governance labels `F-23..F-28` (store 2) were renumbered to `F-29..F-34` to disambiguate from the `cross-sheet-invariants.json` `F-23` SF MCP entry (store 1). The registry ID `F-23` (store 1) was NOT touched — renumbering a registry ID would violate ADR-038.
+
+→ cross-ref: ADR-038 (`docs/DECISIONS.md`), → rules/schema-first.md.
