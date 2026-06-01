@@ -2,6 +2,23 @@
 
 ## Unresolved
 
+### Q-V1.9-PRE-PHASE-1-DECISIONS-01: v1.9 Spec Retro + Invariants + Cleanup — 6 Pre-Phase-1 operator decisions [P1] ✅ RESOLVED 2026-06-01
+**→ RESOLVED 2026-06-01 v1.9 Manager session bootstrap (operator dispatch "phase 1'i ilet … fresh session'da başlatayım" = proceed-to-Phase-1 without overrides → all 6 defaults applied per documented "operator silent on any → Manager applies default" rule):** Süleyman Phase 1'e geçiş istedi, hiçbir Q-V1.9-XX override belirtmedi → 6 kararın tamamı spec v1.0 "Open Questions for Operator Review" (lines 391-401) + Worker Prompts Pre-Phase-1 table (lines 14-21) default'larıyla lock'landı. **NO new ADR** (D-V1.9-06); DECISIONS.md 6067B/77B headroom korundu. Path B confirmed (v1.9 cycle dispatch FIRST → operator workshop AFTER ship). Paterni reuse: v1.8 Q-SF-MCP-PRE-PHASE-1-DECISIONS-01 (8-decision umbrella format).
+
+**Resolutions table:**
+| # | Q | Default Applied | Lock'ladığı yer | Status |
+|---|---|------------------|-----------------|--------|
+| 1 | Q-V1.9-01 OW-1+OW-2 workshop timing | After v1.9 ship (Path B; v1.7 Bank Seed Pilot paterni) | Phase 7 AC-10/AC-13 evidence window post-ship | ✅ |
+| 2 | Q-V1.9-02 FE-4 Tier 3 inclusion | DEFER v2.0 (no operator use-case for 40-vs-24 expansion) | Orchestrator default 24 reports unchanged | ✅ |
+| 3 | Q-V1.9-03 FE-5 F-23 enhancement scope | Additive workspace fallback (engine-repo primary; backward compat) | Phase 5 implementation approach | ✅ |
+| 4 | Q-V1.9-04 LC-4 ADR-004/005 closure | Close NOW (soak expired 2026-05-12; >14 days post-deadline) | Phase 6 DECISIONS_ARCHIVE.md append | ✅ |
+| 5 | Q-V1.9-05 SD-1+SD-2 marketplace decision | DEFER v2.0 (separate Süleyman karar; security audit needed) | v1.9 closeout — NO PUBLIC transition | ✅ |
+| 6 | Q-V1.9-06 New invariants test pyramid | 4+ test cases per invariant (F-23 paterni reuse) | Phase 2-4 test scope | ✅ |
+
+**Raised:** 2026-06-01 v1.9 Manager session bootstrap. Spec authority: `docs/superpowers/specs/2026-05-26-v1.9-retro-invariants-cleanup-design.md` (v1.0, 439 lines) + companion `docs/superpowers/plans/2026-05-26-v1.9-worker-prompts.md` (661 lines, 7 Worker Prompts).
+**Context:** Spec v1.0 "Open Questions for Operator Review" table (6 Q-V1.9-XX) + Worker Prompts Pre-Phase-1 table (lines 12-23) listed 6 decisions to lock before Phase 1 dispatch. Operator opted to proceed without overrides → Manager applied all defaults.
+**Cross-refs:** spec v1.0 lines 391-401 (6 Q table) + Worker Prompts lines 14-21 (default table) + D-V1.9-06 (no new ADR) + D-V1.9-07 (6-question rationale) + `docs/PHASE_STATUS.md` v1.9 Active Phase entry + `docs/CONTEXT_LEDGER.md` v1.9 Pre-Phase-1 entry.
+
 ### Q-SF-MCP-PHASE-5-CLOSURE-FOLLOWUPS-01: v1.8 Phase 5 closure — 1 LOW Worker followup (test name convention) [P3] ✅ ACCEPTED 2026-05-26
 **Raised:** 2026-05-27 v1.8 Phase 5 closure (Manager GO decision after cross-check). Worker Output Package §"Open Questions Surfaced" + Manager review.
 **Context:** Phase 5 Worker (4 SKILL.md + 4 test files; +706 LoC additive only; stub-mod pattern 4'üncü cumulative reuse) surfaced 1 LOW Open Question about test name convention deviation from Manager dispatch example.
