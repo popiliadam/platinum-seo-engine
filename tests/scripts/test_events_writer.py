@@ -25,6 +25,7 @@ from scripts.state.events_writer import (
     append_work,
     append_workflow,
     next_run_id,
+    normalize_audit_action,
 )
 
 
@@ -315,3 +316,73 @@ def test_next_run_id_monotonic(tmp_path: Path) -> None:
         workspace_root=tmp_path,
     )
     assert next_run_id("test-proj", workspace_root=tmp_path) == 3
+
+
+# ---------------------------------------------------------------------------
+# LC-2 — audit_action canonicalization (Q-016)
+# Tool verbs collapse onto the schema's {modified, accessed, deleted} subset;
+# the 6-value events.schema.json enum stays authoritative; canonical values
+# are idempotent so existing append_audit callers are unaffected.
+# ---------------------------------------------------------------------------
+
+def test_normalize_audit_action_edit_and_write_to_modified() -> None:
+    assert normalize_audit_action("Edit") == "modified"
+    assert normalize_audit_action("Write") == "modified"
+    assert normalize_audit_action("MultiEdit") == "modified"
+    assert normalize_audit_action("NotebookEdit") == "modified"
+
+
+def test_normalize_audit_action_read_tools_to_accessed() -> None:
+    for tool in ("Read", "Glob", "Grep", "LS"):
+        assert normalize_audit_action(tool) == "accessed", tool
+
+
+def test_normalize_audit_action_bash_read_write_delete() -> None:
+    # READ command → accessed; write/redirect → modified; rm-family → deleted.
+    assert normalize_audit_action("Bash", command="cat foo.txt") == "accessed"
+    assert normalize_audit_action("Bash", command="grep x f.py") == "accessed"
+    assert normalize_audit_action("Bash", command="echo y > out.txt") == "modified"
+    assert normalize_audit_action("Bash", command="mv a b") == "modified"
+    assert normalize_audit_action("Bash", command="rm -rf build/") == "deleted"
+    # Bare Bash with no command defaults to the safe read action.
+    assert normalize_audit_action("Bash") == "accessed"
+
+
+def test_normalize_audit_action_idempotent_on_canonical_enum() -> None:
+    # All 6 canonical schema values pass through unchanged (R6-style safety).
+    for canon in ("created", "modified", "deleted", "accessed",
+                  "permission_changed", "config_changed"):
+        assert normalize_audit_action(canon) == canon, canon
+
+
+def test_normalize_audit_action_unknown_passthrough() -> None:
+    # Unknown verb is returned verbatim → schema validation still rejects it.
+    assert normalize_audit_action("frobnicate") == "frobnicate"
+
+
+def test_append_audit_maps_tool_verb_to_canonical(tmp_path: Path) -> None:
+    # End-to-end: append_audit('Edit') persists audit_action='modified'.
+    _project_dir(tmp_path)
+    append_audit(
+        project_id="test-proj",
+        audit_action="Edit",
+        audit_target="schemas/project-config.schema.json",
+        actor="agent:hook",
+        workspace_root=tmp_path,
+    )
+    events = _read_events(tmp_path / "projects" / "test-proj" / "_state" / "events.jsonl")
+    assert events[-1]["audit_action"] == "modified"
+
+
+def test_append_audit_canonical_value_unchanged(tmp_path: Path) -> None:
+    # Regression: an already-canonical audit_action is written verbatim.
+    _project_dir(tmp_path)
+    append_audit(
+        project_id="test-proj",
+        audit_action="accessed",
+        audit_target="invariants:24",
+        actor="drift-check",
+        workspace_root=tmp_path,
+    )
+    events = _read_events(tmp_path / "projects" / "test-proj" / "_state" / "events.jsonl")
+    assert events[-1]["audit_action"] == "accessed"

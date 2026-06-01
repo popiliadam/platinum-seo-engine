@@ -159,7 +159,7 @@ wb = None
 loads cached values, not formula bodies. Write attempts on a read-only
 workbook raise immediately.
 
-### Step 3 — `evaluate_invariants` (20 rules)
+### Step 3 — `evaluate_invariants` (24 rules)
 
 ```python
 from scripts.validation import validate_invariants
@@ -168,13 +168,13 @@ from scripts.validation import validate_invariants
 # (Documented invocation; helper exec leaves results bound from Step 1 init.)
 ```
 
-The 21 rules are partitioned:
+The 24 rules are partitioned:
 
 | Tier      | Count | Verdict on FAIL  |
 |-----------|-------|------------------|
 | CRITICAL  | 5     | RED              |
-| HIGH      | 11    | RED (F-15 AMBER) |
-| MEDIUM    | 5     | AMBER            |
+| HIGH      | 13    | RED (F-15 AMBER) |
+| MEDIUM    | 6     | AMBER            |
 
 ### Step 4 — `aggregate_verdict`
 
@@ -263,7 +263,7 @@ complete_outputs = {
 (workflow-run.schema.json `outputs.additionalProperties.type` is
 `"string"`). `fail_count` is `str(agg["fail_count"])`, NOT a raw int.
 
-## 20 Invariant Rules
+## 24 Invariant Rules
 
 Source of truth: `scripts/validation/validate_invariants.py`. Each
 rule function signature:
@@ -498,5 +498,5 @@ re-run drift-check; F-08 should then flip to GREEN.
   `scripts/reporting/render_template.py`,
   `scripts/validation/validate_schema.py`.
 - Implementation: `scripts/validation/validate_invariants.py`.
-- Tests: `tests/skills/test_drift_check.py` (11 cases incl. live pilot).
+- Tests: `tests/skills/test_drift_check.py` (30 cases incl. live pilot).
 - Template: `templates/reports/drift.template.md`.

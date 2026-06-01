@@ -63,6 +63,7 @@ ADR-011 rotation kararıyla `DECISIONS.md`'den taşınmış eski kararlar. Appen
 **Context:** Q-004 — `~/Documents/platinum-seo-core/` (Python paketi + MCP server) ve `~/Documents/platinum-premium-seo/` (4. tasarım iterasyonu) ne zaman silinecek? Drift kaynakları ama referans değeri var.
 **Decision:** v1 acceptance (Phase 14 tamamlanması) sonrası **1 hafta soak süresi** beklenir. Bu süre içinde production bug surface ederse referans için eski repo'lara dönülebilir. Soak sonu eski repo'lar silinir. Soak boyunca ve öncesinde READ-ONLY referans (spec §13 + bootstrap §kritik kurallar). Worker'lar eski dosyaları sadece `cp` ile kopyalar; orijinal dosyaları mutate etmez.
 **Consequences:** Tahmini silme tarihi ≈ Phase 14 bitiş + 7 gün. Phase 5–13 boyunca eski dosyalar safe referans olarak elimizde. Migration phase'lerinde (Phase 1, 2, 3) worker'lar SADECE kopyalama operasyonu yapar.
+**Closed:** 2026-06-01 — soak window expired (>14 days post-2026-05-12 deadline; ~20 days at closure); v1.4 eski repo silme acceptance criteria met (engine + workspace eski repo silinmiş, ~1.6GB recovered per memory feedback_decisions_workflow.md); v1.9 Phase 6 LC-4.
 
 ---
 
@@ -72,6 +73,7 @@ ADR-011 rotation kararıyla `DECISIONS.md`'den taşınmış eski kararlar. Appen
 **Context:** Q-005 — `platinum-seo-workspace` repo'su ne zaman ve nerede açılacak? Plugin'le aynı timing'de olmalı mı?
 **Decision:** Workspace repo (`~/Documents/platinum-seo-workspace/`) **Phase 14**'te yaratılır. Kullanıcı GitHub repo'sunu `platinum-seo-workspace` adıyla manuel açar. Phase 5–13 boyunca pilot test için mevcut `~/Documents/platinum-premium-seo/` workspace olarak READ-ONLY kullanılır (path detection eski premium klasörünü gösterir).
 **Consequences:** Plugin Phase 14'e kadar workspace repo'su olmadan test edilir. Phase 14 deliverable'larına workspace bootstrap + ilk proje (dentnotion) onboard dahil. `.env`'deki `PSE_WORKSPACE_PATH` Phase 5'ten itibaren `~/Documents/platinum-premium-seo/` (veya alt klasörü) gösterir; Phase 14'te yeni workspace path'ine taşınır.
+**Closed:** 2026-06-01 — Phase 14 workspace repo timing condition met (workspace bootstrap'landı + ilk proje onboard); ADR-004 ile birlikte idari kapanış (>14 days post-2026-05-12); v1.9 Phase 6 LC-4.
 
 ---
 
