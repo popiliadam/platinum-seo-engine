@@ -1065,6 +1065,110 @@ def check_F_24(workbook: Any, project_slug: str, *,
     )
 
 
+# Migration 0005 (v1.4→v1.5) is what introduces the project.config `sf` block,
+# so sf.mcp.enabled=true is only coherent on schema_version >= 1.5. The
+# threshold is an int TUPLE, compared against _version_tuple(schema_version) —
+# NOT a lexicographic string compare. For 1.4/1.5 the two happen to agree, but
+# "1.10" >= "1.5" is FALSE under string ordering and TRUE under tuple ordering;
+# we want the latter (D-V1.9-10).
+_SF_MCP_MIN_SCHEMA_VERSION = (1, 5)
+
+
+def _version_tuple(value: Any) -> tuple[int, ...]:
+    """Parse a dotted version string into a comparable int tuple.
+    '1.5' → (1, 5); '1.10' → (1, 10). Non-int segments degrade to 0 so a
+    malformed version string can never raise inside the comparison."""
+    parts: list[int] = []
+    for seg in str(value).split("."):
+        try:
+            parts.append(int(seg))
+        except (TypeError, ValueError):
+            parts.append(0)
+    return tuple(parts)
+
+
+def check_F_25(workbook: Any, project_slug: str, *,
+               workspace_root: Path | None = None, **_) -> dict:
+    """`sf.mcp.enabled=true` requires `schema_version >= 1.5` (v1.9 Phase 3):
+    Migration 0005 (v1.4→v1.5) is what adds the `sf` block, so a config that
+    turns SF MCP on while still declaring schema_version 1.4 is incoherent.
+    Per-project invariant — reads projects/{slug}/project.config.json (never the
+    engine repo-root files; F-16 safe, .mcp.json untouched).
+
+    Detection logic (D-V1.9-10):
+      1. project.config.json missing → SKIP (state ambiguous → AMBER).
+      2. schema_version field absent → SKIP (coupling cannot be evaluated).
+      3. project.config.json unparseable → FAIL HIGH.
+      4. sf.mcp.enabled not true → PASS (default behavior valid on any version).
+      5. enabled=true AND schema_version >= 1.5 → PASS.
+      6. enabled=true AND schema_version < 1.5 → FAIL HIGH (RED). Migration 0005
+         makes this impossible in practice, but the defensive check catches a
+         manual misconfiguration that bypassed the migration.
+    """
+    rule = (
+        "if project.config.sf.mcp.enabled=true, project.config.schema_version "
+        "MUST be >= '1.5' (Migration 0005 prerequisite)"
+    )
+    pdir = _project_dir(project_slug, workspace_root)
+    cfg_path = pdir / "project.config.json"
+    if not cfg_path.exists():
+        return _make_result(
+            id_="F-25", severity="HIGH", verdict="SKIP",
+            evidence=f"{cfg_path.name} missing — no SF MCP coupling to check",
+            rule=rule, category="csr_mcp",
+        )
+    try:
+        cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return _make_result(
+            id_="F-25", severity="HIGH", verdict="FAIL",
+            evidence=f"project.config.json unparseable: {exc}",
+            rule=rule, category="csr_mcp",
+        )
+    schema_version = cfg.get("schema_version")
+    if not schema_version:
+        return _make_result(
+            id_="F-25", severity="HIGH", verdict="SKIP",
+            evidence=(
+                "project.config.json has no schema_version field — "
+                "SF MCP coupling cannot be evaluated"
+            ),
+            rule=rule, category="csr_mcp",
+        )
+    mcp_block = (cfg.get("sf") or {}).get("mcp") or {}
+    enabled = bool(mcp_block.get("enabled"))
+    if not enabled:
+        return _make_result(
+            id_="F-25", severity="HIGH", verdict="PASS",
+            evidence=(
+                f"sf.mcp.enabled false/absent (schema_version="
+                f"{schema_version!r}) — default behavior valid on any version"
+            ),
+            rule=rule, category="csr_mcp",
+        )
+    if _version_tuple(schema_version) >= _SF_MCP_MIN_SCHEMA_VERSION:
+        return _make_result(
+            id_="F-25", severity="HIGH", verdict="PASS",
+            evidence=(
+                f"sf.mcp.enabled=true backed by schema_version="
+                f"{schema_version!r} (>= 1.5 Migration 0005 prerequisite)"
+            ),
+            rule=rule, category="csr_mcp",
+        )
+    return _make_result(
+        id_="F-25", severity="HIGH", verdict="FAIL",
+        evidence=(
+            f"sf.mcp.enabled=true but schema_version={schema_version!r} < 1.5 — "
+            "Migration 0005 prerequisite unmet (sf block requires v1.5)"
+        ),
+        rule=rule, category="csr_mcp",
+        sample_violations=[
+            f"schema_version={schema_version}<1.5 with sf.mcp.enabled=true"
+        ],
+        affected_rows=1,
+    )
+
+
 def check_F_17(workbook: Any, project_slug: str, **_) -> dict:
     """severity column ⊆ severityEnum 4-value (LOW/MEDIUM/HIGH/CRITICAL).
 
@@ -1341,6 +1445,7 @@ _RULE_FUNCTIONS = (
     check_F_13, check_F_14, check_F_15, check_F_16, check_F_17,
     check_F_23,  # v1.8 Phase 4 SF MCP cross-sheet
     check_F_24,  # v1.9 Phase 2 .mcp.json↔registry key sync
+    check_F_25,  # v1.9 Phase 3 sf.mcp.enabled ⇒ schema_version >= 1.5
     # MEDIUM
     check_F_18, check_F_19, check_F_20, check_F_21, check_F_22,
 )
@@ -1565,4 +1670,5 @@ __all__: Iterable[str] = (
     "check_F_18", "check_F_19", "check_F_20", "check_F_21", "check_F_22",
     "check_F_23",
     "check_F_24",
+    "check_F_25",
 )

@@ -316,8 +316,9 @@ def test_consistency_report_schema_valid(clean_wb_path: Path, tmp_path: Path,
     # but we double-check end-to-end).
     Draft7Validator(consistency_schema).validate(report)
     assert report["schema_version"] == "1.0"
-    # 20 baseline + F-23 (v1.8 Phase 4) + F-24 (v1.9 Phase 2) = 22.
-    assert len(report["checks"]) == 22
+    # 20 baseline + F-23 (v1.8 Phase 4) + F-24 (v1.9 Phase 2) +
+    # F-25 (v1.9 Phase 3) = 23.
+    assert len(report["checks"]) == 23
     assert report["verdict"] in ("GREEN", "AMBER", "RED")
 
 
@@ -746,3 +747,143 @@ def test_f24_either_file_missing_skip(
         f"F-24 must SKIP when .mcp.json is missing; got {by_id['F-24']}"
     )
     assert ".mcp.json" in by_id["F-24"]["evidence"]
+
+
+# ---------------------------------------------------------------------------
+# F-25 (v1.9 Phase 3) — sf.mcp.enabled=true ⇒ schema_version >= 1.5
+#
+# F-25 is a PER-PROJECT invariant: it reads projects/{slug}/project.config.json
+# only. It NEVER touches the engine repo-root .mcp.json (F-16 safe) — so these
+# tests rewrite the tmp-workspace config built by `clean_wb_path` and never go
+# near a real project.config.json.
+# ---------------------------------------------------------------------------
+
+def _write_project_config(tmp_path: Path, slug: str, config: dict) -> None:
+    """Overwrite projects/{slug}/project.config.json in the tmp workspace.
+
+    F-25 reads ONLY this per-project file; the engine repo-root .mcp.json and
+    mcp-tool-registry.json are untouched (F-16 discipline)."""
+    cfg_path = tmp_path / "projects" / slug / "project.config.json"
+    cfg_path.write_text(json.dumps(config), encoding="utf-8")
+
+
+def test_f25_enabled_true_v1_5_pass(clean_wb_path: Path, tmp_path: Path) -> None:
+    """sf.mcp.enabled=true + schema_version='1.5' → PASS (coupling satisfied)."""
+    slug = "drifttest"
+    _write_project_config(tmp_path, slug, {
+        "project_id": slug,
+        "schema_version": "1.5",
+        "language": {"content_locale": "tr-TR"}, "market": "TR",
+        "sf": {"mcp": {"enabled": True}},
+    })
+    wb = load_workbook(str(clean_wb_path), data_only=True, read_only=True)
+    try:
+        results = vi.evaluate_all(wb, slug, workspace_root=tmp_path)
+    finally:
+        wb.close()
+    by_id = {r["id"]: r for r in results}
+    assert by_id["F-25"]["verdict"] == "PASS", (
+        f"F-25 must PASS when sf.mcp.enabled=true on schema_version 1.5; "
+        f"got {by_id['F-25']}"
+    )
+    assert by_id["F-25"]["severity"] == "HIGH"
+
+
+def test_f25_enabled_true_v1_4_fail(clean_wb_path: Path, tmp_path: Path) -> None:
+    """sf.mcp.enabled=true + schema_version='1.4' → FAIL HIGH → aggregator RED.
+
+    Migration 0005 makes this combination impossible in normal operation (the
+    sf block only lands on v1.5), but the defensive check catches a config that
+    was hand-edited past the migration lock."""
+    slug = "drifttest"
+    _write_project_config(tmp_path, slug, {
+        "project_id": slug,
+        "schema_version": "1.4",
+        "language": {"content_locale": "tr-TR"}, "market": "TR",
+        "sf": {"mcp": {"enabled": True}},
+    })
+    wb = load_workbook(str(clean_wb_path), data_only=True, read_only=True)
+    try:
+        results = vi.evaluate_all(wb, slug, workspace_root=tmp_path)
+    finally:
+        wb.close()
+    by_id = {r["id"]: r for r in results}
+    assert by_id["F-25"]["verdict"] == "FAIL", (
+        f"F-25 must FAIL when sf.mcp.enabled=true on schema_version 1.4; "
+        f"got {by_id['F-25']}"
+    )
+    assert by_id["F-25"]["severity"] == "HIGH"
+    # FAIL HIGH (no manual_triage) → aggregator RED.
+    agg = vi.aggregate_verdicts(results)
+    assert agg["overall"] == "RED", (
+        f"F-25 FAIL HIGH must drive aggregator RED; got {agg['overall']}"
+    )
+
+
+def test_f25_enabled_false_v1_4_pass(clean_wb_path: Path, tmp_path: Path) -> None:
+    """sf.mcp.enabled=false + schema_version='1.4' → PASS.
+
+    The version gate only applies when SF MCP is turned ON; the default
+    file-drop behavior (enabled=false) is valid on any schema version."""
+    slug = "drifttest"
+    _write_project_config(tmp_path, slug, {
+        "project_id": slug,
+        "schema_version": "1.4",
+        "language": {"content_locale": "tr-TR"}, "market": "TR",
+        "sf": {"mcp": {"enabled": False}},
+    })
+    wb = load_workbook(str(clean_wb_path), data_only=True, read_only=True)
+    try:
+        results = vi.evaluate_all(wb, slug, workspace_root=tmp_path)
+    finally:
+        wb.close()
+    by_id = {r["id"]: r for r in results}
+    assert by_id["F-25"]["verdict"] == "PASS", (
+        f"F-25 must PASS when sf.mcp.enabled=false regardless of version; "
+        f"got {by_id['F-25']}"
+    )
+    assert by_id["F-25"]["severity"] == "HIGH"
+
+
+def test_f25_sf_block_absent_pass(clean_wb_path: Path, tmp_path: Path) -> None:
+    """No sf block at all + schema_version='1.4' → PASS (default behavior).
+
+    A config with no `sf` key is the common case; it must not trip the gate
+    on any schema version."""
+    slug = "drifttest"
+    _write_project_config(tmp_path, slug, {
+        "project_id": slug,
+        "schema_version": "1.4",
+        "language": {"content_locale": "tr-TR"}, "market": "TR",
+    })
+    wb = load_workbook(str(clean_wb_path), data_only=True, read_only=True)
+    try:
+        results = vi.evaluate_all(wb, slug, workspace_root=tmp_path)
+    finally:
+        wb.close()
+    by_id = {r["id"]: r for r in results}
+    assert by_id["F-25"]["verdict"] == "PASS", (
+        f"F-25 must PASS when no sf block is present; got {by_id['F-25']}"
+    )
+    assert by_id["F-25"]["severity"] == "HIGH"
+
+
+def test_f25_config_missing_skip(clean_wb_path: Path, tmp_path: Path) -> None:
+    """project.config.json absent → SKIP (state ambiguous, surfaces AMBER).
+
+    Mirrors the spec FE-2 'SKIP cases: project.config.json missing OR
+    schema_version field absent' contract. drift-check must not hard-fail when
+    a project has no config yet."""
+    slug = "drifttest"
+    (tmp_path / "projects" / slug / "project.config.json").unlink()
+    wb = load_workbook(str(clean_wb_path), data_only=True, read_only=True)
+    try:
+        results = vi.evaluate_all(wb, slug, workspace_root=tmp_path)
+    finally:
+        wb.close()
+    by_id = {r["id"]: r for r in results}
+    assert by_id["F-25"]["verdict"] == "SKIP", (
+        f"F-25 must SKIP when project.config.json is missing; "
+        f"got {by_id['F-25']}"
+    )
+    assert "missing" in by_id["F-25"]["evidence"]

@@ -48,14 +48,14 @@ autonomy:
 # drift-check — governance skill (Phase 5 Wave 2)
 
 Read-only consistency engine. Loads `master.xlsx` (data_only=True,
-read_only=True), evaluates **22 hand-coded invariant rules** (5
-CRITICAL + 12 HIGH + 5 MEDIUM; F-23 added v1.8 Phase 4, F-24 added
-v1.9 Phase 2), aggregates per §17.2 verdict logic
+read_only=True), evaluates **23 hand-coded invariant rules** (5
+CRITICAL + 13 HIGH + 5 MEDIUM; F-23 added v1.8 Phase 4, F-24 + F-25
+added v1.9 Phase 2/3), aggregates per §17.2 verdict logic
 (any RED → RED; else any AMBER → AMBER; all PASS → GREEN), emits a
 `consistency-report-{slug}.json` (validated against
 `schemas/consistency-report.schema.json`), renders a human-readable
 markdown report, and appends an `event_kind=audit` row to `events.jsonl`
-with `audit_action="accessed"` and `audit_target="invariants:22"`.
+with `audit_action="accessed"` and `audit_target="invariants:23"`.
 
 The rules are hand-coded Python functions, **not** a DSL — that is a
 deliberate Phase 6+ refactor candidate (§17.2 ADR-TBD). Each rule
@@ -86,7 +86,7 @@ list.
 - `projects/{slug}/outputs/reports/{date}-drift-{slug}.md` — human report.
 - `projects/{slug}/_state/consistency-report-{slug}.json` — schema-valid JSON.
 - `projects/{slug}/_state/events.jsonl` — single `event_kind=audit` entry
-  (`audit_action=accessed`, `audit_target=invariants:22`).
+  (`audit_action=accessed`, `audit_target=invariants:23`).
 
 ## 8-Step Body Protocol
 
@@ -228,14 +228,14 @@ Template variables: `$project_slug`, `$date`, `$verdict`, `$pass_count`,
 # events_writer.append_audit(
 #     project_id=project_slug,
 #     audit_action="accessed",
-#     audit_target="invariants:22",
+#     audit_target="invariants:23",
 #     actor="drift-check",
 #     notes=f"verdict={agg['overall']} fails={agg['fail_count']}",
 # )
 audit_payload = {
     "event_kind": "audit",
     "audit_action": "accessed",
-    "audit_target": "invariants:22",
+    "audit_target": "invariants:23",
     "actor": "drift-check",
     "notes": f"verdict={agg['overall']} fails={agg['fail_count']}",
 }
@@ -292,7 +292,7 @@ def check_F_XX(workbook, project_slug) -> dict:
 | F-04  | dashboard formula `=AVERAGEIF(...)` drift check                       |
 | F-05  | schema_version field per-sheet present (every schema-known sheet has a header row matching schema column count; header row resolved via schema authority `sheets[sheet].header_row` with row-1 fallback — Phase 14 W3-W2-C-a) |
 
-### HIGH (12)
+### HIGH (13)
 
 | ID    | Rule                                                                  |
 |-------|-----------------------------------------------------------------------|
@@ -308,6 +308,7 @@ def check_F_XX(workbook, project_slug) -> dict:
 | F-17  | severity column ⊆ severityEnum 4-value (LOW/MEDIUM/HIGH/CRITICAL)     |
 | F-23  | sf-crawl-orchestrator workflow → repo-root mcp-tool-registry.json has 'sf' (v1.8 Phase 4 SF MCP cross-sheet) |
 | F-24  | .mcp.json mcpServers keys == mcp-tool-registry.json servers keys (ScraplingServer↔scrapling case-fold; v1.9 Phase 2 engine transport↔inventory sync) |
+| F-25  | sf.mcp.enabled=true ⇒ project.config.schema_version >= '1.5' (Migration 0005 prerequisite; v1.9 Phase 3 schema-version coupling) |
 
 ### MEDIUM (5)
 
@@ -403,6 +404,36 @@ transport/inventory desync breaks tooling-discovery provenance but does not
 corrupt `master.xlsx`. (Spec FE-1 proposed category `engine_consistency`; that
 value is not in `consistency-report.schema.json`'s 8-category enum, so
 `check_F_24` emits `csr_mcp` — see Q-V1.9-PHASE-2-WORKER-01.)
+
+## F-25 — `sf.mcp.enabled` ⇒ `schema_version >= 1.5` (v1.9 Phase 3)
+
+If a project's `project.config.json` sets `sf.mcp.enabled = true`, its
+`schema_version` MUST be `>= 1.5`. Migration 0005 (v1.4 → v1.5) is what
+*introduces* the `sf` block, so a config that turns SF MCP on while still
+declaring `schema_version` 1.4 is internally incoherent — the `sf` block could
+only exist there via a manual edit that bypassed the migration.
+
+Detection logic — `check_F_25()` reads (per-project; `projects/{slug}/project.config.json`
+only — never the engine repo-root files, F-16 safe, `.mcp.json` untouched):
+1. `project.config.json` missing → SKIP (state ambiguous; surfaces AMBER).
+2. `schema_version` field absent → SKIP (coupling cannot be evaluated).
+3. `project.config.json` unparseable → FAIL HIGH.
+4. `sf.mcp.enabled` not `true` (false or `sf` block absent) → PASS — the
+   default file-drop behavior is valid on **any** schema version.
+5. `enabled = true` AND `schema_version >= 1.5` → PASS.
+6. `enabled = true` AND `schema_version < 1.5` → FAIL HIGH (→ RED).
+
+The version test is an **integer-tuple** comparison (`"1.5"` → `(1, 5)`),
+**not** a lexicographic string compare: `"1.10" >= "1.5"` is `False` as strings
+but `True` as tuples, and we want the tuple semantics (D-V1.9-10). For the
+current 1.4/1.5 boundary both agree, but the tuple compare stays correct as the
+schema version grows past `1.10`.
+
+Category `csr_mcp` (mirrors F-23/F-24 — the SF/MCP cross-config invariants).
+Severity HIGH (→ RED on FAIL): a version/coupling mismatch signals a migration
+bypass but does not corrupt `master.xlsx`. Migration 0005's idempotent lock
+makes case 6 unreachable in normal operation; the check is a defensive net for
+hand-edited configs (D-V1.9-10).
 
 ## F2 flag — F-08 RED is EXPECTED on the pilot workbook
 
