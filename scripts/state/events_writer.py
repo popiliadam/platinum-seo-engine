@@ -119,6 +119,39 @@ _SECRET_KEY_WHITELIST: frozenset[str] = frozenset({
     "cells_written",
 })
 
+# ---------------------------------------------------------------------------
+# LC-2 (Q-016) — audit_action canonicalization
+# ---------------------------------------------------------------------------
+# The events.schema.json audit_action enum is the 6-value AUTHORITY:
+#   {created, modified, deleted, accessed, permission_changed, config_changed}.
+# Tool-driven audit events (Edit/Write/Read/Bash/...) collapse onto the
+# {modified, accessed, deleted} SUBSET. `normalize_audit_action()` maps a tool
+# verb to its canonical action; already-canonical values pass through unchanged
+# (idempotent) so existing callers are never broken.
+_AUDIT_ACTIONS_CANONICAL: frozenset[str] = frozenset({
+    "created", "modified", "deleted",
+    "accessed", "permission_changed", "config_changed",
+})
+
+# Tool name (lower-cased) → canonical audit_action.
+_TOOL_VERB_AUDIT_ACTION: dict[str, str] = {
+    "edit":         "modified",
+    "multiedit":    "modified",
+    "write":        "modified",
+    "notebookedit": "modified",
+    "read":         "accessed",
+    "glob":         "accessed",
+    "grep":         "accessed",
+    "ls":           "accessed",
+}
+
+# Bash leading-token classification (path-stripped first word).
+_BASH_DELETE_TOKENS: frozenset[str] = frozenset({"rm", "rmdir", "unlink", "shred"})
+_BASH_WRITE_TOKENS: frozenset[str] = frozenset({
+    "mv", "cp", "mkdir", "touch", "tee", "install",
+    "ln", "chmod", "chown", "dd", "truncate", "patch",
+})
+
 
 # ---------------------------------------------------------------------------
 # Exceptions
@@ -321,6 +354,50 @@ def _populate_envelope(event: dict, project_id: str) -> dict:
     return out
 
 
+def _classify_bash_command(command: str | None) -> str:
+    """Map a Bash command to a canonical audit_action (LC-2).
+
+    Read-only by default (accessed); an output redirect (`>`/`>>`) or a
+    mutating/deleting leading token escalates to modified/deleted.
+    """
+    if not isinstance(command, str) or not command.strip():
+        return "accessed"
+    cmd = command.strip()
+    tokens = cmd.split()
+    first = tokens[0].rsplit("/", 1)[-1] if tokens else ""  # strip any leading path
+    if first in _BASH_DELETE_TOKENS:
+        return "deleted"
+    if ">" in cmd or first in _BASH_WRITE_TOKENS:
+        return "modified"
+    return "accessed"
+
+
+def normalize_audit_action(action: str, *, command: str | None = None) -> str:
+    """Normalize a tool verb or raw action to a canonical audit_action (LC-2).
+
+    events.schema.json audit_action enum is the 6-value authority
+    {created, modified, deleted, accessed, permission_changed, config_changed}.
+    Tool-driven audit events collapse onto the {modified, accessed, deleted}
+    subset:
+        Edit/Write/MultiEdit/NotebookEdit → modified
+        Read/Glob/Grep/LS                 → accessed
+        Bash                              → accessed (read) | modified (write)
+                                            | deleted (rm-family); pass `command`
+
+    Already-canonical values pass through unchanged (case-insensitively), so
+    the mapping is IDEMPOTENT and existing append_audit callers are unaffected.
+    Unknown verbs pass through verbatim → schema validation still rejects them.
+    """
+    if not isinstance(action, str):
+        return action  # non-string → let schema validation reject it
+    key = action.strip().lower()
+    if key in _AUDIT_ACTIONS_CANONICAL:
+        return key  # already canonical (also normalizes casing)
+    if key == "bash":
+        return _classify_bash_command(command)
+    return _TOOL_VERB_AUDIT_ACTION.get(key, action)
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -446,10 +523,15 @@ def append_audit(
     schema_path: Path | None = None,
     **kwargs: Any,
 ) -> EventResult:
-    """Convenience wrapper for event_kind='audit' (governance, Phase 14+)."""
+    """Convenience wrapper for event_kind='audit' (governance, Phase 14+).
+
+    LC-2 (Q-016): audit_action is canonicalized via normalize_audit_action —
+    tool verbs (Edit/Write/Bash/...) collapse onto the schema's
+    {modified, accessed, deleted} subset; canonical values are unchanged.
+    """
     event: dict[str, Any] = {
         "event_kind": "audit",
-        "audit_action": audit_action,
+        "audit_action": normalize_audit_action(audit_action),
         "audit_target": audit_target,
         "actor": actor,
     }
@@ -547,4 +629,5 @@ __all__: Iterable[str] = (
     "append_audit",
     "append_workflow",
     "next_run_id",
+    "normalize_audit_action",
 )

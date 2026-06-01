@@ -2,6 +2,33 @@
 
 ## Unresolved
 
+### Q-V1.9-PHASE-6-CLOSURE-FOLLOWUPS-01: v1.9 Phase 6 closure — 4 source-Q RESOLVED + 3 schema-first catches + 2 LOW OQs [P3] ✅ 2026-06-01
+**Raised:** 2026-06-01 v1.9 Phase 6 closure (Manager GO after rigorous verification: git scope, F-16 md5, DECISIONS.md preservation, invariant-logic-untouched diff-grep, count mis-map spot-check, LC-4 date). Worker Output Package §"Open Questions" + §"Decisions made".
+**Context:** Phase 6 landed LC-1..LC-5 + Manager-added LC-6 (count-reconciliation) across 13 work files; pytest 1260→1286 (+26); 3 schema-first catches; 4 v1.2-era source Q items resolved.
+
+**4 source Q items RESOLVED by Phase 6:**
+| Source Q | Resolved by | What |
+|----------|-------------|------|
+| Q-W3W2B-WRITER-01 (v1.2) | LC-1 | WRITER_REGISTRY constant + advisory helper (OPT-IN; enforcement v2.0) |
+| Q-016 (v1.2) | LC-2 | audit_action normalizer (Edit/Write→modified, etc.; idempotent on 6-value enum) |
+| Q-PHASE15-RXX-COUNT-01 (v1.2) | LC-3 | event_id format documented (rules/events-writer.md Section 7) |
+| Q-PHASE15-ADR-CLOSURE-01 (v1.2) | LC-4 | ADR-004 + ADR-005 formal closure (DECISIONS_ARCHIVE.md, 2026-06-01) |
+
+**3 schema-first catches (Manager-ACCEPTED — schema wins, ADR-013/017 paterni reuse):**
+1. LC-2: prompt said audit_action "3-value enum"; real `events.schema.json` enum = **6 values**. Tool verbs collapse onto the {modified,accessed,deleted} subset; 6-value enum stays authoritative. Also: append_audit had NO prior mapping (LC-2 ADDS an idempotent normalizer, not "fixes stale variants").
+2. LC-3: prompt said event_id "3-50 chars, alphanumeric+underscores"; real schema = **3-128 chars, `^[A-Za-z0-9][A-Za-z0-9_.:-]*$`** (allows `_ . : -`). Documented the real schema (test locks doc↔schema parity).
+3. LC-3: prompt said "Section 5 NEW"; Sections 5 (workflow_action) + 6 (audit) already exist + cross-referenced → appended as **Section 7** (append-only; no renumber).
+
+**2 LOW OQs:**
+| ID | Drift | Manager Decision |
+|----|-------|------------------|
+| OQ-LC4-DATE | DECISIONS.md summary marks ADR-004/005 "closed (2026-05-06)"; archive-body footer reads "Closed: 2026-06-01". | ✅ ACCEPT — both accurate (2026-05-06 = repo-deletion event; 2026-06-01 = formal soak-expiry closure documentation). NOT a contradiction; no reconciliation. DECISIONS.md intentionally untouched. |
+| OQ-LC5-RESIDUAL | marketplace.json still carries stale changelog prose (`pytest 1147`, `v1.6 cycle`) + `metadata.version: "1.8.0"` (OUT of LC-5 count-sweep scope). | ✅ ACCEPT + **CARRY TO PHASE 7**: Y-05 `version_bump.py --apply` (1.8.0→1.9.0) updates marketplace.json version + description prefix; Phase 7 pre-push audit Worker scans for residual stale changelog prose in the body. |
+
+**Manager verification highlights:** invariant LOGIC 100% untouched (validate_invariants.py diff = narrative/comment counts only, no check_F_/_RULE_FUNCTIONS/cascade/severity); DECISIONS.md 6067B untouched (LC-4 → DECISIONS_ARCHIVE.md only); F-16 .mcp.json md5 unchanged; declared 31 / implemented 24 series correctly mapped (19-cite per-cite table verified); marketplace.json 45/18/4 valid JSON; drift-check + sync 34 PASS (cascade ==24 holds → F-23/24/25/26 logic intact).
+
+**Cross-refs:** `docs/PHASE_STATUS.md` v1.9 Phase 6 DONE entry; Phase 6 Worker Output Package (per-cite LC-6 table); Q-V1.9-PHASE-2/3/4-CLOSURE-FOLLOWUPS-01 (count-reconciliation backlog, now CLOSED by LC-6); `tests/docs/test_count_consistency.py` (permanent count-drift guard).
+
 ### Q-V1.9-PHASE-5-CLOSURE-FOLLOWUPS-01: v1.9 Phase 5 closure — 0 OQs (regression-free additive enhancement) [P3] ✅ CLEAN 2026-06-01
 **Raised:** 2026-06-01 v1.9 Phase 5 closure (Manager GO after rigorous regression verification). Worker Output Package §"Open Questions: None".
 **Context:** Phase 5 enhanced check_F_23 (additive workspace-aware dual-registry fallback, Q-V1.9-03) — the ONLY v1.9 phase modifying an existing v1.8 function (highest regression risk, R1). Worker followed TDD (RED→GREEN: 3 new tests FAIL against v1.8 code, then PASS after enhancement). **0 OQs surfaced — cleanest phase.**

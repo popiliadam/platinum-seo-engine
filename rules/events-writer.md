@@ -153,7 +153,7 @@ Worker schema-first override paterni: schema'da olmayan kind kullanmak YASAK. Ye
 
 | Skill | audit_action | audit_target | Status / Notes |
 |---|---|---|---|
-| drift-check | accessed | `invariants:20` | ✅ Active — Phase 5 audit kind doğum belgesi |
+| drift-check | accessed | `invariants:24` | ✅ Active — Phase 5 audit kind doğum belgesi |
 | schema-validate | accessed | `schemas:bulk-validate` | ✅ Active — Phase 13 governance read-only |
 | glossary-audit | accessed | `glossary:terms` | ✅ Active — Term drift audit |
 | load-context | accessed | `session:wakeup-codify` | ✅ Active — Hook-driven session start |
@@ -247,3 +247,26 @@ Yanlış (YASAK):
 ```json
 {"event_kind": "audit", "event_type": "audit_run", ...}
 ```
+
+## Section 7 — `event_id` Format (schema pattern codification, LC-3 / Q-PHASE15-RXX-COUNT-01)
+
+`event_id` her event'in (4 kind ortak envelope) zorunlu unique identifier field'idir. Format `schemas/events.schema.json` `properties.event_id` SSoT'tur; bu section o pattern'i codify eder (drift olursa `tests/rules/test_event_id_format.py` doc↔schema parity FAIL eder).
+
+| Constraint | Değer (events.schema.json authority) |
+|---|---|
+| Regex `pattern` | `^[A-Za-z0-9][A-Za-z0-9_.:-]*$` |
+| `minLength` | 3 |
+| `maxLength` | 128 |
+
+- İlk karakter alphanumeric (`[A-Za-z0-9]`) olmalı; sonraki karakterler alphanumeric + `_` (underscore) + `.` (dot) + `:` (colon) + `-` (hyphen) serbest.
+- Uzunluk 3–128 karakter (inclusive). Boşluk / Türkçe karakter / slash YASAK.
+- `event_id` envelope auto-populate edilir (`events_writer._populate_envelope` → `uuid.uuid4().hex`, 32-char hex, pattern + length-compliant) caller omit ederse. Manual override schema pattern'e uymak ZORUNLU.
+
+Per-kind convention (events.schema.json `event_id` description):
+
+- **work** → `{event_type}_{task_id}_{timestamp_compact}` (ör. `content_new_T-0042_20260420T1030`).
+- **provenance** → `run_id` aggregator'dır; `event_id` per-row unique (uuid4 hex default).
+- **audit** → governance assigns (Phase 14+); uuid4 hex default kabul.
+- **workflow** → uuid4 hex default; `workflow_run_id` ayrı string field (Section 5), `event_id` ile karıştırılmaz.
+
+> ⚠️ Not: `event_id` (envelope identifier, 3–128 char, `^[A-Za-z0-9][A-Za-z0-9_.:-]*$`) `workflow_run_id`'den (Section 5, `^[a-z][a-z0-9-]*-[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-f0-9]{4}$`) ve integer `run_id`'den (provenance aggregator) ayrı field'lardır — type/format collision YASAK (ADR-020 type-discipline).

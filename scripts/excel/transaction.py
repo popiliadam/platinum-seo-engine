@@ -70,6 +70,50 @@ _TYPE_MAP: dict[str, tuple[type, ...]] = {
 }
 
 # ---------------------------------------------------------------------------
+# WRITER_REGISTRY — per-sheet allowed-writer convention (LC-1, Q-W3W2B-WRITER-01)
+# ---------------------------------------------------------------------------
+#
+# Codifies which writer identity is *expected* to author each logical sheet.
+# `master_task` mirrors schemas/master-excel.schema.json `allowed_writers`
+# (the only sheet with a HARD schema-level gate); every other sheet carries
+# allowed_writers=None in the schema (no hard gate) and historically accepted
+# arbitrary writer strings — `_check_writer_scope` is vacuous when
+# allowed_writers is None — so the producing-skill convention was lost.
+#
+# v1.9 = OPT-IN / ADVISORY ONLY. WRITER_REGISTRY does NOT gate writes; the
+# write/append/update path is intentionally UNCHANGED (spec Risk R6 — must not
+# break existing transaction.py callers). `writer_registry_status()` is the
+# opt-in surface: a caller (or v2.0 enforcement) may consult it to emit a
+# warning when a writer is off-convention. Enforcement is reserved for v2.0.
+WRITER_REGISTRY_ENFORCEMENT: bool = False  # v1.9 OPT-IN (advisory); v2.0 flips
+
+WRITER_REGISTRY: dict[str, frozenset[str]] = {
+    # Hard-gated sheet — mirrors master-excel.schema.json allowed_writers.
+    "master_task":      frozenset({"human", "dashboard_refresh", "done_protocol", "master_task_sync"}),
+    # KPI projection sheet — refreshed by the dashboard projector.
+    "dashboard":        frozenset({"dashboard_refresh"}),
+    # Planning sheets.
+    "topical_map":      frozenset({"topical-map"}),
+    "cluster_keywords": frozenset({"cluster-map"}),
+    "cannibalization":  frozenset({"cannibalization"}),
+    "quick_wins":       frozenset({"quick-wins"}),
+    "opportunity":      frozenset({"quick-wins"}),
+    "new_content_plan": frozenset({"new-content-plan"}),
+    "content_improve":  frozenset({"content-remediation"}),
+    "content_decay":    frozenset({"content-decay"}),
+    # Ingestion / audit sheets.
+    "gsc_performance":  frozenset({"gsc-pull"}),
+    "on_page_audit":    frozenset({"on-page-audit"}),
+    "tech_seo":         frozenset({"tech-audit"}),
+    "gbp_audit":        frozenset({"gbp-audit"}),
+    "schema":           frozenset({"schema-audit"}),
+    "crawl_sitemap":    frozenset({"sf-import"}),
+    "robots_txt":       frozenset({"tech-audit"}),
+    "redirect_404":     frozenset({"sf-import"}),
+    "completed_work":   frozenset({"done-protocol"}),
+}
+
+# ---------------------------------------------------------------------------
 # Exceptions
 # ---------------------------------------------------------------------------
 
@@ -472,6 +516,39 @@ def _check_writer_scope(schema: dict, sheet: str, writer: str | None) -> None:
         )
 
 
+def writer_registry_status(
+    sheet: str,
+    writer: str | None,
+    *,
+    enforce: bool = WRITER_REGISTRY_ENFORCEMENT,
+) -> str:
+    """Advisory per-sheet writer-convention check (LC-1, Q-W3W2B-WRITER-01).
+
+    Returns:
+        "ok"           — writer is registered for the sheet, OR the sheet is
+                         not in WRITER_REGISTRY, OR writer is None (vacuous).
+        "unregistered" — the sheet IS in WRITER_REGISTRY but `writer` is not
+                         an allowed writer for it. A warning is logged.
+
+    v1.9 contract: ADVISORY ONLY — NEVER raises and NEVER gates a write (spec
+    Risk R6). `enforce` defaults to WRITER_REGISTRY_ENFORCEMENT (False in
+    v1.9) and is reserved for v2.0; even when True it currently only escalates
+    the log marker. The sole HARD write gate remains `_check_writer_scope`
+    (schema allowed_writers). transaction.write/append/update do NOT call this
+    helper — opting in is the caller's choice.
+    """
+    allowed = WRITER_REGISTRY.get(sheet)
+    if allowed is None or writer is None or writer in allowed:
+        return "ok"
+    msg = (
+        f"writer {writer!r} off-convention for sheet {sheet!r} "
+        f"(WRITER_REGISTRY allows {sorted(allowed)}) — advisory "
+        f"(LC-1 OPT-IN; enforcement reserved v2.0)"
+    )
+    _log(f"WARNING{' [enforce]' if enforce else ''}: {msg}")
+    return "unregistered"
+
+
 # ---------------------------------------------------------------------------
 # Internals — sheet I/O (header detection + row write)
 # ---------------------------------------------------------------------------
@@ -779,6 +856,9 @@ __all__: Iterable[str] = (
     "WorkbookLockedByExcelError",
     "WorkbookCorruptError",
     "WriterScopeError",
+    "WRITER_REGISTRY",
+    "WRITER_REGISTRY_ENFORCEMENT",
+    "writer_registry_status",
     "write",
     "append",
     "update",

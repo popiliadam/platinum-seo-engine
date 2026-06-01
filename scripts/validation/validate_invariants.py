@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-validate_invariants.py — 20 hand-coded invariant rules for drift-check.
+validate_invariants.py — 24 hand-coded invariant rules for drift-check.
 
 Owned by `skills/governance/drift-check/SKILL.md`. Read-only governance:
 loads `master.xlsx` (data_only=True, read_only=True) plus _state side
-files (events.jsonl, workflows/*.json, backups/) and evaluates the 20
+files (events.jsonl, workflows/*.json, backups/) and evaluates the 24
 invariants enumerated in §17.2 + the F-08 quick-wins URL subset rule.
 
 Each rule is a small Python function. NO DSL — that is a Phase 6+
@@ -454,7 +454,7 @@ def check_F_05(workbook: Any, project_slug: str, **_) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# HIGH (10)
+# HIGH (13)
 # ---------------------------------------------------------------------------
 
 def check_F_08(workbook: Any, project_slug: str, **_) -> dict:
@@ -1259,7 +1259,7 @@ def check_F_17(workbook: Any, project_slug: str, **_) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# MEDIUM (5)
+# MEDIUM (6)
 # ---------------------------------------------------------------------------
 
 def check_F_18(workbook: Any, project_slug: str, **_) -> dict:
@@ -1693,7 +1693,7 @@ def aggregate_verdicts(rule_results: list[dict]) -> dict:
 
     Raises UnknownRuleError if a result.id is outside the registered set
     — that would mean the caller injected a synthetic rule outside the
-    20-rule contract.
+    24-rule contract.
     """
     pass_count = warn_count = fail_count = 0
     overall = "GREEN"
@@ -1707,7 +1707,7 @@ def aggregate_verdicts(rule_results: list[dict]) -> dict:
         rid = r.get("id")
         if rid not in _VALID_RULE_IDS:
             raise UnknownRuleError(
-                f"unknown rule id {rid!r} — outside 20-rule registry"
+                f"unknown rule id {rid!r} — outside 24-rule registry"
             )
         verdict = r.get("verdict")
         severity = r.get("severity", "MEDIUM")

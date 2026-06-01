@@ -375,3 +375,76 @@ def test_cell_value_too_long(tmp_path: Path) -> None:
             [_topical_row(note=huge_note)],
             "test-proj",
         )
+
+
+# ---------------------------------------------------------------------------
+# LC-1 — WRITER_REGISTRY codification (Q-W3W2B-WRITER-01; spec Risk R6)
+# OPT-IN / advisory in v1.9; enforcement reserved v2.0. The write path is
+# intentionally NOT gated — these tests lock that contract.
+# ---------------------------------------------------------------------------
+
+def _schema_sheet_names() -> set[str]:
+    schema = json.loads(transaction._DEFAULT_SCHEMA_PATH.read_text(encoding="utf-8"))
+    return set(schema.get("sheets", {}).keys())
+
+
+def test_writer_registry_covers_every_schema_sheet() -> None:
+    # Schema-first: the registry must enumerate ALL logical sheets, no more.
+    assert set(transaction.WRITER_REGISTRY.keys()) == _schema_sheet_names()
+    # Every value is a non-empty frozenset of non-empty writer identities.
+    for sheet, writers in transaction.WRITER_REGISTRY.items():
+        assert isinstance(writers, frozenset) and writers, sheet
+        assert all(isinstance(w, str) and w for w in writers), sheet
+
+
+def test_writer_registry_master_task_mirrors_schema_allowed_writers() -> None:
+    # master_task is the one hard-gated sheet; registry must match the schema
+    # SSoT exactly (existing writer pattern: human/dashboard_refresh/
+    # done_protocol/master_task_sync).
+    schema = json.loads(transaction._DEFAULT_SCHEMA_PATH.read_text(encoding="utf-8"))
+    schema_writers = set(schema["sheets"]["master_task"]["allowed_writers"])
+    assert transaction.WRITER_REGISTRY["master_task"] == frozenset(schema_writers)
+    assert "master_task_sync" in transaction.WRITER_REGISTRY["master_task"]
+
+
+def test_writer_registry_known_convention_mappings() -> None:
+    # Prompt-specified convention anchors (LC-1): opportunity + quick_wins are
+    # both produced by the quick-wins skill.
+    assert transaction.WRITER_REGISTRY["opportunity"] == frozenset({"quick-wins"})
+    assert transaction.WRITER_REGISTRY["quick_wins"] == frozenset({"quick-wins"})
+
+
+def test_writer_registry_status_ok_for_registered_writer() -> None:
+    assert transaction.writer_registry_status("quick_wins", "quick-wins") == "ok"
+    assert transaction.writer_registry_status("master_task", "master_task_sync") == "ok"
+
+
+def test_writer_registry_status_unregistered_logs_warning(capsys: pytest.CaptureFixture) -> None:
+    status = transaction.writer_registry_status("quick_wins", "rogue-skill")
+    assert status == "unregistered"
+    err = capsys.readouterr().err
+    assert "off-convention" in err and "rogue-skill" in err and "advisory" in err
+
+
+def test_writer_registry_status_vacuous_when_sheet_absent_or_writer_none() -> None:
+    # Sheet not in the registry → vacuous OK (no convention to enforce).
+    assert transaction.writer_registry_status("not_a_sheet", "anyone") == "ok"
+    # writer None → vacuous OK (nothing claimed).
+    assert transaction.writer_registry_status("quick_wins", None) == "ok"
+
+
+def test_writer_registry_enforcement_off_by_default_r6() -> None:
+    # R6: enforcement MUST be OFF in v1.9 so existing callers cannot break.
+    assert transaction.WRITER_REGISTRY_ENFORCEMENT is False
+
+
+def test_writer_registry_does_not_gate_writes_r6(tmp_path: Path) -> None:
+    # R6 regression proof: a non-master_task write with an off-convention
+    # writer STILL succeeds — WRITER_REGISTRY never touches the write path.
+    proj, _ = _setup_project(tmp_path)
+    wb_path = proj / "master.xlsx"
+    assert transaction.writer_registry_status("topical_map", "rogue-writer") == "unregistered"
+    result = transaction.append(
+        wb_path, "topical_map", [_topical_row()], "test-proj", writer="rogue-writer",
+    )
+    assert isinstance(result, WriteResult) and result.rows_affected == 1

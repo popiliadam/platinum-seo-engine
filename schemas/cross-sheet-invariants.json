@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://platinum-seo-engine/schemas/cross-sheet-invariants.json",
   "additionalProperties": false,
-  "title": "Cross-Sheet Invariants — 20 CSR Registry v1.0",
-  "description": "Populated INSTANCE document (not a meta-schema) carrying the 20 Cross-Sheet Rules per §9.1. Top-level `rules` array is the source of truth consumed by the consistency_check tool. Per S3.5 pivot: instance documents live at `NAME.json`; if a paired meta-schema is ever needed it would go to `NAME.schema.json`. Verdict aggregation (§9.2/§17.2): any RED → RED; else any AMBER/WARN → AMBER; all PASS → GREEN. Severity-to-verdict: CRITICAL/HIGH → RED on FAIL, MEDIUM/LOW → AMBER on FAIL.",
+  "title": "Cross-Sheet Invariants — 31 CSR Registry v1.0",
+  "description": "Populated INSTANCE document (not a meta-schema) carrying the 31 Cross-Sheet Rules per §9.1. Top-level `rules` array is the source of truth consumed by the consistency_check tool. Per S3.5 pivot: instance documents live at `NAME.json`; if a paired meta-schema is ever needed it would go to `NAME.schema.json`. Verdict aggregation (§9.2/§17.2): any RED → RED; else any AMBER/WARN → AMBER; all PASS → GREEN. Severity-to-verdict: CRITICAL/HIGH → RED on FAIL, MEDIUM/LOW → AMBER on FAIL.",
   "schema_version": "1.0",
   "verdict_aggregation": "any RED → RED; else any AMBER/WARN → AMBER; all PASS → GREEN",
   "severity_to_verdict_map": {
