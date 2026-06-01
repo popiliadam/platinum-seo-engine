@@ -78,6 +78,16 @@ python3 scripts/ci/run_skill_python.py skills/governance/schema-validate/SKILL.m
 # Migration 0005 idempotent test
 python3 -m pytest tests/scripts/test_migration_0005.py -v
 # → 5 cases PASS
+#
+# Migration 0005 CLI shape — uses --in / --out / --dry-run, NO --apply (v2.3 retro R-10 / v1.9 live test L-T-1 PROACTIVE clarification):
+#   scripts/migrations/migration_0005_project_config_1_4_to_1_5.py uses
+#     --in PATH    (required)
+#     --out PATH   (optional)
+#     --dry-run    (flag that INVERTS the default apply-in-place behavior)
+#   There is NO --apply flag for this migration script. (Distinct from
+#   scripts/release/version_bump.py --apply, the Y-05 5-file sync flag, which IS valid.)
+#   To APPLY:   invoke WITHOUT --dry-run (default mode writes in place + creates .bak).
+#   To DRY-RUN: add --dry-run (writes preview to stdout; source file untouched).
 
 # sf-mcp-tool-mapping schema validates + rejects unknown
 python3 -m pytest tests/schemas/test_sf_mcp_tool_mapping_schema.py -v
@@ -212,7 +222,7 @@ Phase 3: 8 tasks. Implement `sf-crawl-orchestrator` skill end-to-end.
 ## Files to CREATE
 1. `skills/ingestion/sf-crawl-orchestrator/SKILL.md` (NEW) — Full skill per spec Category A row + MCP-Primary section. Frontmatter MUST validate against `schemas/skill-frontmatter.schema.json` (run schema-validate after writing). Body has 9 steps:
    - Step 1 `create_run` — workflow_runner.create_run with 9 steps (preflight, crawl, poll, [export]×24 logical step, atomic_move, invoke_sf_import, provenance, complete)
-   - Step 2 `preflight` — call `mcp__sf__sf_list_allowed_base_directory` (D-SF-10); compare with `project.config.sf.mcp.allowed_directory`; call `mcp__sf__sf_crawl_progress` to check ANY in-progress crawl (R13 DURUR-orch-7); validate SF GUI responsive (no IllegalStateException)
+   - Step 2 `preflight` — call `mcp__sf__sf_list_allowed_base_directory` (D-SF-10); compare with `project.config.sf.mcp.allowed_directory`; call `mcp__sf__sf_list_crawls` (enumerator — `sf_crawl_progress` needs a crawl_id, circular for an "any in-progress?" check) to check ANY in-progress crawl (R13 DURUR-orch-7); validate SF GUI responsive (no IllegalStateException)
    - Step 3 `crawl_trigger` — `mcp__sf__sf_crawl(url=project_config.domain, config=project_config.sf.mcp.crawl_config_path or default)` → returns crawl_id; emit `sf_mcp_crawl_started` event
    - Step 4 `poll` — loop `mcp__sf__sf_crawl_progress(crawl_id)` every 60s; max wait `project_config.sf.mcp.max_wait_minutes` (Q-SF-MCP-03 default 180); DURUR-orch-3 on timeout
    - Step 5-6 `export_24_reports` — iterate the 24-report list from spec; per-report `mcp__sf__sf_generate_report(crawl_id, report_name, save_report=True, output_dir=allowed_directory, timeout=per_report_timeout_seconds)`; atomic move each CSV to `_state/staging/sf-crawl-{run_id}/{report_name}.csv`; Tier 1 fail → DURUR-orch-8 + rollback; Tier 2 fail → AMBER + continue (matches sf-import Tier policy)
@@ -253,8 +263,12 @@ Phase 3: 8 tasks. Implement `sf-crawl-orchestrator` skill end-to-end.
 ## Verification (RUN BEFORE returning)
 ```bash
 # Schema-validate frontmatter
-python3 scripts/validation/validate_schema.py skills/ingestion/sf-crawl-orchestrator/SKILL.md
-# → "OK" or "VALID"
+# (v2.3 retro R-1 / Q-PHASE-3-WORKER-03: validate_schema.py needs 2 args
+#  [data.json + schema.json]; the 1-arg `validate_schema.py SKILL.md` form exits 0
+#  with a usage message on stderr = FALSE POSITIVE. Use the bonus frontmatter test
+#  from v1.8 Phase 3 instead — it validates against skill-frontmatter.schema.json.)
+python3 -m pytest tests/skills/test_sf_crawl_orchestrator.py::test_frontmatter_validates_against_schema -v
+# → 1 PASS
 
 # Orchestrator skill tests
 python3 -m pytest tests/skills/test_sf_crawl_orchestrator.py -v
@@ -583,7 +597,8 @@ Phase 7: 7 tasks. Live pilot smoke + verify 20 ACs + release.
 5. **Schema-validate full sweep GREEN** — `python3 scripts/ci/run_skill_python.py skills/governance/schema-validate/SKILL.md` → EXIT 0
 6. **Full pytest baseline GREEN** — `python3 -m pytest -q 2>&1 | tail -5` → "1213 passed" or "1225 passed" depending on test granularity (see spec Tests Plan)
 7. **Rollback drill** — In a temp branch, `git revert HEAD~N..HEAD` (N = number of v1.8 commits), then `python3 scripts/migrations/migration_0005_project_config_1_4_to_1_5.py --project vento --reverse` (or equivalent rollback if migration script supports), then `python3 -m pytest -q | tail -3` → should restore 1184 baseline (v1.7 state)
-8. **Git tag + push** — `git tag -a v1.8.0 -m "SF MCP Hybrid Integration (24-report MCP-primary + 4 consumer skills + Migration 0005)"`. **DO NOT push to remote without operator approval.**
+8a. **Release commit (AUTHORIZED — v2.3 retro R-9)** — create the single release commit that bundles the PHASE_STATUS.md milestone-closed update: `git commit -m "release: v1.8.0 MILESTONE CLOSED — SF MCP Hybrid Integration (24-report MCP-primary + 4 consumer skills + Migration 0005)"`. This is the ONE commit Phase 7 is authorized to make (resolves the v1.8 §Forbidden "no commits" vs `git tag` tension).
+8b. **Tag annotated** — `git tag -a v1.8.0 -m "SF MCP Hybrid Integration (24-report MCP-primary + 4 consumer skills + Migration 0005)"`. **DO NOT push the release commit OR the tag to remote without operator approval.**
 
 ## Files to MODIFY
 - `docs/PHASE_STATUS.md` — Update Active Phase to "v1.8.0 SHIPPED {commit_sha}" with evidence block (AC-10 outputs, AC-13 rowcount comparison)
@@ -599,7 +614,8 @@ Phase 7: 7 tasks. Live pilot smoke + verify 20 ACs + release.
 
 ## Forbidden
 - Touch code beyond PHASE_STATUS.md edit
-- Push tag to remote without operator approval
+- Do NOT make commits EXCEPT the one marked **release commit AUTHORIZED** in task #8a (v2.3 retro R-9)
+- Push tag or release commit to remote without operator approval
 - Skip rollback drill (even if all ACs pass)
 - Mark phase complete if ANY AC fails
 

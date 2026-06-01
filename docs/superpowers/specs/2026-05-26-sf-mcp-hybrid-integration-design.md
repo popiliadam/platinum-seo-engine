@@ -103,6 +103,10 @@ v1 spec was scoped narrowly to `ingestion/sf-import + new orchestrator + 4 schem
 |-------|------|---------|--------|
 | **sf-crawl-orchestrator** | `skills/ingestion/sf-crawl-orchestrator/SKILL.md` (NEW) | **PRIMARY ingestion path (v2.2).** Bridge SF MCP to file-based sf-import; trigger crawl via `sf_crawl`, poll `sf_crawl_progress`, **iterate `sf_generate_report(save_report=True)` for 24 reports** (Tier 1: 14 + Tier 2: 10), move files from SF allowed_directory to `projects/{slug}/sf-exports/{date}/raw/`, hand off to sf-import. **Atomic semantics** (D-SF-16): all 24 reports OR rollback. **Resume-capable** (workflow_runner.pause/resume mid-loop). **8 DURURs** (6 base + DURUR-orch-7 concurrent-crawl guard per R13 + DURUR-orch-8 Tier 1 export fail / atomic rollback per D-SF-16). | **XXL (24h)** — bumped from XL after MCP-primary pivot adds 24-report loop + atomic semantics + resume |
 
+#### Step Count Semantics (v2.3 retro — R-6 / Q-PHASE-3-WORKER-04)
+
+When a SKILL.md body specs **"N Body Steps"**, that counts the NUMBERED Body Step prose blocks (typically Step 1 `create_run` + intermediate workflow steps + Step N `complete`). The `workflow_runner.create_run(steps=[...])` `steps[]` array typically has FEWER entries because (a) Step 1 (`create_run` itself) is the entry point, not a step; (b) the `complete` step is a `workflow_runner.complete()` transition, NOT an entry in `steps[]`. **Example:** the sf-crawl-orchestrator has **9 Body Steps numbered** but **7 entries in `steps[]`** (preflight + crawl_trigger + poll + export_24_reports + atomic_move + invoke_sf_import + emit_provenance_and_report). This mirrors the dfs-pull / gsc-pull convention.
+
 ### Category B: EXTENDED skills (5)
 
 | Skill | What changes | Effort | Risk |
@@ -578,6 +582,16 @@ sf_import_subprocess.run([
 ])
 ```
 
+### Schema-First Note: `failure_reason.code` vs DURUR Tokens (v2.3 retro — R-3 / Q-PHASE-3-WORKER-06)
+
+The custom failure-code names in the pseudocode above and elsewhere in this section (`sf_mcp_offline`, `tier1_export_failed`, etc.) are **illustrative DURUR-NN tokens** intended for the human-readable `failure_reason.message` field — NOT for the mechanical code field. The `failure_reason.code` field is ALWAYS one of the `workflow-run.schema.json` CLOSED enum values:
+
+```
+validation_error / mcp_error / budget_exhausted / user_rejected / timeout / internal_error
+```
+
+So `workflow_runner.fail(run_id, code="tier1_export_failed", ...)` above is shorthand; the schema-conformant call sets `code="mcp_error"` (or another enum value) and carries the DURUR identity in `message` (e.g. `message="DURUR-orch-8: Tier 1 report 'X' export failed"`). v1.8 Phase 3 mapped: orch-1/2/7/8 → `mcp_error`; orch-4/5 → `validation_error`; orch-3 → `timeout`; orch-6 → `internal_error`.
+
 ### Resume Semantics (workflow_runner.pause / resume)
 
 If SF MCP crashes mid-loop (e.g., after report #17):
@@ -648,7 +662,7 @@ Step 4-N: existing projection to master.xlsx#tech_seo
 
 ```
 Operator runs: python3 scripts/migrations/migration_0005_project_config_1_4_to_1_5.py \
-    --project vento [--dry-run] [--no-backup]
+    --in projects/vento/project.config.json [--out PATH] [--dry-run]
     ↓
 Migration validates source schema_version (refuses if not in {1.4, 1.5} per strict mode)
     ↓
@@ -656,7 +670,7 @@ Idempotent: re-running on 1.5 doc is no-op (matches 0004 pattern)
     ↓
 Adds sf block default (mcp.enabled=false, url=http://127.0.0.1:11435/mcp, max_wait_minutes=180), bumps schema_version to 1.5
     ↓
-Writes .bak backup unless --no-backup; re-validates against project-config.schema.json v1.5
+Writes .bak backup in in-place mode (default; omit --out); re-validates against project-config.schema.json v1.5
     ↓
 Audit summary to stderr (per 0004 pattern)
     ↓
@@ -664,6 +678,20 @@ Operator can now /pseo-sf-crawl vento (opt-in by setting mcp.enabled=true in con
 ```
 
 **Operator workflow:** A new doc section in `docs/WORKFLOWS.md` (Phase 6 task) walks operators through this command for each of the 9 existing projects.
+
+### events.schema `source` Dict — Canonical Keys (v2.3 retro — R-4 / Q-PHASE-3-WORKER-07)
+
+Whenever any scenario above emits an `sf_mcp` provenance event via `append_provenance(source={...})`, the `source` dict is schema-constrained (`events.schema.json` sets `source.additionalProperties=false`):
+
+```
+# events.schema source.additionalProperties=false; valid keys ONLY:
+#   kind / source_folder / filename_original / filename_normalized / file_hash /
+#   row_count / response_bytes / mcp_server / mcp_tool
+# crawl_id + other arbitrary properties go in the inbox/sf-mcp/{date}-sf-crawl-{slug}.json
+# envelope (the envelope JSON allows arbitrary properties).
+```
+
+So a naive `source={"kind":"sf_mcp","crawl_id":...}` would FAIL validation (`crawl_id` is not an allowed `source` key). The schema-conformant emission uses `source={"kind":"sf_mcp","mcp_server":"sf","mcp_tool":"sf_generate_report","response_bytes":...,"row_count":...}` and keeps `crawl_id` in the ingestion envelope, not the event source dict.
 
 ---
 
@@ -702,7 +730,7 @@ Operator can now /pseo-sf-crawl vento (opt-in by setting mcp.enabled=true in con
 | R10 | **NEW** — Migration 0005 fails on a project with malformed v1.4 config | LOW | Project unusable | Migration is idempotent + has rollback test; failure leaves config untouched |
 | R11 | **NEW** — events.jsonl size growth from MCP polling events | LOW | Events file bloat | Polling emits ONE workflow event per crawl_started + crawl_completed (not per poll); 64KB cap per event enforced |
 | R12 | **NEW** — 100KB cap truncates sf_generate_report response → silent data loss | MEDIUM | Discovery skill gets partial data | Response includes `truncated: true` flag check; AMBER warning if truncated; operator informed to use file-based path |
-| R13 | **NEW** — Multiple projects' orchestrators competing for SF GUI | LOW (single-user) | Concurrent crawl conflict | **v1 concrete guard:** orchestrator preflight calls `mcp__sf__sf_crawl_progress` BEFORE `sf_crawl`. If status=IN_PROGRESS for any crawl (regardless of project), emit DURUR-orch-7: "Another crawl active in SF GUI. Wait for completion or cancel via SF, then retry." This eliminates silent contention without requiring cross-project lock. Long-term cross-project lock primitive deferred to v1.2+ per Q-SF-MCP-06. |
+| R13 | **NEW** — Multiple projects' orchestrators competing for SF GUI | LOW (single-user) | Concurrent crawl conflict | **v1 concrete guard:** orchestrator preflight calls `mcp__sf__sf_list_crawls` (enumerator; no `crawl_id` argument needed — v2.3 retro R-2 / Q-PHASE-3-WORKER-05; the per-crawl `sf_crawl_progress` would be circular here since it requires a `crawl_id`) BEFORE `sf_crawl`. If any listed crawl has status=IN_PROGRESS (regardless of project), emit DURUR-orch-7: "Another crawl active in SF GUI. Wait for completion or cancel via SF, then retry." This eliminates silent contention without requiring cross-project lock. Long-term cross-project lock primitive deferred to v1.2+ per Q-SF-MCP-06. |
 
 ---
 
