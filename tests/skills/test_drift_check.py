@@ -317,8 +317,8 @@ def test_consistency_report_schema_valid(clean_wb_path: Path, tmp_path: Path,
     Draft7Validator(consistency_schema).validate(report)
     assert report["schema_version"] == "1.0"
     # 20 baseline + F-23 (v1.8 Phase 4) + F-24 (v1.9 Phase 2) +
-    # F-25 (v1.9 Phase 3) = 23.
-    assert len(report["checks"]) == 23
+    # F-25 (v1.9 Phase 3) + F-26 (v1.9 Phase 4) = 24.
+    assert len(report["checks"]) == 24
     assert report["verdict"] in ("GREEN", "AMBER", "RED")
 
 
@@ -887,3 +887,167 @@ def test_f25_config_missing_skip(clean_wb_path: Path, tmp_path: Path) -> None:
         f"got {by_id['F-25']}"
     )
     assert "missing" in by_id["F-25"]["evidence"]
+
+
+# ---------------------------------------------------------------------------
+# F-26 (v1.9 Phase 4) — orphan SF GUI crawl detection (MCP-aware → AMBER)
+#
+# F-26 is MEDIUM severity (the FIRST MEDIUM v1.9 invariant): a FAIL surfaces
+# AMBER, never RED — an orphan crawl is an operator cleanup hint, not a data
+# break (D-V1.9-11 / spec v2.2 line 210). The check is MCP-aware: it does a 1s
+# SfMcpClient.health() probe BEFORE any sf_crawl_progress call and SKIPs (never
+# hangs drift-check) when the probe fails (Risk R2).
+#
+# These tests INJECT a fake client (health + call_tool) — no real SF MCP socket
+# is ever opened (mirrors tests/scripts/test_sf_mcp_client.py's injection
+# ethos). check_F_26 is called DIRECTLY (not via evaluate_all, which does not
+# thread an mcp_client through); the fake is the seam that keeps the network —
+# and the repo-root .mcp.json — entirely out of the test path (F-16 safe;
+# fixtures live only in tmp_path).
+# ---------------------------------------------------------------------------
+
+class _FakeSfMcpClient:
+    """Stand-in for scripts.util.sf_mcp_client.SfMcpClient (health + call_tool).
+
+    Mirrors the real API surface F-26 depends on: ``health() -> bool`` and
+    ``call_tool(tool_name, **kwargs) -> dict``. Records calls so tests can
+    assert the probe-before-progress ordering and the exact tool invoked.
+    Never touches a socket."""
+
+    def __init__(self, *, healthy: bool = True,
+                 progress_status: str = "IN_PROGRESS") -> None:
+        self._healthy = healthy
+        self._progress_status = progress_status
+        self.health_calls = 0
+        self.tool_calls: list[tuple[str, dict]] = []
+
+    def health(self) -> bool:
+        self.health_calls += 1
+        return self._healthy
+
+    def call_tool(self, tool_name: str, **kwargs) -> dict:
+        self.tool_calls.append((tool_name, dict(kwargs)))
+        return {"status": self._progress_status}
+
+
+def _write_sf_workflow(
+    tmp_path: Path, slug: str, *, run_id: str, status: str,
+    crawl_id: str | None = None, skill: str = "sf-crawl-orchestrator",
+) -> None:
+    """Write a synthetic sf-crawl-orchestrator workflow-run JSON in the tmp
+    workspace. crawl_id is persisted the way the orchestrator persists it — in a
+    step's ``output_ref`` as ``crawl_id=<value>`` (sf-crawl-orchestrator
+    SKILL.md trigger step), because workflow-run.schema.json is
+    additionalProperties:false at root. F-16 safe: only ever tmp_path."""
+    wf_dir = tmp_path / "projects" / slug / "_state" / "workflows"
+    wf_dir.mkdir(parents=True, exist_ok=True)
+    steps: list[dict] = [{"name": "preflight", "status": "done"}]
+    if crawl_id is not None:
+        steps.append({"name": "trigger_crawl", "status": "done",
+                      "output_ref": f"crawl_id={crawl_id}"})
+    payload: dict = {
+        "schema_version": "1.0",
+        "run_id": run_id,
+        "skill": skill,
+        "project_slug": slug,
+        "status": status,
+        "started_at": "2026-05-26T10:00:00Z",
+        "updated_at": "2026-05-26T11:00:00Z",
+        "steps": steps,
+    }
+    if status == "paused":
+        payload["paused_at"] = "2026-05-26T11:00:00Z"
+    if status == "failed":
+        payload["ended_at"] = "2026-05-26T11:00:00Z"
+        payload["failure_reason"] = {"code": "timeout", "message": "stalled"}
+    (wf_dir / f"{run_id}.json").write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def test_f26_no_orphan_pass(tmp_path: Path) -> None:
+    """PASS — no orphan. Covers spec FE-3 PASS cases (a) AND (b):
+    (a) a ``done`` sf-crawl-orchestrator run is ignored (not paused/failed); and
+    (b) a ``paused`` run whose SF GUI reports a terminal status (DONE, NOT
+    IN_PROGRESS) → workflow state and GUI agree the crawl ended → no orphan.
+
+    Also pins the status filter (only paused/failed runs are probed) and the
+    health-probe-then-progress ordering."""
+    slug = "drifttest"
+    _write_sf_workflow(tmp_path, slug, run_id=f"{slug}-2026-05-26-dead",
+                       status="done", crawl_id="crawl-done")
+    _write_sf_workflow(tmp_path, slug, run_id=f"{slug}-2026-05-26-cafe",
+                       status="paused", crawl_id="crawl-paused")
+    client = _FakeSfMcpClient(healthy=True, progress_status="DONE")
+    # check_F_26 ignores the workbook (reads _state/workflows + SF MCP only).
+    result = vi.check_F_26(None, slug, workspace_root=tmp_path, mcp_client=client)
+    assert result["verdict"] == "PASS", result
+    assert result["severity"] == "MEDIUM"
+    assert client.health_calls == 1, "health() probe must run once"
+    # Only the paused run is probed; the done run is filtered out.
+    assert client.tool_calls == [
+        ("sf_crawl_progress", {"crawl_id": "crawl-paused"})
+    ], client.tool_calls
+
+
+def test_f26_orphan_detected_amber(tmp_path: Path) -> None:
+    """AMBER — a ``failed`` workflow whose SF GUI still reports IN_PROGRESS is an
+    orphan (workflow state + GUI disagree). FAIL MEDIUM → aggregator AMBER, NOT
+    RED (D-V1.9-11)."""
+    slug = "drifttest"
+    _write_sf_workflow(tmp_path, slug, run_id=f"{slug}-2026-05-26-beef",
+                       status="failed", crawl_id="crawl-fail")
+    client = _FakeSfMcpClient(healthy=True, progress_status="IN_PROGRESS")
+    result = vi.check_F_26(None, slug, workspace_root=tmp_path, mcp_client=client)
+    assert result["verdict"] == "FAIL", result
+    assert result["severity"] == "MEDIUM"
+    assert result["affected_rows"] == 1
+    assert any("crawl-fail" in v for v in result["sample_violations"]), result
+    # MEDIUM FAIL must surface AMBER, never RED.
+    agg = vi.aggregate_verdicts([result])
+    assert agg["overall"] == "AMBER", (
+        f"F-26 MEDIUM FAIL must be AMBER (operator hint), not RED; "
+        f"got {agg['overall']}"
+    )
+
+
+def test_f26_mcp_unreachable_skip(tmp_path: Path) -> None:
+    """SKIP — a ``paused`` run exists but the 1s health probe fails (MCP down).
+    drift-check must NOT hang or hard-fail: F-26 SKIPs (→ AMBER) and never calls
+    sf_crawl_progress (Risk R2 mitigation)."""
+    slug = "drifttest"
+    _write_sf_workflow(tmp_path, slug, run_id=f"{slug}-2026-05-26-cafe",
+                       status="paused", crawl_id="crawl-paused")
+    client = _FakeSfMcpClient(healthy=False)  # health probe fails (MCP down)
+    result = vi.check_F_26(None, slug, workspace_root=tmp_path, mcp_client=client)
+    assert result["verdict"] == "SKIP", result
+    assert result["severity"] == "MEDIUM"
+    assert client.health_calls == 1, "health() probe must be attempted"
+    assert client.tool_calls == [], (
+        "no sf_crawl_progress call may fire after a failed health probe (R2)"
+    )
+    # SKIP surfaces AMBER (never RED).
+    agg = vi.aggregate_verdicts([result])
+    assert agg["overall"] == "AMBER"
+
+
+def test_f26_multiple_orphans_amber(tmp_path: Path) -> None:
+    """AMBER — two paused runs both still IN_PROGRESS per the SF GUI → two
+    orphans, two sample_violations, affected_rows == 2."""
+    slug = "drifttest"
+    _write_sf_workflow(tmp_path, slug, run_id=f"{slug}-2026-05-26-aaaa",
+                       status="paused", crawl_id="crawl-aaaa")
+    _write_sf_workflow(tmp_path, slug, run_id=f"{slug}-2026-05-26-bbbb",
+                       status="paused", crawl_id="crawl-bbbb")
+    client = _FakeSfMcpClient(healthy=True, progress_status="IN_PROGRESS")
+    result = vi.check_F_26(None, slug, workspace_root=tmp_path, mcp_client=client)
+    assert result["verdict"] == "FAIL", result
+    assert result["severity"] == "MEDIUM"
+    assert result["affected_rows"] == 2, result
+    assert len(result["sample_violations"]) == 2, result
+    joined = " ".join(result["sample_violations"])
+    assert "crawl-aaaa" in joined and "crawl-bbbb" in joined, result
+    # Both stalled runs were probed (1 health probe, 2 progress calls).
+    assert client.health_calls == 1
+    assert len(client.tool_calls) == 2
+    agg = vi.aggregate_verdicts([result])
+    assert agg["overall"] == "AMBER"
