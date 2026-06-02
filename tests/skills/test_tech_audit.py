@@ -351,8 +351,8 @@ def test_missing_h1_emits_headings_medium() -> None:
     out = tech_audit_transform.transform(
         lighthouse_raw=None, content_parsing_raw=cp,
     )
-    head_rows = [r for r in out["tech_seo"] if r["issue_category"] == "Headings"]
-    assert head_rows, "H1 count=0 must fire Headings rule"
+    head_rows = [r for r in out["tech_seo"] if r["issue_category"] == "Meta Tags"]
+    assert head_rows, "H1 count=0 must fire heading rule under Meta Tags"
     assert head_rows[0]["impact"] == tech_audit_transform.SEVERITY_MEDIUM
     assert head_rows[0]["priority"] == "P1"
     assert "H1 missing" in head_rows[0]["detail"]
@@ -365,9 +365,74 @@ def test_multiple_h1_emits_headings_medium() -> None:
     out = tech_audit_transform.transform(
         lighthouse_raw=None, content_parsing_raw=cp,
     )
-    head_rows = [r for r in out["tech_seo"] if r["issue_category"] == "Headings"]
+    head_rows = [r for r in out["tech_seo"] if r["issue_category"] == "Meta Tags"]
     assert head_rows
     assert head_rows[0]["impact"] == tech_audit_transform.SEVERITY_MEDIUM
+
+
+# ---------------------------------------------------------------------------
+# Test 7b — heading findings carry the schema-locked "Meta Tags" enum value
+# (DFS-path sibling of AC-10 Task D). "Headings" is NOT in the
+# tech_seo.issue_category enum {Performance, Layout Stability, Meta Tags,
+# Structured Data, Accessibility}; emitting it would raise RowSchemaError on
+# transaction.append/replace. H1/H2 issues live under "Meta Tags" in both the
+# human-curated master.xlsx AND scripts/util/sf_issue_taxonomy.py routing.
+# ---------------------------------------------------------------------------
+
+def test_missing_h1_routes_to_meta_tags_enum() -> None:
+    """A DFS content item with a missing H1 (the aluminumstation case —
+    20 pages H1-less) must produce a tech_seo row whose issue_category is
+    the schema-locked 'Meta Tags', never the out-of-enum 'Headings'."""
+    cp = {"items": [_content_item(
+        "https://example.com/no-h1", h1_count=0,
+    )]}
+    out = tech_audit_transform.transform(
+        lighthouse_raw=None, content_parsing_raw=cp,
+    )
+    # The heading finding's row carries the H1-missing detail.
+    heading_rows = [
+        r for r in out["tech_seo"] if "H1 missing" in r["detail"]
+    ]
+    assert heading_rows, "H1 count=0 must emit a tech_seo row"
+    assert heading_rows[0]["issue_category"] == "Meta Tags"
+    # No row escapes the 5-value schema enum.
+    valid = {
+        "Performance", "Layout Stability", "Meta Tags",
+        "Structured Data", "Accessibility",
+    }
+    for r in out["tech_seo"]:
+        assert r["issue_category"] in valid, (
+            f"out-of-enum issue_category: {r['issue_category']!r}"
+        )
+
+
+def test_no_category_constant_escapes_issue_category_enum(
+    master_excel_schema: dict,
+) -> None:
+    """Invariant lock: EVERY module-level CATEGORY_* constant must be a
+    member of the schema-locked tech_seo.issue_category enum. This guards
+    against a future CATEGORY_* reintroducing the 'Headings' bug class —
+    any finding function can only emit one of these constants, so if they
+    are all in-enum, no finding can produce an out-of-enum row."""
+    enum_col = next(
+        c for c in master_excel_schema["sheets"]["tech_seo"]["required_columns"]
+        if c["name"] == "issue_category"
+    )
+    allowed = set(enum_col["enum"])
+    category_consts = {
+        name: getattr(tech_audit_transform, name)
+        for name in dir(tech_audit_transform)
+        if name.startswith("CATEGORY_")
+    }
+    assert category_consts, "expected at least one CATEGORY_* constant"
+    offenders = {
+        name: val for name, val in category_consts.items()
+        if val not in allowed
+    }
+    assert not offenders, (
+        f"CATEGORY_* constants outside issue_category enum {allowed}: "
+        f"{offenders}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -518,13 +583,18 @@ def test_content_parsing_schema_drift_raises() -> None:
 def test_severity_enum_coverage(
     lh_payload_poor: dict,
 ) -> None:
-    """Combined payload exercises HIGH (perf<50), MEDIUM (LCP>2.5 AND
-    H1 anomaly), and LOW (title>60) severities — all of severityEnum's
-    active emission tiers."""
+    """Combined payload exercises HIGH (perf<50), MEDIUM (H1 anomaly,
+    under Meta Tags), and LOW (commercial page missing structured data,
+    under Structured Data) severities — all of severityEnum's active
+    emission tiers. LOW is sourced from the Structured Data category (not
+    a Meta Tags title finding) so it surfaces as a distinct row impact:
+    H1 + title findings now both aggregate under the single Meta Tags row
+    at its max severity (MEDIUM)."""
     cp = {"items": [_content_item(
         "https://example.com/slow-page",
-        title="x" * 70,             # LOW
-        h1_count=0,                 # MEDIUM (Headings)
+        h1_count=0,                 # MEDIUM (heading anomaly → Meta Tags)
+        is_commercial=True,         # LOW (Structured Data missing)
+        has_structured_data=False,
     )]}
     out = tech_audit_transform.transform(
         lighthouse_raw=lh_payload_poor,

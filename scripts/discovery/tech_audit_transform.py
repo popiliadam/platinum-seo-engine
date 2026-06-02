@@ -118,10 +118,16 @@ _SF_DEFAULT_SEVERITY = SEVERITY_MEDIUM
 _SEVERITY_RANK = {s: i for i, s in enumerate(SEVERITY_ENUM)}
 
 #: Issue category labels (no slug literals — generic SEO domain vocabulary).
+#: All CATEGORY_* values MUST be members of the schema-locked
+#: tech_seo.issue_category enum {Performance, Layout Stability, Meta Tags,
+#: Structured Data, Accessibility}; _aggregate_to_rows maps a finding's
+#: category straight to issue_category, so an out-of-enum value would raise
+#: RowSchemaError when the row is written to master.xlsx. (Headings issues
+#: route under "Meta Tags" — matches the human master.xlsx +
+#: sf_issue_taxonomy.py.)
 CATEGORY_PERFORMANCE = "Performance"
 CATEGORY_LAYOUT = "Layout Stability"
 CATEGORY_META = "Meta Tags"
-CATEGORY_HEADINGS = "Headings"
 CATEGORY_STRUCTURED_DATA = "Structured Data"
 
 #: Cap on affected_urls cell length (Excel friendliness — anything past this
@@ -657,7 +663,11 @@ def _heading_findings(sig: ContentSignal) -> list[_Finding]:
     else:
         label = f"H1 anomaly ({sig.h1_count} H1 tags)"
     return [_Finding(
-        category=CATEGORY_HEADINGS,
+        # Headings route under "Meta Tags": "Headings" is NOT in the
+        # schema-locked tech_seo.issue_category enum, and H1/H2 issues live
+        # under "Meta Tags" in both the human-curated master.xlsx AND
+        # scripts/util/sf_issue_taxonomy.py routing.
+        category=CATEGORY_META,
         label=label,
         severity=SEVERITY_MEDIUM,
         resolution="Use exactly one H1 per page, demote extras to H2",
@@ -1120,7 +1130,6 @@ __all__ = (
     "CATEGORY_PERFORMANCE",
     "CATEGORY_LAYOUT",
     "CATEGORY_META",
-    "CATEGORY_HEADINGS",
     "CATEGORY_STRUCTURED_DATA",
     "DEFAULT_URL_CAP",
     "LIGHTHOUSE_CREDITS_PER_URL",
