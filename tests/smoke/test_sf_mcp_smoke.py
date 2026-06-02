@@ -19,12 +19,6 @@ from __future__ import annotations
 
 import pytest
 
-try:
-    import httpx
-    _HTTPX_AVAILABLE = True
-except ImportError:
-    _HTTPX_AVAILABLE = False
-
 from scripts.util.sf_mcp_client import SfMcpClient
 
 
@@ -32,12 +26,17 @@ SF_MCP_BASE_URL = "http://127.0.0.1:11435/mcp"
 
 
 def _is_sf_mcp_running() -> bool:
-    """Quick liveness probe — single GET to /health with 1s timeout."""
-    if not _HTTPX_AVAILABLE:
-        return False
+    """Quick liveness probe via the canonical client handshake.
+
+    There is NO ``GET /health`` route on the SF MCP server — the prior probe
+    (`httpx.get(.../health)`) therefore ALWAYS returned False, so this smoke
+    ALWAYS skipped even when SF was live (false "covered" confidence;
+    OQ-SMOKE-HEALTH-PROBE). ``SfMcpClient.health()`` performs the real MCP
+    ``initialize`` handshake and returns True only when the server is reachable
+    and speaks the Streamable-HTTP protocol.
+    """
     try:
-        resp = httpx.get(f"{SF_MCP_BASE_URL}/health", timeout=1.0)
-        return resp.status_code == 200
+        return SfMcpClient(base_url=SF_MCP_BASE_URL, timeout_seconds=2.0).health()
     except Exception:
         return False
 
@@ -56,14 +55,23 @@ def test_sf_mcp_live_list_allowed_base_directory() -> None:
       (the orchestrator's DURUR-orch-4 probe depends on this contract)
     """
     client = SfMcpClient(base_url=SF_MCP_BASE_URL, timeout_seconds=10.0)
-    assert client.health(), "SF MCP /health failed but smoke proceeded"
+    assert client.health(), "SfMcpClient.health() handshake failed but smoke proceeded"
 
     result = client.call_tool("sf_list_allowed_base_directory")
     assert isinstance(result, dict), f"expected dict, got {type(result).__name__}"
-    # The native SF MCP returns either {"allowed_directory": "..."} or a
-    # plain string wrapped in {"value": "..."}; both shapes are accepted by
-    # the orchestrator body (it normalizes via isinstance check).
-    payload = result.get("allowed_directory") or result.get("value")
+    assert not result.get("isError"), (
+        f"sf_list_allowed_base_directory returned a tool error: {result!r}"
+    )
+    # Live shape (verified 2026-06-02): the native SF MCP returns the path in the
+    # MCP content envelope — {"isError": false, "content": [{"text": "/abs/path"}]}.
+    # (Older mock-era code assumed a top-level {"allowed_directory"|"value"}; keep
+    # those as fallbacks for forward-compat, but the real shape is content[*].text.)
+    text = "".join(
+        item.get("text", "")
+        for item in result.get("content", [])
+        if isinstance(item, dict)
+    ).strip()
+    payload = text or result.get("allowed_directory") or result.get("value")
     assert isinstance(payload, str) and payload, (
         f"sf_list_allowed_base_directory must return a non-empty path; got {result!r}"
     )
