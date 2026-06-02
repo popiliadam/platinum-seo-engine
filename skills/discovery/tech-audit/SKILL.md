@@ -42,7 +42,7 @@ inputs:
     type: boolean
     required: false
     default: false
-    description: "Opt-in (D-SF-11): when true, calls SF MCP via scripts/util/sf_mcp_client.SfMcpClient for live JS/render issues (sf_generate_report issues_overview_report) before merging into tech_seo. Requires SF GUI + MCP server running (preflight via client.health(); on FAIL → AMBER fallback to file-based path, NEVER hard fail). R12 truncation detection via response.get('truncated', False)."
+    description: "Opt-in (D-SF-11): when true, calls SF MCP via scripts/util/sf_mcp_client.SfMcpClient to enrich tech_seo with the live SF 'Issues Overview' report before the transform aggregates. Resolves the crawl id from sf_list_crawls (domain match → instanceDirName), client.load_crawl(...) (resilient), then exports issues_overview_report via SF_EXPORT_DISPATCH (sf_generate_report category 'Issues Overview', export_type CSV) to file_path (the >100KB inline cap is resolved by writing to disk, not a non-existent 'truncated' flag), parses the CSV with csv.DictReader → transform(..., live_findings=...). Requires SF GUI + MCP server running (preflight via client.health(); on FAIL / no matching crawl / SfMcpToolError / load timeout → AMBER fallback to file-based path, NEVER hard fail per R9)."
 outputs:
   - "master.xlsx#tech_seo"
   - "outputs/reports/{date}-tech-audit.md"
@@ -356,59 +356,158 @@ preflight; on probe failure the run AMBER-warns and continues file-based
 (never hard-fail per R9 mitigation).
 
 When `use_sf_mcp_live=true`, the SKILL body branches at Step 5 (transform)
-to optionally enrich the tech_seo rows with live SF MCP signals before
-the transform aggregates per `issue_category`:
+to optionally enrich the tech_seo rows with the live SF "Issues Overview"
+report before the transform aggregates per `issue_category`.
+
+**This branch was rewritten (AC-13) against the REAL SF MCP API** — the
+same class of fix as the sf-crawl-orchestrator Step-5 export dispatch
+(landed in `a714e43`, live-proven on the aluminumstation 1822-URL crawl).
+The engine canonical `issues_overview_report` is NOT a Screaming Frog
+identifier: it maps via `sf_crawl_orchestrator.SF_EXPORT_DISPATCH` to the
+real `sf_generate_report` tool with `category="Issues Overview"` +
+`export_type="CSV"`. There is NO `crawl_id`, `report_name`, or
+`save_report` arg; the report runs on the *currently-loaded* crawl and is
+written to `file_path` (relative to the SF allowed base directory). The
+real SF REJECTS inline output >100KB with a tool error — so `file_path`
+(write-to-disk) is the canonical export path (OQ-FILEPATH-EXPORTS), not a
+non-existent `truncated` flag. issues_overview is small (~43 rows on
+aluminumstation) so it would fit inline, but `file_path` is the safe
+canonical path regardless and matches the orchestrator dispatch contract.
+
+The `sf_list_crawls` result comes back through `SfMcpClient.call_tool` as
+the MCP content envelope `{"isError":false,"content":[{"text":"<JSON>"}]}`,
+so the crawl list is JSON-encoded inside `content[*].text` (exactly like
+`sf_crawl_progress`). We decode the first JSON block, then match on
+`url` → `instanceDirName`. The real entry shape (Manager-probed) is
+`{"url":"https://aluminumstation.com/","instanceDirName":"fc718e3f-..."}`.
 
 ```python
+import csv
+import json
+from pathlib import Path
+from scripts.ingestion import sf_crawl_orchestrator
+
+def _decode_sf_envelope(result: dict):
+    """Decode the first JSON payload from an SfMcpClient content envelope.
+
+    SfMcpClient.call_tool returns {"isError":..,"content":[{"text":"<JSON>"}]}.
+    Returns the parsed object (list/dict) or None if no JSON block is present.
+    """
+    for block in (result or {}).get("content", []) or []:
+        if isinstance(block, dict) and isinstance(block.get("text"), str):
+            try:
+                return json.loads(block["text"])
+            except ValueError:
+                continue
+    return None
+
+def _norm_domain(u: str) -> str:
+    """Normalise a URL for domain matching: drop scheme + trailing slash."""
+    return (u or "").strip().rstrip("/").split("://", 1)[-1].lower()
+
 amber_warnings: list[str] = []
+live_findings: list[dict] = []   # parsed SF "Issues Overview" CSV rows
 if use_sf_mcp_live:
-    from scripts.util.sf_mcp_client import SfMcpClient, SfMcpToolError
-    client = SfMcpClient(base_url=project_config["sf"]["mcp"]["url"])
+    from scripts.util.sf_mcp_client import (
+        SfMcpClient, SfMcpToolError, SfMcpError,
+    )
+    sf_cfg = project_config["sf"]["mcp"]
+    client = SfMcpClient(base_url=sf_cfg["url"])
+    allowed_dir = Path(sf_cfg["allowed_directory"])  # SF write base (D-SF-10)
     if not client.health():
         # R9 AMBER fallback — SF MCP unreachable, continue file-based.
         amber_warnings.append(
-            "SF MCP unavailable; falling back to file-based path"
+            "SF MCP unavailable (health probe failed); "
+            "falling back to file-based path"
         )
     else:
         try:
-            response = client.call_tool(
-                "sf_generate_report",     # native MCP tool name (no prefix)
-                crawl_id=sf_crawl_id,     # from orchestrator handoff or sf-import meta
-                report_name="issues_overview_report",
-                save_report=False,        # inline response, do NOT write to disk
+            # 1) Resolve the crawl id: pick the crawl whose `url` matches the
+            #    project domain (normalise scheme + trailing slash), then take
+            #    its `instanceDirName` (the real saved-crawl id).
+            list_resp = client.call_tool("sf_list_crawls")
+            decoded = _decode_sf_envelope(list_resp)
+            crawls = decoded if isinstance(decoded, list) else (
+                decoded.get("crawls", []) if isinstance(decoded, dict) else []
             )
-            # R12 truncation detection (100KB cap per D-SF-05).
-            if response.get("truncated", False):
+            target = _norm_domain(project_config["domain"])
+            match = next(
+                (c for c in crawls if _norm_domain(c.get("url", "")) == target),
+                None,
+            )
+            if match is None:
+                # R9 AMBER fallback — no crawl for this domain; do NOT hard fail.
                 amber_warnings.append(
-                    "SF MCP response truncated at 100KB cap for "
-                    "issues_overview_report"
+                    f"No SF crawl found for domain {project_config['domain']!r} "
+                    "in sf_list_crawls; falling back to file-based path"
                 )
-            # Merge live rows into tech_seo aggregation (additive only;
-            # transform's per-category severity reducer handles the merge).
-            live_findings = response.get("rows", [])
-            # tech_audit_transform.transform() accepts an optional
-            # `live_findings` kwarg in this branch.
-        except SfMcpToolError as exc:
-            # R9 AMBER fallback — call failed (4xx/5xx or JSON-RPC error).
+            else:
+                crawl_id = match["instanceDirName"]
+                # 2) Ensure it is the active loaded crawl (resilient: tolerates
+                #    the client-side load timeout, polls progress to confirm).
+                client.load_crawl(crawl_id)
+
+                # 3) Export "Issues Overview" via the orchestrator dispatch
+                #    (issues_overview_report → ("sf_generate_report",
+                #    {"category":"Issues Overview","export_type":"CSV"})). The
+                #    >100KB inline cap is resolved by writing to file_path.
+                tool, call_kwargs = sf_crawl_orchestrator.SF_EXPORT_DISPATCH[
+                    "issues_overview_report"
+                ]
+                rel_path = "tech_audit_issues_overview.csv"
+                client.call_tool(tool, file_path=rel_path, **call_kwargs)
+
+                # 4) Read the written CSV from the SF allowed base dir and parse
+                #    it into live_findings rows. issues_overview is a REPORT →
+                #    CSV already (no NDJSON conversion). If a future enrichment
+                #    wires a seo-element export instead, run
+                #    sf_crawl_orchestrator.ndjson_to_csv(...) first (that tool
+                #    has no export_type arg and always emits NDJSON).
+                csv_path = allowed_dir / rel_path
+                # utf-8-sig strips SF's leading BOM so csv.DictReader's first
+                # key is clean "Issue Name" (not '﻿"Issue Name"'); the transform
+                # also normalizes keys defensively (live-caught 2026-06-02).
+                with csv_path.open("r", encoding="utf-8-sig", newline="") as fh:
+                    live_findings = list(csv.DictReader(fh))
+        except (SfMcpToolError, SfMcpError) as exc:
+            # R9 AMBER fallback — list/load/export failed (4xx/5xx, JSON-RPC
+            # error, load_crawl settle timeout). NEVER hard fail.
             amber_warnings.append(
-                f"SF MCP tool error: {exc}; falling back to file-based path"
+                f"SF MCP error: {exc}; falling back to file-based path"
             )
+
+# Pass the parsed rows straight into the transform (default [] / None →
+# byte-identical file-based behaviour). The transform merges them
+# additively into the per-issue_category tech_seo aggregation.
+result = tech_audit_transform.transform(
+    lighthouse_raw=raw_lighthouse,
+    content_parsing_raw=raw_content_parsing,
+    url_cap=url_cap,
+    live_findings=(live_findings or None),
+)
 ```
 
-**AMBER vs RED policy (R9 / R12 contract):**
+**AMBER vs RED policy (R9 contract — never hard-fail this branch):**
 
 - `client.health()` returns False → AMBER warning, continue file-based.
-- `SfMcpToolError` raised → AMBER warning, continue file-based.
-- `response.get("truncated", False) is True` → AMBER warning, continue
-  with partial data (transform handles missing rows gracefully).
-- NEVER raise `SystemExit` from this branch. RED reserved for the
+- No crawl matches the project domain in `sf_list_crawls` → AMBER
+  warning, continue file-based.
+- `SfMcpToolError` / `SfMcpError` raised (export 4xx/5xx, JSON-RPC error,
+  `load_crawl` settle timeout) → AMBER warning, continue file-based.
+- The transform tolerates an empty / absent `live_findings` gracefully
+  (no extra rows), so any partial SF outage degrades to the file-based
+  result with `rowcount(with) >= rowcount(without)` preserved.
+- NEVER raise `SystemExit` from this branch. RED is reserved for the
   existing DURUR set (budget, schema drift, etc.).
 
 **Tool naming reminder (per Manager dispatch):** `call_tool(tool_name=...)`
-takes the **native** SF MCP tool name (`"sf_generate_report"`), NOT the
-registry form (`"sf__sf_generate_report"`) or the Claude Code wrapper
-form (`"mcp__sf__sf_generate_report"`). JSON-RPC `params.name` follows
-the native form per MCP spec.
+takes the **native** SF MCP tool name (`"sf_generate_report"`,
+`"sf_list_crawls"`, `"sf_load_crawl"`), NOT the registry form
+(`"sf__sf_generate_report"`) or the Claude Code wrapper form
+(`"mcp__sf__sf_generate_report"`). JSON-RPC `params.name` follows the
+native form per MCP spec. `SfMcpClient` already speaks the MCP
+Streamable-HTTP transport (session handshake + SSE), so the body only
+ever passes native tool names + the SF call kwargs.
 
 `amber_warnings` is surfaced via the existing provenance event payload
 (Step 9 — `events_writer.append_provenance` accepts a `notes` field
