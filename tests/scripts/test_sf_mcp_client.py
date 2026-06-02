@@ -30,6 +30,10 @@ Coverage:
     * Response size cap → SfMcpResponseTooLargeError; HTTP 4xx → SfMcpToolError.
     * Session expiry → re-initialize once + retry.
     * Redirect handling (307 → 200 follow, POST + body + session preserved).
+    * Spider-BUSY retry (v1.9.2): transient busy → retry-with-backoff →
+      success; busy forever → exhaust budget + return busy as-is (no loop, no
+      raise); permanent isError (SecurityException) → NO retry; success → NO
+      retry.
 
 Mocking: ``httpx.MockTransport`` (built into httpx — no extra dependency).
 
@@ -187,16 +191,71 @@ class _MockMcpServer:
         raise AssertionError(f"unexpected JSON-RPC method in test: {method!r}")
 
 
+#: The live SF Spider-BUSY tool-level error text (Manager-observed, verbatim).
+#: A state-changing op (sf_load_crawl / sf_crawl) leaves the Spider transiently
+#: BUSY and tool calls return this with ``isError == true`` until it is ready.
+SPIDER_BUSY_TEXT = (
+    "Tool error: IllegalStateException: Tool cannot be called currently. "
+    "Please check the state of the Spider"
+)
+
+
+def _busy_result() -> dict:
+    """The transient Spider-BUSY tool-level error result (``isError == true``)."""
+    return {
+        "content": [{"type": "text", "text": SPIDER_BUSY_TEXT}],
+        "isError": True,
+    }
+
+
+class _SequencedToolServer(_MockMcpServer):
+    """Mock server whose ``tools/call`` returns a *scripted sequence* of results.
+
+    Each ``tools/call`` pops the next result from ``tool_results``; once the
+    list is exhausted the final entry is repeated (so "busy forever" = a single
+    busy entry that is reused). This lets a test drive the busy → busy → success
+    progression that the live Spider exhibits after a state-changing op.
+    """
+
+    def __init__(self, tool_results: list[dict], **kwargs) -> None:
+        super().__init__(**kwargs)
+        assert tool_results, "tool_results must be non-empty"
+        self._scripted = list(tool_results)
+
+    def handler(self, request: httpx.Request) -> httpx.Response:
+        rec = _Recorded(request)
+        method = rec.rpc_method
+        # Handshake methods reuse the base behaviour (and its recording).
+        if method != "tools/call":
+            return super().handler(request)
+
+        self.requests.append(rec)
+        self.tool_call_count += 1
+        idx = min(self.tool_call_count - 1, len(self._scripted) - 1)
+        self.tool_result = self._scripted[idx]  # for visibility/debug
+        envelope = _jsonrpc_result(rec.body["id"], self._scripted[idx])
+        # Busy/permanent tool errors are returned over the live SSE transport.
+        return httpx.Response(
+            200,
+            text=_sse_body(envelope, session_id=self.session_id),
+            headers={"content-type": "text/event-stream;charset=UTF-8"},
+        )
+
+
 def _client_for(
     server: _MockMcpServer,
     *,
     max_response_bytes: int = DEFAULT_MAX_RESPONSE_BYTES,
     timeout_seconds: float = 30.0,
+    busy_retry_max: int = 6,
+    busy_retry_base_delay: float = 2.0,
 ) -> SfMcpClient:
     return SfMcpClient(
         BASE_URL,
         timeout_seconds=timeout_seconds,
         max_response_bytes=max_response_bytes,
+        busy_retry_max=busy_retry_max,
+        busy_retry_base_delay=busy_retry_base_delay,
         transport=httpx.MockTransport(server.handler),
     )
 
@@ -716,3 +775,126 @@ def test_call_tool_follows_307_redirect_preserving_post_body() -> None:
         (redirect_target, "POST", DEFAULT_SESSION_ID),
     ], f"307 must preserve POST + session header on redirect; got {tool_calls}"
     assert result == {"final": "yes"}
+
+
+# ---------------------------------------------------------------------------
+# Case 11: Spider-BUSY retry (v1.9.2) — the whole point of the patch.
+# After a state-changing op the Spider is transiently BUSY; the client must
+# retry the SAME call until it clears, but NEVER retry a permanent error.
+# ---------------------------------------------------------------------------
+
+def test_busy_then_ready_retries_until_success(monkeypatch) -> None:
+    """Busy (isError) twice → success on the 3rd call.
+
+    The client must RETRY the SAME tool call and ultimately return the success
+    (``isError == False``). Sleep is patched so the test is instant.
+    """
+    sleeps: list[float] = []
+    monkeypatch.setattr("scripts.util.sf_mcp_client.time.sleep", sleeps.append)
+
+    success = {
+        "content": [{"type": "text", "text": "progress: 100%"}],
+        "isError": False,
+    }
+    server = _SequencedToolServer(
+        [_busy_result(), _busy_result(), success]
+    )
+    client = _client_for(server, busy_retry_max=6, busy_retry_base_delay=2.0)
+
+    result = client.call_tool("sf_crawl_progress")
+
+    assert result == success, "client must retry past the busy window to the success"
+    assert result["isError"] is False
+    assert server.tool_call_count == 3, (
+        "expected 3 tool calls (busy, busy, success); "
+        f"got {server.tool_call_count}"
+    )
+    # Two retries happened → two backoff sleeps with the linear schedule (2s, 4s).
+    assert sleeps == [2.0, 4.0], (
+        f"busy backoff must be linear base*N (2s, 4s); got {sleeps}"
+    )
+
+
+def test_busy_exhausted_returns_busy_result_no_raise(monkeypatch) -> None:
+    """Busy on EVERY call → retry exactly ``busy_retry_max`` times, then return.
+
+    The busy result is returned AS-IS (no raise, no infinite loop). Total tool
+    calls == busy_retry_max + 1 (the initial call plus the retries).
+    """
+    sleeps: list[float] = []
+    monkeypatch.setattr("scripts.util.sf_mcp_client.time.sleep", sleeps.append)
+
+    # A single busy entry is repeated forever by _SequencedToolServer.
+    server = _SequencedToolServer([_busy_result()])
+    busy_retry_max = 4
+    client = _client_for(
+        server, busy_retry_max=busy_retry_max, busy_retry_base_delay=2.0
+    )
+
+    result = client.call_tool("sf_crawl_progress")
+
+    # Returned the busy result as-is (no exception raised).
+    assert result["isError"] is True
+    assert "IllegalStateException" in result["content"][0]["text"]
+    assert "Tool cannot be called currently" in result["content"][0]["text"]
+    # Initial call + busy_retry_max retries == busy_retry_max + 1 total calls.
+    assert server.tool_call_count == busy_retry_max + 1, (
+        f"expected {busy_retry_max + 1} tool calls (1 initial + "
+        f"{busy_retry_max} retries); got {server.tool_call_count}"
+    )
+    # One sleep per retry (capped linear backoff: 2, 4, 6, 8).
+    assert sleeps == [2.0, 4.0, 6.0, 8.0], (
+        f"expected one capped-linear sleep per retry; got {sleeps}"
+    )
+
+
+def test_no_retry_on_permanent_error(monkeypatch) -> None:
+    """A non-busy isError (SecurityException) → returned immediately, NO retry.
+
+    Permanent tool errors (bad arg, security, size-cap) must NOT be retried —
+    retrying is wasteful and wrong. Exactly ONE tool call, returned as-is.
+    """
+    sleeps: list[float] = []
+    monkeypatch.setattr("scripts.util.sf_mcp_client.time.sleep", sleeps.append)
+
+    permanent = {
+        "content": [
+            {
+                "type": "text",
+                "text": "Tool error: SecurityException: Absolute paths are not allowed",
+            }
+        ],
+        "isError": True,
+    }
+    server = _SequencedToolServer([permanent])
+    client = _client_for(server, busy_retry_max=6, busy_retry_base_delay=2.0)
+
+    result = client.call_tool("sf_export_report", file_path="/abs/path.csv")
+
+    assert result == permanent, "permanent isError must be returned as-is"
+    assert result["isError"] is True
+    assert server.tool_call_count == 1, (
+        f"permanent error must NOT be retried; got {server.tool_call_count} calls"
+    )
+    assert sleeps == [], "no backoff sleep on a permanent error"
+
+
+def test_no_retry_on_success(monkeypatch) -> None:
+    """A successful (non-error) result → returned immediately, exactly 1 call."""
+    sleeps: list[float] = []
+    monkeypatch.setattr("scripts.util.sf_mcp_client.time.sleep", sleeps.append)
+
+    success = {
+        "content": [{"type": "text", "text": "ok"}],
+        "isError": False,
+    }
+    server = _SequencedToolServer([success])
+    client = _client_for(server, busy_retry_max=6, busy_retry_base_delay=2.0)
+
+    result = client.call_tool("sf_list_crawls")
+
+    assert result == success
+    assert server.tool_call_count == 1, (
+        f"success must not trigger a retry; got {server.tool_call_count} calls"
+    )
+    assert sleeps == [], "no backoff sleep on success"

@@ -2,6 +2,20 @@
 
 ## Unresolved
 
+### Q-V1.9.2-SF-MCP-RETRY-BUSY-01: SF MCP retry-on-busy fix + Spider-state RESOLVED; live tool-validation in progress [P2] 🩹 FIX LANDED 2026-06-02
+**Raised:** 2026-06-02 OW workshop, live tool-testing on a real crawl (demo-aluminum, 1822 URLs).
+**Spider-state blocker (OQ-SPIDER-STATE from Q-V1.9.1) — RESOLVED, two causes:** (1) an open SF Settings/modal dialog blocks ALL Spider tool calls (operator closed it → metadata tools immediately worked); (2) after a state-changing op (`sf_load_crawl`/`sf_crawl`) the Spider is TRANSIENTLY busy (~seconds) → `IllegalStateException "Tool cannot be called currently"` → resolves on retry.
+**Fix (v1.9.2, SfMcpClient retry-on-busy):** `call_tool()` now retries ONLY the busy signal (`_is_spider_busy` = isError AND text has BOTH "illegalstateexception" + "tool cannot be called currently") with linear backoff (default `busy_retry_max=6`, base 2s, cap 8s ≈ 36s budget; constructor-tunable). **Surgical — Manager-verified live:** busy call succeeded in 2.0s via 1 retry; a PERMANENT error (SecurityException on absolute path) returned in **0.0s with NO retry**. Does NOT match other errors (SecurityException / size-cap / IllegalArgument / "Spider has not been started"). Tests 17→21; full suite 1298→**1302** PASS / 12 SKIP / 0 FAIL. F-16 .mcp.json unchanged. Public API preserved → check_F_26 + consumer skills benefit automatically.
+**Live tool coverage so far (~14/29 confirmed FUNCTIONAL on real data):** ✅ list_crawls, list_allowed_base_directory, list_available_reports, list_available_bulk_exports, list_directories(relative), list_available_filters, load_crawl, crawl_progress, generate_report (real Crawl Overview), url_info (real SEO data). ⚠️ expected-limit (work, hit cap → use file_path/smaller): url_content (8192-char cap), generate_bulk_export (3.6MB>100KB→file_path). ⏳ retry-clean now: url_links, get_url_screenshot.
+**New OQs (production-readiness follow-ups):**
+| ID | Item | Sev |
+|----|------|-----|
+| OQ-ORCH-BUSYMAX | Orchestrator/consumer skills should raise `busy_retry_max` for huge-crawl loads (post-`sf_load_crawl`/`sf_crawl` busy window can exceed 36s on 100k+ URL crawls). Policy/heuristic TBD. | P3 |
+| OQ-FILEPATH-EXPORTS | Verify the 24-report orchestrator + 4 consumer skills use `file_path` (not inline) for >100KB exports — SF rejects inline at 100KB (D-SF-05 cap; SF server itself instructs file export). | **P2** (next verify) |
+| OQ-REMAINING-SWEEP | ~15 tools not yet exercised live, incl. DESTRUCTIVE (sf_crawl/clear/pause/resume, write/create file, run_node_js/npm_install, open_url_in_browser) — operator-gated. | P2 |
+
+**Cross-refs:** `scripts/util/sf_mcp_client.py` (retry-on-busy `_is_spider_busy` + busy_retry_max); Q-V1.9.1-SF-MCP-TRANSPORT-01 (transport fix); Fix Worker package (v1.9.2); live evidence (demo-aluminum crawl).
+
 ### Q-V1.9.1-SF-MCP-TRANSPORT-01: SF MCP client transport defect (v1.8) — FIXED + live-proven; Spider-state blocker + 4 OQs [P1→P2] 🩹 FIX LANDED 2026-06-02
 **Raised:** 2026-06-02 OW workshop (operator started real SF MCP on port 11435). Live testing — the FIRST time the engine ever hit a real SF MCP server — surfaced a CRITICAL defect invisible to 1286 mock tests.
 **Defect (v1.8 `scripts/util/sf_mcp_client.py`, NOT a v1.9 regression):** client did bare JSON-RPC-over-HTTP, not MCP Streamable-HTTP. `health()` GET /health → 404 (always False); `call_tool()` no handshake/session/Accept-headers → every call HTTP 400 (`-32601` "Accept + mcp-session-id required"). Root cause: 100% mocked tests encoded the engine's ASSUMED protocol, never validated against a real server (the deep lesson — code-ready ≠ live-proven).
