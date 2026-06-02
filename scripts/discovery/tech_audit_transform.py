@@ -99,6 +99,21 @@ _PRIORITY_BY_SEVERITY = {
     SEVERITY_LOW: "P2",
 }
 
+#: SF "Issues Overview" `Issue Priority` string → severityEnum. SF emits
+#: High/Medium/Low (and occasionally Critical); we normalise case-insensitively.
+#: Any unrecognised / blank priority degrades to the SF default emission tier
+#: (MEDIUM) so a live merge never produces a non-severityEnum impact value.
+_SF_PRIORITY_TO_SEVERITY = {
+    "critical": SEVERITY_CRITICAL,
+    "high": SEVERITY_HIGH,
+    "medium": SEVERITY_MEDIUM,
+    "low": SEVERITY_LOW,
+}
+
+#: severityEnum a live SF issue degrades to when its Issue Priority is blank
+#: or unrecognised (keeps the merge strict — never emits outside the enum).
+_SF_DEFAULT_SEVERITY = SEVERITY_MEDIUM
+
 #: Severity ordering for stable sort (high-impact rows first in the sheet).
 _SEVERITY_RANK = {s: i for i, s in enumerate(SEVERITY_ENUM)}
 
@@ -675,6 +690,98 @@ def _detect_findings(
     return findings
 
 
+def _sf_priority_to_severity(priority: Any) -> str:
+    """Map an SF 'Issue Priority' string to the strict severityEnum.
+
+    SF emits High/Medium/Low (occasionally Critical). Matching is
+    case-insensitive and whitespace-tolerant. Blank / unrecognised values
+    degrade to :data:`_SF_DEFAULT_SEVERITY` so the merge can never emit a
+    non-severityEnum impact value.
+    """
+    key = _safe_str(priority).lower()
+    return _SF_PRIORITY_TO_SEVERITY.get(key, _SF_DEFAULT_SEVERITY)
+
+
+def _clean_key(key: Any) -> str:
+    """Normalize a CSV-parsed column key: strip a leading UTF-8 BOM and any
+    surrounding double-quotes.
+
+    SF's CSV export writes a BOM before the first header field, so
+    ``csv.DictReader``'s first key arrives as ``'\\ufeff"Issue Name"'`` — the
+    BOM precedes the opening quote, defeating csv's quote-stripping, so a naive
+    ``row.get("Issue Name")`` returns ``None`` and the row silently drops.
+    Reading with ``utf-8-sig`` avoids the BOM, but we normalize here too so a
+    BOM-keyed row can never silently drop every field (live-caught 2026-06-02).
+    """
+    return _safe_str(key).lstrip("﻿").strip().strip('"')
+
+
+def _live_finding_to_finding(row: dict) -> _Finding | None:
+    """Map one SF 'Issues Overview' CSV-row dict to a ``_Finding``.
+
+    The SF Issues Overview export columns are::
+
+        Issue Name | Issue Type | Issue Priority | URLs | % of Total |
+        Description | How To Fix | Help URL
+
+    Field mapping into the tech_seo schema (additive merge — these flow
+    through the SAME per-category aggregation as the DFS findings, so a
+    same-named category de-dupes by max severity for free):
+
+        issue_category ← Issue Name
+        detail (label) ← Description (fallback Issue Type)
+        affected_urls  ← URLs
+        impact         ← Issue Priority → severityEnum
+        resolution     ← How To Fix
+
+    Returns ``None`` for a row with no usable Issue Name (skipped — we do
+    not fabricate a category). Non-dict rows are skipped too (defensive).
+    """
+    if not isinstance(row, dict):
+        return None
+    # Normalize keys so a BOM-prefixed first column (SF CSV export) can't drop
+    # the row — '﻿"Issue Name"' → 'Issue Name' (live-caught 2026-06-02).
+    row = {_clean_key(k): v for k, v in row.items()}
+    issue_name = _safe_str(row.get("Issue Name"))
+    if not issue_name:
+        return None
+
+    description = _safe_str(row.get("Description"))
+    issue_type = _safe_str(row.get("Issue Type"))
+    # detail label: prefer the human Description; fall back to Issue Type so
+    # the detail column is never empty for a real SF issue.
+    label = description or issue_type or issue_name
+
+    resolution = _safe_str(row.get("How To Fix")) or (
+        f"See Screaming Frog issue guidance: {_safe_str(row.get('Help URL'))}".strip()
+        if _safe_str(row.get("Help URL")) else "Review and remediate per the SF issue report"
+    )
+
+    return _Finding(
+        category=issue_name,
+        label=label,
+        severity=_sf_priority_to_severity(row.get("Issue Priority")),
+        resolution=resolution,
+        url=_safe_str(row.get("URLs")),
+    )
+
+
+def _live_findings_to_findings(live_findings: Sequence[dict]) -> list[_Finding]:
+    """Convert SF Issues Overview CSV-row dicts → ``_Finding`` list.
+
+    Rows that carry no usable Issue Name are skipped (no fabricated rows).
+    The result is concatenated with the DFS findings before aggregation, so
+    SF issues become tech_seo rows and any Issue Name colliding with a
+    DFS-derived category collapses (max-severity) via the existing reducer.
+    """
+    out: list[_Finding] = []
+    for row in live_findings:
+        finding = _live_finding_to_finding(row)
+        if finding is not None:
+            out.append(finding)
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Aggregation → tech_seo rows
 # ---------------------------------------------------------------------------
@@ -776,6 +883,7 @@ def transform(
     lighthouse_raw: dict | None,
     content_parsing_raw: dict | None,
     url_cap: int = DEFAULT_URL_CAP,
+    live_findings: list[dict] | None = None,
 ) -> dict:
     """
     Transform DFS Lighthouse + on_page_content_parsing payloads into
@@ -790,6 +898,20 @@ def transform(
             meta/heading/structured-data findings.
         url_cap: DoS prevention. raises URLCapExceededError when either
             payload's item count > url_cap.
+        live_findings: OPTIONAL list of CSV-row dicts from SF's "Issues
+            Overview" export (columns: ``Issue Name``, ``Issue Type``,
+            ``Issue Priority``, ``URLs``, ``% of Total``, ``Description``,
+            ``How To Fix``, ``Help URL``). When ``None`` (the default) the
+            transform behaves byte-identically to the file-based path —
+            every existing caller and test is unchanged. When provided,
+            each SF issue row is merged ADDITIVELY into the per-category
+            tech_seo aggregation (field map: ``issue_category←Issue Name``,
+            ``detail←Description|Issue Type``, ``affected_urls←URLs``,
+            ``impact←Issue Priority→severityEnum``, ``resolution←How To
+            Fix``). SF issues flow through the SAME aggregation as the DFS
+            findings, so an Issue Name colliding with a DFS-derived
+            category de-dupes by max severity, and the merge guarantees
+            ``rowcount(with live_findings) >= rowcount(without)``.
 
     Returns:
         {
@@ -797,6 +919,7 @@ def transform(
           "meta": {
             "lighthouse_url_count": int,
             "content_parsing_url_count": int,
+            "live_findings_count": int,
             "finding_count": int,
             "row_count": int,
             "url_cap": int,
@@ -841,6 +964,15 @@ def transform(
         content_signals = [_extract_content_signal(it) for it in items]
 
     findings = _detect_findings(lighthouse_signals, content_signals)
+
+    # AC-13: additively merge live SF "Issues Overview" rows (if any) into
+    # the same finding stream BEFORE aggregation, so the per-category
+    # severity reducer de-dupes and rowcount is monotonic non-decreasing.
+    live_findings_findings = (
+        _live_findings_to_findings(live_findings) if live_findings else []
+    )
+    findings = findings + live_findings_findings
+
     rows = _aggregate_to_rows(findings)
 
     return {
@@ -848,6 +980,7 @@ def transform(
         "meta": {
             "lighthouse_url_count": len(lighthouse_signals),
             "content_parsing_url_count": len(content_signals),
+            "live_findings_count": len(live_findings_findings),
             "finding_count": len(findings),
             "row_count": len(rows),
             "url_cap": url_cap,

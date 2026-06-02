@@ -686,18 +686,27 @@ def test_use_sf_mcp_live_flag_in_frontmatter(
 
 
 def test_skill_md_documents_sf_mcp_live_pattern() -> None:
-    """v1.8 Phase 5: the tech-audit SKILL.md body MUST document the
-    SF MCP live mode branch with the 4 required patterns:
+    """AC-13: the tech-audit SKILL.md SF MCP live mode branch MUST document
+    the CORRECT real SF MCP API pattern (same class of fix as the
+    orchestrator Step-5 dispatch landed in a714e43). The previous prose
+    called a non-existent ``sf_generate_report(crawl_id=, report_name=,
+    save_report=)`` shape and read non-existent ``response.get("truncated"/
+    "rows")`` keys. The corrected branch must document:
 
       (1) `SfMcpClient` import from `scripts.util.sf_mcp_client`
       (2) `client.health()` preflight check (R9 mitigation)
       (3) AMBER fallback semantics ("falling back to file-based path")
-      (4) R12 truncation detection (`response.get("truncated"`)
+      (4) crawl-id resolution via `sf_list_crawls` (matched on domain) +
+          resilient `client.load_crawl(...)`
+      (5) the real `sf_generate_report` schema via the orchestrator
+          dispatch: category "Issues Overview", export to `file_path`
+          (the >100KB cap is resolved by writing to disk, NOT a
+          non-existent `truncated` flag)
+      (6) the transform's `live_findings` merge kwarg
 
-    This is a stub-mod pattern contract lock: the runtime body branch
-    is in SKILL.md prose (Phase 11+ for runtime impl), but the
-    contract is verified here so a future SKILL.md edit cannot
-    silently drop the R9/R12 mitigation patterns.
+    This is a contract lock: the runtime body branch is interpreter prose,
+    but the contract is verified here so a future SKILL.md edit cannot
+    silently regress back to the broken (invented-arg) pattern.
 
     Also asserts the NATIVE tool naming convention is enforced
     (`"sf_generate_report"`, NOT `"sf__sf_generate_report"` or
@@ -724,21 +733,285 @@ def test_skill_md_documents_sf_mcp_live_pattern() -> None:
     )
     assert "amber_warnings" in text.lower() or "AMBER" in text
 
-    # (4) R12 truncation detection.
-    assert 'response.get("truncated"' in text, (
-        "SKILL.md body must document the R12 truncation detection "
-        "(100KB cap per D-SF-05)"
+    # (4) Crawl-id resolution + resilient load (the previously-undefined
+    #     `sf_crawl_id` free variable is now plumbed from sf_list_crawls).
+    assert "sf_list_crawls" in text, (
+        "SKILL.md body must resolve the crawl id via sf_list_crawls "
+        "(the old `sf_crawl_id` free variable was never plumbed)"
+    )
+    assert "instanceDirName" in text, (
+        "SKILL.md body must pick the crawl id from the sf_list_crawls "
+        "entry's instanceDirName field (real SF shape)"
+    )
+    assert "load_crawl" in text, (
+        "SKILL.md body must call the resilient client.load_crawl(...) "
+        "(tolerates the client-side timeout, polls progress)"
     )
 
-    # Native tool naming enforcement (no wrapper / registry prefix
-    # inside the call_tool invocation example).
+    # (5) Real sf_generate_report schema: category "Issues Overview" +
+    #     file_path export (NOT crawl_id/report_name/save_report/truncated).
     assert '"sf_generate_report"' in text, (
         "SKILL.md body must use the NATIVE SF MCP tool name "
-        '("sf_generate_report"); registry / wrapper forms forbidden '
-        "in script call examples"
+        '("sf_generate_report"); registry / wrapper forms forbidden'
     )
-    # tech-audit specifically calls issues_overview_report.
+    assert "Issues Overview" in text, (
+        "SKILL.md body must map issues_overview_report → SF report "
+        'category "Issues Overview" (engine canonical → SF category)'
+    )
+    assert "file_path" in text, (
+        "SKILL.md body must export via file_path (resolves the >100KB "
+        "inline cap by writing to disk; OQ-FILEPATH-EXPORTS)"
+    )
+    assert "SF_EXPORT_DISPATCH" in text, (
+        "SKILL.md body must cite the orchestrator's SF_EXPORT_DISPATCH "
+        "(the live-proven canonical→SF mapping) rather than re-inventing"
+    )
+    # tech-audit specifically exports the canonical issues_overview_report.
     assert '"issues_overview_report"' in text, (
-        "tech-audit SF MCP branch must call the canonical "
+        "tech-audit SF MCP branch must export the canonical "
         "issues_overview_report (per spec line 122)"
     )
+
+    # (6) The transform's live_findings merge kwarg.
+    assert "live_findings" in text, (
+        "SKILL.md body must pass the parsed CSV rows into "
+        "transform(..., live_findings=...)"
+    )
+    assert "csv.DictReader" in text, (
+        "SKILL.md body must parse the written Issues Overview CSV with "
+        "csv.DictReader to build live_findings rows"
+    )
+
+    # Regression guard: the BROKEN invented-arg pattern must be GONE.
+    assert "report_name=" not in text, (
+        "SKILL.md must NOT pass report_name= (no such sf_generate_report arg)"
+    )
+    assert "save_report=" not in text, (
+        "SKILL.md must NOT pass save_report= (no such sf_generate_report arg)"
+    )
+    assert 'response.get("truncated"' not in text, (
+        "SKILL.md must NOT read a non-existent `truncated` flag — the real "
+        "SF rejects >100KB inline; file_path export is the canonical path"
+    )
+    assert 'response.get("rows"' not in text, (
+        "SKILL.md must NOT read a non-existent `rows` key — the real result "
+        "is the MCP content envelope, parsed from the written CSV instead"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 15 — AC-13 live_findings merge (REAL merge, not grep)
+# ---------------------------------------------------------------------------
+
+def _issues_overview_row(
+    *,
+    issue_name: str,
+    issue_type: str = "Warning",
+    priority: str = "High",
+    urls: str = "10",
+    pct: str = "5.0",
+    description: str = "",
+    how_to_fix: str = "",
+    help_url: str = "https://www.screamingfrog.co.uk/seo-spider/issues/",
+) -> dict:
+    """Build one SF 'Issues Overview' CSV-row dict (csv.DictReader shape).
+
+    Columns mirror the real SF Issues Overview export header:
+    Issue Name | Issue Type | Issue Priority | URLs | % of Total |
+    Description | How To Fix | Help URL.
+    """
+    return {
+        "Issue Name": issue_name,
+        "Issue Type": issue_type,
+        "Issue Priority": priority,
+        "URLs": urls,
+        "% of Total": pct,
+        "Description": description,
+        "How To Fix": how_to_fix,
+        "Help URL": help_url,
+    }
+
+
+def test_live_findings_none_is_identical_baseline(lh_payload_poor: dict) -> None:
+    """Regression: live_findings=None (the default) yields byte-identical
+    output to omitting the kwarg entirely — the existing baseline behaviour
+    is preserved."""
+    out_default = tech_audit_transform.transform(
+        lighthouse_raw=lh_payload_poor, content_parsing_raw=None,
+    )
+    out_explicit_none = tech_audit_transform.transform(
+        lighthouse_raw=lh_payload_poor, content_parsing_raw=None,
+        live_findings=None,
+    )
+    assert out_default == out_explicit_none
+
+
+def test_live_findings_merges_additively_increases_rowcount(
+    lh_payload_poor: dict,
+) -> None:
+    """AC-13 core: passing SF Issues Overview rows ADDITIVELY merges them
+    into the tech_seo aggregation. rowcount(with) >= rowcount(without),
+    and the SF issues surface as tech_seo rows with the mapped fields."""
+    live = [
+        _issues_overview_row(
+            issue_name="Canonical: Missing",
+            priority="High",
+            urls="43",
+            description="URLs with no canonical link element.",
+            how_to_fix="Add a self-referencing <link rel=canonical>.",
+        ),
+        _issues_overview_row(
+            issue_name="Directives: Noindex",
+            priority="Medium",
+            urls="7",
+            description="URLs returning a noindex directive.",
+            how_to_fix="Remove noindex from pages that should be indexed.",
+        ),
+    ]
+
+    base = tech_audit_transform.transform(
+        lighthouse_raw=lh_payload_poor, content_parsing_raw=None,
+    )
+    merged = tech_audit_transform.transform(
+        lighthouse_raw=lh_payload_poor, content_parsing_raw=None,
+        live_findings=live,
+    )
+
+    # Additive: never fewer rows than the no-live baseline.
+    assert len(merged["tech_seo"]) >= len(base["tech_seo"])
+    # The two SF issues each become a tech_seo row (new categories that did
+    # not exist in the lighthouse-only baseline).
+    cats = {r["issue_category"] for r in merged["tech_seo"]}
+    assert "Canonical: Missing" in cats
+    assert "Directives: Noindex" in cats
+
+    # Field mapping is correct on the High-priority SF issue.
+    canon = next(
+        r for r in merged["tech_seo"]
+        if r["issue_category"] == "Canonical: Missing"
+    )
+    assert canon["impact"] == tech_audit_transform.SEVERITY_HIGH  # High→HIGH
+    assert canon["priority"] == "P0"
+    assert "43" in canon["affected_urls"]                          # URLs col
+    assert "canonical" in canon["resolution"].lower()             # How To Fix
+    assert "canonical" in canon["detail"].lower()                 # Description
+
+    # severityEnum stays strict for every merged row.
+    for r in merged["tech_seo"]:
+        assert r["impact"] in tech_audit_transform.SEVERITY_ENUM
+        assert set(r.keys()) == set(tech_audit_transform.TECH_SEO_COLUMNS)
+
+    # The baseline lighthouse Performance row still survives the merge.
+    assert "Performance" in cats
+
+
+def test_live_findings_priority_maps_to_severity_enum() -> None:
+    """Every SF Issue Priority string maps onto the strict severityEnum;
+    unknown/blank priority degrades safely (never emits a non-enum value)."""
+    live = [
+        _issues_overview_row(issue_name="Crit issue", priority="High",
+                             urls="1", how_to_fix="fix a"),
+        _issues_overview_row(issue_name="Mid issue", priority="Medium",
+                             urls="2", how_to_fix="fix b"),
+        _issues_overview_row(issue_name="Low issue", priority="Low",
+                             urls="3", how_to_fix="fix c"),
+        _issues_overview_row(issue_name="Unknown issue", priority="",
+                             urls="4", how_to_fix="fix d"),
+    ]
+    out = tech_audit_transform.transform(
+        lighthouse_raw=None, content_parsing_raw=None, live_findings=live,
+    )
+    by_cat = {r["issue_category"]: r for r in out["tech_seo"]}
+    assert by_cat["Crit issue"]["impact"] == tech_audit_transform.SEVERITY_HIGH
+    assert by_cat["Mid issue"]["impact"] == tech_audit_transform.SEVERITY_MEDIUM
+    assert by_cat["Low issue"]["impact"] == tech_audit_transform.SEVERITY_LOW
+    # Unknown priority must still be a valid severityEnum value (degrade).
+    assert by_cat["Unknown issue"]["impact"] in tech_audit_transform.SEVERITY_ENUM
+    for r in out["tech_seo"]:
+        assert r["impact"] in tech_audit_transform.SEVERITY_ENUM
+
+
+def test_live_findings_detail_falls_back_to_issue_type() -> None:
+    """When an SF row has no Description, detail falls back to Issue Type
+    (never empty — the detail column carries something descriptive)."""
+    live = [
+        _issues_overview_row(
+            issue_name="Page Titles: Over 60 Characters",
+            issue_type="Opportunity",
+            priority="Low",
+            urls="12",
+            description="",                 # no description
+            how_to_fix="Shorten the title.",
+        ),
+    ]
+    out = tech_audit_transform.transform(
+        lighthouse_raw=None, content_parsing_raw=None, live_findings=live,
+    )
+    row = next(
+        r for r in out["tech_seo"]
+        if r["issue_category"] == "Page Titles: Over 60 Characters"
+    )
+    assert "Opportunity" in row["detail"]   # Issue Type fallback
+
+
+def test_live_findings_dedupes_against_existing_category() -> None:
+    """If an SF Issue Name collides with an existing DFS-derived category,
+    the merge de-dupes by issue_category (one row, max severity wins) —
+    the transform's existing per-category aggregation handles it."""
+    # lighthouse_poor fires a 'Performance' HIGH row; feed an SF issue named
+    # 'Performance' at LOW priority — they must collapse to ONE row at HIGH.
+    lh = {"items": [_lighthouse_item(
+        "https://example.com/slow", perf=30, lcp_s=5.0,
+    )]}
+    live = [
+        _issues_overview_row(
+            issue_name="Performance", priority="Low",
+            urls="https://example.com/other", how_to_fix="tune it",
+        ),
+    ]
+    out = tech_audit_transform.transform(
+        lighthouse_raw=lh, content_parsing_raw=None, live_findings=live,
+    )
+    perf_rows = [r for r in out["tech_seo"] if r["issue_category"] == "Performance"]
+    assert len(perf_rows) == 1, "same-category SF issue must de-dupe, not duplicate"
+    # Max severity wins (HIGH from the lighthouse rule beats LOW from SF).
+    assert perf_rows[0]["impact"] == tech_audit_transform.SEVERITY_HIGH
+
+
+def test_live_findings_empty_list_is_noop(lh_payload_poor: dict) -> None:
+    """An empty live_findings list behaves like None (no extra rows)."""
+    base = tech_audit_transform.transform(
+        lighthouse_raw=lh_payload_poor, content_parsing_raw=None,
+    )
+    merged = tech_audit_transform.transform(
+        lighthouse_raw=lh_payload_poor, content_parsing_raw=None,
+        live_findings=[],
+    )
+    assert merged["tech_seo"] == base["tech_seo"]
+
+
+def test_live_findings_bom_prefixed_first_key_still_merges(
+    lh_payload_poor: dict,
+) -> None:
+    """Live-caught regression (2026-06-02): SF's CSV export writes a UTF-8 BOM
+    before the first header field, so ``csv.DictReader``'s first key arrives as
+    ``'﻿"Issue Name"'`` (the BOM precedes the opening quote, defeating
+    csv's quote-stripping). The transform normalizes keys (``_clean_key``) so
+    the row is NOT silently dropped — without it, every SF row would map to a
+    ``None`` Issue Name and the merge would yield zero rows."""
+    clean = _issues_overview_row(
+        issue_name="Canonical: Missing", priority="High", urls="43",
+    )
+    bom_row = {'﻿"Issue Name"': clean["Issue Name"]}
+    bom_row.update({k: v for k, v in clean.items() if k != "Issue Name"})
+
+    base = tech_audit_transform.transform(
+        lighthouse_raw=lh_payload_poor, content_parsing_raw=None,
+    )
+    live = tech_audit_transform.transform(
+        lighthouse_raw=lh_payload_poor, content_parsing_raw=None,
+        live_findings=[bom_row],
+    )
+    assert len(live["tech_seo"]) > len(base["tech_seo"])
+    assert any(r["issue_category"] == "Canonical: Missing" for r in live["tech_seo"])
+    assert live["meta"]["live_findings_count"] == 1
