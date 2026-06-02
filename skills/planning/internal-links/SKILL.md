@@ -48,7 +48,7 @@ inputs:
     type: boolean
     required: false
     default: false
-    description: "Opt-in (D-SF-11): when true, calls SF MCP via scripts/util/sf_mcp_client.SfMcpClient for live all_inlinks (bypasses sf-exports CSV freshness gap). Requires SF GUI + MCP server running (preflight via client.health(); on FAIL → AMBER fallback to file-based path, NEVER hard fail). R12 truncation detection via response.get('truncated', False)."
+    description: "Opt-in (D-SF-11): when true, calls SF MCP via scripts/util/sf_mcp_client.SfMcpClient for live all_inlinks (bypasses sf-exports CSV freshness gap). Resolves the crawl id from sf_list_crawls (domain match → instanceDirName), client.load_crawl(...) (resilient), then exports all_inlinks via SF_EXPORT_DISPATCH (sf_generate_bulk_export category 'Links:All Inlinks', export_type CSV) to file_path (the >100KB inline cap is resolved by writing to disk, not a non-existent 'truncated' flag), reads the native CSV with utf-8-sig (strips SF's BOM), parses with csv.DictReader → transform(inlinks_rows=...). Requires SF GUI + MCP server running (preflight via client.health(); on FAIL / no matching crawl / SfMcpToolError / load timeout → AMBER fallback to file-based path, NEVER hard fail per R9)."
 outputs:
   - "master.xlsx#master_task"
   - "outputs/reports/{date}-internal-links.md"
@@ -393,60 +393,161 @@ When `use_sf_mcp_live=true`, the SKILL body branches at Step 2
 (`load_sf_csvs`) to optionally pull `all_inlinks` rows inline from SF
 MCP instead of reading the on-disk CSV. The default no-DFS, no-MCP
 path remains 0 credits and continues to satisfy the existing SF CSV
-fixtures used in the 1184+ baseline:
+fixtures used in the 1184+ baseline.
+
+**This branch was rewritten (AC-13 replication) against the REAL SF MCP
+API** — the same class of fix as tech-audit (landed in `6ee6fb9`,
+live-proven on the aluminumstation crawl) and the sf-crawl-orchestrator
+Step-5 export dispatch (`a714e43`). The engine canonical `all_inlinks`
+is NOT a Screaming Frog identifier: it maps via
+`sf_crawl_orchestrator.SF_EXPORT_DISPATCH` to the real
+`sf_generate_bulk_export` tool with `category="Links:All Inlinks"` +
+`export_type="CSV"`. There is NO `crawl_id`, `report_name`, or
+`save_report` arg; the export runs on the *currently-loaded* crawl and
+is written to `file_path` (relative to the SF allowed base directory).
+The real SF REJECTS inline output >100KB with a tool error — and
+all_inlinks is the single largest export (one row per edge), so
+`file_path` (write-to-disk) is the only safe path (OQ-FILEPATH-EXPORTS),
+not a non-existent `truncated` flag.
+
+The `sf_list_crawls` result comes back through `SfMcpClient.call_tool`
+as the MCP content envelope `{"isError":false,"content":[{"text":
+"<JSON>"}]}`, so the crawl list is JSON-encoded inside `content[*].text`
+(exactly like `sf_crawl_progress`). We decode the first JSON block, then
+match on `url` → `instanceDirName`. The real entry shape (Manager-probed)
+is `{"url":"https://aluminumstation.com/","instanceDirName":"fc718e3f-..."}`.
+
+`sf_generate_bulk_export` writes a **native CSV WITH a leading UTF-8 BOM**
+(live-verified) — so the written file is read with `encoding="utf-8-sig"`,
+otherwise `csv.DictReader`'s first key arrives BOM-quoted
+(`'﻿"Address"'`) and every row silently drops.
 
 ```python
+import csv
+import json
+from pathlib import Path
+from scripts.ingestion import sf_crawl_orchestrator
+
+def _decode_sf_envelope(result: dict):
+    """Decode the first JSON payload from an SfMcpClient content envelope.
+
+    SfMcpClient.call_tool returns {"isError":..,"content":[{"text":"<JSON>"}]}.
+    Returns the parsed object (list/dict) or None if no JSON block is present.
+    """
+    for block in (result or {}).get("content", []) or []:
+        if isinstance(block, dict) and isinstance(block.get("text"), str):
+            try:
+                return json.loads(block["text"])
+            except ValueError:
+                continue
+    return None
+
+def _norm_domain(u: str) -> str:
+    """Normalise a URL for domain matching: drop scheme + leading www. +
+    trailing slash."""
+    bare = (u or "").strip().rstrip("/").split("://", 1)[-1].lower()
+    return bare[4:] if bare.startswith("www.") else bare
+
 amber_warnings: list[str] = []
 if use_sf_mcp_live:
-    from scripts.util.sf_mcp_client import SfMcpClient, SfMcpToolError
-    client = SfMcpClient(base_url=project_config["sf"]["mcp"]["url"])
+    from scripts.util.sf_mcp_client import (
+        SfMcpClient, SfMcpToolError, SfMcpError,
+    )
+    sf_cfg = project_config["sf"]["mcp"]
+    client = SfMcpClient(base_url=sf_cfg["url"])
+    allowed_dir = Path(sf_cfg["allowed_directory"])  # SF write base (D-SF-10)
     if not client.health():
         # R9 AMBER fallback — SF MCP unreachable, continue file-based.
         amber_warnings.append(
-            "SF MCP unavailable; falling back to file-based path"
+            "SF MCP unavailable (health probe failed); "
+            "falling back to file-based path"
         )
     else:
         try:
-            response = client.call_tool(
-                "sf_generate_report",     # native MCP tool name
-                crawl_id=sf_crawl_id,     # from orchestrator handoff or fresh sf_list_crawls call
-                report_name="all_inlinks",
-                save_report=False,        # inline response, no disk write
+            # 1) Resolve the crawl id: pick the crawl whose `url` matches the
+            #    project domain (normalise scheme + leading www. + trailing
+            #    slash), then take its `instanceDirName` (the real crawl id).
+            list_resp = client.call_tool("sf_list_crawls")
+            decoded = _decode_sf_envelope(list_resp)
+            crawls = decoded if isinstance(decoded, list) else (
+                decoded.get("crawls", []) if isinstance(decoded, dict) else []
             )
-            # R12 truncation detection (100KB cap per D-SF-05).
-            if response.get("truncated", False):
+            target = _norm_domain(project_config["domain"])
+            match = next(
+                (c for c in crawls if _norm_domain(c.get("url", "")) == target),
+                None,
+            )
+            if match is None:
+                # R9 AMBER fallback — no crawl for this domain; do NOT hard fail.
                 amber_warnings.append(
-                    "SF MCP response truncated at 100KB cap for "
-                    "all_inlinks"
+                    f"No SF crawl found for domain {project_config['domain']!r} "
+                    "in sf_list_crawls; falling back to file-based path"
                 )
-            # Use the live rows in place of the on-disk all_inlinks.csv.
-            # The transform's per-destination aggregator (broken /
-            # redirect-chain / anchor-diversity) consumes the same
-            # DictReader-shaped rows whether they come from CSV or MCP.
-            inlinks_rows = response.get("rows", [])
-        except SfMcpToolError as exc:
-            # R9 AMBER fallback — call failed.
+            else:
+                crawl_id = match["instanceDirName"]
+                # 2) Ensure it is the active loaded crawl (resilient: tolerates
+                #    the client-side load timeout, polls progress to confirm).
+                client.load_crawl(crawl_id)
+
+                # 3) Export "Links:All Inlinks" via the orchestrator dispatch
+                #    (all_inlinks → ("sf_generate_bulk_export",
+                #    {"category":"Links:All Inlinks","export_type":"CSV"})). The
+                #    >100KB inline cap is resolved by writing to file_path.
+                tool, call_kwargs = sf_crawl_orchestrator.SF_EXPORT_DISPATCH[
+                    "all_inlinks"
+                ]
+                rel_path = "all_inlinks.csv"
+                client.call_tool(tool, file_path=rel_path, **call_kwargs)
+
+                # 4) Read the written CSV from the SF allowed base dir. A BULK
+                #    export is NATIVE CSV → read directly (NO ndjson_to_csv).
+                #    utf-8-sig strips SF's leading BOM so csv.DictReader's first
+                #    key is clean "Address" (not '﻿"Address"'); without it
+                #    every row would silently drop (the AC-13 BOM bug class).
+                csv_path = allowed_dir / rel_path
+                with csv_path.open("r", encoding="utf-8-sig", newline="") as fh:
+                    inlinks_rows = list(csv.DictReader(fh))
+                # The transform's per-destination aggregator (broken /
+                # redirect-chain / anchor-diversity) consumes the same
+                # DictReader-shaped rows whether they come from CSV or MCP.
+        except (SfMcpToolError, SfMcpError) as exc:
+            # R9 AMBER fallback — list/load/export failed (4xx/5xx, JSON-RPC
+            # error, load_crawl settle timeout). NEVER hard fail.
             amber_warnings.append(
-                f"SF MCP tool error: {exc}; falling back to file-based path"
+                f"SF MCP error: {exc}; falling back to file-based path"
             )
+
+# Pass the parsed rows straight into the transform (default file-based
+# inlinks_rows when the MCP path was skipped / fell back).
+result = internal_links_transform.transform(
+    internal_all_rows=internal_all_rows,
+    inlinks_rows=inlinks_rows,
+    project_slug=project_slug,
+    run_date=run_date,
+)
 ```
 
-**AMBER vs RED policy (R9 / R12 contract):**
+**AMBER vs RED policy (R9 contract — never hard-fail this branch):**
 
 - `client.health()` returns False → AMBER warning, continue file-based.
-- `SfMcpToolError` raised → AMBER warning, continue file-based.
-- `response.get("truncated", False) is True` → AMBER warning, continue
-  with partial inlinks rows (orphan/broken/redirect-chain detectors
-  handle missing edges gracefully — affected_urls just understates).
+- No crawl matches the project domain in `sf_list_crawls` → AMBER
+  warning, continue file-based.
+- `SfMcpToolError` / `SfMcpError` raised (export 4xx/5xx, JSON-RPC error,
+  `load_crawl` settle timeout) → AMBER warning, continue file-based.
+- A partial SF outage degrades to the file-based `all_inlinks.csv`
+  (orphan/broken/redirect-chain detectors handle missing edges
+  gracefully — affected_urls just understates).
 - NEVER raise `SystemExit` from this branch. RED reserved for the
   existing DURUR set (SF data missing in BOTH paths, CSV parse error,
   max_entries exceeded, etc.).
 
 **Tool naming reminder:** `call_tool(tool_name=...)` takes the **native**
-SF MCP tool name (`"sf_generate_report"`), NOT the registry form
-(`"sf__sf_generate_report"`) or the Claude Code wrapper form
-(`"mcp__sf__sf_generate_report"`). JSON-RPC `params.name` follows
-the native form per MCP spec.
+SF MCP tool name (`"sf_generate_bulk_export"`, `"sf_list_crawls"`,
+`"sf_load_crawl"`), NOT the registry form (`"sf__sf_generate_bulk_export"`)
+or the Claude Code wrapper form (`"mcp__sf__sf_generate_bulk_export"`).
+JSON-RPC `params.name` follows the native form per MCP spec. `SfMcpClient`
+already speaks the MCP Streamable-HTTP transport (session handshake +
+SSE), so the body only ever passes native tool names + the SF call kwargs.
 
 `amber_warnings` is surfaced via the existing provenance event
 (an additional `source.kind=sf_mcp` event is emitted alongside the

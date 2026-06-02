@@ -339,6 +339,92 @@ def _action_for(
 
 
 # ---------------------------------------------------------------------------
+# SF MCP "Page Titles" live-findings merge (AC-13 replication)
+# ---------------------------------------------------------------------------
+
+def _clean_key(key: Any) -> str:
+    """Normalize a CSV-parsed column key: strip a leading UTF-8 BOM and any
+    surrounding double-quotes.
+
+    A seo-element export is NDJSON and is converted via
+    ``sf_crawl_orchestrator.ndjson_to_csv`` (BOM-free header), so a BOM is not
+    expected on this path — but we normalize defensively so a BOM-keyed first
+    column (e.g. if a caller ever feeds a native-CSV row) can never silently
+    drop every field (the AC-13 BOM bug class, live-caught 2026-06-02).
+    """
+    return _safe_str(key).lstrip("﻿").strip().strip('"')
+
+
+def _sf_row_to_audit_row(row: dict) -> dict | None:
+    """Map one SF 'Page Titles' export row dict → a partial on_page_audit row.
+
+    The live-verified SF Page Titles seo-element export columns are
+    ``Address`` (URL), ``Title 1`` (+ ``Title 1 Length``/``Pixel Width``),
+    plus the adjacent ``Meta Description 1`` / ``H1-1`` crawl-truth columns.
+
+    Field mapping into the on_page_audit schema (SF carries NO GSC query /
+    click metrics, so those are zeroed — SF is a crawl-truth cross-check, not
+    a performance source):
+
+        url           ← Address (D-03 normalized)
+        target_query  ← "" (no SF query)
+        impressions_30d / clicks_30d ← 0
+        in_title / in_meta / in_h1   ← presence (SF column non-empty)
+        action        ← descriptive "SF crawl: ..." note
+
+    Returns ``None`` for a row with no usable Address (skipped — we do not
+    fabricate a URL). Non-dict rows are skipped too (defensive).
+    """
+    if not isinstance(row, dict):
+        return None
+    row = {_clean_key(k): v for k, v in row.items()}
+    address = _safe_str(row.get("Address"))
+    if not address:
+        return None
+    try:
+        url_n = _normalize_url(address)
+    except OnPageAuditError:
+        return None
+
+    in_title = bool(_safe_str(row.get("Title 1")))
+    in_meta = bool(_safe_str(row.get("Meta Description 1")))
+    in_h1 = bool(_safe_str(row.get("H1-1")))
+    return {
+        "url": url_n,
+        "target_query": "",
+        "impressions_30d": 0,
+        "clicks_30d": 0,
+        "in_title": in_title,
+        "in_meta": in_meta,
+        "in_h1": in_h1,
+        "action": "SF crawl cross-check — no GSC query; verify on-page intent",
+    }
+
+
+def _merge_live_findings(
+    out_rows: list[dict], live_findings: list[dict] | None,
+) -> tuple[list[dict], int]:
+    """Additively merge SF 'Page Titles' rows into the DFS-derived rows.
+
+    Returns ``(merged_rows, sf_row_count)``. SF rows for a URL already present
+    in ``out_rows`` are dropped (DFS content_parsing is authoritative for
+    on-page); only SF-only URLs surface as new rows. This guarantees
+    ``len(merged) >= len(out_rows)`` (monotonic) and never mutates the input.
+    """
+    if not live_findings:
+        return out_rows, 0
+    existing = {r["url"] for r in out_rows}
+    additions: list[dict] = []
+    for raw in live_findings:
+        mapped = _sf_row_to_audit_row(raw)
+        if mapped is None or mapped["url"] in existing:
+            continue
+        existing.add(mapped["url"])
+        additions.append(mapped)
+    return out_rows + additions, len(additions)
+
+
+# ---------------------------------------------------------------------------
 # Core transform
 # ---------------------------------------------------------------------------
 
@@ -347,6 +433,7 @@ def transform(
     *,
     raw_gsc: dict | None = None,
     strict_cross_ref: bool = False,
+    live_findings: list[dict] | None = None,
 ) -> dict:
     """
     Build master.xlsx#on_page_audit rows from a DFS content_parsing
@@ -360,6 +447,20 @@ def transform(
                           disjoint after normalization → CrossRefMismatchError.
                           If False (default), fall back to no-cross-ref
                           mode (documented design choice — DURUR #4).
+        live_findings: OPTIONAL list of CSV-row dicts from SF's "Page Titles"
+                       seo-element export (columns: ``Address``, ``Title 1``,
+                       ``Title 1 Length``, ``Meta Description 1``, ``H1-1``,
+                       ...). When ``None`` (the default) the transform behaves
+                       byte-identically to the file-based path — every existing
+                       caller and test is unchanged. When provided, each SF row
+                       for a URL NOT already covered by the DFS content_parsing
+                       set is merged ADDITIVELY as a crawl-truth cross-check
+                       row (field map: ``url←Address`` D-03 normalized,
+                       ``in_title/in_meta/in_h1←`` SF column presence,
+                       ``target_query/impressions_30d/clicks_30d←`` empty/zero
+                       since SF carries no GSC metrics). DFS-covered URLs are
+                       never duplicated, so ``rowcount(with live_findings) >=
+                       rowcount(without)``.
 
     Returns:
         {"on_page_audit": [...], "meta": {...}}.
@@ -428,6 +529,11 @@ def transform(
             "action": action,
         })
 
+    # AC-13: additively merge live SF "Page Titles" rows (if any) for URLs the
+    # DFS set did not cover — BEFORE the sort, so SF-only rows participate in
+    # the deterministic impressions/url ordering and get column-locked below.
+    out_rows, live_findings_count = _merge_live_findings(out_rows, live_findings)
+
     # Sort: impressions_30d desc, then url asc for determinism.
     out_rows.sort(key=lambda r: (-r["impressions_30d"], r["url"]))
 
@@ -445,6 +551,7 @@ def transform(
             "cross_ref_used": cross_ref_used,
             "cross_ref_mismatch": cross_ref_mismatch,
             "gsc_url_count": len(gsc_index),
+            "live_findings_count": live_findings_count,
         },
     }
 

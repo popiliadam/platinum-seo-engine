@@ -588,17 +588,31 @@ def test_use_sf_mcp_live_flag_in_frontmatter(
 
 
 def test_skill_md_documents_sf_mcp_live_pattern() -> None:
-    """v1.8 Phase 5: the schema-audit SKILL.md body MUST document the
-    SF MCP live mode branch with the 4 required patterns:
+    """AC-13 replication: the schema-audit SKILL.md SF MCP live mode branch
+    MUST document the CORRECT real SF MCP API pattern (same class of fix as
+    tech-audit, landed in 6ee6fb9, live-proven). The previous prose called a
+    non-existent ``sf_generate_report(crawl_id=, report_name=, save_report=)``
+    shape and read non-existent ``response.get("truncated"/"rows")`` keys.
+
+    schema-audit exports the canonical ``structured_data_all`` via the
+    orchestrator's SF_EXPORT_DISPATCH → ``sf_export_seo_element_urls``
+    (seo_element_name "Structured Data"), a seo-element export that writes
+    NDJSON (no export_type arg) → converted to CSV via
+    ``sf_crawl_orchestrator.ndjson_to_csv(...)`` before parsing, then fed into
+    ``transform(raw_sf={"rows": rows})``. The corrected branch must document:
 
       (1) `SfMcpClient` import from `scripts.util.sf_mcp_client`
       (2) `client.health()` preflight check (R9 mitigation)
       (3) AMBER fallback semantics ("falling back to file-based path")
-      (4) R12 truncation detection (`response.get("truncated"`)
+      (4) crawl-id resolution via `sf_list_crawls` (matched on domain) +
+          resilient `client.load_crawl(...)`
+      (5) export via the orchestrator dispatch to `file_path` (the >100KB
+          inline cap is resolved by writing to disk, NOT a non-existent
+          `truncated` flag), converting the NDJSON export via `ndjson_to_csv`
+      (6) feeding the parsed rows into `transform(raw_sf={"rows": ...})`
 
-    This is a stub-mod pattern contract lock: the runtime body branch
-    is in SKILL.md prose, but the contract is verified here so a
-    future SKILL.md edit cannot silently drop the R9/R12 mitigations.
+    This is a contract lock: a future SKILL.md edit cannot silently regress
+    back to the broken (invented-arg) pattern.
     """
     text = SKILL_PATH.read_text(encoding="utf-8")
 
@@ -621,19 +635,63 @@ def test_skill_md_documents_sf_mcp_live_pattern() -> None:
     )
     assert "amber_warnings" in text.lower() or "AMBER" in text
 
-    # (4) R12 truncation detection.
-    assert 'response.get("truncated"' in text, (
-        "SKILL.md body must document the R12 truncation detection "
-        "(100KB cap per D-SF-05)"
+    # (4) Crawl-id resolution + resilient load (the previously-undefined
+    #     `sf_crawl_id` free variable is now plumbed from sf_list_crawls).
+    assert "sf_list_crawls" in text, (
+        "SKILL.md body must resolve the crawl id via sf_list_crawls "
+        "(the old `sf_crawl_id` free variable was never plumbed)"
+    )
+    assert "instanceDirName" in text, (
+        "SKILL.md body must pick the crawl id from the sf_list_crawls "
+        "entry's instanceDirName field (real SF shape)"
+    )
+    assert "load_crawl" in text, (
+        "SKILL.md body must call the resilient client.load_crawl(...) "
+        "(tolerates the client-side timeout, polls progress)"
     )
 
-    # Native tool naming enforcement.
-    assert '"sf_generate_report"' in text, (
-        "SKILL.md body must use the NATIVE SF MCP tool name; "
-        "registry / wrapper forms forbidden in script call examples"
+    # (5) Real export via the orchestrator dispatch → file_path + NDJSON conv.
+    assert "SF_EXPORT_DISPATCH" in text, (
+        "SKILL.md body must cite the orchestrator's SF_EXPORT_DISPATCH "
+        "(the live-proven canonical→SF mapping) rather than re-inventing"
     )
-    # schema-audit specifically calls structured_data_all.
+    assert "file_path" in text, (
+        "SKILL.md body must export via file_path (resolves the >100KB "
+        "inline cap by writing to disk; OQ-FILEPATH-EXPORTS)"
+    )
+    assert "ndjson_to_csv" in text, (
+        "structured_data_all is a seo-element export (NDJSON, no export_type "
+        "arg) — SKILL.md must convert it via sf_crawl_orchestrator."
+        "ndjson_to_csv before parsing"
+    )
+    assert "csv.DictReader" in text, (
+        "SKILL.md body must parse the ndjson_to_csv output with "
+        "csv.DictReader to build the structured_data rows"
+    )
+    # schema-audit specifically exports the canonical structured_data_all.
     assert '"structured_data_all"' in text, (
-        "schema-audit SF MCP branch must call the canonical "
+        "schema-audit SF MCP branch must export the canonical "
         "structured_data_all report (per spec line 123)"
+    )
+
+    # (6) The transform's raw_sf={"rows": ...} feed.
+    assert 'raw_sf' in text, (
+        "SKILL.md body must pass the parsed rows into "
+        'transform(raw_sf={"rows": ...})'
+    )
+
+    # Regression guard: the BROKEN invented-arg pattern must be GONE.
+    assert "report_name=" not in text, (
+        "SKILL.md must NOT pass report_name= (no such SF export arg)"
+    )
+    assert "save_report=" not in text, (
+        "SKILL.md must NOT pass save_report= (no such SF export arg)"
+    )
+    assert 'response.get("truncated"' not in text, (
+        "SKILL.md must NOT read a non-existent `truncated` flag — the real "
+        "SF rejects >100KB inline; file_path export is the canonical path"
+    )
+    assert 'response.get("rows"' not in text, (
+        "SKILL.md must NOT read a non-existent `rows` key — the real result "
+        "is the MCP content envelope, parsed from the written export instead"
     )

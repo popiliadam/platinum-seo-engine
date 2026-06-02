@@ -47,7 +47,7 @@ inputs:
     type: boolean
     required: false
     default: false
-    description: "Opt-in (D-SF-11): when true, calls SF MCP via scripts/util/sf_mcp_client.SfMcpClient for live structured_data_all rows (bypasses file requirement for fresh JSON-LD). Requires SF GUI + MCP server running (preflight via client.health(); on FAIL → AMBER fallback to file-based path, NEVER hard fail). R12 truncation detection via response.get('truncated', False)."
+    description: "Opt-in (D-SF-11): when true, calls SF MCP via scripts/util/sf_mcp_client.SfMcpClient for live structured_data_all rows (bypasses file requirement for fresh JSON-LD). Resolves the crawl id from sf_list_crawls (domain match → instanceDirName), client.load_crawl(...) (resilient), then exports structured_data_all via SF_EXPORT_DISPATCH (sf_export_seo_element_urls 'Structured Data') to file_path (the >100KB inline cap is resolved by writing to disk, not a non-existent 'truncated' flag); the seo-element export is NDJSON → converted via sf_crawl_orchestrator.ndjson_to_csv → csv.DictReader → transform(raw_sf={'rows': ...}). Requires SF GUI + MCP server running (preflight via client.health(); on FAIL / no matching crawl / SfMcpToolError / load timeout → AMBER fallback to file-based path, NEVER hard fail per R9)."
 outputs:
   - "master.xlsx#schema"
   - "outputs/reports/{date}-schema-audit.md"
@@ -345,58 +345,154 @@ mitigation).
 
 When `use_sf_mcp_live=true`, the SKILL body branches at Step 3
 (`parse_sf_structured_data`) to optionally bypass the on-disk SF CSV
-requirement and pull `structured_data_all` rows inline from SF MCP:
+requirement and pull `structured_data_all` rows inline from SF MCP.
+
+**This branch was rewritten (AC-13 replication) against the REAL SF MCP
+API** — the same class of fix as tech-audit (landed in `6ee6fb9`,
+live-proven on the aluminumstation crawl) and the sf-crawl-orchestrator
+Step-5 export dispatch (`a714e43`). The engine canonical
+`structured_data_all` is NOT a Screaming Frog identifier: it maps via
+`sf_crawl_orchestrator.SF_EXPORT_DISPATCH` to the real
+`sf_export_seo_element_urls` tool with `seo_element_name="Structured
+Data"` + `filter_name="All"`. There is NO `crawl_id`, `report_name`, or
+`save_report` arg; the export runs on the *currently-loaded* crawl and is
+written to `file_path` (relative to the SF allowed base directory). The
+real SF REJECTS inline output >100KB with a tool error — so `file_path`
+(write-to-disk) is the canonical export path (OQ-FILEPATH-EXPORTS), not a
+non-existent `truncated` flag.
+
+The `sf_list_crawls` result comes back through `SfMcpClient.call_tool`
+as the MCP content envelope `{"isError":false,"content":[{"text":
+"<JSON>"}]}`, so the crawl list is JSON-encoded inside `content[*].text`
+(exactly like `sf_crawl_progress`). We decode the first JSON block, then
+match on `url` → `instanceDirName`. The real entry shape (Manager-probed)
+is `{"url":"https://aluminumstation.com/","instanceDirName":"fc718e3f-..."}`.
+
+**Critical: a seo-element export is NDJSON, not CSV.**
+`sf_export_seo_element_urls` has no `export_type` arg and always writes
+one flat JSON object per line (live-verified — `export_returns_ndjson`
+semantics). So the written file is converted to CSV text first via
+`sf_crawl_orchestrator.ndjson_to_csv(...)` (which emits a clean CSV
+header — no BOM), then parsed with `csv.DictReader`.
 
 ```python
+import csv
+import json
+from pathlib import Path
+from scripts.ingestion import sf_crawl_orchestrator
+
+def _decode_sf_envelope(result: dict):
+    """Decode the first JSON payload from an SfMcpClient content envelope.
+
+    SfMcpClient.call_tool returns {"isError":..,"content":[{"text":"<JSON>"}]}.
+    Returns the parsed object (list/dict) or None if no JSON block is present.
+    """
+    for block in (result or {}).get("content", []) or []:
+        if isinstance(block, dict) and isinstance(block.get("text"), str):
+            try:
+                return json.loads(block["text"])
+            except ValueError:
+                continue
+    return None
+
+def _norm_domain(u: str) -> str:
+    """Normalise a URL for domain matching: drop scheme + leading www. +
+    trailing slash."""
+    bare = (u or "").strip().rstrip("/").split("://", 1)[-1].lower()
+    return bare[4:] if bare.startswith("www.") else bare
+
 amber_warnings: list[str] = []
 if use_sf_mcp_live:
-    from scripts.util.sf_mcp_client import SfMcpClient, SfMcpToolError
-    client = SfMcpClient(base_url=project_config["sf"]["mcp"]["url"])
+    from scripts.util.sf_mcp_client import (
+        SfMcpClient, SfMcpToolError, SfMcpError,
+    )
+    sf_cfg = project_config["sf"]["mcp"]
+    client = SfMcpClient(base_url=sf_cfg["url"])
+    allowed_dir = Path(sf_cfg["allowed_directory"])  # SF write base (D-SF-10)
     if not client.health():
         # R9 AMBER fallback — SF MCP unreachable, continue file-based.
         amber_warnings.append(
-            "SF MCP unavailable; falling back to file-based path"
+            "SF MCP unavailable (health probe failed); "
+            "falling back to file-based path"
         )
     else:
         try:
-            response = client.call_tool(
-                "sf_generate_report",         # native MCP tool name
-                crawl_id=sf_crawl_id,         # from orchestrator handoff
-                report_name="structured_data_all",
-                save_report=False,            # inline response, no disk write
+            # 1) Resolve the crawl id: pick the crawl whose `url` matches the
+            #    project domain (normalise scheme + leading www. + trailing
+            #    slash), then take its `instanceDirName` (the real crawl id).
+            list_resp = client.call_tool("sf_list_crawls")
+            decoded = _decode_sf_envelope(list_resp)
+            crawls = decoded if isinstance(decoded, list) else (
+                decoded.get("crawls", []) if isinstance(decoded, dict) else []
             )
-            # R12 truncation detection (100KB cap per D-SF-05).
-            if response.get("truncated", False):
+            target = _norm_domain(project_config["domain"])
+            match = next(
+                (c for c in crawls if _norm_domain(c.get("url", "")) == target),
+                None,
+            )
+            if match is None:
+                # R9 AMBER fallback — no crawl for this domain; do NOT hard fail.
                 amber_warnings.append(
-                    "SF MCP response truncated at 100KB cap for "
-                    "structured_data_all"
+                    f"No SF crawl found for domain {project_config['domain']!r} "
+                    "in sf_list_crawls; falling back to file-based path"
                 )
-            # When MCP path succeeds, use inline rows in place of
-            # sf-exports/{date}/raw/structured_data_all.csv (file path
-            # check at Step 2 is bypassed; transform consumes the same
-            # flat envelope shape).
-            flat_envelope = {"rows": response.get("rows", [])}
-        except SfMcpToolError as exc:
-            # R9 AMBER fallback — call failed.
+            else:
+                crawl_id = match["instanceDirName"]
+                # 2) Ensure it is the active loaded crawl (resilient: tolerates
+                #    the client-side load timeout, polls progress to confirm).
+                client.load_crawl(crawl_id)
+
+                # 3) Export "Structured Data" via the orchestrator dispatch
+                #    (structured_data_all → ("sf_export_seo_element_urls",
+                #    {"seo_element_name":"Structured Data","filter_name":
+                #    "All"})). The >100KB inline cap is resolved by file_path.
+                tool, call_kwargs = sf_crawl_orchestrator.SF_EXPORT_DISPATCH[
+                    "structured_data_all"
+                ]
+                rel_path = "structured_data_all.ndjson"
+                client.call_tool(tool, file_path=rel_path, **call_kwargs)
+
+                # 4) A seo-element export is NDJSON (no export_type arg) → convert
+                #    to clean CSV text first (ndjson_to_csv emits a BOM-free
+                #    header), then parse with csv.DictReader. The transform
+                #    consumes the same flat `{"rows": [...]}` envelope shape.
+                csv_text = sf_crawl_orchestrator.ndjson_to_csv(
+                    (allowed_dir / rel_path).read_text(encoding="utf-8")
+                )
+                rows = list(csv.DictReader(csv_text.splitlines()))
+                flat_envelope = {"rows": rows}
+        except (SfMcpToolError, SfMcpError) as exc:
+            # R9 AMBER fallback — list/load/export failed (4xx/5xx, JSON-RPC
+            # error, load_crawl settle timeout). NEVER hard fail.
             amber_warnings.append(
-                f"SF MCP tool error: {exc}; falling back to file-based path"
+                f"SF MCP error: {exc}; falling back to file-based path"
             )
+
+# Pass the parsed rows straight into the transform (the same flat
+# envelope the file-based path builds from sf-import).
+result = schema_audit_transform.transform(raw_sf=flat_envelope, raw_dfs=raw_dfs)
 ```
 
-**AMBER vs RED policy (R9 / R12 contract):**
+**AMBER vs RED policy (R9 contract — never hard-fail this branch):**
 
 - `client.health()` returns False → AMBER warning, continue file-based.
-- `SfMcpToolError` raised → AMBER warning, continue file-based.
-- `response.get("truncated", False) is True` → AMBER warning, continue
-  with partial structured_data_all rows.
+- No crawl matches the project domain in `sf_list_crawls` → AMBER
+  warning, continue file-based.
+- `SfMcpToolError` / `SfMcpError` raised (export 4xx/5xx, JSON-RPC error,
+  `load_crawl` settle timeout) → AMBER warning, continue file-based.
+- A partial SF outage degrades to the file-based
+  `structured_data_all.csv` (the transform tolerates partial rows).
 - NEVER raise `SystemExit` from this branch. RED reserved for the
   existing DURUR set (SF data missing in BOTH paths, schema drift, etc.).
 
 **Tool naming reminder:** `call_tool(tool_name=...)` takes the **native**
-SF MCP tool name (`"sf_generate_report"`), NOT the registry form
-(`"sf__sf_generate_report"`) or the Claude Code wrapper form
-(`"mcp__sf__sf_generate_report"`). JSON-RPC `params.name` follows
-the native form per MCP spec.
+SF MCP tool name (`"sf_export_seo_element_urls"`, `"sf_list_crawls"`,
+`"sf_load_crawl"`), NOT the registry form
+(`"sf__sf_export_seo_element_urls"`) or the Claude Code wrapper form
+(`"mcp__sf__sf_export_seo_element_urls"`). JSON-RPC `params.name` follows
+the native form per MCP spec. `SfMcpClient` already speaks the MCP
+Streamable-HTTP transport (session handshake + SSE), so the body only
+ever passes native tool names + the SF call kwargs.
 
 `amber_warnings` is surfaced via the existing provenance event
 `source.kind=sf_mcp` (Step 9) and the rendered report template
