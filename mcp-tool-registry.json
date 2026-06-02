@@ -269,7 +269,21 @@
         },
         {
           "tool_name": "sf__sf_generate_report",
-          "description": "Generate one of SF's 24 Tier-1/Tier-2 reports. save_report=true writes CSV to allowed_directory (preferred for large reports); save_report=false returns CSV-as-string in the MCP response (small reports only).",
+          "description": "Export an SF report by category ('Cat:Subcat' colon form from sf_list_available_reports) to file_path (relative to allowed_directory). Args: category (required), file_path, data_fields, export_type ('CSV'|'NDJSON'). Operates on the currently-loaded crawl. build_export_plan maps engine canonicals (issues_overview_report, redirect_chains, orphan_pages) to this tool.",
+          "category": "platform_detection",
+          "used_by_mappings": ["internal"],
+          "cache_ttl_hours": 0
+        },
+        {
+          "tool_name": "sf__sf_generate_bulk_export",
+          "description": "Export an SF bulk export by category (from sf_list_available_bulk_exports) to file_path. Same arg shape as sf_generate_report: category (required), file_path, data_fields, export_type ('CSV'|'NDJSON'). build_export_plan maps link/content canonicals (all_inlinks, all_outlinks, all_anchor_text, near_duplicates_report, exact_duplicates_report) to this tool.",
+          "category": "platform_detection",
+          "used_by_mappings": ["internal"],
+          "cache_ttl_hours": 0
+        },
+        {
+          "tool_name": "sf__sf_export_seo_element_urls",
+          "description": "Export the URL list for a named SEO element + filter to file_path (CSV by default; NO export_type arg). Args: seo_element_name (required enum incl. Internal/H1/H2/Page Titles/Meta Description/Canonicals/Directives/Images/Hreflang/Sitemaps/Structured Data/Pagination/Response Codes/Search Console), filter_name (required; 'All' valid for every element), file_path, segment_name, data_fields, start_index, max_rows. build_export_plan maps the majority of canonicals (internal_all, page_titles_all, h1_all, indexability, crawl_depth, etc.) to this tool.",
           "category": "platform_detection",
           "used_by_mappings": ["internal"],
           "cache_ttl_hours": 0
