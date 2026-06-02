@@ -571,17 +571,32 @@ def test_use_sf_mcp_live_flag_in_frontmatter(
 
 
 def test_skill_md_documents_sf_mcp_live_pattern() -> None:
-    """v1.8 Phase 5: the on-page-audit SKILL.md body MUST document the
-    SF MCP live mode branch with the 4 required patterns:
+    """AC-13 replication: the on-page-audit SKILL.md SF MCP live mode branch
+    MUST document the CORRECT real SF MCP API pattern (same class of fix as
+    tech-audit, landed in 6ee6fb9, live-proven). The previous prose called a
+    non-existent ``sf_generate_report(crawl_id=, report_name=, save_report=)``
+    shape and read non-existent ``response.get("truncated"/"rows")`` keys.
+
+    on-page-audit exports the canonical ``page_titles_all`` via the
+    orchestrator's SF_EXPORT_DISPATCH → ``sf_export_seo_element_urls``
+    (seo_element_name "Page Titles"), a seo-element export that writes NDJSON
+    (no export_type arg) → converted to CSV via
+    ``sf_crawl_orchestrator.ndjson_to_csv(...)`` before parsing, then fed into
+    ``transform(..., live_findings=rows)`` (the new additive merge kwarg). The
+    corrected branch must document:
 
       (1) `SfMcpClient` import from `scripts.util.sf_mcp_client`
       (2) `client.health()` preflight check (R9 mitigation)
       (3) AMBER fallback semantics ("falling back to file-based path")
-      (4) R12 truncation detection (`response.get("truncated"`)
+      (4) crawl-id resolution via `sf_list_crawls` (matched on domain) +
+          resilient `client.load_crawl(...)`
+      (5) export via the orchestrator dispatch to `file_path` (the >100KB
+          inline cap is resolved by writing to disk, NOT a non-existent
+          `truncated` flag), converting the NDJSON export via `ndjson_to_csv`
+      (6) feeding the parsed rows into `transform(..., live_findings=...)`
 
-    This is a stub-mod pattern contract lock: the runtime body branch
-    is in SKILL.md prose, but the contract is verified here so a
-    future SKILL.md edit cannot silently drop the R9/R12 mitigations.
+    This is a contract lock: a future SKILL.md edit cannot silently regress
+    back to the broken (invented-arg) pattern.
     """
     text = SKILL_PATH.read_text(encoding="utf-8")
 
@@ -604,19 +619,252 @@ def test_skill_md_documents_sf_mcp_live_pattern() -> None:
     )
     assert "amber_warnings" in text.lower() or "AMBER" in text
 
-    # (4) R12 truncation detection.
-    assert 'response.get("truncated"' in text, (
-        "SKILL.md body must document the R12 truncation detection "
-        "(100KB cap per D-SF-05)"
+    # (4) Crawl-id resolution + resilient load (the previously-undefined
+    #     `sf_crawl_id` free variable is now plumbed from sf_list_crawls).
+    assert "sf_list_crawls" in text, (
+        "SKILL.md body must resolve the crawl id via sf_list_crawls "
+        "(the old `sf_crawl_id` free variable was never plumbed)"
+    )
+    assert "instanceDirName" in text, (
+        "SKILL.md body must pick the crawl id from the sf_list_crawls "
+        "entry's instanceDirName field (real SF shape)"
+    )
+    assert "load_crawl" in text, (
+        "SKILL.md body must call the resilient client.load_crawl(...) "
+        "(tolerates the client-side timeout, polls progress)"
     )
 
-    # Native tool naming enforcement.
-    assert '"sf_generate_report"' in text, (
-        "SKILL.md body must use the NATIVE SF MCP tool name; "
-        "registry / wrapper forms forbidden in script call examples"
+    # (5) Real export via the orchestrator dispatch → file_path + NDJSON conv.
+    assert "SF_EXPORT_DISPATCH" in text, (
+        "SKILL.md body must cite the orchestrator's SF_EXPORT_DISPATCH "
+        "(the live-proven canonical→SF mapping) rather than re-inventing"
     )
-    # on-page-audit specifically calls page_titles_all.
+    assert "file_path" in text, (
+        "SKILL.md body must export via file_path (resolves the >100KB "
+        "inline cap by writing to disk; OQ-FILEPATH-EXPORTS)"
+    )
+    assert "ndjson_to_csv" in text, (
+        "page_titles_all is a seo-element export (NDJSON, no export_type "
+        "arg) — SKILL.md must convert it via sf_crawl_orchestrator."
+        "ndjson_to_csv before parsing"
+    )
+    assert "csv.DictReader" in text, (
+        "SKILL.md body must parse the ndjson_to_csv output with "
+        "csv.DictReader to build the live_findings rows"
+    )
+    # on-page-audit specifically exports the canonical page_titles_all.
     assert '"page_titles_all"' in text, (
-        "on-page-audit SF MCP branch must call the canonical "
+        "on-page-audit SF MCP branch must export the canonical "
         "page_titles_all report (per spec line 124)"
     )
+    # Live-caught fix (2026-06-02): the Page Titles seo-element export carries
+    # ONLY Title columns (no 'Meta Description 1'/'H1-1'), so in_meta/in_h1
+    # presence MUST come from their own exports — else every SF-only URL is
+    # falsely flagged missing-meta/missing-h1.
+    assert '"meta_description_all"' in text and '"h1_all"' in text, (
+        "on-page-audit SF branch must ALSO export meta_description_all + "
+        "h1_all so in_meta/in_h1 reflect real crawl truth"
+    )
+    assert "by_url" in text, (
+        "the 3 seo-element exports must be merged per-URL (keyed by Address) "
+        "so each live_findings row carries Title 1 + Meta Description 1 + H1-1"
+    )
+
+    # (6) The transform's live_findings merge kwarg.
+    assert "live_findings" in text, (
+        "SKILL.md body must pass the parsed CSV rows into "
+        "transform(..., live_findings=...)"
+    )
+
+    # Regression guard: the BROKEN invented-arg pattern must be GONE.
+    assert "report_name=" not in text, (
+        "SKILL.md must NOT pass report_name= (no such SF export arg)"
+    )
+    assert "save_report=" not in text, (
+        "SKILL.md must NOT pass save_report= (no such SF export arg)"
+    )
+    assert 'response.get("truncated"' not in text, (
+        "SKILL.md must NOT read a non-existent `truncated` flag — the real "
+        "SF rejects >100KB inline; file_path export is the canonical path"
+    )
+    assert 'response.get("rows"' not in text, (
+        "SKILL.md must NOT read a non-existent `rows` key — the real result "
+        "is the MCP content envelope, parsed from the written export instead"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 16 — AC-13 replication: live_findings merge (REAL merge, not grep)
+# ---------------------------------------------------------------------------
+
+def _page_titles_row(
+    *,
+    address: str,
+    title: str = "",
+    meta: str = "",
+    h1: str = "",
+) -> dict:
+    """Build one SF 'Page Titles' seo-element export row (csv.DictReader shape
+    after ndjson_to_csv). The live-verified SF Page Titles element columns
+    carry Address (URL), Title 1, plus the adjacent Meta Description 1 / H1-1
+    crawl truth columns SF surfaces in that element export.
+    """
+    return {
+        "Address": address,
+        "Title 1": title,
+        "Title 1 Length": str(len(title)),
+        "Meta Description 1": meta,
+        "H1-1": h1,
+    }
+
+
+def test_live_findings_none_is_identical_baseline() -> None:
+    """Regression: live_findings=None (the default) yields byte-identical
+    output to omitting the kwarg entirely — the existing baseline behaviour
+    is preserved (the other on_page_audit tests never pass the kwarg)."""
+    cp = _cp_envelope([
+        _cp_item(
+            url="https://example.com/seo-guide",
+            title="Ultimate SEO Guide for 2026",
+            meta="The ultimate seo guide explains every step.",
+            h1=["Ultimate SEO Guide"],
+        ),
+    ])
+    gsc = _gsc_payload([
+        ("https://example.com/seo-guide", "ultimate seo guide", 25, 1000),
+    ])
+    out_default = opa.transform(cp, raw_gsc=gsc)
+    out_explicit_none = opa.transform(cp, raw_gsc=gsc, live_findings=None)
+    assert out_default == out_explicit_none
+
+
+def test_live_findings_empty_list_is_noop() -> None:
+    """An empty live_findings list behaves like None (no extra rows)."""
+    cp = _cp_envelope([
+        _cp_item(
+            url="https://example.com/a", title="A title",
+            meta="A meta", h1=["A h1"],
+        ),
+    ])
+    base = opa.transform(cp)
+    merged = opa.transform(cp, live_findings=[])
+    assert merged["on_page_audit"] == base["on_page_audit"]
+
+
+def test_live_findings_merges_additively_surfaces_sf_only_urls() -> None:
+    """AC-13 core: passing SF Page Titles rows ADDITIVELY merges SF-only URLs
+    (URLs SF crawled that the DFS content_parsing set did not cover) into the
+    on_page_audit output. rowcount(with) >= rowcount(without), and the SF rows
+    surface with the title/meta/h1 presence mapped from the SF crawl truth."""
+    cp = _cp_envelope([
+        _cp_item(
+            url="https://example.com/known",
+            title="Known Page",
+            meta="Known meta",
+            h1=["Known H1"],
+        ),
+    ])
+    # Two SF rows: one duplicates the DFS URL (must de-dupe, DFS authoritative),
+    # one is an SF-only URL (must surface as a NEW row).
+    live = [
+        _page_titles_row(
+            address="https://example.com/known",
+            title="Known Page (SF copy)", meta="x", h1="y",
+        ),
+        _page_titles_row(
+            address="https://example.com/sf-only",
+            title="SF Only Page", meta="SF meta", h1="SF H1",
+        ),
+    ]
+
+    base = opa.transform(cp)
+    merged = opa.transform(cp, live_findings=live)
+
+    # Additive: never fewer rows than the no-live baseline.
+    assert len(merged["on_page_audit"]) >= len(base["on_page_audit"])
+    urls = {r["url"] for r in merged["on_page_audit"]}
+    # The SF-only URL surfaces; the DFS URL is NOT duplicated.
+    assert "https://example.com/sf-only" in urls
+    known_rows = [
+        r for r in merged["on_page_audit"]
+        if r["url"] == "https://example.com/known"
+    ]
+    assert len(known_rows) == 1, "DFS-covered URL must not be duplicated by SF"
+
+    # The SF-only row reflects SF crawl-truth presence (title/meta/h1 non-empty)
+    # and is shaped to exactly the 8 on_page_audit columns.
+    sf_row = next(
+        r for r in merged["on_page_audit"]
+        if r["url"] == "https://example.com/sf-only"
+    )
+    assert sf_row["in_title"] is True
+    assert sf_row["in_meta"] is True
+    assert sf_row["in_h1"] is True
+    assert tuple(sf_row.keys()) == opa.ON_PAGE_AUDIT_COLUMNS
+    # No GSC metrics from SF → zeros, and a non-empty action string.
+    assert sf_row["impressions_30d"] == 0
+    assert sf_row["clicks_30d"] == 0
+    assert sf_row["action"]
+
+    # meta surfaces the live-findings count for provenance.
+    assert merged["meta"]["live_findings_count"] >= 1
+
+
+def test_live_findings_presence_reflects_empty_sf_columns() -> None:
+    """An SF-only URL whose SF title/meta/h1 columns are blank maps to
+    in_title/in_meta/in_h1 = False (presence, not fabricated)."""
+    cp = _cp_envelope([])  # no DFS rows at all
+    live = [
+        _page_titles_row(
+            address="https://example.com/blank-title",
+            title="", meta="", h1="",
+        ),
+    ]
+    out = opa.transform(cp, live_findings=live)
+    row = next(
+        r for r in out["on_page_audit"]
+        if r["url"] == "https://example.com/blank-title"
+    )
+    assert row["in_title"] is False
+    assert row["in_meta"] is False
+    assert row["in_h1"] is False
+    assert tuple(row.keys()) == opa.ON_PAGE_AUDIT_COLUMNS
+
+
+def test_live_findings_url_normalized_for_dedupe() -> None:
+    """SF Address is D-03 normalized before the de-dupe join, so a trailing
+    slash on the SF row collapses against the DFS URL (no spurious dup)."""
+    cp = _cp_envelope([
+        _cp_item(
+            url="https://example.com/page",
+            title="Page", meta="m", h1=["h"],
+        ),
+    ])
+    live = [
+        _page_titles_row(
+            address="https://example.com/page/",   # trailing slash variant
+            title="Page SF", meta="m2", h1="h2",
+        ),
+    ]
+    out = opa.transform(cp, live_findings=live)
+    page_rows = [
+        r for r in out["on_page_audit"]
+        if r["url"] == "https://example.com/page"
+    ]
+    assert len(page_rows) == 1, (
+        "trailing-slash SF Address must D-03 normalize and de-dupe against "
+        "the DFS URL — not create a second row"
+    )
+
+
+def test_live_findings_skips_rows_without_address() -> None:
+    """An SF row with no usable Address is skipped (no fabricated URL row)."""
+    cp = _cp_envelope([])
+    live = [
+        {"Title 1": "Orphan title with no Address"},   # no Address key
+        _page_titles_row(address="https://example.com/ok", title="OK"),
+    ]
+    out = opa.transform(cp, live_findings=live)
+    urls = {r["url"] for r in out["on_page_audit"]}
+    assert "https://example.com/ok" in urls
+    assert out["meta"]["live_findings_count"] == 1   # only the usable row

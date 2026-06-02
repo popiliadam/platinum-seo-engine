@@ -39,7 +39,7 @@ inputs:
     type: boolean
     required: false
     default: false
-    description: "Opt-in (D-SF-11): when true, calls SF MCP via scripts/util/sf_mcp_client.SfMcpClient for live page_titles_all cross-check (title/meta/h1 freshness vs SF crawl truth). Requires SF GUI + MCP server running (preflight via client.health(); on FAIL → AMBER fallback to file-based path, NEVER hard fail). R12 truncation detection via response.get('truncated', False)."
+    description: "Opt-in (D-SF-11): when true, calls SF MCP via scripts/util/sf_mcp_client.SfMcpClient for live page_titles_all cross-check (title/meta/h1 freshness vs SF crawl truth). Resolves the crawl id from sf_list_crawls (domain match → instanceDirName), client.load_crawl(...) (resilient), then exports page_titles_all + meta_description_all + h1_all via SF_EXPORT_DISPATCH (sf_export_seo_element_urls), merged per-URL by Address, to file_path (the >100KB inline cap is resolved by writing to disk, not a non-existent 'truncated' flag; live-verified the Page Titles export has only Title columns, so meta/h1 presence must come from their own exports). Each seo-element export is NDJSON → converted via sf_crawl_orchestrator.ndjson_to_csv → csv.DictReader → transform(live_findings=...) (additive crawl-truth merge for SF-only URLs). Requires SF GUI + MCP server running (preflight via client.health(); on FAIL / no matching crawl / SfMcpToolError / load timeout → AMBER fallback to file-based path, NEVER hard fail per R9)."
 outputs:
   - "master.xlsx#on_page_audit"
   - "outputs/reports/{date}-on-page-audit.md"
@@ -334,60 +334,178 @@ the SF cross-check (never hard-fail per R9 mitigation).
 
 When `use_sf_mcp_live=true`, the SKILL body branches at Step 4
 (`transform`) to optionally cross-check the per-URL title/meta/h1
-signals against SF MCP's `page_titles_all` report:
+signals against SF MCP's `page_titles_all` report.
+
+**This branch was rewritten (AC-13 replication) against the REAL SF MCP
+API** — the same class of fix as tech-audit (landed in `6ee6fb9`,
+live-proven on the demo-aluminum crawl) and the sf-crawl-orchestrator
+Step-5 export dispatch (`a714e43`). The engine canonical `page_titles_all`
+is NOT a Screaming Frog identifier: it maps via
+`sf_crawl_orchestrator.SF_EXPORT_DISPATCH` to the real
+`sf_export_seo_element_urls` tool with `seo_element_name="Page Titles"` +
+`filter_name="All"`. There is NO `crawl_id`, `report_name`, or
+`save_report` arg; the export runs on the *currently-loaded* crawl and is
+written to `file_path` (relative to the SF allowed base directory). The
+real SF REJECTS inline output >100KB with a tool error — so `file_path`
+(write-to-disk) is the canonical export path (OQ-FILEPATH-EXPORTS), not a
+non-existent `truncated` flag.
+
+The `sf_list_crawls` result comes back through `SfMcpClient.call_tool`
+as the MCP content envelope `{"isError":false,"content":[{"text":
+"<JSON>"}]}`, so the crawl list is JSON-encoded inside `content[*].text`
+(exactly like `sf_crawl_progress`). We decode the first JSON block, then
+match on `url` → `instanceDirName`. The real entry shape (Manager-probed)
+is `{"url":"https://demo-aluminum.example/","instanceDirName":"fc718e3f-..."}`.
+
+**Critical: a seo-element export is NDJSON, not CSV.**
+`sf_export_seo_element_urls` has no `export_type` arg and always writes
+one flat JSON object per line (live-verified — `export_returns_ndjson`
+semantics). So the written file is converted to CSV text first via
+`sf_crawl_orchestrator.ndjson_to_csv(...)` (which emits a clean CSV
+header — no BOM), then parsed with `csv.DictReader` and passed into the
+transform's additive `live_findings` merge. The merge adds an SF
+crawl-truth row for every URL the DFS content_parsing set did NOT cover
+(DFS-covered URLs are never duplicated — `rowcount(with) >=
+rowcount(without)`); `live_findings=None` (the default) is byte-identical
+to the file-based path.
 
 ```python
+import csv
+import json
+from pathlib import Path
+from scripts.ingestion import sf_crawl_orchestrator
+
+def _decode_sf_envelope(result: dict):
+    """Decode the first JSON payload from an SfMcpClient content envelope.
+
+    SfMcpClient.call_tool returns {"isError":..,"content":[{"text":"<JSON>"}]}.
+    Returns the parsed object (list/dict) or None if no JSON block is present.
+    """
+    for block in (result or {}).get("content", []) or []:
+        if isinstance(block, dict) and isinstance(block.get("text"), str):
+            try:
+                return json.loads(block["text"])
+            except ValueError:
+                continue
+    return None
+
+def _norm_domain(u: str) -> str:
+    """Normalise a URL for domain matching: drop scheme + leading www. +
+    trailing slash."""
+    bare = (u or "").strip().rstrip("/").split("://", 1)[-1].lower()
+    return bare[4:] if bare.startswith("www.") else bare
+
 amber_warnings: list[str] = []
+live_findings: list[dict] = []   # parsed SF "Page Titles" rows (crawl truth)
 if use_sf_mcp_live:
-    from scripts.util.sf_mcp_client import SfMcpClient, SfMcpToolError
-    client = SfMcpClient(base_url=project_config["sf"]["mcp"]["url"])
+    from scripts.util.sf_mcp_client import (
+        SfMcpClient, SfMcpToolError, SfMcpError,
+    )
+    sf_cfg = project_config["sf"]["mcp"]
+    client = SfMcpClient(base_url=sf_cfg["url"])
+    allowed_dir = Path(sf_cfg["allowed_directory"])  # SF write base (D-SF-10)
     if not client.health():
-        # R9 AMBER fallback — SF MCP unreachable, continue without
-        # the SF cross-check (DFS evidence is still authoritative).
+        # R9 AMBER fallback — SF MCP unreachable, continue without the SF
+        # cross-check (DFS evidence is still authoritative).
         amber_warnings.append(
-            "SF MCP unavailable; falling back to file-based path"
+            "SF MCP unavailable (health probe failed); "
+            "falling back to file-based path"
         )
     else:
         try:
-            response = client.call_tool(
-                "sf_generate_report",          # native MCP tool name
-                crawl_id=sf_crawl_id,          # from orchestrator handoff
-                report_name="page_titles_all",
-                save_report=False,             # inline response, no disk write
+            # 1) Resolve the crawl id: pick the crawl whose `url` matches the
+            #    project domain (normalise scheme + leading www. + trailing
+            #    slash), then take its `instanceDirName` (the real crawl id).
+            list_resp = client.call_tool("sf_list_crawls")
+            decoded = _decode_sf_envelope(list_resp)
+            crawls = decoded if isinstance(decoded, list) else (
+                decoded.get("crawls", []) if isinstance(decoded, dict) else []
             )
-            # R12 truncation detection (100KB cap per D-SF-05).
-            if response.get("truncated", False):
+            target = _norm_domain(project_config["domain"])
+            match = next(
+                (c for c in crawls if _norm_domain(c.get("url", "")) == target),
+                None,
+            )
+            if match is None:
+                # R9 AMBER fallback — no crawl for this domain; do NOT hard fail.
                 amber_warnings.append(
-                    "SF MCP response truncated at 100KB cap for "
-                    "page_titles_all"
+                    f"No SF crawl found for domain {project_config['domain']!r} "
+                    "in sf_list_crawls; falling back to file-based path"
                 )
-            # Live SF rows are passed to the transform as an optional
-            # third source for in_title/in_meta/in_h1 cross-validation.
-            # The transform decorates `action` with "(SF disagrees: ...)"
-            # notes; default behavior unchanged when this kwarg is None.
-            sf_live_rows = response.get("rows", [])
-        except SfMcpToolError as exc:
-            # R9 AMBER fallback — call failed.
+            else:
+                crawl_id = match["instanceDirName"]
+                # 2) Ensure it is the active loaded crawl (resilient: tolerates
+                #    the client-side load timeout, polls progress to confirm).
+                client.load_crawl(crawl_id)
+
+                # 3) Export the THREE on-page seo-element reports via the
+                #    orchestrator dispatch — Page Titles + Meta Description + H1.
+                #    page_titles_all carries ONLY 'Title 1' columns (live-verified
+                #    2026-06-02: the Page Titles export has NO 'Meta Description 1'
+                #    / 'H1-1' columns), so in_meta / in_h1 presence MUST come from
+                #    their own exports — else every SF-only URL would be falsely
+                #    flagged missing-meta / missing-h1. The >100KB inline cap is
+                #    resolved by writing each to file_path.
+                # 4) Each seo-element export is NDJSON (no export_type arg) →
+                #    convert to clean CSV (ndjson_to_csv emits a BOM-free header)
+                #    → DictReader → merge each export's columns per URL (Address).
+                by_url: dict[str, dict] = {}
+                for canonical, rel_path in (
+                    ("page_titles_all", "page_titles_all.ndjson"),
+                    ("meta_description_all", "meta_description_all.ndjson"),
+                    ("h1_all", "h1_all.ndjson"),
+                ):
+                    tool, call_kwargs = sf_crawl_orchestrator.SF_EXPORT_DISPATCH[
+                        canonical
+                    ]
+                    client.call_tool(tool, file_path=rel_path, **call_kwargs)
+                    csv_text = sf_crawl_orchestrator.ndjson_to_csv(
+                        (allowed_dir / rel_path).read_text(encoding="utf-8")
+                    )
+                    for row in csv.DictReader(csv_text.splitlines()):
+                        addr = (row.get("Address") or "").strip()
+                        if addr:
+                            by_url.setdefault(addr, {"Address": addr}).update(row)
+                live_findings = list(by_url.values())
+        except (SfMcpToolError, SfMcpError) as exc:
+            # R9 AMBER fallback — list/load/export failed (4xx/5xx, JSON-RPC
+            # error, load_crawl settle timeout). NEVER hard fail.
             amber_warnings.append(
-                f"SF MCP tool error: {exc}; falling back to file-based path"
+                f"SF MCP error: {exc}; falling back to file-based path"
             )
+
+# Pass the parsed rows into the transform's additive merge (default
+# None / [] → byte-identical file-based behaviour; DFS stays authoritative
+# and SF-only URLs are surfaced as crawl-truth cross-check rows).
+result = on_page_audit_transform.transform(
+    raw_content_parsing,
+    raw_gsc=raw_gsc,
+    live_findings=(live_findings or None),
+)
 ```
 
-**AMBER vs RED policy (R9 / R12 contract):**
+**AMBER vs RED policy (R9 contract — never hard-fail this branch):**
 
 - `client.health()` returns False → AMBER warning, continue without
-  SF cross-check (DFS evidence remains the on_page_audit truth).
-- `SfMcpToolError` raised → AMBER warning, continue without SF.
-- `response.get("truncated", False) is True` → AMBER warning, continue
-  with partial SF data.
+  the SF cross-check (DFS evidence remains the on_page_audit truth).
+- No crawl matches the project domain in `sf_list_crawls` → AMBER
+  warning, continue without SF.
+- `SfMcpToolError` / `SfMcpError` raised (export 4xx/5xx, JSON-RPC error,
+  `load_crawl` settle timeout) → AMBER warning, continue without SF.
+- The transform tolerates an empty / absent `live_findings` gracefully
+  (no extra rows), so any partial SF outage degrades to the DFS-only
+  result with `rowcount(with) >= rowcount(without)` preserved.
 - NEVER raise `SystemExit` from this branch. RED reserved for the
   existing DURUR set (budget, DFS schema drift, etc.).
 
 **Tool naming reminder:** `call_tool(tool_name=...)` takes the **native**
-SF MCP tool name (`"sf_generate_report"`), NOT the registry form
-(`"sf__sf_generate_report"`) or the Claude Code wrapper form
-(`"mcp__sf__sf_generate_report"`). JSON-RPC `params.name` follows
-the native form per MCP spec.
+SF MCP tool name (`"sf_export_seo_element_urls"`, `"sf_list_crawls"`,
+`"sf_load_crawl"`), NOT the registry form
+(`"sf__sf_export_seo_element_urls"`) or the Claude Code wrapper form
+(`"mcp__sf__sf_export_seo_element_urls"`). JSON-RPC `params.name` follows
+the native form per MCP spec. `SfMcpClient` already speaks the MCP
+Streamable-HTTP transport (session handshake + SSE), so the body only
+ever passes native tool names + the SF call kwargs.
 
 `amber_warnings` is surfaced via the existing provenance event
 (an additional `source.kind=sf_mcp` event is emitted alongside the
