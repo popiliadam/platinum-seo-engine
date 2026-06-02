@@ -1,20 +1,42 @@
-"""tests/scripts/test_sf_mcp_client.py — v1.8 Phase 2 D-SF-14 HTTP MCP client.
+"""tests/scripts/test_sf_mcp_client.py — v1.9.1 D-SF-14 MCP Streamable-HTTP client.
 
-5 cases covering the Worker Prompt verification matrix:
+These tests exercise the client against the **real** MCP Streamable-HTTP
+protocol (revision 2024-11-05), as proven by live curl against the
+seospider-mcp-server. The v1.8 tests were rewritten in v1.9.1 because they
+mocked an *assumed* bare-JSON-RPC-POST protocol that the real server rejects —
+the mocks encoded the engine's assumption, not the wire reality, which is
+exactly why a broken transport shipped with green tests.
 
-    1. JSON-RPC envelope formatting (POST body shape)
-    2. Timeout → SfMcpTimeoutError after 3 attempts
-    3. 3-retry exponential backoff on connection errors
-    4. Response size cap → SfMcpResponseTooLargeError
-    5. Redirect handling (301 → 200 follow)
+The mock server (:class:`_MockMcpServer`) simulates the full handshake:
+
+    1. ``initialize``                → HTTP 200, ``Mcp-Session-Id`` *response header*.
+    2. ``notifications/initialized`` → HTTP 202, empty body (a notification).
+    3. ``tools/call``                → HTTP 200, JSON **or** SSE (``data:``) body.
+
+It also RECORDS every request (method, url, headers, body) so the regression
+test can assert the wire-level contract that the v1.8 client violated.
+
+Coverage:
+    * Handshake + envelope formatting (POST body shape, params).
+    * SSE (text/event-stream) tool response parsing.
+    * JSON (application/json) tool response parsing.
+    * REGRESSION — the bug-catcher: handshake-before-call ordering + the
+      mandatory ``Accept`` and ``Mcp-Session-Id`` headers on the tool call.
+    * health() True (live handshake) / False (server down).
+    * MCP tool-level error (``result.isError``) returned as-is (NOT raised).
+    * JSON-RPC protocol error (top-level ``error``) → SfMcpToolError.
+    * Timeout → SfMcpTimeoutError after 3 attempts (backoff 1s, 2s).
+    * Connection error → 3-retry exp-backoff; all-fail → SfMcpConnectionError.
+    * Response size cap → SfMcpResponseTooLargeError; HTTP 4xx → SfMcpToolError.
+    * Session expiry → re-initialize once + retry.
+    * Redirect handling (307 → 200 follow, POST + body + session preserved).
 
 Mocking: ``httpx.MockTransport`` (built into httpx — no extra dependency).
-The transport handler is a callable ``(httpx.Request) -> httpx.Response``;
-the client injects it via the ``transport=`` kwarg, so no monkey-patching.
 
 Refs:
     * scripts/util/sf_mcp_client.py (system under test)
     * D-SF-14 (first reusable HTTP MCP client)
+    * MCP spec 2024-11-05 — Streamable-HTTP transport
 """
 
 from __future__ import annotations
@@ -27,7 +49,9 @@ import pytest
 
 from scripts.util.sf_mcp_client import (
     DEFAULT_MAX_RESPONSE_BYTES,
+    MCP_ACCEPT_HEADER,
     RETRY_DELAYS_SECONDS,
+    SESSION_ID_HEADER,
     SfMcpClient,
     SfMcpConnectionError,
     SfMcpResponseTooLargeError,
@@ -37,55 +61,180 @@ from scripts.util.sf_mcp_client import (
 
 
 BASE_URL = "http://127.0.0.1:11435/mcp"
+DEFAULT_SESSION_ID = "11111111-2222-3333-4444-555555555555"
 
 
-def _ok_envelope(request_id: str, result: dict | str | list | None = None) -> dict:
-    return {
-        "jsonrpc": "2.0",
-        "id": request_id,
-        "result": result if result is not None else {"ok": True},
-    }
+# ---------------------------------------------------------------------------
+# Recording mock MCP server (full Streamable-HTTP handshake simulation)
+# ---------------------------------------------------------------------------
+
+def _jsonrpc_result(request_id, result):
+    return {"jsonrpc": "2.0", "id": request_id, "result": result}
 
 
-def _make_client(
+def _sse_body(envelope: dict, *, session_id: str = DEFAULT_SESSION_ID) -> str:
+    """Encode a JSON-RPC envelope as a single SSE ``event: message`` frame.
+
+    Mirrors the live server byte-for-byte: ``id:`` / ``event: message`` /
+    ``data: {json}`` lines terminated by a blank line.
+    """
+    return (
+        f"id: {session_id}\n"
+        "event: message\n"
+        f"data: {json.dumps(envelope)}\n"
+        "\n"
+    )
+
+
+class _Recorded:
+    """One captured request."""
+
+    __slots__ = ("method", "url", "headers", "rpc_method", "body")
+
+    def __init__(self, request: httpx.Request) -> None:
+        self.method = request.method
+        self.url = str(request.url)
+        # httpx.Headers is case-insensitive; copy to a plain dict for asserts.
+        self.headers = {k.lower(): v for k, v in request.headers.items()}
+        self.body = json.loads(request.content) if request.content else {}
+        self.rpc_method = self.body.get("method")
+
+
+class _MockMcpServer:
+    """Stateful, recording MCP Streamable-HTTP server for ``httpx.MockTransport``.
+
+    Args:
+        tool_result: the JSON-RPC ``result`` returned for ``tools/call``.
+        tool_transport: ``"sse"`` (default, like the live server) or ``"json"``.
+        session_id: the session id handed out by ``initialize``.
+        require_session_on_tool: if True, a ``tools/call`` without the
+            ``Mcp-Session-Id`` header returns the real server's HTTP-400
+            ``-32600`` session error (used by the re-init test).
+    """
+
+    def __init__(
+        self,
+        *,
+        tool_result=None,
+        tool_transport: str = "sse",
+        session_id: str = DEFAULT_SESSION_ID,
+        require_session_on_tool: bool = True,
+    ) -> None:
+        self.tool_result = tool_result if tool_result is not None else {"ok": True}
+        self.tool_transport = tool_transport
+        self.session_id = session_id
+        self.require_session_on_tool = require_session_on_tool
+        self.requests: list[_Recorded] = []
+        #: count of initialize calls — proves re-handshake / caching behavior.
+        self.initialize_count = 0
+        self.tool_call_count = 0
+
+    def handler(self, request: httpx.Request) -> httpx.Response:
+        rec = _Recorded(request)
+        self.requests.append(rec)
+        method = rec.rpc_method
+
+        if method == "initialize":
+            self.initialize_count += 1
+            body = _jsonrpc_result(
+                rec.body["id"],
+                {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {"tools": {"listChanged": False}},
+                    "serverInfo": {"name": "seospider-mcp-server", "version": "1.0.0"},
+                },
+            )
+            return httpx.Response(
+                200,
+                json=body,
+                headers={SESSION_ID_HEADER: self.session_id},
+            )
+
+        if method == "notifications/initialized":
+            # A notification → HTTP 202, empty body (matches the live server).
+            return httpx.Response(202)
+
+        if method == "tools/call":
+            self.tool_call_count += 1
+            if self.require_session_on_tool and SESSION_ID_HEADER.lower() not in rec.headers:
+                # Real server's response when the session header is absent.
+                return httpx.Response(
+                    400,
+                    json={
+                        "jsonrpc": "2.0",
+                        "id": rec.body.get("id"),
+                        "error": {
+                            "code": -32600,
+                            "message": (
+                                "Session ID required in mcp-session-id header"
+                            ),
+                        },
+                    },
+                )
+            envelope = _jsonrpc_result(rec.body["id"], self.tool_result)
+            if self.tool_transport == "sse":
+                return httpx.Response(
+                    200,
+                    text=_sse_body(envelope, session_id=self.session_id),
+                    headers={"content-type": "text/event-stream;charset=UTF-8"},
+                )
+            return httpx.Response(
+                200,
+                json=envelope,
+                headers={"content-type": "application/json;charset=UTF-8"},
+            )
+
+        raise AssertionError(f"unexpected JSON-RPC method in test: {method!r}")
+
+
+def _client_for(
+    server: _MockMcpServer,
+    *,
+    max_response_bytes: int = DEFAULT_MAX_RESPONSE_BYTES,
+    timeout_seconds: float = 30.0,
+) -> SfMcpClient:
+    return SfMcpClient(
+        BASE_URL,
+        timeout_seconds=timeout_seconds,
+        max_response_bytes=max_response_bytes,
+        transport=httpx.MockTransport(server.handler),
+    )
+
+
+def _raw_client(
     handler: Callable[[httpx.Request], httpx.Response],
     *,
     max_response_bytes: int = DEFAULT_MAX_RESPONSE_BYTES,
     timeout_seconds: float = 30.0,
 ) -> SfMcpClient:
-    transport = httpx.MockTransport(handler)
+    """Client wired to an arbitrary low-level handler (for failure-mode tests)."""
     return SfMcpClient(
         BASE_URL,
         timeout_seconds=timeout_seconds,
         max_response_bytes=max_response_bytes,
-        transport=transport,
+        transport=httpx.MockTransport(handler),
     )
 
 
 # ---------------------------------------------------------------------------
-# Case 1: JSON-RPC envelope formatting
+# Case 1: Handshake + JSON-RPC envelope formatting
 # ---------------------------------------------------------------------------
 
-def test_call_tool_emits_jsonrpc_2_0_envelope() -> None:
-    """POST body must match the JSON-RPC 2.0 ``tools/call`` spec exactly."""
-    captured: dict = {}
+def test_call_tool_emits_jsonrpc_tools_call_envelope() -> None:
+    """The ``tools/call`` POST body must match the MCP JSON-RPC spec exactly."""
+    server = _MockMcpServer(tool_result={"echo": "pong"})
+    client = _client_for(server)
 
-    def handler(request: httpx.Request) -> httpx.Response:
-        captured["url"] = str(request.url)
-        captured["method"] = request.method
-        captured["body"] = json.loads(request.content)
-        return httpx.Response(200, json=_ok_envelope(captured["body"]["id"],
-                                                    result={"echo": "pong"}))
-
-    client = _make_client(handler)
     result = client.call_tool("sf_crawl", start_url="https://example.com", max_pages=10)
 
-    assert captured["method"] == "POST"
-    assert captured["url"] == BASE_URL
+    # The tool-call request is the last one (after initialize + initialized).
+    tool_req = server.requests[-1]
+    assert tool_req.method == "POST"
+    assert tool_req.url == BASE_URL
+    assert tool_req.rpc_method == "tools/call"
 
-    body = captured["body"]
+    body = tool_req.body
     assert body["jsonrpc"] == "2.0", "JSON-RPC version must be exactly '2.0'"
-    assert body["method"] == "tools/call", "method must be 'tools/call'"
     assert body["params"]["name"] == "sf_crawl"
     assert body["params"]["arguments"] == {
         "start_url": "https://example.com",
@@ -98,25 +247,216 @@ def test_call_tool_emits_jsonrpc_2_0_envelope() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Case 2: Timeout exhausts retries → SfMcpTimeoutError
+# Case 2: REGRESSION — the bug-catcher.
+# Would FAIL against the v1.8 client (no handshake, no Accept/session headers).
+# ---------------------------------------------------------------------------
+
+def test_regression_handshake_and_required_headers_before_tool_call() -> None:
+    """Pin the wire contract the v1.8 client violated → caused the live HTTP 400.
+
+    Asserts the client:
+      (a) performs the ``initialize`` handshake BEFORE any ``tools/call``,
+      (b) sends ``Accept: application/json, text/event-stream`` on the call,
+      (c) sends the ``Mcp-Session-Id`` header (the value handed out by
+          ``initialize``) on the call,
+      (d) sends the ``notifications/initialized`` step between them.
+    """
+    server = _MockMcpServer(tool_result={"crawls": []})
+    client = _client_for(server)
+
+    client.call_tool("sf_list_crawls")
+
+    methods = [r.rpc_method for r in server.requests]
+    # (a) + (d): exact handshake order before the tool call.
+    assert methods == [
+        "initialize",
+        "notifications/initialized",
+        "tools/call",
+    ], f"client must handshake before tools/call; got order {methods}"
+
+    init_req = server.requests[0]
+    tool_req = server.requests[-1]
+
+    # (b) Accept header carries BOTH media types on EVERY request.
+    for rec in server.requests:
+        assert rec.headers.get("accept") == MCP_ACCEPT_HEADER, (
+            f"{rec.rpc_method} must send Accept '{MCP_ACCEPT_HEADER}'; "
+            f"got {rec.headers.get('accept')!r}"
+        )
+        assert "application/json" in rec.headers.get("content-type", ""), (
+            f"{rec.rpc_method} must send Content-Type application/json"
+        )
+
+    # (c) Session id from initialize's RESPONSE header is replayed on the call.
+    assert SESSION_ID_HEADER.lower() not in init_req.headers, (
+        "initialize must NOT pre-send a session id (server mints it)"
+    )
+    assert tool_req.headers.get(SESSION_ID_HEADER.lower()) == DEFAULT_SESSION_ID, (
+        "tools/call must carry the Mcp-Session-Id minted by initialize"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Case 3: Tool response parsing — SSE and JSON variants
+# ---------------------------------------------------------------------------
+
+def test_call_tool_parses_sse_event_stream_response() -> None:
+    """text/event-stream body → JSON-RPC result extracted from the data: frame.
+
+    This is the live server's actual tool-call transport.
+    """
+    server = _MockMcpServer(
+        tool_result={"content": [{"type": "text", "text": "hi"}], "isError": False},
+        tool_transport="sse",
+    )
+    client = _client_for(server)
+
+    result = client.call_tool("sf_list_crawls")
+    assert result == {"content": [{"type": "text", "text": "hi"}], "isError": False}
+
+    # Confirm the response really was SSE (guards against the mock drifting).
+    assert server.tool_transport == "sse"
+
+
+def test_call_tool_parses_application_json_response() -> None:
+    """application/json body → JSON-RPC result parsed directly (no SSE framing)."""
+    server = _MockMcpServer(tool_result={"recovered": True}, tool_transport="json")
+    client = _client_for(server)
+
+    result = client.call_tool("sf_generate_report", report_name="page_titles_all")
+    assert result == {"recovered": True}
+
+
+def test_call_tool_returns_mcp_tool_level_error_as_is() -> None:
+    """``result.isError == true`` is an MCP tool-level error → returned, NOT raised.
+
+    The live server returns this (HTTP 200) when the Spider is not in a
+    callable state. The transport succeeded, so the consumer skill must
+    receive the result and interpret ``isError`` itself.
+    """
+    tool_error_result = {
+        "content": [{"type": "text", "text": "Tool error: IllegalStateException"}],
+        "isError": True,
+    }
+    server = _MockMcpServer(tool_result=tool_error_result, tool_transport="sse")
+    client = _client_for(server)
+
+    result = client.call_tool("sf_list_crawls")
+    assert result == tool_error_result
+    assert result["isError"] is True
+
+
+# ---------------------------------------------------------------------------
+# Case 4: health() — live handshake vs server down
+# ---------------------------------------------------------------------------
+
+def test_health_true_on_successful_handshake() -> None:
+    """health() returns True iff the initialize handshake yields a session id."""
+    server = _MockMcpServer()
+    client = _client_for(server)
+
+    assert client.health() is True
+    assert server.initialize_count == 1
+    # health warms the cache → a follow-up call_tool reuses the session.
+    client.call_tool("sf_list_crawls")
+    assert server.initialize_count == 1, "health() should warm + reuse the session"
+
+
+def test_health_false_when_server_unreachable() -> None:
+    """health() returns False (never raises) on connection failure."""
+    def refuse(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("connection refused", request=request)
+
+    client = _raw_client(refuse)
+    assert client.health() is False
+
+
+def test_health_false_when_initialize_returns_no_session_header() -> None:
+    """A 200 initialize with NO Mcp-Session-Id header is not 'alive'."""
+    def no_session(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        return httpx.Response(200, json=_jsonrpc_result(body["id"], {"ok": True}))
+
+    client = _raw_client(no_session)
+    assert client.health() is False
+
+
+def test_health_false_on_http_error_status() -> None:
+    """A non-2xx initialize → health() False (no raise)."""
+    def server_error(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, text="boom")
+
+    client = _raw_client(server_error)
+    assert client.health() is False
+
+
+# ---------------------------------------------------------------------------
+# Case 5: JSON-RPC protocol error → SfMcpToolError
+# ---------------------------------------------------------------------------
+
+def test_call_tool_raises_on_jsonrpc_error_field() -> None:
+    """A top-level JSON-RPC ``error`` (protocol fault) → SfMcpToolError."""
+    def server_handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        method = body.get("method")
+        if method == "initialize":
+            return httpx.Response(
+                200, json=_jsonrpc_result(body["id"], {"ok": True}),
+                headers={SESSION_ID_HEADER: DEFAULT_SESSION_ID},
+            )
+        if method == "notifications/initialized":
+            return httpx.Response(202)
+        # tools/call → JSON-RPC error envelope
+        return httpx.Response(
+            200,
+            json={
+                "jsonrpc": "2.0",
+                "id": body["id"],
+                "error": {"code": -32601, "message": "Method not found"},
+            },
+            headers={"content-type": "application/json"},
+        )
+
+    client = _raw_client(server_handler)
+    with pytest.raises(SfMcpToolError) as exc_info:
+        client.call_tool("sf_bogus")
+    assert "Method not found" in str(exc_info.value)
+    assert exc_info.value.rpc_error == {"code": -32601, "message": "Method not found"}
+
+
+# ---------------------------------------------------------------------------
+# Case 6: Timeout exhausts retries → SfMcpTimeoutError
 # ---------------------------------------------------------------------------
 
 def test_call_tool_timeout_raises_after_three_attempts(monkeypatch) -> None:
-    """All 3 attempts time out → SfMcpTimeoutError, sleep called twice (between)."""
-    attempts = {"count": 0}
+    """All 3 tool-call attempts time out → SfMcpTimeoutError, sleep called twice.
+
+    The handshake succeeds; only ``tools/call`` times out (so the retry/backoff
+    under test is the tool-call loop, not the handshake).
+    """
     sleeps: list[float] = []
     monkeypatch.setattr("scripts.util.sf_mcp_client.time.sleep", sleeps.append)
 
+    attempts = {"tool": 0}
+
     def handler(request: httpx.Request) -> httpx.Response:
-        attempts["count"] += 1
+        body = json.loads(request.content)
+        method = body.get("method")
+        if method == "initialize":
+            return httpx.Response(
+                200, json=_jsonrpc_result(body["id"], {"ok": True}),
+                headers={SESSION_ID_HEADER: DEFAULT_SESSION_ID},
+            )
+        if method == "notifications/initialized":
+            return httpx.Response(202)
+        attempts["tool"] += 1
         raise httpx.ReadTimeout("simulated read timeout", request=request)
 
-    client = _make_client(handler, timeout_seconds=0.01)
-
+    client = _raw_client(handler, timeout_seconds=0.01)
     with pytest.raises(SfMcpTimeoutError) as exc_info:
         client.call_tool("sf_crawl_progress", run_id="abc")
 
-    assert attempts["count"] == 3, "client must attempt exactly 3 times"
+    assert attempts["tool"] == 3, "client must attempt the tool call exactly 3 times"
     assert sleeps == [RETRY_DELAYS_SECONDS[0], RETRY_DELAYS_SECONDS[1]], (
         f"client must sleep (1s, 2s) between attempts; got {sleeps}"
     )
@@ -124,129 +464,255 @@ def test_call_tool_timeout_raises_after_three_attempts(monkeypatch) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Case 3: 3-retry exponential backoff on connection errors
+# Case 7: 3-retry exponential backoff on connection errors
 # ---------------------------------------------------------------------------
 
 def test_call_tool_retries_three_times_with_exp_backoff(monkeypatch) -> None:
-    """Connection error on attempts 1 and 2; success on attempt 3 → no exception.
+    """Tool-call conn error on attempts 1+2, success on 3 → no exception.
 
-    Verifies the exp-backoff schedule (1s, 2s) is consulted in order.
+    Then: all-fail → SfMcpConnectionError after exactly 3 attempts (2 sleeps).
     """
-    attempts = {"count": 0}
     sleeps: list[float] = []
     monkeypatch.setattr("scripts.util.sf_mcp_client.time.sleep", sleeps.append)
 
-    def handler(request: httpx.Request) -> httpx.Response:
-        attempts["count"] += 1
-        if attempts["count"] < 3:
-            raise httpx.ConnectError("connection refused", request=request)
-        body = json.loads(request.content)
-        return httpx.Response(200, json=_ok_envelope(body["id"], result={"recovered": True}))
+    state = {"tool": 0}
 
-    client = _make_client(handler)
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        method = body.get("method")
+        if method == "initialize":
+            return httpx.Response(
+                200, json=_jsonrpc_result(body["id"], {"ok": True}),
+                headers={SESSION_ID_HEADER: DEFAULT_SESSION_ID},
+            )
+        if method == "notifications/initialized":
+            return httpx.Response(202)
+        state["tool"] += 1
+        if state["tool"] < 3:
+            raise httpx.ConnectError("connection refused", request=request)
+        return httpx.Response(
+            200,
+            text=_sse_body(_jsonrpc_result(body["id"], {"recovered": True})),
+            headers={"content-type": "text/event-stream"},
+        )
+
+    client = _raw_client(handler)
     result = client.call_tool("sf_generate_report", report_name="page_titles_all")
 
-    assert attempts["count"] == 3, "expected exactly 3 attempts (2 failures + 1 success)"
+    assert state["tool"] == 3, "expected exactly 3 tool attempts (2 fail + 1 ok)"
     assert sleeps == [RETRY_DELAYS_SECONDS[0], RETRY_DELAYS_SECONDS[1]], (
-        f"backoff must be exactly (1s, 2s) between attempts 1→2 and 2→3; got {sleeps}"
+        f"backoff must be exactly (1s, 2s); got {sleeps}"
     )
     assert result == {"recovered": True}
 
-    # And: when ALL 3 attempts fail → SfMcpConnectionError (no 4th attempt).
-    attempts["count"] = 0
+    # All-fail variant → SfMcpConnectionError, no 4th attempt.
     sleeps.clear()
+    fail_state = {"tool": 0}
 
     def always_fail(request: httpx.Request) -> httpx.Response:
-        attempts["count"] += 1
+        body = json.loads(request.content)
+        method = body.get("method")
+        if method == "initialize":
+            return httpx.Response(
+                200, json=_jsonrpc_result(body["id"], {"ok": True}),
+                headers={SESSION_ID_HEADER: DEFAULT_SESSION_ID},
+            )
+        if method == "notifications/initialized":
+            return httpx.Response(202)
+        fail_state["tool"] += 1
         raise httpx.ConnectError("connection refused", request=request)
 
-    client2 = _make_client(always_fail)
+    client2 = _raw_client(always_fail)
     with pytest.raises(SfMcpConnectionError) as exc_info:
         client2.call_tool("sf_crawl", start_url="https://example.com")
 
-    assert attempts["count"] == 3, "must not exceed 3 attempts even on continuous failure"
+    assert fail_state["tool"] == 3, "must not exceed 3 tool attempts"
     assert len(sleeps) == 2, "exactly 2 sleeps between 3 attempts (no trailing sleep)"
     assert "3 attempts" in str(exc_info.value)
 
 
 # ---------------------------------------------------------------------------
-# Case 4: Response size cap raises SfMcpResponseTooLargeError
+# Case 8: Response size cap + HTTP 4xx
 # ---------------------------------------------------------------------------
 
 def test_call_tool_response_too_large_raises() -> None:
-    """Body > max_response_bytes → SfMcpResponseTooLargeError."""
-    big_payload = "x" * (1000 + 1)  # 1001 bytes — over a small 1000-byte cap
+    """Body > max_response_bytes → SfMcpResponseTooLargeError (SSE body counts)."""
+    big_payload = "x" * (1000 + 1)  # over a small 1000-byte cap
+    server = _MockMcpServer(tool_result={"blob": big_payload}, tool_transport="sse")
+    client = _client_for(server, max_response_bytes=1000)
 
-    def handler(request: httpx.Request) -> httpx.Response:
-        body = json.loads(request.content)
-        return httpx.Response(
-            200,
-            json=_ok_envelope(body["id"], result={"blob": big_payload}),
-        )
-
-    client = _make_client(handler, max_response_bytes=1000)
     with pytest.raises(SfMcpResponseTooLargeError) as exc_info:
         client.call_tool("sf_generate_report", report_name="all_inlinks")
-
     assert "exceeds" in str(exc_info.value)
     assert "1000" in str(exc_info.value)
 
-    # And: HTTP 4xx must surface as SfMcpToolError (no retry) — sibling sanity
-    # to confirm size-cap path doesn't swallow status semantics.
-    def bad_request_handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(400, text="bad arguments")
 
-    client2 = _make_client(bad_request_handler)
-    with pytest.raises(SfMcpToolError) as exc_info_2:
-        client2.call_tool("sf_crawl", start_url="not-a-url")
-    assert exc_info_2.value.status_code == 400
+def test_call_tool_http_4xx_raises_tool_error_no_retry() -> None:
+    """A non-session HTTP 4xx on the tool call → SfMcpToolError, no retry."""
+    state = {"tool": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        method = body.get("method")
+        if method == "initialize":
+            return httpx.Response(
+                200, json=_jsonrpc_result(body["id"], {"ok": True}),
+                headers={SESSION_ID_HEADER: DEFAULT_SESSION_ID},
+            )
+        if method == "notifications/initialized":
+            return httpx.Response(202)
+        state["tool"] += 1
+        return httpx.Response(400, text="bad arguments")  # not a session error
+
+    client = _raw_client(handler)
+    with pytest.raises(SfMcpToolError) as exc_info:
+        client.call_tool("sf_crawl", start_url="not-a-url")
+    assert exc_info.value.status_code == 400
+    assert state["tool"] == 1, "HTTP 4xx must NOT be retried"
 
 
 # ---------------------------------------------------------------------------
-# Case 5: Redirect handling (307 → 200 follow, preserves POST + body)
+# Case 9: Session expiry → re-initialize once + retry
+# ---------------------------------------------------------------------------
+
+def test_call_tool_reinitializes_once_on_session_error() -> None:
+    """A stale session (HTTP-400 session error) → re-handshake once + retry → ok.
+
+    Simulates a server that has forgotten the cached session: the first
+    tools/call with the (now-stale) id is rejected with the session-required
+    400; the client must re-initialize and succeed on the retry.
+    """
+    state = {"init": 0, "tool": 0}
+    first_session = "aaaa1111-0000-0000-0000-000000000000"
+    second_session = "bbbb2222-0000-0000-0000-000000000000"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        method = body.get("method")
+        headers = {k.lower(): v for k, v in request.headers.items()}
+
+        if method == "initialize":
+            state["init"] += 1
+            sid = first_session if state["init"] == 1 else second_session
+            return httpx.Response(
+                200, json=_jsonrpc_result(body["id"], {"ok": True}),
+                headers={SESSION_ID_HEADER: sid},
+            )
+        if method == "notifications/initialized":
+            return httpx.Response(202)
+
+        # tools/call: reject the FIRST session id as stale; accept the second.
+        state["tool"] += 1
+        sent_sid = headers.get(SESSION_ID_HEADER.lower())
+        if sent_sid != second_session:
+            return httpx.Response(
+                400,
+                json={
+                    "jsonrpc": "2.0",
+                    "id": body.get("id"),
+                    "error": {
+                        "code": -32600,
+                        "message": "Session ID required in mcp-session-id header",
+                    },
+                },
+            )
+        return httpx.Response(
+            200,
+            text=_sse_body(_jsonrpc_result(body["id"], {"done": True}),
+                           session_id=second_session),
+            headers={"content-type": "text/event-stream"},
+        )
+
+    client = _raw_client(handler)
+    result = client.call_tool("sf_list_crawls")
+
+    assert result == {"done": True}
+    assert state["init"] == 2, "client must re-initialize exactly once on session error"
+    assert state["tool"] == 2, "the tool call is retried once after re-handshake"
+
+
+def test_call_tool_session_error_does_not_loop_forever() -> None:
+    """A persistent session error → re-init ONCE then surface SfMcpToolError.
+
+    Guards against an infinite re-handshake loop if the server keeps rejecting.
+    """
+    state = {"init": 0, "tool": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        method = body.get("method")
+        if method == "initialize":
+            state["init"] += 1
+            return httpx.Response(
+                200, json=_jsonrpc_result(body["id"], {"ok": True}),
+                headers={SESSION_ID_HEADER: DEFAULT_SESSION_ID},
+            )
+        if method == "notifications/initialized":
+            return httpx.Response(202)
+        state["tool"] += 1
+        return httpx.Response(
+            400,
+            json={
+                "jsonrpc": "2.0",
+                "id": body.get("id"),
+                "error": {
+                    "code": -32600,
+                    "message": "Session ID required in mcp-session-id header",
+                },
+            },
+        )
+
+    client = _raw_client(handler)
+    with pytest.raises(SfMcpToolError) as exc_info:
+        client.call_tool("sf_list_crawls")
+    assert exc_info.value.status_code == 400
+    assert state["init"] == 2, "exactly one re-initialize (2 total) — no infinite loop"
+    assert state["tool"] == 2, "tool attempted twice (original + one retry)"
+
+
+# ---------------------------------------------------------------------------
+# Case 10: Redirect handling (307 → 200 follow, POST + body + headers preserved)
 # ---------------------------------------------------------------------------
 
 def test_call_tool_follows_307_redirect_preserving_post_body() -> None:
-    """307 Temporary Redirect must be followed; method (POST) + body preserved.
+    """307 must be followed; method (POST), body, and session header preserved.
 
-    Per RFC 7231 §6.4.7: only 307/308 explicitly preserve the request method
-    and body. An MCP JSON-RPC server using redirects in practice MUST use 307
-    (or 308), because 301/302/303 would downgrade POST→GET and drop the
-    envelope body — silently breaking every tool call. This test pins that
-    follow-redirects behavior end-to-end (envelope round-trips through the
-    redirect intact).
+    Per RFC 7231 §6.4.7, only 307/308 preserve method+body. An MCP server using
+    redirects MUST use 307, or POST→GET downgrade would drop the envelope.
+    We redirect only the ``tools/call`` (the handshake completes normally).
     """
     redirect_target = BASE_URL + "/v2"
-    call_log: list[tuple[str, str]] = []  # (url, method)
-    bodies_received: list[dict] = []
+    tool_calls: list[tuple[str, str, str | None]] = []  # (url, method, session)
 
     def handler(request: httpx.Request) -> httpx.Response:
-        url = str(request.url)
-        call_log.append((url, request.method))
-        if url == BASE_URL:
+        body = json.loads(request.content) if request.content else {}
+        method = body.get("method")
+        headers = {k.lower(): v for k, v in request.headers.items()}
+
+        if method == "initialize":
             return httpx.Response(
-                307,
-                headers={"location": redirect_target},
-                text="",
+                200, json=_jsonrpc_result(body["id"], {"ok": True}),
+                headers={SESSION_ID_HEADER: DEFAULT_SESSION_ID},
             )
-        # Redirected target — POST + body must still be present.
-        body = json.loads(request.content)
-        bodies_received.append(body)
+        if method == "notifications/initialized":
+            return httpx.Response(202)
+
+        # tools/call
+        url = str(request.url)
+        tool_calls.append((url, request.method, headers.get(SESSION_ID_HEADER.lower())))
+        if url == BASE_URL:
+            return httpx.Response(307, headers={"location": redirect_target}, text="")
         return httpx.Response(
             200,
-            json=_ok_envelope(body["id"], result={"final": "yes"}),
+            text=_sse_body(_jsonrpc_result(body["id"], {"final": "yes"})),
+            headers={"content-type": "text/event-stream"},
         )
 
-    client = _make_client(handler)
+    client = _raw_client(handler)
     result = client.call_tool("sf_list_crawls")
 
-    assert call_log == [
-        (BASE_URL, "POST"),
-        (redirect_target, "POST"),
-    ], f"expected POST on both original and redirected URL; got {call_log}"
-    assert len(bodies_received) == 1, "redirected target must receive the envelope body"
-    body = bodies_received[0]
-    assert body["jsonrpc"] == "2.0"
-    assert body["method"] == "tools/call"
-    assert body["params"]["name"] == "sf_list_crawls"
+    assert tool_calls == [
+        (BASE_URL, "POST", DEFAULT_SESSION_ID),
+        (redirect_target, "POST", DEFAULT_SESSION_ID),
+    ], f"307 must preserve POST + session header on redirect; got {tool_calls}"
     assert result == {"final": "yes"}
