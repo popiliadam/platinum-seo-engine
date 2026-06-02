@@ -5,7 +5,9 @@ description: |
   "24 raporu çek", "site full crawl", "sf orchestrator", "MCP üzerinden
   sf-export al" der ya da `/pseo-sf-crawl <slug>` çağırırsa. SF 24 native
   MCP'yi sürer: sf_crawl → sf_crawl_progress polling → 24 raporu (Tier 1
-  14 + Tier 2 10) sırasıyla sf_generate_report(save_report=True) ile
+  14 + Tier 2 10) build_export_plan() dispatch'i ile 3 gerçek SF export
+  tool'una (sf_generate_report / sf_generate_bulk_export /
+  sf_export_seo_element_urls) eşlenip file_path=f"{canonical}.csv" olarak
   export eder → SF allowed_directory'den projeye atomic move → mevcut
   sf-import skill'ini subprocess olarak çalıştırarak master.xlsx'in
   6 SF-türevi sheet'ine projeksiyon yapar.
@@ -72,6 +74,8 @@ mcp_tools:
     - "mcp__sf__sf_crawl"
     - "mcp__sf__sf_crawl_progress"
     - "mcp__sf__sf_generate_report"
+    - "mcp__sf__sf_generate_bulk_export"
+    - "mcp__sf__sf_export_seo_element_urls"
     - "mcp__sf__sf_list_allowed_base_directory"
   optional:
     - "mcp__sf__sf_list_crawls"
@@ -89,10 +93,13 @@ autonomy:
 9-step protocol. Bridges SF 24 native MCP (HTTP `http://127.0.0.1:11435/mcp`)
 to the file-based sf-import skill. **MCP-PRIMARY ingestion path** (v2.2): the
 orchestrator handles the full 24-report export per crawl (Tier 1 14 + Tier 2
-10) via `mcp__sf__sf_generate_report(save_report=True)`, moves files from SF
-allowed_directory into `projects/{slug}/sf-exports/{date}/raw/`, then invokes
-sf-import as a subprocess for projection into master.xlsx's 6 SF-derived
-sheets. File-drop fallback is preserved as disaster recovery only.
+10) via the `build_export_plan()` dispatch — each engine canonical name maps to
+one of three real SF export tools (`sf_generate_report`,
+`sf_generate_bulk_export`, `sf_export_seo_element_urls`), called with
+`file_path=f"{canonical}.csv"` against the currently-loaded crawl — then moves
+files from SF allowed_directory into `projects/{slug}/sf-exports/{date}/raw/`,
+then invokes sf-import as a subprocess for projection into master.xlsx's 6
+SF-derived sheets. File-drop fallback is preserved as disaster recovery only.
 
 This skill is the **first HTTP MCP consumer** in PSEO (D-SF-01 + D-SF-14).
 Future HTTP MCPs (local LM Studio, custom servers) reuse the
@@ -298,69 +305,109 @@ workflow_runner.finish_step(handle.run_id, 2, project_slug=project_slug,
                             output_ref=f"urls_crawled={final_state.urls_crawled}")
 ```
 
-### Step 5 — `export_24_reports` (24 raporu × sf_generate_report loop)
+### Step 5 — `export_24_reports` (24 raporu × SF-export-tool dispatch loop)
 
-Iterate the 24-report list returned by
-`sf_crawl_orchestrator.enumerate_reports(include_tier3=False)` — 14 Tier 1
-+ 10 Tier 2, sourced from `scripts.ingestion.sf_import.TIER1_REQUIRED` +
-`TIER2_RECOMMENDED` frozensets (SSoT discipline per
-rules/single-source-of-truth.md; canonical names live in
-`schemas/sf-required-reports.schema.json`). Per-report export goes to a
-temp staging directory `_state/staging/sf-crawl-{run_id}/`.
+Iterate the export PLAN returned by
+`sf_crawl_orchestrator.build_export_plan(include_tier3=False)` — one
+`SfExportSpec` per canonical, in the same order as
+`enumerate_reports(include_tier3=False)` (14 Tier 1 + 10 Tier 2, sourced
+from `scripts.ingestion.sf_import.TIER1_REQUIRED` + `TIER2_RECOMMENDED`
+frozensets; SSoT per rules/single-source-of-truth.md). Per-report export
+goes to a temp staging directory `_state/staging/sf-crawl-{run_id}/`.
+
+**Dispatch contract (Manager live-validated):** the engine's 24 canonical
+report names are NOT Screaming Frog identifiers. Each maps to one of THREE
+real SF MCP export tools — the SF API keys off `category` (colon form, e.g.
+`"Links:All Inlinks"`) or `seo_element_name` + `filter_name` (e.g.
+`"Internal"` + `"All"`), NEVER the engine names. There is NO `crawl_id`,
+`report_name`, `save_report`, or `output_directory` arg on any of them; the
+export runs on the *currently-loaded* crawl (the one Step 3 triggered + Step
+4 confirmed DONE) and writes to `file_path` relative to the SF allowed base
+directory. We always pass `file_path=f"{spec.canonical}.csv"` so the file
+lands with the exact name `sf_import.normalize_filename` matches downstream.
+
+- `sf_generate_report` / `sf_generate_bulk_export` — `category` +
+  `export_type="CSV"` (+ `file_path`).
+- `sf_export_seo_element_urls` — `seo_element_name` + `filter_name` (+
+  `file_path`). This tool has NO `export_type` arg → it always emits **NDJSON**
+  (one flat JSON object per line), even to a `.csv` path. The export loop
+  converts those 16 reports to CSV in place via
+  `sf_crawl_orchestrator.ndjson_to_csv` (gated by `export_returns_ndjson(spec)`)
+  before the atomic move, so sf_import sees a uniform CSV `raw/` set.
+
+`spec.tool` selects which wrapper to call; `spec.call_kwargs` carries the
+correct args WITHOUT `file_path` (we add it). See
+`scripts/ingestion/sf_crawl_orchestrator.SF_EXPORT_DISPATCH` for the full
+24-entry mapping (one line per canonical, Manager-correctable in place).
 
 Tier policy (matches sf-import):
-- **Tier 1 fail** → DURUR-orch-8: rollback (delete temp staging dir + all
-  partial CSVs), surface RED to operator. D-SF-16 atomic semantics.
-- **Tier 2 fail** → AMBER warning, continue (matches sf-import
-  search_console_all canonical exemption).
+- **Tier 1 fail** (`spec.tier == "tier1"`) → DURUR-orch-8: rollback (delete
+  temp staging dir + all partial CSVs), surface RED to operator. D-SF-16
+  atomic semantics.
+- **Tier 2 fail** (`spec.tier == "tier2"`) → AMBER warning, continue
+  (matches sf-import search_console_all canonical exemption).
 
 ```python
 import shutil
 from pathlib import Path
 from scripts.ingestion import sf_crawl_orchestrator
-from scripts.ingestion import sf_import as _sf_import_const  # SSoT import only
 
 workflow_runner.start_step(handle.run_id, 3, project_slug=project_slug)
-report_names = sf_crawl_orchestrator.enumerate_reports(include_tier3=include_tier3)
-assert len(report_names) == (40 if include_tier3 else 24), \
-    f"enumerate_reports drift: expected {40 if include_tier3 else 24}, got {len(report_names)}"
+export_plan = sf_crawl_orchestrator.build_export_plan(include_tier3=include_tier3)
+assert len(export_plan) == (40 if include_tier3 else 24), \
+    f"build_export_plan drift: expected {40 if include_tier3 else 24}, got {len(export_plan)}"
 
 temp_staging = workspace_root / "projects" / project_slug / "_state" / "staging" / f"sf-crawl-{handle.run_id}"
 temp_staging.mkdir(parents=True, exist_ok=True)
 
-per_report_timeout = int(project_config["sf"]["mcp"]["per_report_timeout_seconds"])
+# SF export tools write file_path relative to the allowed base directory; we
+# always use "{canonical}.csv" so sf_import.normalize_filename matches.
 amber_warnings: list[str] = []
-tier1_required = _sf_import_const.TIER1_REQUIRED
 exported: list[str] = []
 
-for report_name in report_names:
+# Map spec.tool → the live mcp__sf__* wrapper (operator session).
+SF_EXPORT_TOOLS = {
+    "sf_generate_report": mcp__sf__sf_generate_report,
+    "sf_generate_bulk_export": mcp__sf__sf_generate_bulk_export,
+    "sf_export_seo_element_urls": mcp__sf__sf_export_seo_element_urls,
+}
+
+for spec in export_plan:
+    rel_path = f"{spec.canonical}.csv"
     try:
-        resp = mcp__sf__sf_generate_report(
-            crawl_id=crawl_id,
-            report_name=report_name,
-            save_report=True,
-            output_directory=mcp_allowed,
-            timeout=per_report_timeout,
-        )
-        # Move the saved CSV from SF allowed_directory → temp_staging.
-        src = Path(mcp_allowed) / f"{report_name}.csv"
-        dst = temp_staging / f"{report_name}.csv"
+        tool_fn = SF_EXPORT_TOOLS[spec.tool]
+        resp = tool_fn(file_path=rel_path, **spec.call_kwargs)
+        src = Path(mcp_allowed) / rel_path
+        # sf_export_seo_element_urls has NO export_type arg → SF writes NDJSON
+        # even to a .csv path (live-verified 2026-06-02). Convert in place so
+        # sf_import (CSV-only, header-matched) consumes a uniform CSV raw/ set.
+        if sf_crawl_orchestrator.export_returns_ndjson(spec):
+            src.write_text(
+                sf_crawl_orchestrator.ndjson_to_csv(src.read_text(encoding="utf-8")),
+                encoding="utf-8",
+            )
+        # Move the (now-CSV) export from SF allowed_directory → temp_staging.
+        dst = temp_staging / rel_path
         sf_crawl_orchestrator.move_with_rollback(src, dst)
-        exported.append(report_name)
+        exported.append(spec.canonical)
     except Exception as exc:
-        if report_name in tier1_required:
+        if spec.tier == "tier1":
             # D-SF-16 rollback: delete temp staging, surface DURUR-orch-8.
             shutil.rmtree(temp_staging, ignore_errors=True)
             workflow_runner.fail(
                 handle.run_id, project_slug=project_slug,
                 code="mcp_error",
-                message=f"DURUR-orch-8 Tier 1 export failed for {report_name!r}: {exc}; "
+                message=f"DURUR-orch-8 Tier 1 export failed for {spec.canonical!r} "
+                        f"(tool={spec.tool} kwargs={spec.call_kwargs}): {exc}; "
                         f"rollback complete (temp_staging deleted)",
                 step_index=3,
             )
             raise SystemExit(2)  # D-SF-16 atomic rollback
         # Tier 2 → AMBER, continue.
-        amber_warnings.append(f"Tier 2 export failed for {report_name!r}: {exc}")
+        amber_warnings.append(
+            f"Tier 2 export failed for {spec.canonical!r} "
+            f"(tool={spec.tool}): {exc}"
+        )
 
 workflow_runner.finish_step(handle.run_id, 3, project_slug=project_slug,
                             output_ref=f"exported={len(exported)} amber={len(amber_warnings)}")
@@ -415,7 +462,10 @@ result = subprocess.run(
         "python3", "-m", "scripts.ingestion.sf_import",
         "--project", project_slug,
         "--sf-export-path", str(target_raw.parent),  # the {date} dir; sf-import discovers raw/
-        "--source-run-id", handle.run_id,
+        # NOTE (live-verified 2026-06-02): the sf_import *script* CLI accepts only
+        # --project / --sf-export-path / --workspace-root / --dry-run. source_run_id
+        # provenance chaining is an sf-import *skill frontmatter* input (interpreter
+        # level), NOT a script flag — passing --source-run-id makes argparse exit 2.
     ],
     capture_output=True, text=True, timeout=600,
 )
@@ -473,7 +523,11 @@ events_writer.append_provenance(
         # events.schema source.additionalProperties=false; only these keys are valid:
         "kind": "sf_mcp",
         "mcp_server": "sf",
-        "mcp_tool": "sf__sf_generate_report",
+        # The 24-report export fans out across 3 SF tools (sf_generate_report,
+        # sf_generate_bulk_export, sf_export_seo_element_urls) via
+        # build_export_plan(); mcp_tool is single-valued, so we record the
+        # orchestrator entrypoint. Per-report tool is in the inbox envelope.
+        "mcp_tool": "sf__sf_crawl",
         "response_bytes": len(json.dumps(envelope)),
         "row_count": len(exported),
     },
@@ -580,8 +634,9 @@ Stop and flag the operator — do not patch, do not fall back.
 ## Resume capability (D-SF-16 + workflow_runner.pause/resume)
 
 The orchestrator is **resumable mid-loop**. If `mcp__sf__sf_crawl_progress`
-times out OR `mcp__sf__sf_generate_report` raises a recoverable error
-(transient network), the operator can:
+times out OR any of the three SF export tools (`sf_generate_report`,
+`sf_generate_bulk_export`, `sf_export_seo_element_urls`) raises a recoverable
+error (transient network), the operator can:
 
 1. Set workflow state to `paused`: `workflow_runner.pause(run_id, ...)`
    (paused_at preserved).
@@ -626,6 +681,7 @@ times out OR `mcp__sf__sf_generate_report` raises a recoverable error
       `schemas/skill-frontmatter.schema.json` Draft 7;
       `mcp_tools.required` entries match `mcp-tool-registry.json` sf
       server inventory (sf_crawl, sf_crawl_progress, sf_generate_report,
+      sf_generate_bulk_export, sf_export_seo_element_urls,
       sf_list_allowed_base_directory).
 - [x] Plugin-agnostik — no slug literals; `project_slug` flows through.
 - [x] ADR-013 — `Use when`/`Also use when`/`Do not use when` are STRING
