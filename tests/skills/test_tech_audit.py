@@ -851,21 +851,27 @@ def test_live_findings_merges_additively_increases_rowcount(
 ) -> None:
     """AC-13 core: passing SF Issues Overview rows ADDITIVELY merges them
     into the tech_seo aggregation. rowcount(with) >= rowcount(without),
-    and the SF issues surface as tech_seo rows with the mapped fields."""
+    and the SF issues surface as tech_seo rows with the mapped fields.
+
+    AC-10 Task D: the SF Issue Name is routed to the locked tech_seo enum
+    category (NOT written raw). We pick two issues that route into tech_seo
+    as NEW categories the lighthouse-only baseline lacks: a Meta-Description
+    issue (→ Meta Tags, High) and a Structured-Data issue (→ Structured Data,
+    Medium)."""
     live = [
         _issues_overview_row(
-            issue_name="Canonical: Missing",
+            issue_name="Meta Description: Missing",
             priority="High",
             urls="43",
-            description="URLs with no canonical link element.",
-            how_to_fix="Add a self-referencing <link rel=canonical>.",
+            description="URLs with no meta description element.",
+            how_to_fix="Add a unique meta description per page.",
         ),
         _issues_overview_row(
-            issue_name="Directives: Noindex",
+            issue_name="Structured Data: Validation Errors",
             priority="Medium",
             urls="7",
-            description="URLs returning a noindex directive.",
-            how_to_fix="Remove noindex from pages that should be indexed.",
+            description="URLs whose structured data fails validation.",
+            how_to_fix="Fix the schema.org validation errors.",
         ),
     ]
 
@@ -879,26 +885,27 @@ def test_live_findings_merges_additively_increases_rowcount(
 
     # Additive: never fewer rows than the no-live baseline.
     assert len(merged["tech_seo"]) >= len(base["tech_seo"])
-    # The two SF issues each become a tech_seo row (new categories that did
-    # not exist in the lighthouse-only baseline).
+    # The two SF issues each become a tech_seo row under the MAPPED enum
+    # category (new categories the lighthouse-only baseline lacked).
     cats = {r["issue_category"] for r in merged["tech_seo"]}
-    assert "Canonical: Missing" in cats
-    assert "Directives: Noindex" in cats
+    assert "Meta Tags" in cats          # Meta Description: Missing → Meta Tags
+    assert "Structured Data" in cats    # Structured Data: ... → Structured Data
 
-    # Field mapping is correct on the High-priority SF issue.
-    canon = next(
-        r for r in merged["tech_seo"]
-        if r["issue_category"] == "Canonical: Missing"
+    # Field mapping is correct on the High-priority SF issue; the raw Issue
+    # Name is preserved in the detail (no info loss through the enum mapping).
+    meta_row = next(
+        r for r in merged["tech_seo"] if r["issue_category"] == "Meta Tags"
     )
-    assert canon["impact"] == tech_audit_transform.SEVERITY_HIGH  # High→HIGH
-    assert canon["priority"] == "P0"
-    assert "43" in canon["affected_urls"]                          # URLs col
-    assert "canonical" in canon["resolution"].lower()             # How To Fix
-    assert "canonical" in canon["detail"].lower()                 # Description
+    assert meta_row["impact"] == tech_audit_transform.SEVERITY_HIGH  # High→HIGH
+    assert meta_row["priority"] == "P0"
+    assert "43" in meta_row["affected_urls"]                         # URLs col
+    assert "meta description" in meta_row["resolution"].lower()      # How To Fix
+    assert "Meta Description: Missing" in meta_row["detail"]         # raw name kept
 
-    # severityEnum stays strict for every merged row.
+    # severityEnum + issue_category enum stay strict for every merged row.
     for r in merged["tech_seo"]:
         assert r["impact"] in tech_audit_transform.SEVERITY_ENUM
+        assert r["issue_category"] in _TECH_SEO_ENUM
         assert set(r.keys()) == set(tech_audit_transform.TECH_SEO_COLUMNS)
 
     # The baseline lighthouse Performance row still survives the merge.
@@ -907,33 +914,42 @@ def test_live_findings_merges_additively_increases_rowcount(
 
 def test_live_findings_priority_maps_to_severity_enum() -> None:
     """Every SF Issue Priority string maps onto the strict severityEnum;
-    unknown/blank priority degrades safely (never emits a non-enum value)."""
+    unknown/blank priority degrades safely (never emits a non-enum value).
+
+    AC-10 Task D: issue names are routed to DISTINCT tech_seo enum categories
+    (one per priority tier) so the per-category aggregation keeps the rows
+    separate and the priority→severity mapping is observable per row."""
     live = [
-        _issues_overview_row(issue_name="Crit issue", priority="High",
-                             urls="1", how_to_fix="fix a"),
-        _issues_overview_row(issue_name="Mid issue", priority="Medium",
-                             urls="2", how_to_fix="fix b"),
-        _issues_overview_row(issue_name="Low issue", priority="Low",
-                             urls="3", how_to_fix="fix c"),
-        _issues_overview_row(issue_name="Unknown issue", priority="",
-                             urls="4", how_to_fix="fix d"),
+        _issues_overview_row(issue_name="PageSpeed: Reduce Unused JavaScript",
+                             priority="High", urls="1", how_to_fix="fix a"),
+        _issues_overview_row(issue_name="Images: Missing Size Attributes",
+                             priority="Medium", urls="2", how_to_fix="fix b"),
+        _issues_overview_row(issue_name="Images: Missing Alt Attribute",
+                             priority="Low", urls="3", how_to_fix="fix c"),
+        _issues_overview_row(issue_name="Structured Data: Validation Warnings",
+                             priority="", urls="4", how_to_fix="fix d"),
     ]
     out = tech_audit_transform.transform(
         lighthouse_raw=None, content_parsing_raw=None, live_findings=live,
     )
     by_cat = {r["issue_category"]: r for r in out["tech_seo"]}
-    assert by_cat["Crit issue"]["impact"] == tech_audit_transform.SEVERITY_HIGH
-    assert by_cat["Mid issue"]["impact"] == tech_audit_transform.SEVERITY_MEDIUM
-    assert by_cat["Low issue"]["impact"] == tech_audit_transform.SEVERITY_LOW
-    # Unknown priority must still be a valid severityEnum value (degrade).
-    assert by_cat["Unknown issue"]["impact"] in tech_audit_transform.SEVERITY_ENUM
+    assert by_cat["Performance"]["impact"] == tech_audit_transform.SEVERITY_HIGH
+    assert by_cat["Layout Stability"]["impact"] == tech_audit_transform.SEVERITY_MEDIUM
+    assert by_cat["Accessibility"]["impact"] == tech_audit_transform.SEVERITY_LOW
+    # Unknown/blank priority must still be a valid severityEnum value (degrade).
+    assert by_cat["Structured Data"]["impact"] in tech_audit_transform.SEVERITY_ENUM
     for r in out["tech_seo"]:
         assert r["impact"] in tech_audit_transform.SEVERITY_ENUM
+        assert r["issue_category"] in _TECH_SEO_ENUM
 
 
 def test_live_findings_detail_falls_back_to_issue_type() -> None:
-    """When an SF row has no Description, detail falls back to Issue Type
-    (never empty — the detail column carries something descriptive)."""
+    """When an SF row has no Description, the detail label falls back to Issue
+    Type (never empty — the detail column carries something descriptive).
+
+    AC-10 Task D: "Page Titles: Over 60 Characters" routes to the Meta Tags
+    enum category; the raw Issue Name is preserved in the detail alongside the
+    Issue Type fallback."""
     live = [
         _issues_overview_row(
             issue_name="Page Titles: Over 60 Characters",
@@ -949,23 +965,31 @@ def test_live_findings_detail_falls_back_to_issue_type() -> None:
     )
     row = next(
         r for r in out["tech_seo"]
-        if r["issue_category"] == "Page Titles: Over 60 Characters"
+        if r["issue_category"] == "Meta Tags"
     )
     assert "Opportunity" in row["detail"]   # Issue Type fallback
+    # The original SF Issue Name is preserved in the detail (no info loss).
+    assert "Page Titles: Over 60 Characters" in row["detail"]
 
 
 def test_live_findings_dedupes_against_existing_category() -> None:
-    """If an SF Issue Name collides with an existing DFS-derived category,
-    the merge de-dupes by issue_category (one row, max severity wins) —
-    the transform's existing per-category aggregation handles it."""
-    # lighthouse_poor fires a 'Performance' HIGH row; feed an SF issue named
-    # 'Performance' at LOW priority — they must collapse to ONE row at HIGH.
+    """If an SF Issue Name routes to a category that an existing DFS finding
+    already populates, the merge de-dupes by issue_category (one row, max
+    severity wins) — the transform's existing per-category aggregation handles
+    it.
+
+    AC-10 Task D: the SF issue name routes to the Performance enum category
+    (PageSpeed: ...) rather than being written raw, so it genuinely collides
+    with the lighthouse-derived Performance row."""
+    # lighthouse_poor fires a 'Performance' HIGH row; feed an SF PageSpeed
+    # issue at LOW priority — both route to 'Performance' and must collapse to
+    # ONE row at HIGH.
     lh = {"items": [_lighthouse_item(
         "https://example.com/slow", perf=30, lcp_s=5.0,
     )]}
     live = [
         _issues_overview_row(
-            issue_name="Performance", priority="Low",
+            issue_name="PageSpeed: Reduce Unused CSS", priority="Low",
             urls="https://example.com/other", how_to_fix="tune it",
         ),
     ]
@@ -998,9 +1022,13 @@ def test_live_findings_bom_prefixed_first_key_still_merges(
     ``'﻿"Issue Name"'`` (the BOM precedes the opening quote, defeating
     csv's quote-stripping). The transform normalizes keys (``_clean_key``) so
     the row is NOT silently dropped — without it, every SF row would map to a
-    ``None`` Issue Name and the merge would yield zero rows."""
+    ``None`` Issue Name and the merge would yield zero rows.
+
+    AC-10 Task D: the issue name here routes INTO tech_seo (Meta Description:
+    Missing → Meta Tags) so the BOM-recovery is observable as a real tech_seo
+    row + live_findings_count == 1."""
     clean = _issues_overview_row(
-        issue_name="Canonical: Missing", priority="High", urls="43",
+        issue_name="Meta Description: Missing", priority="High", urls="43",
     )
     bom_row = {'﻿"Issue Name"': clean["Issue Name"]}
     bom_row.update({k: v for k, v in clean.items() if k != "Issue Name"})
@@ -1013,5 +1041,170 @@ def test_live_findings_bom_prefixed_first_key_still_merges(
         live_findings=[bom_row],
     )
     assert len(live["tech_seo"]) > len(base["tech_seo"])
-    assert any(r["issue_category"] == "Canonical: Missing" for r in live["tech_seo"])
+    # The BOM-keyed row is recovered, routed (Meta Tags), and counted.
+    assert any(r["issue_category"] == "Meta Tags" for r in live["tech_seo"])
     assert live["meta"]["live_findings_count"] == 1
+    # The row never leaks an out-of-enum category into the tech_seo sheet.
+    for r in live["tech_seo"]:
+        assert r["issue_category"] in _TECH_SEO_ENUM
+
+
+# ---------------------------------------------------------------------------
+# Test 16 — AC-10 Task D: SF issue names route to the locked tech_seo
+# issue_category 5-enum via sf_issue_taxonomy (out-of-enum bug fix)
+# ---------------------------------------------------------------------------
+
+#: The schema-locked tech_seo issue_category enum (master-excel.schema.json
+#: tech_seo sheet, col A). The SF live-merge MUST only ever emit these.
+_TECH_SEO_ENUM = frozenset({
+    "Performance", "Layout Stability", "Meta Tags",
+    "Structured Data", "Accessibility",
+})
+
+#: Real SF "Issues Overview" export captured from a live aluminumstation-ca
+#: crawl (2026-06-02). 42 issues spanning every routing branch — the canonical
+#: regression fixture for the out-of-enum bug.
+_REAL_ISSUES_CSV = Path(
+    "/Users/apple/Documents/platinum-seo-workspace/projects/"
+    "aluminumstation-ca/sf-exports/2026-06-02/raw/issues_overview_report.csv"
+)
+
+
+def _load_real_issue_rows() -> list[dict]:
+    """Read the live SF Issues Overview CSV as csv.DictReader row dicts.
+
+    utf-8-sig strips the SF-written BOM. Skipped (not failed) when the
+    workspace export is absent so the engine repo's suite stays runnable
+    in isolation.
+    """
+    import csv
+
+    if not _REAL_ISSUES_CSV.exists():
+        pytest.skip(f"live SF export not present: {_REAL_ISSUES_CSV}")
+    with _REAL_ISSUES_CSV.open(encoding="utf-8-sig", newline="") as fh:
+        return list(csv.DictReader(fh))
+
+
+def test_live_finding_never_emits_out_of_enum_category() -> None:
+    """AC-10 Task D regression: feeding the REAL SF issues_overview_report.csv
+    through the live-merge must yield ONLY in-enum tech_seo categories.
+
+    Before the fix, ``_live_finding_to_finding`` wrote the raw SF Issue Name
+    (e.g. ``"Pagination: Pagination URL Not in Anchor Tag"``, ``"H1: Missing"``)
+    straight into ``issue_category`` — 42/42 rows out-of-enum, which would
+    raise RowSchemaError at the transaction write step. After the fix every
+    surviving tech_seo row's ``issue_category`` is one of the locked 5 values.
+    """
+    rows = _load_real_issue_rows()
+    out = tech_audit_transform.transform(
+        lighthouse_raw=None, content_parsing_raw=None, live_findings=rows,
+    )
+    assert out["tech_seo"], "real SF export must produce at least one tech_seo row"
+    offenders = [
+        r["issue_category"] for r in out["tech_seo"]
+        if r["issue_category"] not in _TECH_SEO_ENUM
+    ]
+    assert offenders == [], (
+        "live SF merge emitted out-of-enum issue_category value(s): "
+        f"{sorted(set(offenders))}"
+    )
+
+
+def test_live_finding_drops_non_tech_seo_issues() -> None:
+    """Security-header and Response-Code issues do NOT belong in tech_seo —
+    they route to robots_txt / redirect_404 via sf_issue_taxonomy, so
+    ``_live_finding_to_finding`` returns None and they never appear in the
+    tech_seo output."""
+    hsts = _issues_overview_row(
+        issue_name="Security: Missing HSTS Header",
+        priority="High", urls="120",
+        description="Pages served without an HSTS response header.",
+        how_to_fix="Add Strict-Transport-Security to the response.",
+    )
+    resp4xx = _issues_overview_row(
+        issue_name="Response Codes: Internal Client Error (4xx)",
+        priority="High", urls="3",
+        description="Internal URLs returning a 4xx status.",
+        how_to_fix="Fix or remove the broken links.",
+    )
+
+    # Unit level: the mapper drops each.
+    assert tech_audit_transform._live_finding_to_finding(hsts) is None
+    assert tech_audit_transform._live_finding_to_finding(resp4xx) is None
+
+    # Transform level: neither surfaces as a tech_seo row.
+    out = tech_audit_transform.transform(
+        lighthouse_raw=None, content_parsing_raw=None,
+        live_findings=[hsts, resp4xx],
+    )
+    assert out["tech_seo"] == [], (
+        "security / response-code issues must not produce tech_seo rows"
+    )
+
+
+@pytest.mark.parametrize(
+    "issue_name,expected_category",
+    [
+        ("Images: Over 100 kB", "Performance"),
+        ("Structured Data: Validation Errors", "Structured Data"),
+        ("H1: Missing", "Meta Tags"),
+        ("Images: Missing Alt Attribute", "Accessibility"),
+        ("Images: Missing Size Attributes", "Layout Stability"),
+    ],
+)
+def test_live_finding_maps_known_issues(
+    issue_name: str, expected_category: str,
+) -> None:
+    """Known SF issues map to the correct locked tech_seo category, AND the
+    original SF Issue Name is preserved in the detail/label (no info loss)."""
+    row = _issues_overview_row(
+        issue_name=issue_name, priority="Medium", urls="9",
+        description="A real SF description for the issue.",
+        how_to_fix="Remediate per SF guidance.",
+    )
+    finding = tech_audit_transform._live_finding_to_finding(row)
+    assert finding is not None, f"{issue_name!r} should route to tech_seo"
+    assert finding.category == expected_category
+    # The original Issue Name survives in the label (prepended to detail).
+    assert issue_name in finding.label, (
+        f"original Issue Name {issue_name!r} must be preserved in the label"
+    )
+
+    # End-to-end: the category surfaces on the aggregated row, in-enum, and the
+    # Issue Name is still visible in the row detail.
+    out = tech_audit_transform.transform(
+        lighthouse_raw=None, content_parsing_raw=None, live_findings=[row],
+    )
+    cats = {r["issue_category"] for r in out["tech_seo"]}
+    assert expected_category in cats
+    assert cats <= _TECH_SEO_ENUM
+    row_out = next(
+        r for r in out["tech_seo"] if r["issue_category"] == expected_category
+    )
+    assert issue_name in row_out["detail"]
+
+
+def test_live_finding_real_csv_routing_counts() -> None:
+    """The 42 real SF issues split deterministically: 30 flow into tech_seo
+    (every one of the 5 enum categories represented), 12 route out
+    (security / non-ascii / pagination / crawl-depth → robots_txt;
+    response-codes → redirect_404) and are dropped from the tech_seo sheet.
+    """
+    rows = _load_real_issue_rows()
+    assert len(rows) == 42, "fixture drift — expected the 42-issue live export"
+
+    kept = [
+        f for f in (
+            tech_audit_transform._live_finding_to_finding(r) for r in rows
+        )
+        if f is not None
+    ]
+    dropped = len(rows) - len(kept)
+    assert len(kept) == 30, f"expected 30 tech_seo issues, got {len(kept)}"
+    assert dropped == 12, f"expected 12 dropped issues, got {dropped}"
+
+    # All five enum categories are exercised by the real export.
+    kept_cats = {f.category for f in kept}
+    assert kept_cats == _TECH_SEO_ENUM, (
+        f"real export should cover all 5 enum categories, got {sorted(kept_cats)}"
+    )
