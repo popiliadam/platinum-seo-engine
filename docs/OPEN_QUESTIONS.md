@@ -2,6 +2,22 @@
 
 ## Unresolved
 
+### Q-V1.9.1-SF-MCP-TRANSPORT-01: SF MCP client transport defect (v1.8) — FIXED + live-proven; Spider-state blocker + 4 OQs [P1→P2] 🩹 FIX LANDED 2026-06-02
+**Raised:** 2026-06-02 OW workshop (operator started real SF MCP on port 11435). Live testing — the FIRST time the engine ever hit a real SF MCP server — surfaced a CRITICAL defect invisible to 1286 mock tests.
+**Defect (v1.8 `scripts/util/sf_mcp_client.py`, NOT a v1.9 regression):** client did bare JSON-RPC-over-HTTP, not MCP Streamable-HTTP. `health()` GET /health → 404 (always False); `call_tool()` no handshake/session/Accept-headers → every call HTTP 400 (`-32601` "Accept + mcp-session-id required"). Root cause: 100% mocked tests encoded the engine's ASSUMED protocol, never validated against a real server (the deep lesson — code-ready ≠ live-proven).
+**Fix (Fix Worker via Agent tool, Manager-verified + INDEPENDENTLY live-re-validated):** rewrote transport to MCP Streamable-HTTP — initialize → capture `Mcp-Session-Id` (response header) → `notifications/initialized` → `tools/call` (session id + `Accept: application/json,text/event-stream`) → dual JSON/SSE parse; `health()`→ real liveness probe; session re-init-once on expiry; public API (`health()`/`call_tool`) preserved → check_F_26 + 4 consumer skills unchanged. **LIVE-PROVEN:** health()=True + HTTP 200 on tool calls (was 400). Tests 5→17 (real-protocol mocks + regression `test_regression_handshake_and_required_headers_before_tool_call`). pytest 1286→1298 (+12, 0 regression). F-16 .mcp.json unchanged. Scope: 2 files. NOT yet released (fix committed; v1.9.1 version-bump/tag/push pending full live tool-exercise).
+
+**Open items:**
+| ID | Item | Sev | Status |
+|----|------|-----|--------|
+| OQ-SPIDER-STATE | All tools return `IllegalStateException "Tool cannot be called currently. Check the state of the Spider"` — transport=200 but SF app not in callable state (likely Settings/modal dialog open, or Spider not ready). Engine anticipated: DURUR-orch-1/orch-2. | **P2 (BLOCKER for live tool-exercise)** | ⏳ operator action: put SF in ready state → re-probe |
+| OQ-SF-29TOOLS | Live server exposes **29** tools; engine integrates ~5. Reconcile engine's documented/registry SF tool set vs the 29 real tools. | P3 | ⏳ Manager pass (later) |
+| OQ-SF-SMOKE-COMMENT | `tests/smoke/test_sf_mcp_smoke.py:59` comment still references removed `/health` endpoint (test passes; comment stale). | P3 | ⏳ tidy next patch |
+| OQ-SF-SSE-MULTIFRAME | SSE multi-frame/streaming-progress path not exercised live (single frame observed). | P3 | ⏳ revisit if a tool streams |
+| OQ-SF-SESSION-TTL | Server session TTL/idle-expiry not probed live; re-init-once guard is defensive + loop-safe. | P3 | ⏳ revisit |
+
+**Cross-refs:** `docs/PHASE_STATUS.md` v1.9.1 patch entry; Fix Worker Output Package; `scripts/util/sf_mcp_client.py` (transport rewrite) + `tests/scripts/test_sf_mcp_client.py` (5→17); curl-proven handshake (initialize → Mcp-Session-Id → tools/call); `seospider-mcp-server v1.0.0` @ 127.0.0.1:11435.
+
 ### Q-V1.9-PHASE-7-CLOSURE-FOLLOWUPS-01: v1.9 Phase 7 / MILESTONE CLOSED — 20/20 AC GREEN, 1 LOW deferred to v1.10 [P3] ✅ 2026-06-01
 **Raised:** 2026-06-01 v1.9 Phase 7 closure (Manager GO after final release verification: tag annotated→de075e7, 8 unpushed, F-16 543B, DECISIONS 6067B, Y-05 sync 1.9.0, 2 MEDIUM fixes landed, 31 declared). Worker Output Package (FINAL) + Manager post-release closeout.
 **Context:** Phase 7 (FINAL) = pilot smoke + release. Worker made the release commit `de075e7` + annotated tag `v1.9.0` (R-9 AUTHORIZED — the one Worker that commits) + wrote PHASE_STATUS "v1.9.0 MILESTONE CLOSED" §13.2 exception. 20/20 AC GREEN; pytest 1286/12/0; rollback drill restored 1244; Y-05 5'inci dogfooding; pre-push audit 0 CRITICAL / 2 MEDIUM (both FIXED pre-release) / 1 LOW (deferred).
