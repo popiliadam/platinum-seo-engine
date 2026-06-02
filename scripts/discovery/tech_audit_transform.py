@@ -186,6 +186,10 @@ from scripts.util.dfs_response import (  # noqa: E402  (sys.path mutation above)
 from scripts.util.profile_aware_defaults import (  # noqa: E402
     cascade_default,
 )
+from scripts.util.sf_issue_taxonomy import (  # noqa: E402
+    SHEET_TECH_SEO as _SHEET_TECH_SEO,
+    route_sf_issue as _route_sf_issue,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -728,14 +732,33 @@ def _live_finding_to_finding(row: dict) -> _Finding | None:
     through the SAME per-category aggregation as the DFS findings, so a
     same-named category de-dupes by max severity for free):
 
-        issue_category ← Issue Name
-        detail (label) ← Description (fallback Issue Type)
+        issue_category ← route_sf_issue(Issue Name) → one of the locked
+                         5-value enum {Performance, Layout Stability, Meta
+                         Tags, Structured Data, Accessibility}
+        detail (label) ← "<Issue Name> — <Description|Issue Type>" (the raw
+                         SF Issue Name is PRESERVED in the label so the
+                         enum-mapping loses no information)
         affected_urls  ← URLs
         impact         ← Issue Priority → severityEnum
         resolution     ← How To Fix
 
+    AC-10 Task D — the ``issue_category`` column is a SCHEMA-LOCKED 5-value
+    enum (master-excel.schema.json#tech_seo, ADR-028). Writing the raw SF
+    Issue Name straight in produces out-of-enum categories (e.g.
+    ``"Pagination: ..."``, ``"Security: Missing HSTS Header"``) that would
+    raise RowSchemaError at the transaction write step. So we route the
+    Issue Name through the single-source taxonomy
+    (:func:`scripts.util.sf_issue_taxonomy.route_sf_issue`):
+
+      - sheet == "tech_seo" → emit a finding with the MAPPED enum category.
+      - sheet != "tech_seo" (security headers, response codes, pagination,
+        crawl-structure, unmatched) → ``return None`` and DROP. tech_audit
+        owns ONLY the tech_seo sheet; those issues are projected to
+        robots_txt / redirect_404 by the sf-import projection instead.
+
     Returns ``None`` for a row with no usable Issue Name (skipped — we do
-    not fabricate a category). Non-dict rows are skipped too (defensive).
+    not fabricate a category) and for any non-tech_seo-routed issue.
+    Non-dict rows are skipped too (defensive).
     """
     if not isinstance(row, dict):
         return None
@@ -746,11 +769,19 @@ def _live_finding_to_finding(row: dict) -> _Finding | None:
     if not issue_name:
         return None
 
+    # Route the Issue Name to a target sheet + tech_seo enum category. Anything
+    # that does not belong in tech_seo (security / response-code / pagination /
+    # crawl-structure / unmatched) returns category=None → DROP (AC-10 Task D).
+    sheet, category = _route_sf_issue(issue_name)
+    if sheet != _SHEET_TECH_SEO or category is None:
+        return None
+
     description = _safe_str(row.get("Description"))
     issue_type = _safe_str(row.get("Issue Type"))
-    # detail label: prefer the human Description; fall back to Issue Type so
-    # the detail column is never empty for a real SF issue.
-    label = description or issue_type or issue_name
+    # detail label: keep the raw SF Issue Name visible (so the enum mapping
+    # loses no information), then the human Description / Issue Type.
+    suffix = description or issue_type
+    label = f"{issue_name} — {suffix}" if suffix else issue_name
 
     resolution = _safe_str(row.get("How To Fix")) or (
         f"See Screaming Frog issue guidance: {_safe_str(row.get('Help URL'))}".strip()
@@ -758,7 +789,7 @@ def _live_finding_to_finding(row: dict) -> _Finding | None:
     )
 
     return _Finding(
-        category=issue_name,
+        category=category,
         label=label,
         severity=_sf_priority_to_severity(row.get("Issue Priority")),
         resolution=resolution,
