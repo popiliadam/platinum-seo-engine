@@ -17,7 +17,11 @@ gated by allowed_writers; AFTER write emit provenance event via
 events_writer.append_provenance(operation="project_excel"). Plugin-
 agnostik (no slug literals).
 
-Public API: write/append/update (no delete — rules/append-only-state.md).
+Public API: write/append/replace/update (no delete — rules/append-only-state.md).
+`replace` is an idempotent in-sheet refresh (clears the data block below the
+schema header_row, re-lands at data_start_row); it is NOT a row delete — the
+append-only state ledger (events.jsonl) is untouched and a provenance event is
+still emitted for the refresh.
 
 Refs: spec §3 + §8.5; schemas/master-excel.schema.json (definitions,
 formula_policy, allowed_writers); rules/excel-discipline, schema-first,
@@ -581,6 +585,26 @@ def _next_data_row(ws) -> int:
     return (ws.max_row or 1) + 1
 
 
+def _data_start_row(schema: dict, sheet: str) -> int:
+    """First physical row where DATA lives for `sheet`.
+
+    Template-seeded sheets (bootstrap_excel.py honors each sheet's header_row)
+    place data below a multi-row header block: a header_row=3 sheet has data at
+    row 4, a header_row=4 sheet at row 5. The schema sheet dict carries this as
+    `data_start_row`. Readers (weekly_summary, portfolio_heatmap,
+    validate_invariants) all read from there, so the replace writer must land
+    data there too.
+
+    Fallback: a sheet that declares no `data_start_row` keeps the legacy
+    header@1/data@2 layout (return 2), matching `_ensure_sheet_with_header`.
+    """
+    sdef = schema.get("sheets", {}).get(sheet, {})
+    declared = sdef.get("data_start_row")
+    if isinstance(declared, int) and declared >= 1:
+        return declared
+    return 2
+
+
 # ---------------------------------------------------------------------------
 # Public API — write / append / update
 # ---------------------------------------------------------------------------
@@ -624,6 +648,33 @@ def append(
         workbook_path, sheet, rows, project_slug,
         schema_path=schema_path, state_root=state_root, writer=writer,
         mode="append",
+    )
+
+
+def replace(
+    workbook_path: Path | str,
+    sheet: str,
+    rows: list[dict],
+    project_slug: str,
+    *,
+    schema_path: Path | str | None = None,
+    state_root: Path | str | None = None,
+    writer: str | None = None,
+) -> WriteResult:
+    """Idempotent refresh: clear `sheet`'s data block, then write `rows`.
+
+    Unlike append(), re-importing the same source does NOT duplicate rows: the
+    prior data block (everything from the schema's data_start_row down) is
+    cleared first, then `rows` are written starting at data_start_row. The
+    header block (rows 1..data_start_row-1) is preserved verbatim. Schema
+    validation runs BEFORE the lock/clear, so an invalid payload leaves the
+    sheet untouched. Same atomic envelope as append (backup → atomic_save →
+    rotate, provenance emit).
+    """
+    return _write_or_append(
+        workbook_path, sheet, rows, project_slug,
+        schema_path=schema_path, state_root=state_root, writer=writer,
+        mode="replace",
     )
 
 
@@ -729,7 +780,7 @@ def _write_or_append(
     writer: str | None,
     mode: str,
 ) -> WriteResult:
-    if mode != "append":
+    if mode not in ("append", "replace"):
         raise TransactionError(f"unsupported mode: {mode!r}")
 
     workbook_path = Path(workbook_path)
@@ -765,8 +816,19 @@ def _write_or_append(
         _ensure_sheet_with_header(wb, sheet, columns)
         ws = wb[sheet]
 
-        # Append rows in canonical column order.
-        write_row = _next_data_row(ws)
+        # Resolve the write cursor by mode. append: bottom of existing data
+        # (byte-identical legacy behavior). replace: clear the prior data block
+        # then re-land at the schema's data_start_row (idempotent refresh).
+        # Rows are already schema-validated above (step 3), so a clear here is
+        # only reached for a valid payload — a bad row raised before the lock.
+        if mode == "replace":
+            data_start = _data_start_row(schema, sheet)
+            if (ws.max_row or 0) >= data_start:
+                ws.delete_rows(data_start, ws.max_row - data_start + 1)
+            write_row = data_start
+        else:
+            write_row = _next_data_row(ws)
+
         col_index = {c["name"]: idx for idx, c in enumerate(columns, start=1)}
         for row in rows:
             for k, v in row.items():
@@ -861,5 +923,6 @@ __all__: Iterable[str] = (
     "writer_registry_status",
     "write",
     "append",
+    "replace",
     "update",
 )

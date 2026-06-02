@@ -448,3 +448,222 @@ def test_writer_registry_does_not_gate_writes_r6(tmp_path: Path) -> None:
         wb_path, "topical_map", [_topical_row()], "test-proj", writer="rogue-writer",
     )
     assert isinstance(result, WriteResult) and result.rows_affected == 1
+
+
+# ---------------------------------------------------------------------------
+# AC-10 — transaction.replace (idempotent sheet refresh)
+#
+# The template-seeded row model that existing tests miss: bootstrap_excel.py
+# honors each sheet's header_row, so a header_row=3 sheet physically has
+# row1=header, row2=blank, row3=header, and DATA starts at data_start_row (=4).
+# Readers (weekly_summary, portfolio_heatmap, validate_invariants) all read
+# from data_start_row. replace() MUST clear the data block and re-land data at
+# data_start_row, leaving the header block (rows 1..data_start-1) verbatim.
+# ---------------------------------------------------------------------------
+
+def _seed_template_workbook(
+    wb_path: Path,
+    sheet: str,
+    header_names: list[str],
+    *,
+    header_row: int,
+    data_start_row: int,
+    data_rows: list[list],
+) -> None:
+    """Build a workbook mimicking bootstrap_excel's template layout.
+
+    Lays the schema header at row 1 AND at `header_row` (the bootstrap seeds a
+    title/sub-header block then the real header), leaves any rows between blank,
+    and seeds `data_rows` starting at `data_start_row`. This is the realistic
+    layout the replace() writer must respect.
+    """
+    wb = Workbook()
+    ws = wb.active
+    ws.title = sheet
+    # Header at row 1 (mirrors transaction._ensure_sheet_with_header) and at the
+    # schema header_row. Rows in between (e.g. row 2) stay blank.
+    for col_idx, name in enumerate(header_names, start=1):
+        ws.cell(row=1, column=col_idx, value=name)
+        ws.cell(row=header_row, column=col_idx, value=name)
+    for offset, values in enumerate(data_rows):
+        r = data_start_row + offset
+        for col_idx, val in enumerate(values, start=1):
+            ws.cell(row=r, column=col_idx, value=val)
+    wb.save(str(wb_path))
+
+
+# tech_seo: header_row=3, data_start_row=4 (the header_row=3 case).
+_TECH_SEO_HEADERS = [
+    "issue_category", "detail", "affected_urls", "impact", "resolution", "priority",
+]
+
+
+def _tech_seo_row(**overrides) -> dict:
+    base = {
+        "issue_category": "Performance",
+        "detail": "slow LCP",
+        "affected_urls": "/page",
+        "impact": "HIGH",
+        "resolution": "lazy-load",
+        "priority": "P1",
+    }
+    base.update(overrides)
+    return base
+
+
+def _tech_seo_values(row: dict) -> list:
+    return [row[h] for h in _TECH_SEO_HEADERS]
+
+
+# robots_txt: header_row=4, data_start_row=5 (the header_row=4 case).
+_ROBOTS_HEADERS = ["id", "level", "issue", "detail", "resolution"]
+
+
+def _robots_row(**overrides) -> dict:
+    base = {
+        "id": "R-001",
+        "level": "MEDIUM",
+        "issue": "missing sitemap directive",
+        "detail": "robots.txt lacks Sitemap:",
+        "resolution": "add Sitemap line",
+    }
+    base.update(overrides)
+    return base
+
+
+def _robots_values(row: dict) -> list:
+    return [row[h] for h in _ROBOTS_HEADERS]
+
+
+def test_replace_clears_prior_data_then_writes(tmp_path: Path) -> None:
+    # header_row=3 sheet (tech_seo): seed 5 data rows at row4-8, replace with 2.
+    proj, _ = _setup_project(tmp_path)
+    wb_path = proj / "master.xlsx"
+    seeded = [_tech_seo_row(detail=f"old-{i}") for i in range(5)]
+    _seed_template_workbook(
+        wb_path, "tech_seo", _TECH_SEO_HEADERS,
+        header_row=3, data_start_row=4,
+        data_rows=[_tech_seo_values(r) for r in seeded],
+    )
+
+    new_rows = [_tech_seo_row(detail="new-A"), _tech_seo_row(detail="new-B")]
+    result = transaction.replace(wb_path, "tech_seo", new_rows, "test-proj")
+    assert result.rows_affected == 2
+
+    wb = load_workbook(wb_path)
+    ws = wb["tech_seo"]
+    # Data now lands at row4-5 only; max_row == 5 (old 5 rows gone).
+    assert ws.max_row == 5
+    # Header block (rows 1..3) UNCHANGED — header still at row1 and row3.
+    assert ws.cell(row=1, column=1).value == "issue_category"
+    assert ws.cell(row=3, column=1).value == "issue_category"
+    assert ws.cell(row=2, column=1).value is None  # blank row preserved
+    # The 2 new rows are exactly what we wrote, at data_start_row onward.
+    assert ws.cell(row=4, column=2).value == "new-A"
+    assert ws.cell(row=5, column=2).value == "new-B"
+    # The old rows are gone — no "old-*" survives.
+    survivors = [
+        ws.cell(row=r, column=2).value
+        for r in range(4, ws.max_row + 1)
+    ]
+    assert all(not str(v).startswith("old-") for v in survivors if v is not None)
+
+
+def test_replace_is_idempotent(tmp_path: Path) -> None:
+    # robots_txt: header_row=4, data_start_row=5. Replace same 3 rows twice →
+    # identical rowcount + content (no duplication / drift).
+    proj, _ = _setup_project(tmp_path)
+    wb_path = proj / "master.xlsx"
+    _seed_template_workbook(
+        wb_path, "robots_txt", _ROBOTS_HEADERS,
+        header_row=4, data_start_row=5,
+        data_rows=[],  # start with header block only
+    )
+    rows = [_robots_row(id=f"R-{i:03d}") for i in range(3)]
+
+    r1 = transaction.replace(wb_path, "robots_txt", rows, "test-proj")
+    wb1 = load_workbook(wb_path)
+    ws1 = wb1["robots_txt"]
+    snap1 = [
+        [ws1.cell(row=r, column=c).value for c in range(1, len(_ROBOTS_HEADERS) + 1)]
+        for r in range(5, ws1.max_row + 1)
+    ]
+    max1 = ws1.max_row
+
+    r2 = transaction.replace(wb_path, "robots_txt", rows, "test-proj")
+    wb2 = load_workbook(wb_path)
+    ws2 = wb2["robots_txt"]
+    snap2 = [
+        [ws2.cell(row=r, column=c).value for c in range(1, len(_ROBOTS_HEADERS) + 1)]
+        for r in range(5, ws2.max_row + 1)
+    ]
+    max2 = ws2.max_row
+
+    assert r1.rows_affected == r2.rows_affected == 3
+    assert max1 == max2 == 7  # rows 5,6,7 — no growth on second replace
+    assert snap1 == snap2
+    # Data starts exactly at row 5 (header_row=4 + 1).
+    assert ws2.cell(row=5, column=1).value == "R-000"
+
+
+def test_replace_validates_schema_and_does_not_clear_on_failure(tmp_path: Path) -> None:
+    # Seed 4 rows; an enum-violating replace must RAISE and leave the 4 intact.
+    proj, _ = _setup_project(tmp_path)
+    wb_path = proj / "master.xlsx"
+    seeded = [_tech_seo_row(detail=f"keep-{i}") for i in range(4)]
+    _seed_template_workbook(
+        wb_path, "tech_seo", _TECH_SEO_HEADERS,
+        header_row=3, data_start_row=4,
+        data_rows=[_tech_seo_values(r) for r in seeded],
+    )
+
+    bad = [_tech_seo_row(impact="URGENT")]  # URGENT not in severityEnum
+    with pytest.raises(RowSchemaError):
+        transaction.replace(wb_path, "tech_seo", bad, "test-proj")
+
+    # The original 4 rows must STILL be present — clear must NOT have happened.
+    wb = load_workbook(wb_path)
+    ws = wb["tech_seo"]
+    assert ws.max_row == 7  # rows 4-7 = 4 data rows
+    survivors = [ws.cell(row=r, column=2).value for r in range(4, 8)]
+    assert survivors == ["keep-0", "keep-1", "keep-2", "keep-3"]
+
+
+def test_replace_on_empty_data_block(tmp_path: Path) -> None:
+    # Sheet with only the header block (rows 1-3), no data → replace writes
+    # cleanly from row 4.
+    proj, _ = _setup_project(tmp_path)
+    wb_path = proj / "master.xlsx"
+    _seed_template_workbook(
+        wb_path, "tech_seo", _TECH_SEO_HEADERS,
+        header_row=3, data_start_row=4,
+        data_rows=[],
+    )
+
+    rows = [_tech_seo_row(detail="first"), _tech_seo_row(detail="second")]
+    result = transaction.replace(wb_path, "tech_seo", rows, "test-proj")
+    assert result.rows_affected == 2
+
+    wb = load_workbook(wb_path)
+    ws = wb["tech_seo"]
+    assert ws.cell(row=3, column=1).value == "issue_category"  # header intact
+    assert ws.cell(row=4, column=2).value == "first"
+    assert ws.cell(row=5, column=2).value == "second"
+    assert ws.max_row == 5
+
+
+def test_append_mode_unchanged(tmp_path: Path) -> None:
+    # Regression guard: append still lands at max_row+1 (NOT data_start_row).
+    # topical_map's data_start_row is 5, but append writes at row 2 on a fresh
+    # _ensure_sheet_with_header sheet — proving append is byte-identical.
+    proj, _ = _setup_project(tmp_path)
+    wb_path = proj / "master.xlsx"
+    result = transaction.append(wb_path, "topical_map", [_topical_row()], "test-proj")
+    assert result.rows_affected == 1
+
+    wb = load_workbook(wb_path)
+    ws = wb["topical_map"]
+    # Header at row 1, data appended at row 2 (max_row+1), max_row == 2.
+    assert ws["A1"].value == "pillar"
+    assert ws.max_row == 2
+    assert ws["A2"].value == "P01_sofa_sets"
