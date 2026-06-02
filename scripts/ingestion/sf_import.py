@@ -32,6 +32,16 @@ from collections import defaultdict
 from pathlib import Path
 from typing import NamedTuple
 
+# scripts is a namespace package; ensure repo root on sys.path so absolute
+# imports resolve when invoked as a CLI module or imported in tests.
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from scripts.excel import transaction  # noqa: E402
+from scripts.ingestion import sf_projection  # noqa: E402
+from scripts.state import events_writer  # noqa: E402
+
 
 # Tier registry (mirrors schemas/sf-required-reports.schema.json)
 TIER1_REQUIRED = frozenset({
@@ -174,6 +184,85 @@ def build_envelope(
     return inbox_path
 
 
+def _rel_to_workspace(path: Path, workspace_root: Path) -> str:
+    """Path relative to workspace_root as a POSIX string; absolute string when
+    the path is not under workspace_root (defensive — mirrors build_envelope).
+
+    The Step 7 ``source.source_folder`` is documented as the ingest folder
+    relative to the workspace root; in production raw_dir lives under it. We
+    never crash on an out-of-tree path (e.g. a test pointing at a real export
+    dir) — we fall back to the absolute string instead.
+    """
+    try:
+        return path.relative_to(workspace_root).as_posix()
+    except ValueError:
+        return str(path)
+
+
+def project_and_write(
+    raw_dir: Path,
+    master_xlsx: Path,
+    project_slug: str,
+    *,
+    workspace_root: Path,
+) -> dict[str, int]:
+    """Step 6+7: project the six SF sheets and replace them in master.xlsx
+    (idempotent), then emit one ``sf_csv`` source-provenance event.
+
+    Step 6 — ``sf_projection.project_all`` yields the six schema-valid sheet
+    row lists; each is written via ``transaction.replace`` (clears the sheet's
+    data block, then re-lands the rows), so re-running this refreshes rather
+    than duplicates. ``replace`` itself emits a ``tool_computed`` provenance
+    event per sheet.
+
+    Step 7 — a single ``sf_csv`` source-provenance event records the data
+    lineage (``sf_csv → tool_computed``): ``source.source_folder`` is the raw
+    dir relative to the workspace root, ``source.row_count`` and
+    ``rows_written`` are the total rows projected.
+
+    Errors propagate (DURUR): a ``RowSchemaError`` from an invalid projected
+    row, or any ``transaction``/``events_writer`` failure, is NOT swallowed.
+
+    Args:
+        raw_dir: the SF crawl's ``.../raw/`` export directory.
+        master_xlsx: the project's master.xlsx (written via the approved path).
+        project_slug: project_id (plugin-agnostic; no slug literals here).
+        workspace_root: the workspace root (for the events.jsonl path + the
+            relative ``source_folder``).
+
+    Returns:
+        ``{sheet: rows_written}`` for the six projected sheets, in projection
+        key order.
+    """
+    projections = sf_projection.project_all(Path(raw_dir))
+
+    counts: dict[str, int] = {}
+    for sheet, rows in projections.items():
+        result = transaction.replace(
+            master_xlsx,
+            sheet,
+            rows,
+            project_slug,
+            writer="sf-import",
+        )
+        counts[sheet] = result.rows_affected
+
+    total_rows = sum(counts.values())
+    events_writer.append_provenance(
+        project_id=project_slug,
+        run_id=events_writer.next_run_id(project_slug, workspace_root=workspace_root),
+        source={
+            "kind": "sf_csv",
+            "source_folder": _rel_to_workspace(Path(raw_dir), workspace_root),
+            "row_count": total_rows,
+        },
+        operation="ingest",
+        rows_written=total_rows,
+        workspace_root=workspace_root,
+    )
+    return counts
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Implement sf-import skill protocol.")
     p.add_argument("--project", required=True, help="project_slug (lowercase kebab)")
@@ -227,13 +316,14 @@ def main(argv: list[str] | None = None) -> int:
         print("DRY-RUN: skipping Excel projection.")
         return 0
 
-    # Step 5/6/7 — Excel projection + provenance + complete
-    # NOTE: Full per-sheet projection logic intentionally lives in skill body
-    # (or in workspace populate_master.py for chat-driven flows). This script
-    # validates + envelopes; the projection pass is invoked separately per
-    # ADR-018 separation: validation script ≠ projection script.
-    print("INFO: Tier validation + envelope written. Run per-sheet projection separately.")
-    print("      (See skills/ingestion/sf-import/SKILL.md Step 6 transaction.append calls.)")
+    # Step 6/7 — per-sheet projection (idempotent replace) + sf_csv provenance.
+    # project_and_write raises on any projection / write / event failure (DURUR);
+    # we do not catch — a RowSchemaError must surface as a non-zero exit.
+    counts = project_and_write(
+        raw_dir, master_xlsx, args.project, workspace_root=workspace_root
+    )
+    for sheet, n in counts.items():
+        print(f"OK: {sheet} ← {n} rows")
     return 0
 
 
