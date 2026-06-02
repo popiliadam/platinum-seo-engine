@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Claude Code Plugin](https://img.shields.io/badge/Claude_Code-plugin-7C3AED)](https://claude.ai/code)
 
-> Status: **v1.9.0** — production-ready · 45 skills · 18 commands · 6 hooks · 4 MCP servers (3 stdio + 1 HTTP)
+> Status: **v1.9.3** — production-ready · 45 skills · 18 commands · 6 hooks · 4 MCP servers (3 stdio + 1 HTTP)
 
 > **Schema-locked, drift-checked SEO automation for Claude Code.**
 > Turn manual SEO work into auditable, repeatable workflows — backed by JSON Schemas, append-only state, and a tool that audits itself.
@@ -248,7 +248,7 @@ Browse the full catalog: [`skills/`](skills/). Slash commands map 1:1 to commonl
 
 ## Status & roadmap
 
-**Current:** v1.9.0 — hardening cycle: spec v2.3 retro + 3 new invariants (F-24/25/26) + F-23 workspace-aware enhancement + legacy cleanup (1,286 tests passing, drift-check AMBER).
+**Current:** v1.9.3 — SF MCP live-hardening: MCP Streamable-HTTP transport + retry-on-busy + 29/29 tools live-proven + sf-crawl-orchestrator export dispatch (24→SF-tool mapping + NDJSON→CSV) + resilient `load_crawl` (1,324 tests passing, drift-check AMBER).
 
 The plugin is delivered in **15 phases**. Foundation phases (0–4) are complete; skill phases (5–13) deliver the ~45 skills in batches; phase 14 covers the workspace + CI + a full pilot run end-to-end. Phase 5 is the **GO/NO-GO gateway** — failing it sends the project back to foundation work rather than papering over gaps.
 
@@ -270,7 +270,7 @@ The plugin is delivered in **15 phases**. Foundation phases (0–4) are complete
 | 13 | Governance Final | done | 4 |
 | 14 | Workspace + CI + Pilot E2E | in progress | — |
 
-Detailed status: **[docs/PHASE_STATUS.md](docs/PHASE_STATUS.md)** · Open questions: **[docs/OPEN_QUESTIONS.md](docs/OPEN_QUESTIONS.md)** · Latest release: **[docs/RELEASE_NOTES_v1.9.0.md](docs/RELEASE_NOTES_v1.9.0.md)**.
+Detailed status: **[docs/PHASE_STATUS.md](docs/PHASE_STATUS.md)** · Open questions: **[docs/OPEN_QUESTIONS.md](docs/OPEN_QUESTIONS.md)** · Latest release: **[docs/RELEASE_NOTES_v1.9.3.md](docs/RELEASE_NOTES_v1.9.3.md)**.
 
 ---
 
