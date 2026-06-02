@@ -55,6 +55,17 @@ Reliability:
     * Session expiry: if a ``tools/call`` fails with a session error (HTTP 400
       whose body mentions the session id header), the session is re-initialized
       ONCE and the call retried.
+    * Spider-BUSY (v1.9.2): a state-changing op (sf_load_crawl / sf_crawl)
+      leaves the SF Spider transiently BUSY for a few seconds; the next tool
+      call returns a TOOL-LEVEL error (``isError == true`` whose text contains
+      "IllegalStateException" + "Tool cannot be called currently"). The client
+      retries the SAME call up to ``busy_retry_max`` times with a linear backoff
+      and returns the success once the Spider is ready — so callers no longer
+      need a manual post-load sleep. ONLY this transient busy signal is retried;
+      every other ``isError`` (SecurityException / IllegalArgument / size-cap /
+      any other state error) is PERMANENT and returned immediately. If the
+      Spider is still busy after the budget, the busy result is returned AS-IS
+      (never raised).
     * Response size cap: raises :class:`SfMcpResponseTooLargeError` when
       Content-Length OR the actual body bytes exceed ``max_response_bytes``
       (default 100,000 bytes per D-SF-05).
@@ -88,6 +99,9 @@ __all__ = (
     "SfMcpClient",
     "DEFAULT_MAX_RESPONSE_BYTES",
     "RETRY_DELAYS_SECONDS",
+    "DEFAULT_BUSY_RETRY_MAX",
+    "DEFAULT_BUSY_RETRY_BASE_DELAY",
+    "BUSY_RETRY_DELAY_CAP_SECONDS",
     "MCP_PROTOCOL_VERSION",
     "MCP_ACCEPT_HEADER",
     "SESSION_ID_HEADER",
@@ -148,6 +162,22 @@ DEFAULT_MAX_RESPONSE_BYTES: int = 100_000
 #: because attempt 3 is terminal — included so the schedule is self-documenting.
 RETRY_DELAYS_SECONDS: tuple[float, ...] = (1.0, 2.0, 4.0)
 
+#: Spider-busy retry budget (v1.9.2). A state-changing op (sf_load_crawl,
+#: sf_crawl) leaves the SF Spider transiently BUSY for a few seconds; it returns
+#: a TOOL-LEVEL error (``isError == true`` + "Tool cannot be called currently")
+#: until ready. We retry the SAME call with a linear backoff until it clears.
+#: Default budget: 6 retries × (2s·n, capped at 8s) ≈ 2+4+6+8+8+8 = 36s of sleep
+#: across the 6 retry waits — comfortably covering the live-observed ~12s window
+#: with margin. Tunable via the constructor for huge crawls.
+DEFAULT_BUSY_RETRY_MAX: int = 6
+
+#: Linear backoff base: wait ``base_delay * attempt`` seconds before retry N.
+DEFAULT_BUSY_RETRY_BASE_DELAY: float = 2.0
+
+#: Per-wait cap so the linear backoff cannot grow without bound on a large
+#: ``busy_retry_max``.
+BUSY_RETRY_DELAY_CAP_SECONDS: float = 8.0
+
 #: MCP protocol revision negotiated in ``initialize``. Matches the live
 #: seospider-mcp-server (which advertises 2024-11-05).
 MCP_PROTOCOL_VERSION: str = "2024-11-05"
@@ -181,6 +211,15 @@ class SfMcpClient:
             about single-request timeouts.
         max_response_bytes: Hard cap on response body size; default 100,000 per
             D-SF-05. Raises :class:`SfMcpResponseTooLargeError` if exceeded.
+        busy_retry_max: Max number of automatic retries (v1.9.2) when a tool
+            returns the transient Spider-BUSY tool-level error after a
+            state-changing op (sf_load_crawl / sf_crawl). Default 6. Set higher
+            for huge crawls whose post-load busy window exceeds the default
+            budget. ``0`` disables busy-retry (the busy result is returned as-is
+            on the first response).
+        busy_retry_base_delay: Linear backoff base in seconds; the wait before
+            retry N is ``base_delay * N`` capped at
+            :data:`BUSY_RETRY_DELAY_CAP_SECONDS`. Default 2.0.
         transport: Optional :class:`httpx.BaseTransport` for test injection
             (e.g. :class:`httpx.MockTransport`). When None a real network
             transport is used. A single transport handler serves the whole
@@ -193,6 +232,8 @@ class SfMcpClient:
         *,
         timeout_seconds: float = 30.0,
         max_response_bytes: int = DEFAULT_MAX_RESPONSE_BYTES,
+        busy_retry_max: int = DEFAULT_BUSY_RETRY_MAX,
+        busy_retry_base_delay: float = DEFAULT_BUSY_RETRY_BASE_DELAY,
         transport: httpx.BaseTransport | None = None,
     ) -> None:
         if not isinstance(base_url, str) or not base_url.strip():
@@ -200,6 +241,8 @@ class SfMcpClient:
         self.base_url = base_url.rstrip("/")
         self.timeout_seconds = float(timeout_seconds)
         self.max_response_bytes = int(max_response_bytes)
+        self.busy_retry_max = max(0, int(busy_retry_max))
+        self.busy_retry_base_delay = max(0.0, float(busy_retry_base_delay))
         self._transport = transport
         #: Cached MCP session id (set by :meth:`_ensure_session`). ``None``
         #: means "no live session" → next call performs the handshake.
@@ -257,12 +300,23 @@ class SfMcpClient:
             * Session error (HTTP 400 mentioning the session header): the
               session is re-initialized ONCE and the call retried.
             * Response size exceeded: NO retry → :class:`SfMcpResponseTooLargeError`.
+            * Spider-BUSY tool-level error (v1.9.2): a state-changing op
+              (sf_load_crawl / sf_crawl) leaves the Spider transiently BUSY and
+              the next tool call returns ``isError == true`` +
+              "Tool cannot be called currently". The SAME call is retried up to
+              ``busy_retry_max`` times with a linear backoff
+              (``busy_retry_base_delay * N``, capped). After the budget is
+              exhausted the last busy result is returned AS-IS (never raised).
+              ONLY this exact busy signal is retried — every OTHER ``isError``
+              (SecurityException, IllegalArgumentException, size-cap, etc.) is
+              PERMANENT and returned immediately on the first response.
 
         Returns:
             The ``result`` field of the JSON-RPC envelope (dict). A non-dict
             ``result`` is wrapped as ``{"value": <result>}``. An MCP tool-level
             error (``result.isError == true``) is returned as-is — it does NOT
-            raise.
+            raise. (Transient Spider-BUSY is retried first; any other isError,
+            and a still-busy result after the retry budget, is returned as-is.)
 
         Raises:
             ValueError: ``tool_name`` is empty / not a string.
@@ -274,6 +328,42 @@ class SfMcpClient:
         if not isinstance(tool_name, str) or not tool_name.strip():
             raise ValueError(f"tool_name must be a non-empty string, got {tool_name!r}")
 
+        # Outer loop: retry the SAME tool call while the Spider is transiently
+        # BUSY (v1.9.2). attempt 0 is the initial call; attempts 1..busy_retry_max
+        # are the retries. Any non-busy result (success OR a permanent isError)
+        # returns immediately from inside the loop.
+        result: dict = {}
+        for busy_attempt in range(self.busy_retry_max + 1):
+            result = self._call_tool_once(tool_name, kwargs)
+            if not _is_spider_busy(result):
+                return result
+            if busy_attempt >= self.busy_retry_max:
+                # Budget exhausted — surface the busy result AS-IS (no raise).
+                self._log("POST", tool_name,
+                          f"still BUSY after {self.busy_retry_max} retries "
+                          f"→ returning busy result as-is")
+                return result
+            delay = min(
+                self.busy_retry_base_delay * (busy_attempt + 1),
+                BUSY_RETRY_DELAY_CAP_SECONDS,
+            )
+            self._log("POST", tool_name,
+                      f"Spider BUSY (transient) → retry "
+                      f"{busy_attempt + 1}/{self.busy_retry_max} in {delay}s")
+            time.sleep(delay)
+        # Unreachable when busy_retry_max >= 0 (loop always returns); kept for
+        # type-checkers and the busy_retry_max==0 edge (loop body runs once).
+        return result  # pragma: no cover
+
+    def _call_tool_once(self, tool_name: str, kwargs: dict) -> dict:
+        """One logical tool call: ensure session, POST, parse → JSON-RPC result.
+
+        Includes the v1.8 single automatic re-handshake on a stale/expired
+        session (HTTP-400 session error). Returns the result dict (including a
+        tool-level ``isError`` result as-is); raises on transport / JSON-RPC
+        faults. The Spider-BUSY retry is layered ABOVE this in
+        :meth:`call_tool`.
+        """
         # One automatic re-handshake on a stale/expired session.
         session_retried = False
         while True:
@@ -347,7 +437,7 @@ class SfMcpClient:
             "params": {
                 "protocolVersion": MCP_PROTOCOL_VERSION,
                 "capabilities": {},
-                "clientInfo": {"name": "pseo-engine", "version": "1.9.1"},
+                "clientInfo": {"name": "pseo-engine", "version": "1.9.2"},
             },
         }
         resp = self._post_once(envelope)
@@ -605,3 +695,61 @@ def _is_session_error(exc: SfMcpToolError) -> bool:
     """
     msg = str(exc).lower()
     return "session" in msg and ("mcp-session-id" in msg or "session id" in msg)
+
+
+#: Substrings (lower-cased) that BOTH must appear in a tool-level error's text
+#: for it to count as the transient Spider-BUSY signal. The live message is:
+#: "Tool error: IllegalStateException: Tool cannot be called currently. Please
+#: check the state of the Spider". Requiring BOTH "illegalstateexception" AND
+#: "tool cannot be called currently" is deliberately narrow so that PERMANENT
+#: errors that share neither phrase are never retried:
+#:   * SecurityException: Absolute paths are not allowed   (no match)
+#:   * IllegalArgumentException: ... argument missing/blank (no match)
+#:   * size-cap "...too large" / "would exceed 100.0 kB"    (no match)
+#:   * any other IllegalStateException without the busy phrase (no match)
+_BUSY_MARKERS: tuple[str, ...] = (
+    "illegalstateexception",
+    "tool cannot be called currently",
+)
+
+
+def _result_error_text(result: dict) -> str:
+    """Concatenate the text of every ``content`` block of a tool result.
+
+    MCP tool results carry their human-readable payload in
+    ``result["content"]`` — a list of blocks, each typically
+    ``{"type": "text", "text": "..."}``. We join every block's ``text`` so the
+    busy match works regardless of how the server chunks the message.
+    """
+    parts: list[str] = []
+    content = result.get("content")
+    if isinstance(content, list):
+        for block in content:
+            if isinstance(block, dict):
+                txt = block.get("text")
+                if isinstance(txt, str):
+                    parts.append(txt)
+    return " ".join(parts)
+
+
+def _is_spider_busy(result: dict) -> bool:
+    """True iff ``result`` is the TRANSIENT Spider-BUSY tool-level error.
+
+    The busy condition (v1.9.2) is, exactly:
+        * ``result["isError"] is True`` (a tool-level error), AND
+        * the concatenated ``content[*].text`` contains BOTH
+          ``"IllegalStateException"`` AND ``"Tool cannot be called currently"``
+          (case-insensitive).
+
+    Every other ``isError`` result (SecurityException, IllegalArgumentException,
+    size-cap, or any IllegalStateException lacking the busy phrase) → ``False``,
+    so :meth:`SfMcpClient.call_tool` does NOT retry it — those are permanent.
+    A non-error result (``isError`` falsey/absent) → ``False`` (success; return
+    immediately, no retry).
+    """
+    if not isinstance(result, dict):
+        return False
+    if result.get("isError") is not True:
+        return False
+    text = _result_error_text(result).lower()
+    return all(marker in text for marker in _BUSY_MARKERS)
