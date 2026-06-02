@@ -61,6 +61,7 @@ from scripts.util.sf_mcp_client import (
     SfMcpResponseTooLargeError,
     SfMcpTimeoutError,
     SfMcpToolError,
+    _progress_indicates_loaded,
 )
 
 
@@ -898,3 +899,388 @@ def test_no_retry_on_success(monkeypatch) -> None:
         f"success must not trigger a retry; got {server.tool_call_count} calls"
     )
     assert sleeps == [], "no backoff sleep on success"
+
+
+# ---------------------------------------------------------------------------
+# Case 12: Per-call timeout / attempts override (v1.9.3 — load_crawl support).
+# Two OPTIONAL keyword-only params let a caller fire a single FAST attempt with
+# a short per-request timeout. Default behaviour MUST be byte-identical to
+# today (all the Case-6 / Case-7 retry tests above still pass unchanged).
+# ---------------------------------------------------------------------------
+
+def _progress_result(
+    *, active: int = 0, completed: int = 1822, percent: int = 100, waiting: int = 0
+) -> dict:
+    """An sf_crawl_progress tool result: JSON text inside a content text block.
+
+    Mirrors the live SF MCP shape — the progress dict is JSON-encoded into
+    ``content[0].text`` (NOT a structured field on the result).
+    """
+    payload = {
+        "active": active,
+        "completed": completed,
+        "percentComplete": percent,
+        "waiting": waiting,
+    }
+    return {
+        "content": [{"type": "text", "text": json.dumps(payload)}],
+        "isError": False,
+    }
+
+
+def test_call_tool_override_does_single_fast_attempt_on_timeout(monkeypatch) -> None:
+    """``_max_attempts_override=1`` + ``_timeout_override`` → ONE post, short timeout.
+
+    Asserts (a) exactly one tool post attempt is made (the retry loop is capped
+    at 1), (b) the per-request httpx timeout equals the override (not the
+    instance ``timeout_seconds``), and (c) it still raises SfMcpTimeoutError.
+    """
+    sleeps: list[float] = []
+    monkeypatch.setattr("scripts.util.sf_mcp_client.time.sleep", sleeps.append)
+
+    attempts = {"tool": 0}
+    seen_timeouts: list[object] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        method = body.get("method")
+        if method == "initialize":
+            return httpx.Response(
+                200, json=_jsonrpc_result(body["id"], {"ok": True}),
+                headers={SESSION_ID_HEADER: DEFAULT_SESSION_ID},
+            )
+        if method == "notifications/initialized":
+            return httpx.Response(202)
+        attempts["tool"] += 1
+        # httpx records the effective per-request timeout in request.extensions.
+        seen_timeouts.append(request.extensions.get("timeout"))
+        raise httpx.ReadTimeout("simulated read timeout", request=request)
+
+    client = _raw_client(handler, timeout_seconds=30.0)
+    with pytest.raises(SfMcpTimeoutError):
+        client.call_tool(
+            "sf_load_crawl",
+            crawl_id="big",
+            _timeout_override=5.0,
+            _max_attempts_override=1,
+        )
+
+    assert attempts["tool"] == 1, (
+        f"override must cap the tool call at ONE attempt; got {attempts['tool']}"
+    )
+    assert sleeps == [], "a single capped attempt must not sleep between retries"
+    # httpx normalises a float timeout into a per-operation dict; every leg = 5.0.
+    assert seen_timeouts and all(
+        v == {"connect": 5.0, "read": 5.0, "write": 5.0, "pool": 5.0}
+        for v in seen_timeouts
+    ), f"per-request timeout must be the 5.0s override; got {seen_timeouts}"
+
+
+def test_default_call_still_three_attempts_when_no_override(monkeypatch) -> None:
+    """No override → IDENTICAL to today: 3 attempts, 2 sleeps, instance timeout.
+
+    Pins backward-compatibility: threading the optional params must not change
+    the default path. (Companion to the Case-6 timeout test.)
+    """
+    sleeps: list[float] = []
+    monkeypatch.setattr("scripts.util.sf_mcp_client.time.sleep", sleeps.append)
+
+    attempts = {"tool": 0}
+    seen_timeouts: list[object] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        method = body.get("method")
+        if method == "initialize":
+            return httpx.Response(
+                200, json=_jsonrpc_result(body["id"], {"ok": True}),
+                headers={SESSION_ID_HEADER: DEFAULT_SESSION_ID},
+            )
+        if method == "notifications/initialized":
+            return httpx.Response(202)
+        attempts["tool"] += 1
+        seen_timeouts.append(request.extensions.get("timeout"))
+        raise httpx.ReadTimeout("simulated read timeout", request=request)
+
+    client = _raw_client(handler, timeout_seconds=12.0)
+    with pytest.raises(SfMcpTimeoutError):
+        client.call_tool("sf_crawl_progress")
+
+    assert attempts["tool"] == 3, "default (no override) must still attempt 3 times"
+    assert sleeps == [RETRY_DELAYS_SECONDS[0], RETRY_DELAYS_SECONDS[1]], (
+        f"default backoff must be (1s, 2s); got {sleeps}"
+    )
+    assert all(
+        v == {"connect": 12.0, "read": 12.0, "write": 12.0, "pool": 12.0}
+        for v in seen_timeouts
+    ), f"default per-request timeout must be the instance 12.0s; got {seen_timeouts}"
+
+
+def test_override_params_not_leaked_into_jsonrpc_arguments() -> None:
+    """``_timeout_override`` / ``_max_attempts_override`` MUST NOT reach the wire.
+
+    They are client-side knobs, not tool arguments — the posted JSON-RPC
+    ``params.arguments`` must contain ONLY the genuine tool kwargs.
+    """
+    server = _MockMcpServer(tool_result={"ok": True})
+    client = _client_for(server)
+
+    client.call_tool(
+        "sf_load_crawl",
+        crawl_id="aluminumstation",
+        _timeout_override=5.0,
+        _max_attempts_override=1,
+    )
+
+    tool_req = server.requests[-1]
+    assert tool_req.rpc_method == "tools/call"
+    assert tool_req.body["params"]["arguments"] == {"crawl_id": "aluminumstation"}, (
+        "override knobs must not leak into params.arguments; "
+        f"got {tool_req.body['params']['arguments']}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Case 13: _progress_indicates_loaded — the readiness predicate.
+# ---------------------------------------------------------------------------
+
+def test_progress_indicates_loaded_true_for_settled_crawl() -> None:
+    """active==0 AND (completed>0 OR percentComplete>=100) AND not isError → True."""
+    assert _progress_indicates_loaded(
+        _progress_result(active=0, completed=1822, percent=100)
+    ) is True
+    # completed>0 alone (percent missing/low) is enough.
+    assert _progress_indicates_loaded(
+        {"content": [{"type": "text", "text": json.dumps(
+            {"active": 0, "completed": 5})}], "isError": False}
+    ) is True
+    # percentComplete>=100 alone (completed 0) is enough.
+    assert _progress_indicates_loaded(
+        {"content": [{"type": "text", "text": json.dumps(
+            {"active": 0, "completed": 0, "percentComplete": 100})}],
+         "isError": False}
+    ) is True
+
+
+def test_progress_indicates_loaded_false_when_still_active() -> None:
+    """active>0 → still crawling/loading → False (even at completed>0)."""
+    assert _progress_indicates_loaded(
+        _progress_result(active=3, completed=10, percent=40)
+    ) is False
+
+
+def test_progress_indicates_loaded_false_on_iserror() -> None:
+    """isError==True → False regardless of the (here valid-looking) payload."""
+    bad = _progress_result(active=0, completed=1822, percent=100)
+    bad = {**bad, "isError": True}
+    assert _progress_indicates_loaded(bad) is False
+
+
+def test_progress_indicates_loaded_false_on_non_json_or_empty() -> None:
+    """Non-JSON text, missing content, empty dict, non-dict → all False (defensive)."""
+    assert _progress_indicates_loaded(
+        {"content": [{"type": "text", "text": "not json {{"}], "isError": False}
+    ) is False
+    assert _progress_indicates_loaded({"isError": False}) is False  # no content
+    assert _progress_indicates_loaded({}) is False
+    assert _progress_indicates_loaded(None) is False  # type: ignore[arg-type]
+    # Well-formed JSON but no active/completed/percent keys → not loaded.
+    assert _progress_indicates_loaded(
+        {"content": [{"type": "text", "text": json.dumps({"waiting": 5})}],
+         "isError": False}
+    ) is False
+
+
+# ---------------------------------------------------------------------------
+# Case 14: load_crawl — the resilient loader (the live-discovered fix).
+# sf_load_crawl times out CLIENT-side on a big crawl but loads SERVER-side;
+# load_crawl fires it fast+tolerantly then polls sf_crawl_progress to confirm.
+# ---------------------------------------------------------------------------
+
+class _LoadCrawlServer(_MockMcpServer):
+    """Routes by tool name: ``sf_load_crawl`` vs ``sf_crawl_progress``.
+
+    ``load_raises`` (e.g. httpx.ReadTimeout) simulates the client-side timeout
+    the live big-crawl load triggers. ``progress_results`` is a scripted
+    sequence for successive ``sf_crawl_progress`` calls (last entry repeats).
+    """
+
+    def __init__(
+        self,
+        *,
+        load_raises: Exception | None = None,
+        load_result: dict | None = None,
+        progress_results: list[dict],
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        assert progress_results, "progress_results must be non-empty"
+        self._load_raises = load_raises
+        self._load_result = load_result if load_result is not None else {"ok": True}
+        self._progress = list(progress_results)
+        self.load_call_count = 0
+        self.progress_call_count = 0
+
+    def handler(self, request: httpx.Request) -> httpx.Response:
+        rec = _Recorded(request)
+        if rec.rpc_method != "tools/call":
+            return super().handler(request)
+        self.requests.append(rec)
+        self.tool_call_count += 1
+        tool = rec.body["params"]["name"]
+        if tool == "sf_load_crawl":
+            self.load_call_count += 1
+            if self._load_raises is not None:
+                raise self._load_raises
+            result = self._load_result
+        elif tool == "sf_crawl_progress":
+            idx = min(self.progress_call_count, len(self._progress) - 1)
+            self.progress_call_count += 1
+            result = self._progress[idx]
+        else:
+            raise AssertionError(f"unexpected tool in load test: {tool!r}")
+        envelope = _jsonrpc_result(rec.body["id"], result)
+        return httpx.Response(
+            200,
+            text=_sse_body(envelope, session_id=self.session_id),
+            headers={"content-type": "text/event-stream;charset=UTF-8"},
+        )
+
+
+def test_load_crawl_success_when_load_times_out_but_progress_settles(monkeypatch) -> None:
+    """THE live case: load TIMES OUT client-side, but progress reports loaded.
+
+    sf_load_crawl raises SfMcpTimeoutError (the timeout is swallowed); the first
+    sf_crawl_progress poll already shows active=0/completed=1822 → load_crawl
+    RETURNS that progress (no raise).
+    """
+    sleeps: list[float] = []
+    monkeypatch.setattr("scripts.util.sf_mcp_client.time.sleep", sleeps.append)
+
+    # sf_load_crawl raises a ReadTimeout on its single fast attempt → the
+    # client's _post_with_retry surfaces SfMcpTimeoutError, which load_crawl
+    # swallows. (A bare ConnectError path is covered implicitly by the same
+    # except clause; we exercise the timeout flavour seen live.)
+    server = _LoadCrawlServer(
+        load_raises=httpx.ReadTimeout("client-side load timeout"),
+        progress_results=[_progress_result(active=0, completed=1822, percent=100)],
+    )
+    client = _client_for(server, busy_retry_max=6, busy_retry_base_delay=2.0)
+
+    prog = client.load_crawl(
+        "aluminumstation",
+        settle_timeout_seconds=5.0,
+        poll_interval_seconds=0.05,
+        load_fire_timeout_seconds=1.0,
+    )
+
+    assert _progress_indicates_loaded(prog) is True
+    assert prog["content"][0]["text"]  # the real progress payload is returned
+    assert server.load_call_count == 1, (
+        f"load must be fired exactly once (fast); got {server.load_call_count}"
+    )
+    assert server.progress_call_count == 1, (
+        "progress should settle on the first poll → exactly one progress call; "
+        f"got {server.progress_call_count}"
+    )
+    assert sleeps == [], "settled on first poll → no poll sleeps"
+
+
+def test_load_crawl_success_when_load_returns_cleanly(monkeypatch) -> None:
+    """Variant: load returns WITHOUT a timeout, progress is loaded → success."""
+    monkeypatch.setattr("scripts.util.sf_mcp_client.time.sleep", lambda *_: None)
+
+    server = _LoadCrawlServer(
+        load_result={"content": [{"type": "text", "text": "loaded"}], "isError": False},
+        progress_results=[
+            _progress_result(active=2, completed=0, percent=10),   # not yet
+            _progress_result(active=0, completed=1822, percent=100),  # settled
+        ],
+    )
+    client = _client_for(server, busy_retry_max=6, busy_retry_base_delay=2.0)
+
+    prog = client.load_crawl(
+        "aluminumstation",
+        settle_timeout_seconds=5.0,
+        poll_interval_seconds=0.01,
+        load_fire_timeout_seconds=15.0,
+    )
+
+    assert _progress_indicates_loaded(prog) is True
+    assert server.load_call_count == 1
+    assert server.progress_call_count == 2, (
+        "first poll not settled, second settled → exactly two progress calls; "
+        f"got {server.progress_call_count}"
+    )
+
+
+def test_load_crawl_raises_when_progress_never_settles(monkeypatch) -> None:
+    """Load fired but progress stays active>0 past the budget → SfMcpTimeoutError.
+
+    Uses a tiny settle budget + tiny poll interval so the test is instant; the
+    deadline is driven by monotonic time, so we DON'T patch time.monotonic, only
+    time.sleep (kept tiny by the 0.05s interval anyway).
+    """
+    # Let the real (tiny) sleeps run so the monotonic deadline actually elapses.
+    server = _LoadCrawlServer(
+        load_raises=httpx.ReadTimeout("client-side load timeout"),
+        progress_results=[_progress_result(active=4, completed=0, percent=20)],  # never settles
+    )
+    client = _client_for(server, busy_retry_max=6, busy_retry_base_delay=2.0)
+
+    with pytest.raises(SfMcpTimeoutError) as exc_info:
+        client.load_crawl(
+            "aluminumstation",
+            settle_timeout_seconds=0.3,
+            poll_interval_seconds=0.05,
+            load_fire_timeout_seconds=1.0,
+        )
+
+    msg = str(exc_info.value)
+    assert "aluminumstation" in msg
+    assert "did not settle" in msg
+    assert server.load_call_count == 1, "load fired once even on the failure path"
+    assert server.progress_call_count >= 1, "at least one progress poll happened"
+
+
+def test_load_crawl_validates_crawl_id() -> None:
+    """Empty / non-str crawl_id → ValueError before any network call."""
+    server = _LoadCrawlServer(
+        progress_results=[_progress_result()],
+    )
+    client = _client_for(server)
+
+    for bad in ("", "   ", None, 123):
+        with pytest.raises(ValueError):
+            client.load_crawl(bad)  # type: ignore[arg-type]
+    assert server.load_call_count == 0, "validation must short-circuit before firing"
+
+
+def test_load_crawl_swallows_load_tool_error_and_confirms_via_progress(monkeypatch) -> None:
+    """A non-timeout tool-error RESULT from the load is ignored; progress decides.
+
+    sf_load_crawl returns a tool-level isError result (NOT a raise) on the fire;
+    load_crawl must not treat that as fatal — it proceeds to poll progress, which
+    is loaded → success. (The progress poll is the real readiness gate.)
+    """
+    monkeypatch.setattr("scripts.util.sf_mcp_client.time.sleep", lambda *_: None)
+
+    load_err = {
+        "content": [{"type": "text", "text": "Tool error: some transient state"}],
+        "isError": True,
+    }
+    server = _LoadCrawlServer(
+        load_result=load_err,
+        progress_results=[_progress_result(active=0, completed=1822, percent=100)],
+    )
+    client = _client_for(server, busy_retry_max=0)  # don't busy-retry the err result
+
+    prog = client.load_crawl(
+        "aluminumstation",
+        settle_timeout_seconds=5.0,
+        poll_interval_seconds=0.01,
+        load_fire_timeout_seconds=15.0,
+    )
+
+    assert _progress_indicates_loaded(prog) is True
+    assert server.load_call_count == 1

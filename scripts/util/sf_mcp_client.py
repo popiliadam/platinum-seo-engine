@@ -97,6 +97,7 @@ __all__ = (
     "SfMcpResponseTooLargeError",
     "SfMcpToolError",
     "SfMcpClient",
+    "_progress_indicates_loaded",
     "DEFAULT_MAX_RESPONSE_BYTES",
     "RETRY_DELAYS_SECONDS",
     "DEFAULT_BUSY_RETRY_MAX",
@@ -285,13 +286,34 @@ class SfMcpClient:
         self._log("POST", "health", f"up ok={ok}")
         return ok
 
-    def call_tool(self, tool_name: str, **kwargs: Any) -> dict:
+    def call_tool(
+        self,
+        tool_name: str,
+        *,
+        _timeout_override: float | None = None,
+        _max_attempts_override: int | None = None,
+        **kwargs: Any,
+    ) -> dict:
         """Invoke an MCP tool via the Streamable-HTTP ``tools/call`` method.
 
         Ensures a live MCP session (lazy handshake) then POSTs::
 
             {"jsonrpc": "2.0", "id": <uuid>, "method": "tools/call",
              "params": {"name": tool_name, "arguments": kwargs}}
+
+        ``**kwargs`` are the TOOL arguments (placed verbatim into
+        ``params.arguments``). The two underscore-prefixed, keyword-only params
+        are CLIENT-side knobs and are NEVER forwarded into ``arguments``:
+
+            * ``_timeout_override``      — per-request httpx timeout for this
+              call only (overrides the instance ``timeout_seconds``).
+            * ``_max_attempts_override`` — cap the conn/timeout retry loop at
+              ``max(1, N)`` attempts (1 = a single fast attempt, no backoff).
+
+        Both default to ``None``, in which case behaviour is byte-identical to
+        the historical default (3 attempts at ``timeout_seconds``). They exist
+        so :meth:`load_crawl` can fire a tolerant fast attempt; general callers
+        should leave them unset.
 
         Retry policy:
             * 3 attempts total on connection errors / timeouts, with delays
@@ -334,7 +356,12 @@ class SfMcpClient:
         # returns immediately from inside the loop.
         result: dict = {}
         for busy_attempt in range(self.busy_retry_max + 1):
-            result = self._call_tool_once(tool_name, kwargs)
+            result = self._call_tool_once(
+                tool_name,
+                kwargs,
+                timeout_override=_timeout_override,
+                max_attempts_override=_max_attempts_override,
+            )
             if not _is_spider_busy(result):
                 return result
             if busy_attempt >= self.busy_retry_max:
@@ -355,14 +382,100 @@ class SfMcpClient:
         # type-checkers and the busy_retry_max==0 edge (loop body runs once).
         return result  # pragma: no cover
 
-    def _call_tool_once(self, tool_name: str, kwargs: dict) -> dict:
+    def load_crawl(
+        self,
+        crawl_id: str,
+        *,
+        settle_timeout_seconds: float = 180.0,
+        poll_interval_seconds: float = 3.0,
+        load_fire_timeout_seconds: float = 15.0,
+    ) -> dict:
+        """Resiliently load a saved crawl, confirming readiness via progress polling.
+
+        **Live finding (Manager, 2026-06-02).** ``sf_load_crawl`` on a large
+        saved crawl (e.g. aluminumstation, 1822 URLs) RELIABLY times out
+        CLIENT-side — even after an SF restart — yet the crawl DOES load
+        SERVER-side: immediately after the timeout ``sf_crawl_progress`` reports
+        ``{"active":0,"completed":1822,"percentComplete":100}`` and exports work.
+        A plain :meth:`call_tool("sf_load_crawl", ...)` would burn
+        ~3×``timeout_seconds`` on its conn/timeout retry then raise
+        :class:`SfMcpTimeoutError`, hard-failing the orchestrator's load/resume
+        step. This method instead FIRES the load fast + tolerantly (a single
+        short attempt) then CONFIRMS readiness by polling ``sf_crawl_progress``
+        until the crawl is loaded + settled — the poll is the real readiness gate.
+
+        Args:
+            crawl_id: The saved-crawl id to load. Must be a non-empty string.
+            settle_timeout_seconds: Wall-budget (monotonic) for the crawl to
+                report loaded via progress polling. Default 180s.
+            poll_interval_seconds: Sleep between progress polls. Default 3s.
+            load_fire_timeout_seconds: Per-request timeout for the single
+                ``sf_load_crawl`` fire attempt. Default 15s. (A client-side
+                timeout here is EXPECTED and swallowed — the server loads anyway.)
+
+        Returns:
+            The ``sf_crawl_progress`` result dict that first satisfied
+            :func:`_progress_indicates_loaded` (active==0 AND completed>0 OR
+            percentComplete>=100).
+
+        Raises:
+            ValueError: ``crawl_id`` is empty / not a string.
+            SfMcpTimeoutError: progress never reported a loaded crawl within
+                ``settle_timeout_seconds`` (the load was still fired).
+        """
+        if not isinstance(crawl_id, str) or not crawl_id.strip():
+            raise ValueError(f"crawl_id must be a non-empty string, got {crawl_id!r}")
+
+        # 1) FIRE the load fast + tolerantly: a single short attempt. The big
+        #    crawl times out client-side (EXPECTED) while loading server-side, so
+        #    swallow timeout/connection faults — progress polling is the gate.
+        #    A non-timeout tool-error RESULT is likewise non-fatal (verified next).
+        try:
+            self.call_tool(
+                "sf_load_crawl",
+                crawl_id=crawl_id,
+                _timeout_override=load_fire_timeout_seconds,
+                _max_attempts_override=1,
+            )
+        except (SfMcpTimeoutError, SfMcpConnectionError) as exc:
+            self._log("POST", "sf_load_crawl",
+                      f"load fire gave up client-side ({type(exc).__name__}) — "
+                      f"server loads anyway; confirming via sf_crawl_progress")
+
+        # 2) POLL readiness on a monotonic deadline (NOT wallclock).
+        deadline = time.monotonic() + max(0.0, float(settle_timeout_seconds))
+        while True:
+            prog = self.call_tool("sf_crawl_progress")
+            if _progress_indicates_loaded(prog):
+                self._log("POST", "sf_crawl_progress",
+                          f"crawl {crawl_id!r} settled (loaded)")
+                return prog
+            if time.monotonic() >= deadline:
+                break
+            time.sleep(poll_interval_seconds)
+
+        raise SfMcpTimeoutError(
+            f"crawl {crawl_id!r} did not settle within {settle_timeout_seconds}s "
+            f"(load fired; sf_crawl_progress never reported a loaded crawl)"
+        )
+
+    def _call_tool_once(
+        self,
+        tool_name: str,
+        kwargs: dict,
+        *,
+        timeout_override: float | None = None,
+        max_attempts_override: int | None = None,
+    ) -> dict:
         """One logical tool call: ensure session, POST, parse → JSON-RPC result.
 
         Includes the v1.8 single automatic re-handshake on a stale/expired
         session (HTTP-400 session error). Returns the result dict (including a
         tool-level ``isError`` result as-is); raises on transport / JSON-RPC
         faults. The Spider-BUSY retry is layered ABOVE this in
-        :meth:`call_tool`.
+        :meth:`call_tool`. The two optional overrides (both ``None`` by default →
+        unchanged behaviour) are forwarded to :meth:`_post_with_retry` so a
+        single fast attempt is possible (used by :meth:`load_crawl`).
         """
         # One automatic re-handshake on a stale/expired session.
         session_retried = False
@@ -375,7 +488,12 @@ class SfMcpClient:
                 "params": {"name": tool_name, "arguments": dict(kwargs)},
             }
             try:
-                resp = self._post_with_retry(envelope, tool_name)
+                resp = self._post_with_retry(
+                    envelope,
+                    tool_name,
+                    timeout_override=timeout_override,
+                    max_attempts_override=max_attempts_override,
+                )
                 return self._handle_tool_response(resp, tool_name)
             except SfMcpToolError as exc:
                 if (
@@ -497,23 +615,56 @@ class SfMcpClient:
         return headers
 
     def _post_once(
-        self, envelope: dict, *, session_id: str | None = None
+        self,
+        envelope: dict,
+        *,
+        session_id: str | None = None,
+        timeout: float | None = None,
     ) -> httpx.Response:
-        """Single POST with MCP headers. ``session_id`` defaults to the cached one."""
+        """Single POST with MCP headers. ``session_id`` defaults to the cached one.
+
+        ``timeout`` (when not None) overrides the instance ``timeout_seconds`` for
+        THIS request only — used by :meth:`load_crawl` to fire a tolerant, fast
+        attempt without changing the client-wide default.
+        """
         sid = session_id if session_id is not None else self._session_id
         client = self._get_client()
-        return client.post(
-            self.base_url,
-            content=json.dumps(envelope).encode("utf-8"),
-            headers=self._build_headers(sid),
-        )
+        post_kwargs: dict[str, Any] = {
+            "content": json.dumps(envelope).encode("utf-8"),
+            "headers": self._build_headers(sid),
+        }
+        if timeout is not None:
+            post_kwargs["timeout"] = timeout
+        return client.post(self.base_url, **post_kwargs)
 
-    def _post_with_retry(self, envelope: dict, tool_name: str) -> httpx.Response:
-        """POST a ``tools/call`` envelope with 3-attempt conn/timeout backoff."""
-        total_attempts = len(RETRY_DELAYS_SECONDS)
+    def _post_with_retry(
+        self,
+        envelope: dict,
+        tool_name: str,
+        *,
+        timeout_override: float | None = None,
+        max_attempts_override: int | None = None,
+    ) -> httpx.Response:
+        """POST a ``tools/call`` envelope with conn/timeout backoff retry.
+
+        Default (both overrides None) is IDENTICAL to today: 3 attempts with
+        delays (1s, 2s) between them, at the instance ``timeout_seconds``.
+
+        When ``max_attempts_override`` is set, the attempt loop is capped at
+        ``max(1, override)`` (so 1 = a single fast attempt, no backoff sleeps).
+        When ``timeout_override`` is set, each post uses it as the per-request
+        httpx timeout instead of ``self.timeout_seconds``.
+        """
+        if max_attempts_override is None:
+            total_attempts = len(RETRY_DELAYS_SECONDS)
+        else:
+            total_attempts = max(1, int(max_attempts_override))
+        per_request_timeout = (
+            self.timeout_seconds if timeout_override is None else float(timeout_override)
+        )
         for attempt_idx in range(1, total_attempts + 1):
             try:
-                return self._post_once(envelope)
+                return self._post_once(envelope, timeout=timeout_override)
             except httpx.TimeoutException as exc:
                 self._log("POST", tool_name,
                           f"attempt={attempt_idx}/{total_attempts} timeout: {exc}")
@@ -522,7 +673,7 @@ class SfMcpClient:
                     continue
                 raise SfMcpTimeoutError(
                     f"request to {tool_name!r} timed out after {total_attempts} "
-                    f"attempts ({self.timeout_seconds}s each): {exc}"
+                    f"attempts ({per_request_timeout}s each): {exc}"
                 ) from exc
             except httpx.RequestError as exc:
                 # ConnectError, ReadError, WriteError, RemoteProtocolError, etc.
@@ -753,3 +904,70 @@ def _is_spider_busy(result: dict) -> bool:
         return False
     text = _result_error_text(result).lower()
     return all(marker in text for marker in _BUSY_MARKERS)
+
+
+def _result_first_json(result: dict) -> dict | None:
+    """Parse the first JSON object found in any ``content[*].text`` block.
+
+    MCP tool results carry their payload as text blocks; ``sf_crawl_progress``
+    encodes the progress dict as JSON inside ``content[0].text``. Returns the
+    decoded dict, or ``None`` if no block holds a JSON *object* (defensive
+    against non-JSON / non-object text). Self-contained — does NOT import the
+    sf_crawl_orchestrator (whose parser operates on an already-extracted dict).
+    """
+    content = result.get("content")
+    if not isinstance(content, list):
+        return None
+    for block in content:
+        if not isinstance(block, dict):
+            continue
+        txt = block.get("text")
+        if not isinstance(txt, str):
+            continue
+        try:
+            parsed = json.loads(txt)
+        except Exception:  # noqa: BLE001 — non-JSON text is simply "not progress"
+            continue
+        if isinstance(parsed, dict):
+            return parsed
+    return None
+
+
+def _coerce_int(value: object, default: int = 0) -> int:
+    """Best-effort int coercion (mirrors the orchestrator's tolerance)."""
+    try:
+        return int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return default
+
+
+def _progress_indicates_loaded(result: dict) -> bool:
+    """True iff an ``sf_crawl_progress`` result shows a crawl LOADED + SETTLED.
+
+    The live finding (Manager, 2026-06-02): after a big-crawl load the server
+    reports ``{"active":0,"completed":1822,"percentComplete":100,"waiting":0}``
+    inside ``result["content"][*]["text"]`` (JSON-encoded). A crawl is
+    considered loaded + settled when ALL of:
+
+        * ``result`` is a dict and NOT a tool-level error (``isError`` falsey), AND
+        * the parsed progress has ``active == 0`` (nothing in flight), AND
+        * ``completed > 0`` OR ``percentComplete >= 100`` (work actually present).
+
+    Defensive by design — non-dict input, missing/empty ``content``, non-JSON or
+    non-object text, an ``isError`` result, or progress lacking the keys all
+    return ``False``. (Self-contained: does NOT import sf_crawl_orchestrator.)
+    """
+    if not isinstance(result, dict):
+        return False
+    if result.get("isError") is True:
+        return False
+    progress = _result_first_json(result)
+    if progress is None:
+        return False
+    if "active" not in progress:
+        return False
+    if _coerce_int(progress.get("active"), default=-1) != 0:
+        return False
+    completed = _coerce_int(progress.get("completed"), default=0)
+    percent = _coerce_int(progress.get("percentComplete"), default=0)
+    return completed > 0 or percent >= 100
