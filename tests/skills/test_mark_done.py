@@ -337,8 +337,18 @@ def test_done_protocol_cross_sheet_invariant_compliance() -> None:
     # Authority: F-02 + F-05 must exist in invariants
     assert "F-02" in rule_ids, "F-02 invariant missing in cross-sheet-invariants.json"
     assert "F-05" in rule_ids, "F-05 invariant missing in cross-sheet-invariants.json"
-    # F-05 rule text targets completed_work + master_task DONE
-    f05 = next(r for r in invariants["rules"] if r["id"] == "F-05")
+    # F-05's design meaning (completed_work.task_id ⊆ master_task WHERE
+    # status=DONE) is the cross-sheet rule mark-done enforces. After the P0-01
+    # registry↔code binding (codex audit Phase 1), the ACTIVE rules[] F-05 entry
+    # carries the IMPLEMENTED meaning (schema header column count), while this
+    # design intent is preserved (not deleted) under deferred_design_rules.
+    # Assert the completed_work/master_task/DONE design rule in its new home.
+    deferred = {r["id"]: r for r in invariants.get("deferred_design_rules", [])}
+    assert "F-05" in deferred, (
+        "F-05 design rule (completed_work ⊆ master_task DONE) must be preserved "
+        "in deferred_design_rules after the P0-01 registry↔code binding"
+    )
+    f05 = deferred["F-05"]
     assert "completed_work" in f05["rule"]
     assert "master_task" in f05["rule"]
     assert "DONE" in f05["rule"]

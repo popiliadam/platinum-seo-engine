@@ -136,6 +136,18 @@ agnostik boundary and MUST stop. R-72 (image_model serbest string +
 override edilebilir) is the architectural twin of this boundary at the
 schema level.
 
+**External dependency preflight (P1-13 registry contract).** Higgsfield is
+declared in `mcp-tool-registry.json` under
+`external_user_dependencies.higgsfield` (NOT under `servers`) — the governance
+representation of a **user-level external MCP** that must already exist in the
+operator's own client environment. Step 4 **preflights**
+`mcp__higgsfield__generate_image` in the Claude tool registry; if the external
+tool is absent the skill does NOT crash — it routes to **DURUR #5** (graceful
+`default_hero_url` fallback + a clear "Higgsfield MCP not configured at
+user-level" message). This is what lets the registry advertise a
+required-but-not-plugin-installed tool without tripping the
+`.mcp.json`↔registry server-key invariant (F-24).
+
 ## Foundational Principles Enforcement (3-Layer)
 
 The 3 üst-prensip (Phase 10 `rules/content-quality.md#foundational-principles`)
