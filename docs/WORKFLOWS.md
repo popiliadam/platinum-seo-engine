@@ -2,6 +2,12 @@
 
 > v1.8.0 release **45 skill** — tüm skill'ler implement edildi ve production-ready (Phase 5–13 baseline 43 + v1.7 gbp-audit + v1.8 sf-crawl-orchestrator). Status: **active** (2026-05-27).
 
+> **SF MCP call shapes — canonical contract (P3-01).** The inline `mcp__sf__*`
+> tool-call shapes in the SF crawl flow below are illustrative and have evolved.
+> The authoritative SF MCP contract is `commands/pseo-sf-crawl.md` + the
+> `sf-crawl-orchestrator` SKILL (`skills/ingestion/sf-crawl-orchestrator/SKILL.md`).
+> The rest of this catalog reflects the active v1.8.0 skill set.
+
 Phase 5–13 boyunca parallel worker batch'lerle inşa edildi; pilot dentnotion E2E PASS.
 
 ---

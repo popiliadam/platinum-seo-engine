@@ -10,8 +10,9 @@ a glance:
   5. _state/consistency-report.json verdict (GREEN/AMBER/RED)
 
 CLI semantics:
-  - --project <slug> opsiyonel. Eğer atlanırsa shared/active.json'daki bound
-    slug okunur. Active.json yoksa FileNotFoundError raise edilir.
+  - --project <slug> opsiyonel. Eğer atlanırsa shared/active.json'daki
+    `active_project` key okunur (legacy `slug` fallback + deprecation uyarısı).
+    Active.json yoksa FileNotFoundError raise edilir.
   - --workspace-root  PSEO_WORKSPACE_ROOT environment variable'ından default
     alınır; --workspace-root flag explicit override.
 
@@ -246,7 +247,7 @@ def main(argv: List[str] | None = None) -> int:
         "--project",
         default=None,
         dest="slug",
-        help="Project slug (default: shared/active.json bound slug)",
+        help="Project slug (default: shared/active.json active_project)",
     )
     parser.add_argument(
         "--events-tail",

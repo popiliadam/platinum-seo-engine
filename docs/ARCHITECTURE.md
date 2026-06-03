@@ -52,23 +52,23 @@ Her biri `rules/*.md`'de tanımlı; drift-check ve CI otomatik denetler.
 
 | Phase | Ad | Durum | Skill Sayısı |
 |---|---|---|---|
-| 0 | Manager Bootstrap | **active** | — |
-| 1 | Schema Migration | planned | — |
-| 2 | Rules + Templates Migration | planned | — |
-| 3 | Core Scripts | planned | — |
-| 4 | Hooks + Commands | planned | — |
-| 5 | Critical Path Skills (GO/NO-GO gateway) | planned | 5 |
-| 6 | Ingestion Suite | planned | 3 |
-| 7 | Discovery Suite | planned | 8 |
-| 8 | Planning Suite | planned | 5 |
-| 9 | Reporting Suite | planned | 8 |
-| 10 | Content Rules Processing | planned | — |
-| 11 | Production Suite | planned | 5 |
-| 12 | Publishing + Specialized | planned | 6 |
-| 13 | Governance Final | planned | 3 |
-| 14 | Workspace + CI + Pilot End-to-End | planned | — |
+| 0 | Manager Bootstrap | tamamlandı ✅ | — |
+| 1 | Schema Migration | tamamlandı ✅ | — |
+| 2 | Rules + Templates Migration | tamamlandı ✅ | — |
+| 3 | Core Scripts | tamamlandı ✅ | — |
+| 4 | Hooks + Commands | tamamlandı ✅ | — |
+| 5 | Critical Path Skills (GO/NO-GO gateway) | tamamlandı ✅ | 5 |
+| 6 | Ingestion Suite | tamamlandı ✅ | 3 |
+| 7 | Discovery Suite | tamamlandı ✅ | 8 |
+| 8 | Planning Suite | tamamlandı ✅ | 5 |
+| 9 | Reporting Suite | tamamlandı ✅ | 8 |
+| 10 | Content Rules Processing | tamamlandı ✅ | — |
+| 11 | Production Suite | tamamlandı ✅ | 5 |
+| 12 | Publishing + Specialized | tamamlandı ✅ | 6 |
+| 13 | Governance Final | tamamlandı ✅ | 3 |
+| 14 | Workspace + CI + Pilot End-to-End | devam ediyor 🚧 | — |
 
-**Toplam v1.8: ~45 skill**, 9 batch phase'e yayılmış (v1.7'de +1 gbp-audit; v1.8'de +1 sf-crawl-orchestrator). Foundation (Phase 0–4) tamamlanmadan skill phase'leri başlamaz. Phase 5 **GO/NO-GO gateway**: geçemezse foundation'a dönülür.
+**Toplam ~45 skill** (45 SKILL.md filesystem SoT), 9 batch phase'e yayılmış (v1.7'de +1 gbp-audit; v1.8'de +1 sf-crawl-orchestrator). **Güncel durum (engine v1.9.4): Phase 0–13 tamamlandı; Phase 14 (workspace + CI + pilot E2E) devam ediyor.** Foundation (Phase 0–4) skill phase'lerinden önce tamamlandı; Phase 5 **GO/NO-GO gateway** geçildi.
 
 ---
 

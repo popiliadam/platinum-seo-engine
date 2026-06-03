@@ -150,3 +150,56 @@ def test_drift_check_test_count_cite_matches_actual() -> None:
     doc = _read("skills/governance/drift-check/SKILL.md")
     assert f"({actual} cases incl. live pilot)" in doc
     assert "(11 cases" not in doc
+
+
+# ---------------------------------------------------------------------------
+# Phase 6 cleanup — doc/comment count drift guards (P2-02, P3-03 + carry-overs)
+#
+# Each cite below is anchored to a GROUND-TRUTH counter so a future
+# skill/invariant/MCP-server change can never leave a stale literal behind.
+# ---------------------------------------------------------------------------
+
+def test_skills_count_is_45() -> None:
+    """Mechanical lock: 45 SKILL.md on disk. Every doc/comment cite that
+    names the skill count must track this number."""
+    assert _count_skills() == 45
+
+
+def test_glossary_cites_current_invariant_count() -> None:
+    """docs/GLOSSARY.md Invariant definition must cite the live CSR rule
+    count (31, len(cross-sheet-invariants.rules)), never the stale pre-SF
+    '28'."""
+    glossary = _read("docs/GLOSSARY.md")
+    assert f"{_declared_count()} CSR rule" in glossary
+    assert "28 CSR rule" not in glossary
+
+
+def test_generate_images_cites_current_mcp_server_count() -> None:
+    """skills/production/generate-images/SKILL.md MCP-boundary cites must
+    track the live .mcp.json server count (4: gsc/dataforseo/ScraplingServer/
+    sf), never the stale '3 servers'."""
+    doc = _read("skills/production/generate-images/SKILL.md")
+    assert f"{_count_mcp_servers()} servers" in doc
+    assert "3 servers" not in doc
+
+
+def test_skill_count_comments_track_filesystem() -> None:
+    """Test/CI comments that cite the SKILL.md count must track the live
+    number (45), never the stale '43'."""
+    skills = _count_skills()
+    for rel in (
+        "tests/ci/test_ci_yaml.py",
+        "tests/schemas/test_events_schema_event_type_enum_v1_1.py",
+    ):
+        text = _read(rel)
+        assert f"{skills} SKILL.md" in text, rel
+        assert "43 SKILL.md" not in text, rel
+
+
+def test_dump_workspace_docstring_reads_active_project() -> None:
+    """scripts/state/dump_workspace.py must describe reading the
+    active_project key (the code's real behavior since the legacy 'slug'
+    rename), not the stale 'bound slug'."""
+    src = _read("scripts/state/dump_workspace.py")
+    assert "active_project" in src
+    assert "bound slug" not in src
