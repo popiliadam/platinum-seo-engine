@@ -35,10 +35,10 @@ Beklenen tool inventory (minimum 5): `sf_crawl`, `sf_crawl_progress`, `sf_genera
 2. **`workflow_runner.create_run`** + envelope yazımı (`inbox/sf-mcp/{date}-sf-crawl-{slug}.json`)
 3. **Trigger crawl**: `mcp__sf__sf_crawl(start_url=$2, ...)` → `crawl_id` döner
 4. **Poll progress**: `mcp__sf__sf_crawl_progress(crawl_id)` her N saniyede; max_wait_minutes default 180 (Q-SF-MCP-03)
-5. **24 rapor iterate** (Step 6 orchestrator body): Tier 1 (14 mandatory RED-fail) + Tier 2 (10 AMBER-tolerant); `save_report=True` her birinde; temp staging dir `_state/staging/sf-crawl-{run_id}/` (D-SF-16 atomic)
+5. **24 rapor iterate** (Step 6 orchestrator body): Tier 1 (14 mandatory RED-fail) + Tier 2 (10 AMBER-tolerant); her rapor SF allowed base directory'ye `export_type="CSV"` + `file_path=f"{canonical}.csv"` ile yazılır (export tool'larında `save_report` / `report_name` / `output_directory` arg'ı YOK — export currently-loaded crawl üzerinden çalışır, SKILL.md "Dispatch contract"); temp staging dir `_state/staging/sf-crawl-{run_id}/` (D-SF-16 atomic)
 6. **DURUR-orch-8** Tier 1 fail → `shutil.rmtree(temp_staging)` + `workflow_runner.fail` + SystemExit(8)
 7. **Atomic move**: temp_staging → `projects/{slug}/sf-exports/{date}/raw/` (same-filesystem atomic mv; DURUR-orch-5 target dir conflict guard)
-8. **sf-import handoff**: `sf_import.py --project {slug} --sf-export-path {final_dir.parent} --source-run-id {run_id}` (D-SF-07: sf-import body UNCHANGED, source_run_id frontmatter input)
+8. **sf-import handoff**: `python3 -m scripts.ingestion.sf_import --project {slug} --sf-export-path {final_dir.parent}` (D-SF-07: sf-import body UNCHANGED; sf_import script CLI yalnızca `--project` / `--sf-export-path` / `--workspace-root` / `--dry-run` kabul eder; `source_run_id` provenance chaining sf-import *skill frontmatter* input'udur — script flag DEĞİL, CLI'ye verilirse argparse exit 2)
 9. **`workflow_runner.complete`** + events.jsonl provenance (source.kind=sf_mcp)
 
 ## 4. Resume mid-loop (workflow_runner.pause/resume)
@@ -63,7 +63,7 @@ Frontmatter `requires_approval=true` — skill `awaiting_approval` durumunda dur
 - Skill: `skills/ingestion/sf-crawl-orchestrator/SKILL.md` — v1.8 Phase 3 aktif
 - Script: `scripts/ingestion/sf_crawl_orchestrator.py` (pure-transform helpers)
 - Util: `scripts/util/sf_mcp_client.py` (HTTP MCP client, D-SF-14)
-- MCP required: `mcp__sf__sf_crawl` + `mcp__sf__sf_crawl_progress` + `mcp__sf__sf_generate_report` + `mcp__sf__sf_list_crawls` + `mcp__sf__sf_list_allowed_base_directory`
+- MCP required: `mcp__sf__sf_crawl` + `mcp__sf__sf_crawl_progress` + `mcp__sf__sf_generate_report` + `mcp__sf__sf_generate_bulk_export` + `mcp__sf__sf_export_seo_element_urls` + `mcp__sf__sf_list_crawls` + `mcp__sf__sf_list_allowed_base_directory`
 - `project.config.sf.mcp.{enabled,url,allowed_directory,max_wait_minutes,per_report_timeout_seconds}` — Migration 0005 retro-populates (D-SF-12 + D-SF-18)
 - `.mcp.json` `sf` entry (`http://127.0.0.1:11435/mcp`) — v1.8 Phase 2 ADR-039
 - Schema: `schemas/sf-mcp-tool-mapping.schema.json` + `mcp-tool-registry.json` (sf entry, F-23 invariant)
