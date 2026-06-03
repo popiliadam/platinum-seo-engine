@@ -81,7 +81,7 @@ def test_no_workspace_renders_unbound_message() -> None:
     rc, stdout, _ = _run_hook()
     assert rc == 0
     assert "no active project bound" in stdout
-    assert "/pseo-bootstrap-project" in stdout
+    assert "/pseo-init" in stdout  # P1-05: real scaffolder (was /pseo-bootstrap-project)
     assert "PSEO_WORKSPACE_ROOT" in stdout
 
 
