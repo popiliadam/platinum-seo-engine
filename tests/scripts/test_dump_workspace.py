@@ -121,7 +121,7 @@ def _write_active_json(workspace_root: Path, slug: str) -> None:
     shared = workspace_root / "shared"
     shared.mkdir(parents=True, exist_ok=True)
     (shared / "active.json").write_text(
-        json.dumps({"slug": slug}), encoding="utf-8"
+        json.dumps({"active_project": slug}), encoding="utf-8"
     )
 
 
@@ -147,6 +147,37 @@ def test_dump_with_explicit_slug_returns_summary_dict(dump_module, tmp_path):
 def test_dump_uses_active_json_when_slug_none(dump_module, tmp_path):
     _make_workspace(tmp_path, slug="demo")
     _write_active_json(tmp_path, "demo")
+
+    result = dump_module.dump_workspace(workspace_root=tmp_path, project_slug=None)
+
+    assert result["project"] == "demo"
+
+
+# ---------- 2a. canonical active_project key resolves (P0-02) ----------
+
+
+def test_dump_reads_active_project_canonical(dump_module, tmp_path):
+    _make_workspace(tmp_path, slug="demo")
+    (tmp_path / "shared").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "shared" / "active.json").write_text(
+        json.dumps({"active_project": "demo", "updated_at": "2026-06-03T00:00:00Z"}),
+        encoding="utf-8",
+    )
+
+    result = dump_module.dump_workspace(workspace_root=tmp_path, project_slug=None)
+
+    assert result["project"] == "demo"
+
+
+# ---------- 2b. legacy slug key still resolves (P0-02 back-compat) ----------
+
+
+def test_dump_legacy_slug_still_resolves(dump_module, tmp_path):
+    _make_workspace(tmp_path, slug="demo")
+    (tmp_path / "shared").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "shared" / "active.json").write_text(
+        json.dumps({"slug": "demo"}), encoding="utf-8"
+    )
 
     result = dump_module.dump_workspace(workspace_root=tmp_path, project_slug=None)
 

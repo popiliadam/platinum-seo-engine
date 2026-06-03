@@ -29,9 +29,9 @@
     },
     "active_projects": {
       "type": "array",
-      "description": "Projects currently in operational rotation — weekly briefs + monthly roundups + portfolio aggregation queries read from these. Minimum 1; portfolio scale ceiling 8.",
+      "description": "Projects currently in operational rotation — weekly briefs + monthly roundups + portfolio aggregation queries read from these. Minimum 1; soft cap (raised 8→12 when the active portfolio reached 10) — not a hard product limit, raise further as the portfolio grows.",
       "minItems": 1,
-      "maxItems": 8,
+      "maxItems": 12,
       "items": { "$ref": "#/definitions/ActiveProjectEntry" }
     },
     "pending_onboard": {
