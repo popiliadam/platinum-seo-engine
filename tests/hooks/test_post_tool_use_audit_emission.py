@@ -17,6 +17,7 @@ Coverage matrix:
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -28,16 +29,25 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 HOOK_PATH = REPO_ROOT / "hooks" / "post-tool-use.json"
 
 # The early-exit chain that must be replaced for unit-level invocation
-# (avoiding the events_writer side-effect path; we only assert tgt + audit_action).
+# (avoiding the events_writer append side-effect; we only assert tgt +
+# audit_action). P1-06: audit_action is now computed AFTER the import (Bash is
+# classified via normalize_audit_action), so the debug replacement does the
+# import + computes audit_action itself before printing.
 _EARLY_EXIT_CHAIN = (
     '(sys.exit(0)) if not (ws and pid) else None; '
     'sys.path.insert(0, os.environ["CLAUDE_PLUGIN_ROOT"]); '
-    'from scripts.state.events_writer import append_audit; '
+    'from scripts.state.events_writer import append_audit, normalize_audit_action; '
+    'audit_action=("modified" if tn=="Edit" else (("modified" if (fp and pathlib.Path(fp).exists()) '
+    'else "created") if tn=="Write" else normalize_audit_action(tn, command=cmd))); '
     'append_audit(project_id=pid, audit_action=audit_action, '
     'audit_target=(tn+":"+str(tgt))[:480], actor="claude-code:hook:PostToolUse", '
     'workspace_root=pathlib.Path(ws)); sys.exit(0)'
 )
 _DEBUG_REPLACEMENT = (
+    'sys.path.insert(0, os.environ["CLAUDE_PLUGIN_ROOT"]); '
+    'from scripts.state.events_writer import normalize_audit_action; '
+    'audit_action=("modified" if tn=="Edit" else (("modified" if (fp and pathlib.Path(fp).exists()) '
+    'else "created") if tn=="Write" else normalize_audit_action(tn, command=cmd))); '
     'print(json.dumps({"audit_target": (tn+":"+str(tgt))[:480], '
     '"audit_action": audit_action})); sys.exit(0)'
 )
@@ -72,6 +82,9 @@ def _run(inline: str, payload: dict) -> dict:
         capture_output=True,
         text=True,
         timeout=10,
+        # P1-06: the debug replacement imports normalize_audit_action via
+        # sys.path.insert(CLAUDE_PLUGIN_ROOT), so the env var must be present.
+        env={**os.environ, "CLAUDE_PLUGIN_ROOT": str(REPO_ROOT)},
     )
     assert proc.returncode == 0, f"rc={proc.returncode}, stderr={proc.stderr!r}"
     return json.loads(proc.stdout.strip().splitlines()[-1])
@@ -93,12 +106,14 @@ def test_append_audit_invocation_intact() -> None:
     assert "workspace_root=pathlib.Path(ws)" in cmd
 
 
-def test_outer_or_true_wrap_intact() -> None:
-    """|| true outer wrap: hook fail Claude Code interrupt etmesin (defensive)."""
+def test_audit_failure_wrap_is_visible_and_nonblocking() -> None:
+    """P1-06: the blanket `|| true` (silent swallow) is replaced with a wrap that
+    prints a visible WARNING to stderr but still exits 0 (non-blocking) — an
+    audit-emit failure surfaces instead of vanishing, without blocking the tool."""
     cmd = _audit_command()
-    assert cmd.endswith("' || true"), (
-        "PostToolUse hook must end with `|| true` so audit failure does not block tool execution"
-    )
+    assert "|| true" not in cmd, "blanket `|| true` must be gone — it silently swallowed failures"
+    assert "WARNING" in cmd, "hook must print a visible WARNING when the audit emit fails"
+    assert cmd.rstrip().endswith("; }"), "warning wrap must still exit 0 (non-blocking)"
 
 
 def test_bash_redaction_ghp_leak(debug_inline: str) -> None:
