@@ -26,8 +26,8 @@ Eğer çıktı `NO_ACTIVE_PROJECT` ise: kullanıcıdan slug iste veya `/pseo-act
 
 `scripts/state/workflow_runner.py` modül CLI olarak değil, Python `import` ile expose edilmiş (bkz. `list_runs(project_slug, *, workspace_root=None, status_filter=None)` — döndürdüğü liste `RunHandle` dataclass'lardır). Inline Python ile çağır:
 
-!`if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş — kullanıcıya workspace path'ini sor"; exit 2; fi; ENGINE_ROOT="${CLAUDE_PLUGIN_ROOT:-${PSEO_ENGINE_ROOT:-$(find /Users/apple/.claude/plugins/cache 2>/dev/null -type d -name 'platinum-seo-engine' | sort | tail -1 | xargs -I{} find {} -maxdepth 1 -type d -name '[0-9]*' 2>/dev/null | sort -V | tail -1)}}"; if [ -z "$ENGINE_ROOT" ]; then echo "ERROR: CLAUDE_PLUGIN_ROOT yok ve fallback bulunamadı — PSEO_ENGINE_ROOT env var set edin"; exit 3; fi; PROJECT="${1:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/active.json" 2>/dev/null)}"; PSEO_ENGINE_ROOT="$ENGINE_ROOT" PYTHONPATH="$ENGINE_ROOT" python3 -c "
-import json, os, sys
+!`if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş — kullanıcıya workspace path'ini sor"; exit 2; fi; ENGINE_ROOT="${CLAUDE_PLUGIN_ROOT:-${PSEO_ENGINE_ROOT:-$(find /Users/apple/.claude/plugins/cache 2>/dev/null -type d -name 'platinum-seo-engine' | sort | tail -1 | xargs -I{} find {} -maxdepth 1 -type d -name '[0-9]*' 2>/dev/null | sort -V | tail -1)}}"; if [ -z "$ENGINE_ROOT" ]; then echo "ERROR: CLAUDE_PLUGIN_ROOT yok ve fallback bulunamadı — PSEO_ENGINE_ROOT env var set edin"; exit 3; fi; PROJECT="${1:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/active.json" 2>/dev/null)}"; PSEO_ENGINE_ROOT="$ENGINE_ROOT" PYTHONPATH="$ENGINE_ROOT" PROJECT="$PROJECT" python3 -c "
+import json, os, re, sys
 from pathlib import Path
 engine = os.environ.get('CLAUDE_PLUGIN_ROOT') or os.environ.get('PSEO_ENGINE_ROOT')
 if not engine:
@@ -35,9 +35,11 @@ if not engine:
 sys.path.insert(0, engine)
 from scripts.state import workflow_runner as wr
 ws_path = Path(os.environ['PSEO_WORKSPACE_ROOT']).expanduser()
-slug = '$PROJECT'
+slug = os.environ.get('PROJECT', '')
 if not slug:
     print('NO_ACTIVE_PROJECT', file=sys.stderr); sys.exit(2)
+if not re.fullmatch(r'[a-z0-9][a-z0-9-]*', slug):
+    print('ERROR: invalid project slug (lowercase alnum + hyphen only): ' + repr(slug), file=sys.stderr); sys.exit(2)
 try:
     runs = wr.list_runs(slug, workspace_root=ws_path)
 except wr.WorkflowError as e:
