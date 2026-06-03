@@ -718,8 +718,12 @@ def update(
 
         col_index = {c["name"]: idx for idx, c in enumerate(columns, start=1)}
         affected_rows: list[dict] = []
-        # Walk data rows starting from row 2.
-        for row_idx in range(2, (ws.max_row or 1) + 1):
+        # Walk data rows from the schema's data_start_row down — never a hardcoded
+        # row 2. Template-seeded sheets (header_row>1) keep header/blank rows above
+        # data_start_row; scanning from row 2 would match and mutate them. Mirrors
+        # the data_start_row contract _write_or_append/replace already honor.
+        data_start = _data_start_row(schema, sheet)
+        for row_idx in range(data_start, (ws.max_row or 1) + 1):
             current = {
                 c["name"]: ws.cell(row=row_idx, column=col_index[c["name"]]).value
                 for c in columns
