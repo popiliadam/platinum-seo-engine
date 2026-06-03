@@ -667,3 +667,49 @@ def test_append_mode_unchanged(tmp_path: Path) -> None:
     assert ws["A1"].value == "pillar"
     assert ws.max_row == 2
     assert ws["A2"].value == "P01_sofa_sets"
+
+
+def test_update_starts_at_data_start_row_not_row_2(tmp_path: Path) -> None:
+    """update() must scan from the schema's data_start_row, never hardcoded row 2.
+
+    A template-seeded sheet (tech_seo: header_row=3, data_start_row=4) keeps
+    header/blank rows at 1-3. A schema-valid row planted ABOVE data_start_row
+    must never be matched or mutated by update(); otherwise update() corrupts the
+    header block and over-counts rows_affected. Regression guard for the
+    `range(2, ...)` scan bug (the same data_start_row contract replace() honors).
+    """
+    proj, _ = _setup_project(tmp_path)
+    wb_path = proj / "master.xlsx"
+    # Real data at rows 4-5 (data_start_row=4); only row 4 carries the marker.
+    seeded = [_tech_seo_row(detail="COLLIDE"), _tech_seo_row(detail="other")]
+    _seed_template_workbook(
+        wb_path, "tech_seo", _TECH_SEO_HEADERS,
+        header_row=3, data_start_row=4,
+        data_rows=[_tech_seo_values(r) for r in seeded],
+    )
+    # Adversary: plant a schema-valid row at row 3 (ABOVE data_start_row=4) whose
+    # `detail` collides with the where clause. A correct update() ignores it.
+    wb = load_workbook(str(wb_path))
+    ws = wb["tech_seo"]
+    planted = _tech_seo_values(
+        _tech_seo_row(detail="COLLIDE", resolution="HEADER-UNTOUCHED")
+    )
+    for col_idx, val in enumerate(planted, start=1):
+        ws.cell(row=3, column=col_idx, value=val)
+    wb.save(str(wb_path))
+
+    result = transaction.update(
+        wb_path, "tech_seo",
+        where={"detail": "COLLIDE"},
+        set_={"resolution": "FIXED"},
+        project_slug="test-proj",
+    )
+
+    res_col = _TECH_SEO_HEADERS.index("resolution") + 1
+    check = load_workbook(wb_path)["tech_seo"]
+    # Only the row-4 data row matches — the planted row-3 is above data_start_row.
+    assert result.rows_affected == 1
+    # Row 3 (above data_start_row) must be untouched by update().
+    assert check.cell(row=3, column=res_col).value == "HEADER-UNTOUCHED"
+    # The real data row at row 4 IS updated (positive path still works).
+    assert check.cell(row=4, column=res_col).value == "FIXED"
