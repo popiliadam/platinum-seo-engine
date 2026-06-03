@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "http://platinum-seo-engine/schemas/events",
   "title": "Events Log Entry v1.0",
-  "description": "Unified events log schema — replaces provenance-log + work-log. One row/file = one event. Three kinds: 'provenance' (pipeline ingest/normalize/project/validate/cascade — every MCP response or SF file produces one entry, append-only, run_id monotonic per project), 'work' (DONE protocol §21.4 step 4 emits these into logs/work-done/{YYYY-MM}/{task_id}.json — 12 closed event_type subtypes including 2 skill_<name> canonical entries, monthly-report aggregates last-28-day events), 'audit' (governance placeholder — Phase 14+ for permission/access changes). Discriminator field is event_kind. Common envelope: schema_version, event_kind, event_id, timestamp, project_id. Sub-kind specific fields are defined alongside; conditional requireds enforced via allOf if/then. Cross-kind invariants: agent_run_id on a work event must reference an existing provenance event run_id. Retention: provenance append-only forever; work 12 months active then archive zip (§20.3); audit policy TBD. Both url + url_normalized required on URL-bearing work events (D-S3-5). All hash fields use sha256:hex64 pattern.",
+  "description": "Unified events log schema — replaces provenance-log + work-log. One row/file = one event. Four kinds: 'provenance' (pipeline ingest/normalize/project/validate/cascade — every MCP response or SF file produces one entry, append-only, run_id monotonic per project), 'work' (DONE protocol §21.4 step 4 emits these into logs/work-done/{YYYY-MM}/{task_id}.json — 12 closed event_type subtypes including 2 skill_<name> canonical entries, monthly-report aggregates last-28-day events), 'audit' (governance placeholder — Phase 14+ for permission/access changes), 'workflow' (ADR-020 — workflow lifecycle transitions logged by workflow_runner.py state machine; workflow_action + workflow_run_id required). Discriminator field is event_kind. Common envelope: schema_version, event_kind, event_id, timestamp, project_id. Sub-kind specific fields are defined alongside; conditional requireds enforced via allOf if/then. Cross-kind invariants: agent_run_id on a work event must reference an existing provenance event run_id. Retention: provenance append-only forever; work 12 months active then archive zip (§20.3); audit policy TBD. Both url + url_normalized required on URL-bearing work events (D-S3-5). All hash fields use sha256:hex64 pattern.",
   "type": "object",
   "required": ["schema_version", "event_kind", "event_id", "timestamp", "project_id"],
   "additionalProperties": false,
@@ -275,23 +275,23 @@
   "allOf": [
     {
       "description": "PROVENANCE kind required fields.",
-      "if":   { "properties": { "event_kind": { "const": "provenance" } } },
+      "if":   { "required": ["event_kind"], "properties": { "event_kind": { "const": "provenance" } } },
       "then": { "required": ["run_id", "source", "operation"] }
     },
     {
       "description": "WORK kind required fields.",
-      "if":   { "properties": { "event_kind": { "const": "work" } } },
+      "if":   { "required": ["event_kind"], "properties": { "event_kind": { "const": "work" } } },
       "then": { "required": ["event_type", "task_id"] }
     },
     {
       "description": "AUDIT kind required fields.",
-      "if":   { "properties": { "event_kind": { "const": "audit" } } },
+      "if":   { "required": ["event_kind"], "properties": { "event_kind": { "const": "audit" } } },
       "then": { "required": ["audit_action", "audit_target", "actor"] }
     },
     {
       "description": "Per docs/ARCHITECTURE.md §20.2: URL-bearing work event types require url + url_normalized together.",
       "if":   { "allOf": [
-                 { "properties": { "event_kind": { "const": "work" } } },
+                 { "required": ["event_kind"], "properties": { "event_kind": { "const": "work" } } },
                  { "properties": { "event_type": { "enum": ["content_new", "content_revise", "content_remove", "tech_fix", "quickwin_applied", "pillar_launch", "schema_fix", "redirect_deployed"] } } }
                ] },
       "then": { "required": ["url", "url_normalized"] }
@@ -299,7 +299,7 @@
     {
       "description": "content_revise MUST carry both before + after snapshots (§20.2).",
       "if":   { "allOf": [
-                 { "properties": { "event_kind": { "const": "work" } } },
+                 { "required": ["event_kind"], "properties": { "event_kind": { "const": "work" } } },
                  { "properties": { "event_type": { "const": "content_revise" } } }
                ] },
       "then": { "required": ["before", "after"] }
@@ -307,7 +307,7 @@
     {
       "description": "content_new + pillar_launch require after snapshot + pillar (§20.2).",
       "if":   { "allOf": [
-                 { "properties": { "event_kind": { "const": "work" } } },
+                 { "required": ["event_kind"], "properties": { "event_kind": { "const": "work" } } },
                  { "properties": { "event_type": { "enum": ["content_new", "pillar_launch"] } } }
                ] },
       "then": { "required": ["after", "pillar"] }
@@ -315,7 +315,7 @@
     {
       "description": "schema_fix requires before + after schema_types (§20.2).",
       "if":   { "allOf": [
-                 { "properties": { "event_kind": { "const": "work" } } },
+                 { "required": ["event_kind"], "properties": { "event_kind": { "const": "work" } } },
                  { "properties": { "event_type": { "const": "schema_fix" } } }
                ] },
       "then": { "required": ["before", "after"] }
@@ -323,7 +323,7 @@
     {
       "description": "redirect_deployed + content_remove + backlink_outreach + manual + skill_<name> canonical entries require note. skill_X canonical entries inherit note discipline because legacy DSL workaround stored skill metadata in note alanı; canonical paterni'nde note hala structured data taşıyıcı (router context, improve_routing explanation, etc).",
       "if":   { "allOf": [
-                 { "properties": { "event_kind": { "const": "work" } } },
+                 { "required": ["event_kind"], "properties": { "event_kind": { "const": "work" } } },
                  { "properties": { "event_type": { "enum": ["redirect_deployed", "content_remove", "backlink_outreach", "manual", "skill_content_remediation", "skill_whats_next"] } } }
                ] },
       "then": { "required": ["note"] }
@@ -331,14 +331,14 @@
     {
       "description": "quickwin_applied requires cluster + before + after (title/meta change diff).",
       "if":   { "allOf": [
-                 { "properties": { "event_kind": { "const": "work" } } },
+                 { "required": ["event_kind"], "properties": { "event_kind": { "const": "work" } } },
                  { "properties": { "event_type": { "const": "quickwin_applied" } } }
                ] },
       "then": { "required": ["cluster", "before", "after"] }
     },
     {
       "description": "WORKFLOW kind required fields (ADR-020). workflow_action + workflow_run_id mandatory; step_index optional.",
-      "if":   { "properties": { "event_kind": { "const": "workflow" } } },
+      "if":   { "required": ["event_kind"], "properties": { "event_kind": { "const": "workflow" } } },
       "then": { "required": ["workflow_action", "workflow_run_id"] }
     }
   ],
