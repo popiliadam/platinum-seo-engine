@@ -1,5 +1,11 @@
 # SF MCP Hybrid Integration — Worker Prompts (Phase 1..7)
 
+> ⚠️ **HISTORICAL DESIGN DOC (P3-01).** Dated 2026-05-26; carries earlier SF MCP
+> call shapes that have since evolved. For the CURRENT SF contract see
+> `commands/pseo-sf-crawl.md` + the `sf-crawl-orchestrator` SKILL
+> (`skills/ingestion/sf-crawl-orchestrator/SKILL.md`). Preserved as-is for design
+> provenance — do not follow the tool-call shapes here verbatim.
+
 > **Companion file to:** `docs/superpowers/specs/2026-05-26-sf-mcp-hybrid-integration-design.md` (v2.2)
 > **Date:** 2026-05-26
 > **Author:** Manager session (Claude, Süleyman dispatch)

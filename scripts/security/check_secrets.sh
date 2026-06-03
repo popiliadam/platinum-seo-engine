@@ -1,8 +1,15 @@
 #!/usr/bin/env bash
 # ============================================================================
-# check_secrets.sh — Zero-secrets-on-disk enforcement
+# check_secrets.sh — Zero committed/tracked-secrets enforcement
 # ============================================================================
-# Runs at: bootstrap sign-off + every plugin install + PreToolUse hook
+# Policy: zero COMMITTED / CHANGED secrets — NOT "zero secrets on disk". A local
+#   .env that is GITIGNORED is allowed: it only emits a WARN and the exit stays
+#   0/GREEN (it can never be committed). A .env that is NOT gitignored, or a
+#   secret-shaped pattern in a tracked file, is a FAIL (exit 1/RED). See the
+#   .env handling in section 3 below + rules/secrets-management.md.
+# Runs at: bootstrap sign-off + every plugin install + PreToolUse hook (full or
+#   --changed-since incremental). CI uses the committed-only wrapper
+#   scripts/ci/check_secrets.sh (git grep HEAD).
 # Reference: docs/superpowers/specs/2026-04-30-platinum-seo-engine-design.md §8.7
 #            rules/secrets-management.md
 #
@@ -11,8 +18,8 @@
 #   (default root_dir = current working directory)
 #
 # Exit codes:
-#   0  GREEN — no secrets detected, safe to proceed
-#   1  RED   — secrets or credential artifacts detected, BLOCK
+#   0  GREEN — no committed/tracked secrets (a gitignored local .env only WARNs)
+#   1  RED   — committed/tracked secrets or credential artifacts detected, BLOCK
 # ============================================================================
 set -euo pipefail
 
@@ -276,7 +283,7 @@ if [ "$EXIT" -eq 1 ]; then
   echo "   Reference: rules/secrets-management.md"
   exit 1
 else
-  echo "SECURITY GATE GREEN (zero secrets detected)"
+  echo "SECURITY GATE GREEN (no committed/tracked secrets)"
   echo "   Last scan: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
   exit 0
 fi

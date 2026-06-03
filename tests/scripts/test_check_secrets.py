@@ -28,3 +28,26 @@ def test_runs_clean_on_empty_dir(tmp_path: Path) -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "GREEN" in result.stdout
+
+
+def _header() -> str:
+    """The leading comment block, before `set -euo pipefail`."""
+    return SCRIPT.read_text(encoding="utf-8").split("set -euo pipefail", 1)[0]
+
+
+def test_header_states_committed_policy_not_on_disk() -> None:
+    """P2-07: the script WARNs (not fails) on a gitignored .env (see section 3:
+    git check-ignore -> WARN, exit stays 0), so the policy is 'zero COMMITTED/
+    tracked secrets', NOT 'zero secrets on disk'. The header must say so."""
+    header = _header()
+    assert "Zero-secrets-on-disk" not in header, (
+        "header still claims 'Zero-secrets-on-disk' but a gitignored local .env "
+        "only WARNs (exit 0) — the policy is zero COMMITTED/tracked secrets"
+    )
+    assert ("committed" in header.lower()) or ("tracked" in header.lower()), (
+        "header must state the committed/tracked-secrets policy"
+    )
+    assert ("WARN" in header) and ("gitignore" in header.lower()), (
+        "header must document the gitignored-.env WARN allowance so the wording "
+        "and the code agree"
+    )
