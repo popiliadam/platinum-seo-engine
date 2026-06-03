@@ -66,14 +66,14 @@ jobs:
           "
         continue-on-error: false
 
-      # Step 5 — plugin agnostik invariant (.mcp.json 3 server + skill body slug hardcode YOK F-16)
+      # Step 5 — plugin agnostik invariant (.mcp.json 4 server + skill body slug hardcode YOK F-16)
       # Wave 2 strict: `|| true` mask removed (real exit code visible).
       # Adjacent-slug-pair patterns filter F-16 disclaimer multi-line lists
       # (real hardcode = 1 slug; disclaimer enumerates 8 slugs across 2-3 lines).
       - name: 5. plugin-agnostik-grep
         run: |
-          # .mcp.json 3 server invariant
-          test "$(jq '.mcpServers | keys | length' .mcp.json)" = "3"
+          # .mcp.json 4 server invariant (gsc + dataforseo + ScraplingServer + sf; v1.8 ADR-039)
+          test "$(jq '.mcpServers | keys | length' .mcp.json)" = "4"
           # Skill body slug grep — word-boundary + F-16 disclaimer exclude.
           # Filter expansion: adjacent-slug pairs catch multi-line disclaimer
           # continuation lines (lesson 28 mop-up 6'ıncı uygulama → Wave 2 strict).
@@ -90,7 +90,7 @@ jobs:
         run: bash scripts/ci/check_secrets.sh
         continue-on-error: false
 
-      # Step 7 — frontmatter-compile (skill-frontmatter.schema.json Draft7 validate her SKILL.md frontmatter, 43 SKILL.md compliance)
+      # Step 7 — frontmatter-compile (skill-frontmatter.schema.json Draft7 validate her SKILL.md frontmatter, 45 SKILL.md compliance)
       - name: 7. frontmatter-compile
         run: |
           python3 -c "
