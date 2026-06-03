@@ -10,7 +10,7 @@
     "currency", "platform", "profiles", "paths", "gsc", "dataforseo"
   ],
   "properties": {
-    "schema_version": { "const": "1.5", "description": "v1.5 (v1.8 Phase 1 D-SF-12): additive 'sf' block for Screaming Frog 24 native MCP integration. v1.4 docs MUST be migrated via scripts/migrations/migration_0005_project_config_1_4_to_1_5.py before validation against this schema (ADR-018 strict const). Prior bumps: v1.4 added bank entry enrichment (Migration 0004); v1.3 renamed brand_identity hitap/tone → pronoun_preference/formality (Migration 0003); v1.2 added singular 'profile' field; v1.1 added content_settings + brand_identity extension fields." },
+    "schema_version": { "const": "1.5", "description": "v1.5 (v1.8 Phase 1 D-SF-12): additive 'sf' block for Screaming Frog 24 native MCP integration. v1.4 docs MUST be migrated via scripts/migrations/migration_0005_project_config_1_4_to_1_5.py before validation against this schema (ADR-018 strict const). Prior bumps: v1.4 added bank entry enrichment (Migration 0004); v1.3 renamed brand_identity hitap/tone → pronoun_preference/formality (Migration 0003); v1.2 added singular 'profile' field; v1.1 added content_settings + brand_identity extension fields. This is the config CONTRACT version (bumped only by scripts/migrations/* migration scripts), distinct from the ENGINE RELEASE version (e.g. v1.9.4): the two axes version different things — the per-project data contract vs the shipped engine/plugin tooling." },
     "project_id": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]*$",
