@@ -4,7 +4,7 @@ description: |
   Use when: kullanıcı "yeni proje", "brand onboarding", "proje bootstrap",
   "wizard çalıştır", "yeni site ekle", "project-config oluştur" der ya da
   /pseo-brand-onboarding çağırır; brand_identity 18 + content_settings 14
-  + profile enum 5-value Süleyman input'u alarak project-config.schema 1.2
+  + profile enum 5-value Süleyman input'u alarak project-config.schema 1.5
   conformant staging output üretir.
   Also use when: workspace henüz yok (Phase 14 öncesi staging-only mode);
   domain DNS doğrulanması gerekiyor; profile heuristic suggest fallback
@@ -46,7 +46,7 @@ autonomy:
 
 10-step interactive wizard that captures brand identity + content
 settings + profile hint from Süleyman, validates against
-`schemas/project-config.schema.json` v1.2, and emits a
+`schemas/project-config.schema.json` v1.5, and emits a
 **staging-only** config artifact under `outputs/onboarding/`. The
 canonical `projects/{slug}/project.config.json` write is
 deferred to Phase 14 (workspace bring-up); pre-Phase-14 invocations
@@ -88,7 +88,7 @@ kabul edilmez.
   workflow_action=done, workflow_run_id={generated}). **Yazılır
   YALNIZCA** Süleyman onayı geldikten sonra (DURUR #1).
 - `outputs/onboarding/{slug}-staging-config.json` —
-  project-config.schema.json v1.2 conformant staging artifact;
+  project-config.schema.json v1.5 conformant staging artifact;
   validation amaçlı, `projects/{slug}/project.config.json`
   DEĞİLDİR (DURUR #5 STAGING-ONLY mode).
 
@@ -176,13 +176,13 @@ Aynı disiplin (default yok, skip = AMBER iterate). 14 alan:
 ### Step 6 — `projects/{slug}/project.config.json` YAZILMAZ
 
 Phase 14 öncesi workspace yok ya da skill scope dışında. Bu adım
-explicit no-op: skill **asla** `projects/{slug}/config/` dizinine
+explicit no-op: skill **asla** `projects/{slug}/project.config.json` dosyasına
 yazmaz. STAGING-ONLY (DURUR #5).
 
 ### Step 7 — Emit staging output package
 
 `outputs/onboarding/{slug}-staging-config.json` yazılır. İçerik
-`schemas/project-config.schema.json` v1.2 ile (Draft7) **validate
+`schemas/project-config.schema.json` v1.5 ile (Draft7) **validate
 edilir**; başarısızsa DURUR #3 (eksik alan iterate). Schema PASS
 olunca artifact diske inilir. Bu **staging** output; `init-project`
 Phase 14'te bunu input olarak okuyabilir, ama buradaki dosya
@@ -247,6 +247,13 @@ case-study HTML, top-20 keywords). Output: `draft_experience_entries`
 + `draft_research_entries` + `topic_candidates`. F-16 budget
 pre-flight short-circuits to DURUR awaiting_approval if DFS daily
 credits are exhausted.
+
+> **STAGING-ONLY (P1-12) — real discovery deferred.** Stage A is stubbed
+> today: `discover()` returns empty drafts until the live-MCP wiring lands
+> (Phase 11 Wave 2) and the full staging→canonical flow goes live with
+> workspace bring-up (Phase 14). It never spends paid credits and never
+> writes project state — the 5 profile-aware questions below are the
+> operator's manual fallback in the meantime.
 
 **Stage B — Operator Review:**
 `scripts/meta/brand_onboarding_review.generate_review_prompt()`
@@ -320,7 +327,7 @@ test'le doğrulanır (`tests/skills/test_brand_onboarding.py`).
 ## Cross-references
 
 - Schemas: `schemas/skill-frontmatter.schema.json` (frontmatter
-  contract), `schemas/project-config.schema.json` v1.2 (staging
+  contract), `schemas/project-config.schema.json` v1.5 (staging
   artifact validation), `schemas/events.schema.json` v1.0
   (workflow event_kind discipline ADR-020).
 - Skills: `init-project` (Phase 14 staging consumer),

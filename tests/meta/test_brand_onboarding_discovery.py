@@ -70,3 +70,27 @@ def test_discover_skips_paid_mcp_when_budget_exhausted(
     result = discover(project_slug="test")
     assert result["status"] == "awaiting_approval"
     assert "budget" in result["reason"].lower()
+
+
+def test_discover_founding_year_uses_live_utc_year_not_hardcoded(
+    mock_dfs_whois_2018, mock_scrapling, tmp_workspace_factory, monkeypatch
+) -> None:
+    """P1-12: the experience-claim 'X+ yıl' math must subtract founding_year
+    from the LIVE UTC year, never a hardcoded constant. Pin the year to 2030
+    and assert the claim reflects 2030-2018=12 (it would read 8 if 2026 were
+    still hardcoded). This keeps the auto-discovery claim truthful every year
+    without a code edit."""
+    from scripts.meta import brand_onboarding_discovery as d
+
+    monkeypatch.setattr(d, "_current_year", lambda: 2030, raising=False)
+    tmp_workspace_factory(slug="test", profiles=["b2b-saas"])
+    result = discover(project_slug="test")
+
+    founding = [
+        e for e in result["draft_experience_entries"]
+        if "founding" in e.get("hint", "")
+    ]
+    assert len(founding) >= 1
+    assert "12+ yıl" in founding[0]["claim_core"], (
+        f"expected dynamic 2030-2018=12 yıl, got: {founding[0]['claim_core']!r}"
+    )
