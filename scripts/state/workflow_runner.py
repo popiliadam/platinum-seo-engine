@@ -516,8 +516,14 @@ def request_approval(
 
 def _do(run_id: str, new_status: str, action: str, *,
         project_slug: str, workspace_root: Path | None,
-        schema_path: Path | None, **context: Any) -> RunHandle:
-    """Shared transition+emit. action = workflow_action enum string."""
+        schema_path: Path | None, event_notes: str | None = None,
+        **context: Any) -> RunHandle:
+    """Shared transition+emit. action = workflow_action enum string.
+
+    event_notes (P1-10): optional free-text mirrored into the emitted workflow
+    event's `notes` metadata (e.g. pause reason / approve notes). The same text
+    is persisted into the run JSON by the caller via `context`.
+    """
     handle = transition(
         run_id, new_status,
         project_slug=project_slug,
@@ -528,6 +534,7 @@ def _do(run_id: str, new_status: str, action: str, *,
     _emit_workflow_event(
         project_slug=project_slug, workflow_action=action,
         workflow_run_id=run_id, workspace_root=workspace_root,
+        notes=event_notes,
     )
     return handle
 
@@ -535,12 +542,16 @@ def _do(run_id: str, new_status: str, action: str, *,
 def approve(run_id: str, *, project_slug: str, approver: str,
             notes: str | None = None, workspace_root: Path | None = None,
             schema_path: Path | None = None) -> RunHandle:
-    """Resume awaiting_approval → running."""
+    """Resume awaiting_approval → running. notes (P1-10): persisted into the run
+    JSON and mirrored into the emitted workflow event metadata."""
     if not approver:
         raise ValidationError("approver is required for approve()")
+    context: dict[str, Any] = {"resumed_at": _utc_iso_z()}
+    if notes:
+        context["notes"] = notes
     return _do(run_id, "running", "approved",
                project_slug=project_slug, workspace_root=workspace_root,
-               schema_path=schema_path, resumed_at=_utc_iso_z())
+               schema_path=schema_path, event_notes=notes, **context)
 
 
 def reject(run_id: str, *, project_slug: str, approver: str, reason: str,
@@ -564,10 +575,14 @@ def reject(run_id: str, *, project_slug: str, approver: str, reason: str,
 def pause(run_id: str, *, project_slug: str, reason: str | None = None,
           workspace_root: Path | None = None,
           schema_path: Path | None = None) -> RunHandle:
-    """Pause running or awaiting_approval → paused."""
+    """Pause running or awaiting_approval → paused. reason (P1-10): persisted
+    into the run JSON and mirrored into the emitted workflow event metadata."""
+    context: dict[str, Any] = {"paused_at": _utc_iso_z()}
+    if reason:
+        context["reason"] = reason
     return _do(run_id, "paused", "paused",
                project_slug=project_slug, workspace_root=workspace_root,
-               schema_path=schema_path, paused_at=_utc_iso_z())
+               schema_path=schema_path, event_notes=reason, **context)
 
 
 def resume(run_id: str, *, project_slug: str,
@@ -618,6 +633,17 @@ def retry(run_id: str, *, project_slug: str,
         data["status"] = "running"
         data["retry_count"] = int(data.get("retry_count", 0)) + 1
         data["updated_at"] = _utc_iso_z()
+        # P1-10: preserve the prior terminal timing before clearing ended_at —
+        # otherwise the ended_at of each failed attempt is lost forever.
+        prior: dict[str, Any] = {}
+        if "ended_at" in data:
+            prior["ended_at"] = data["ended_at"]
+        if "failure_reason" in data:
+            prior["failure_reason"] = data["failure_reason"]
+        if prior:
+            history = list(data.get("retry_history", []))
+            history.append(prior)
+            data["retry_history"] = history
         # Clear ended_at; keep failure_reason as historical evidence.
         if "ended_at" in data:
             del data["ended_at"]
@@ -749,16 +775,28 @@ def _patch_step(
 
 def _emit_workflow_event(*, project_slug: str, workflow_action: str,
                          workflow_run_id: str, workspace_root: Path | None,
-                         step_index: int | None = None) -> None:
-    """Emit event_kind=workflow (ADR-020). Failure does NOT undo run JSON write."""
+                         step_index: int | None = None,
+                         notes: str | None = None) -> None:
+    """Emit event_kind=workflow (ADR-020). Failure does NOT undo the run JSON
+    write — emission is non-blocking by design. P1-10: a failed emit is no
+    longer swallowed silently; it surfaces a visible WARNING on stderr. The
+    catch is broad (any exception) so an event-writer hiccup can never roll back
+    a transition that already committed to disk. `notes` (when given) is mirrored
+    into the event's free-text metadata (pause reason / approve notes)."""
+    extra: dict[str, Any] = {}
+    if notes:
+        extra["notes"] = notes
     try:
         events_writer.append_workflow(
             project_id=project_slug, workflow_action=workflow_action,
             workflow_run_id=workflow_run_id, step_index=step_index,
-            workspace_root=workspace_root,
+            workspace_root=workspace_root, **extra,
         )
-    except events_writer.EventWriterError as exc:  # pragma: no cover
-        _log(f"workflow event emit failed ({workflow_action} {workflow_run_id}): {exc}")
+    except Exception as exc:
+        _log(
+            f"WARNING: workflow event emit failed (non-blocking) "
+            f"({workflow_action} {workflow_run_id}): {exc}"
+        )
 
 
 # ---------------------------------------------------------------------------

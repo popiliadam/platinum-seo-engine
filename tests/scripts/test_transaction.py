@@ -103,11 +103,13 @@ def test_happy_path_write_topical_map(tmp_path: Path) -> None:
 
     wb = load_workbook(wb_path)
     ws = wb["topical_map"]
-    # Header row + 3 data rows.
-    assert ws.max_row == 4
-    assert ws["A1"].value == "pillar"
-    assert ws["C2"].value == "kw 0"
-    assert ws["C4"].value == "kw 2"
+    # P1-09: header lands at the schema header_row (topical_map=4); data follows
+    # at data_start_row (5). Row 1 is no longer clobbered with a spurious header.
+    assert ws.max_row == 7
+    assert ws["A1"].value is None
+    assert ws["A4"].value == "pillar"
+    assert ws["C5"].value == "kw 0"
+    assert ws["C7"].value == "kw 2"
 
     # Provenance event was emitted.
     events_path = state / "events.jsonl"
@@ -653,20 +655,26 @@ def test_replace_on_empty_data_block(tmp_path: Path) -> None:
 
 
 def test_append_mode_unchanged(tmp_path: Path) -> None:
-    # Regression guard: append still lands at max_row+1 (NOT data_start_row).
-    # topical_map's data_start_row is 5, but append writes at row 2 on a fresh
-    # _ensure_sheet_with_header sheet — proving append is byte-identical.
+    # Regression guard: append still lands at _next_data_row (max_row+1), NOT a
+    # recomputed data_start_row. P1-09: with the header now at the schema
+    # header_row (topical_map=4), the first append lands at row 5 (= max_row+1)
+    # and row 1 is no longer clobbered. The cursor is still physical: a second
+    # append advances to row 6 rather than resetting.
     proj, _ = _setup_project(tmp_path)
     wb_path = proj / "master.xlsx"
-    result = transaction.append(wb_path, "topical_map", [_topical_row()], "test-proj")
+    transaction.append(wb_path, "topical_map", [_topical_row()], "test-proj")
+    result = transaction.append(
+        wb_path, "topical_map", [_topical_row(primary_keyword="second")], "test-proj"
+    )
     assert result.rows_affected == 1
 
     wb = load_workbook(wb_path)
     ws = wb["topical_map"]
-    # Header at row 1, data appended at row 2 (max_row+1), max_row == 2.
-    assert ws["A1"].value == "pillar"
-    assert ws.max_row == 2
-    assert ws["A2"].value == "P01_sofa_sets"
+    assert ws["A1"].value is None            # row 1 not clobbered
+    assert ws["A4"].value == "pillar"        # header at header_row=4
+    assert ws["A5"].value == "P01_sofa_sets"  # first append at row 5
+    assert ws["C6"].value == "second"        # second append advances to row 6
+    assert ws.max_row == 6
 
 
 def test_update_starts_at_data_start_row_not_row_2(tmp_path: Path) -> None:
@@ -677,6 +685,10 @@ def test_update_starts_at_data_start_row_not_row_2(tmp_path: Path) -> None:
     must never be matched or mutated by update(); otherwise update() corrupts the
     header block and over-counts rows_affected. Regression guard for the
     `range(2, ...)` scan bug (the same data_start_row contract replace() honors).
+
+    P1-09: the plant lives at row 2 (a blank row above data_start_row that is NOT
+    the header row=3), since _ensure_sheet_with_header now correctly (re)writes the
+    canonical header at row 3.
     """
     proj, _ = _setup_project(tmp_path)
     wb_path = proj / "master.xlsx"
@@ -687,15 +699,16 @@ def test_update_starts_at_data_start_row_not_row_2(tmp_path: Path) -> None:
         header_row=3, data_start_row=4,
         data_rows=[_tech_seo_values(r) for r in seeded],
     )
-    # Adversary: plant a schema-valid row at row 3 (ABOVE data_start_row=4) whose
-    # `detail` collides with the where clause. A correct update() ignores it.
+    # Adversary: plant a schema-valid row at row 2 (ABOVE data_start_row=4, and not
+    # the header row=3) whose `detail` collides with the where clause. A correct
+    # update() scans only from data_start_row and ignores it.
     wb = load_workbook(str(wb_path))
     ws = wb["tech_seo"]
     planted = _tech_seo_values(
-        _tech_seo_row(detail="COLLIDE", resolution="HEADER-UNTOUCHED")
+        _tech_seo_row(detail="COLLIDE", resolution="ABOVE-UNTOUCHED")
     )
     for col_idx, val in enumerate(planted, start=1):
-        ws.cell(row=3, column=col_idx, value=val)
+        ws.cell(row=2, column=col_idx, value=val)
     wb.save(str(wb_path))
 
     result = transaction.update(
@@ -707,9 +720,9 @@ def test_update_starts_at_data_start_row_not_row_2(tmp_path: Path) -> None:
 
     res_col = _TECH_SEO_HEADERS.index("resolution") + 1
     check = load_workbook(wb_path)["tech_seo"]
-    # Only the row-4 data row matches — the planted row-3 is above data_start_row.
+    # Only the row-4 data row matches — the planted row-2 is above data_start_row.
     assert result.rows_affected == 1
-    # Row 3 (above data_start_row) must be untouched by update().
-    assert check.cell(row=3, column=res_col).value == "HEADER-UNTOUCHED"
+    # Row 2 (above data_start_row) must be untouched by update().
+    assert check.cell(row=2, column=res_col).value == "ABOVE-UNTOUCHED"
     # The real data row at row 4 IS updated (positive path still works).
     assert check.cell(row=4, column=res_col).value == "FIXED"

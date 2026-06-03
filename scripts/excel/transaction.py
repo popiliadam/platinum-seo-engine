@@ -200,8 +200,13 @@ def _resolve_definition_ref(schema: dict, ref: str) -> dict:
     return defs[name]
 
 
-def _build_row_validator(schema: dict, sheet: str) -> Draft7Validator:
-    """Synthesize a Draft7 validator for a single row of the named sheet."""
+def _build_row_validator(schema: dict, sheet: str, *, allow_extra: bool = False) -> Draft7Validator:
+    """Synthesize a Draft7 validator for a single row of the named sheet.
+
+    allow_extra (P1-09): when False (default), unknown row keys are REJECTED
+    (additionalProperties:false) so a typo'd column name surfaces instead of
+    being silently dropped at write time. Pass True to keep the legacy behaviour
+    (extras validate, then get skipped because they have no column)."""
     sheets = schema.get("sheets") or {}
     if sheet not in sheets:
         raise SchemaSheetMismatchError(
@@ -251,7 +256,10 @@ def _build_row_validator(schema: dict, sheet: str) -> Draft7Validator:
     row_schema = {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
-        "additionalProperties": True,  # per-row dicts may carry extras; primary check is required+typed
+        # P1-09: closed by default — an unknown key is almost always a typo and
+        # would otherwise be silently dropped at write time. allow_extra=True
+        # reopens it for callers that intentionally carry non-column metadata.
+        "additionalProperties": bool(allow_extra),
         "required": required,
         "properties": properties,
     }
@@ -561,8 +569,19 @@ def _ordered_columns(schema: dict, sheet: str) -> list[dict]:
     return list(schema["sheets"][sheet]["required_columns"])
 
 
-def _ensure_sheet_with_header(wb: Workbook, sheet: str, columns: list[dict]) -> None:
-    """Create the sheet if missing; ensure row 1 has the header in column order."""
+def _ensure_sheet_with_header(
+    wb: Workbook, sheet: str, columns: list[dict], header_row: int = 1
+) -> None:
+    """Create the sheet if missing; ensure the header lands at `header_row`.
+
+    P1-09: previously the header was always written to row 1, which disagreed
+    with the schema header_row (>=3 for 18/19 sheets) and the data_start_row
+    (=header_row+1) used by replace() and every reader — so a freshly-created
+    sheet had its header at row 1 but data was expected at row 5. Writing the
+    header at the declared header_row keeps creation, replace(), append's
+    _next_data_row landing, and all readers consistent, and stops the spurious
+    row-1 header that clobbered template title blocks on bootstrap-seeded sheets.
+    """
     if sheet in wb.sheetnames:
         ws = wb[sheet]
     else:
@@ -570,10 +589,10 @@ def _ensure_sheet_with_header(wb: Workbook, sheet: str, columns: list[dict]) -> 
         ws = wb.create_sheet(sheet)
         if "Sheet" in wb.sheetnames and wb["Sheet"].max_row == 1 and wb["Sheet"].max_column == 1 and wb["Sheet"]["A1"].value is None:
             del wb["Sheet"]
-    # Always (re)write the header row in canonical order.
+    # Always (re)write the header row in canonical order at the schema header_row.
     header_names = [c["name"] for c in columns]
     for col_idx, name in enumerate(header_names, start=1):
-        ws.cell(row=1, column=col_idx, value=name)
+        ws.cell(row=header_row, column=col_idx, value=name)
 
 
 def _row_to_tuple(row: dict, columns: list[dict]) -> tuple:
@@ -605,6 +624,21 @@ def _data_start_row(schema: dict, sheet: str) -> int:
     return 2
 
 
+def _header_row(schema: dict, sheet: str) -> int:
+    """Physical row where the column HEADER lives for `sheet` (P1-09).
+
+    Mirrors _data_start_row: returns the schema's declared header_row (3/4/5 for
+    template-seeded sheets) or 1 for legacy sheets that declare none. The invariant
+    data_start_row == header_row + 1 holds across the schema, so writing the header
+    here keeps append/replace landing + readers aligned.
+    """
+    sdef = schema.get("sheets", {}).get(sheet, {})
+    declared = sdef.get("header_row")
+    if isinstance(declared, int) and declared >= 1:
+        return declared
+    return 1
+
+
 # ---------------------------------------------------------------------------
 # Public API — write / append / update
 # ---------------------------------------------------------------------------
@@ -618,18 +652,20 @@ def write(
     schema_path: Path | str | None = None,
     state_root: Path | str | None = None,
     writer: str | None = None,
+    allow_extra: bool = False,
 ) -> WriteResult:
     """
     Append-and-replace write: appends `rows` to `sheet`, atomically.
 
     The 'replace' aspect is not destructive: existing rows are preserved.
     Use update() for in-place mutation. The function name 'write' is
-    retained for back-compat with the brief.
+    retained for back-compat with the brief. allow_extra (P1-09): keep False to
+    reject unknown row keys (typo guard); True restores the legacy skip.
     """
     return _write_or_append(
         workbook_path, sheet, rows, project_slug,
         schema_path=schema_path, state_root=state_root, writer=writer,
-        mode="append",
+        mode="append", allow_extra=allow_extra,
     )
 
 
@@ -642,12 +678,14 @@ def append(
     schema_path: Path | str | None = None,
     state_root: Path | str | None = None,
     writer: str | None = None,
+    allow_extra: bool = False,
 ) -> WriteResult:
-    """Append rows to the bottom of `sheet`. Alias for write(mode='append')."""
+    """Append rows to the bottom of `sheet`. Alias for write(mode='append').
+    allow_extra (P1-09): keep False to reject unknown row keys; True skips them."""
     return _write_or_append(
         workbook_path, sheet, rows, project_slug,
         schema_path=schema_path, state_root=state_root, writer=writer,
-        mode="append",
+        mode="append", allow_extra=allow_extra,
     )
 
 
@@ -660,6 +698,7 @@ def replace(
     schema_path: Path | str | None = None,
     state_root: Path | str | None = None,
     writer: str | None = None,
+    allow_extra: bool = False,
 ) -> WriteResult:
     """Idempotent refresh: clear `sheet`'s data block, then write `rows`.
 
@@ -669,12 +708,13 @@ def replace(
     header block (rows 1..data_start_row-1) is preserved verbatim. Schema
     validation runs BEFORE the lock/clear, so an invalid payload leaves the
     sheet untouched. Same atomic envelope as append (backup → atomic_save →
-    rotate, provenance emit).
+    rotate, provenance emit). allow_extra (P1-09): keep False to reject unknown
+    row keys; True skips them.
     """
     return _write_or_append(
         workbook_path, sheet, rows, project_slug,
         schema_path=schema_path, state_root=state_root, writer=writer,
-        mode="replace",
+        mode="replace", allow_extra=allow_extra,
     )
 
 
@@ -713,7 +753,7 @@ def update(
     fd = _acquire_lock(lock_path)
     try:
         wb = _load_or_new(workbook_path)
-        _ensure_sheet_with_header(wb, sheet, columns)
+        _ensure_sheet_with_header(wb, sheet, columns, _header_row(schema, sheet))
         ws = wb[sheet]
 
         col_index = {c["name"]: idx for idx, c in enumerate(columns, start=1)}
@@ -783,6 +823,7 @@ def _write_or_append(
     state_root: Path | str | None,
     writer: str | None,
     mode: str,
+    allow_extra: bool = False,
 ) -> WriteResult:
     if mode not in ("append", "replace"):
         raise TransactionError(f"unsupported mode: {mode!r}")
@@ -799,8 +840,8 @@ def _write_or_append(
     # 2. Writer scope (master_task only, currently).
     _check_writer_scope(schema, sheet, writer)
 
-    # 3. Per-row schema validation.
-    validator = _build_row_validator(schema, sheet)
+    # 3. Per-row schema validation. P1-09: unknown keys rejected unless allow_extra.
+    validator = _build_row_validator(schema, sheet, allow_extra=allow_extra)
     if not isinstance(rows, list):
         raise RowSchemaError("rows must be a list of dicts")
     _validate_rows(rows, validator)
@@ -817,7 +858,7 @@ def _write_or_append(
     fd = _acquire_lock(lock_path)
     try:
         wb = _load_or_new(workbook_path)
-        _ensure_sheet_with_header(wb, sheet, columns)
+        _ensure_sheet_with_header(wb, sheet, columns, _header_row(schema, sheet))
         ws = wb[sheet]
 
         # Resolve the write cursor by mode. append: bottom of existing data
@@ -890,13 +931,12 @@ def _emit_provenance(
     grandparent is the workspace root expected by events_writer.
     """
     workspace_root = state_root.parent.parent  # projects/<slug> → projects → workspace
-    run_id = events_writer.next_run_id(project_slug, workspace_root=workspace_root)
     # source.kind enum (events.schema): manual | tool_computed | sf_csv | *_mcp.
     # An Excel projection by transaction.py is internally tool_computed —
     # it's the engine writing structured output, not a human key-by-key edit.
+    # run_id auto-allocated race-free under the append flock (P1-11).
     result = events_writer.append_provenance(
         project_id=project_slug,
-        run_id=run_id,
         source={"kind": "tool_computed"},
         operation=operation,
         target_excel_sheet=sheet,

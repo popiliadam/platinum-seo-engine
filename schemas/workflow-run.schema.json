@@ -185,6 +185,44 @@
       "minimum": 0,
       "default": 0,
       "description": "Retry attempts (incremented on each failed → running transition via retry()). ADR-019 additive bump; default 0 backward-compat."
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Free-text reason captured when a run is paused via pause(reason=...). Previously accepted but silently dropped (P1-10); now persisted into the run JSON and mirrored into the emitted workflow event 'notes' metadata."
+    },
+    "notes": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Free-text approver notes captured when an awaiting_approval run is approved via approve(notes=...). Previously accepted but silently dropped (P1-10); now persisted into the run JSON and mirrored into the emitted workflow event 'notes' metadata."
+    },
+    "retry_history": {
+      "type": "array",
+      "description": "Append-only archive of prior terminal attempts, preserved across retry() calls. Before retry() clears ended_at, the prior {ended_at, failure_reason} is pushed here so the terminal timing of earlier attempts is never lost (P1-10).",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "ended_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ended_at of the failed attempt that was retried (copied before retry() cleared it)."
+          },
+          "failure_reason": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "failure_reason of the failed attempt that was retried. Mirrors the top-level failure_reason shape.",
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": ["validation_error", "mcp_error", "budget_exhausted", "user_rejected", "timeout", "internal_error"]
+              },
+              "message": { "type": "string", "minLength": 1 },
+              "step_index": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      }
     }
   },
 
