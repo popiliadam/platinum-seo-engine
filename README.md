@@ -240,7 +240,7 @@ Browse the full catalog: [`skills/`](skills/). Slash commands map 1:1 to commonl
   - `dataforseo-mcp-server` (DataForSEO, stdio)
   - `Scrapling` (stealthy site fetching, antibot fallback, stdio)
   - `sf` (Screaming Frog 24 native MCP, **HTTP** `http://127.0.0.1:11435/mcp` — v1.8 ADR-039)
-- **JSON Schema** (Draft 2020-12) — 21 schemas in `schemas/` (20 `*.schema.json` + `cross-sheet-invariants.json`).
+- **JSON Schema** (Draft 7) — 21 schemas in `schemas/` (20 `*.schema.json` + `cross-sheet-invariants.json`).
 - **Excel** as the operational data plane (`master.xlsx`), **JSONL** for the append-only event log.
 - **GitHub Actions** — CI runs schema validation, drift-check, lint, and 1,100+ pytest tests on every push.
 
