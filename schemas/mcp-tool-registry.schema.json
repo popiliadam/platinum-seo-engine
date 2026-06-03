@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "http://platinum-seo-engine/schemas/mcp-tool-registry",
   "title": "MCP Tool Registry v1.0",
-  "description": "Schema for the per-project MCP tool registry — a single inventory of every MCP server declared in .mcp.json and every tool that server exposes. Acceptance criterion §34 row 10: `claude mcp list` output MUST match this registry (exit 1 on drift). Distinct from the mapping files: gsc-tool-mapping.json / dataforseo-endpoint-mapping.json / scrapling-output-mapping.json describe HOW a tool feeds Excel sheets; this registry describes WHICH tools are declared to exist and their version locks + capabilities + auth method. Keeps the runtime surface (what Claude can actually call) auditable against the configured surface (what the project said it runs). Version locks here use the same const pattern as S3-D-1 (dataforseo-mcp-server const '2.8.9').",
+  "description": "Schema for the per-project MCP tool registry — a single inventory of every MCP server declared in .mcp.json and every tool that server exposes. Acceptance criterion §34 row 10: `claude mcp list` output MUST match this registry (exit 1 on drift). Distinct from the mapping files: gsc-tool-mapping.json / dataforseo-endpoint-mapping.json / scrapling-output-mapping.json describe HOW a tool feeds Excel sheets; this registry describes WHICH tools are declared to exist and their version locks + capabilities + auth method. Keeps the runtime surface (what Claude can actually call) auditable against the configured surface (what the project said it runs). Version locks here use the same exact-pin pattern as S3-D-1 (e.g. dataforseo-mcp-server); the authoritative value lives in servers.dataforseo.version_lock and is asserted equal to the @<ver> pinned in .mcp.json by tests/schemas/test_mcp_registry_versions_match_mcp_json.py (P0-03) — do not hardcode the number here.",
   "type": "object",
   "required": ["schema_version", "servers"],
   "additionalProperties": false,
@@ -55,6 +55,11 @@
       "additionalProperties": false,
       "properties": {
         "display_name": { "type": "string", "minLength": 1 },
+        "mcp_json_key": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Explicit alias for the matching key in .mcp.json mcpServers when it differs from this registry's canonical (lowercase) server key — e.g. scrapling here is 'ScraplingServer' in .mcp.json (D-SF-02). Mirrors validate_invariants._MCP_JSON_KEY_ALIASES; the F-24 invariant + tests/schemas/test_skill_mcp_tools_exist_in_registry.py rely on it. Omit when the .mcp.json key already equals the registry key."
+        },
         "runtime": { "$ref": "#/definitions/runtime" },
         "package": {
           "type": "string",
