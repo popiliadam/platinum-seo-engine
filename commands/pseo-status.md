@@ -4,7 +4,7 @@ description: |
   Also use when: bir oturumun başında aktif projenin _state/workflows/ altında bekleyen `running`, `paused`, `awaiting_approval` run'larını listelemek; sonraki adım için Phase 5 `whats-next` skill'ine routing önermek gerekir.
   Do not use when: yeni proje açma (`/pseo-init`), aylık rapor (`/pseo-monthly`), drift kontrol (`/pseo-driftcheck`) veya quick-win analizi (`/pseo-quickwin`) istendiğinde — her birinin kendi komutu vardır.
 argument-hint: "[project-slug]"
-allowed-tools: Bash(python3:*), Bash(cat:*), Bash(jq:*), Bash(ls:*), Read
+allowed-tools: Bash(python3:*), Bash(cat:*), Bash(jq:*), Bash(ls:*), Bash(curl:*), Bash(find:*), Bash(grep:*), Bash(sort:*), Bash(tail:*), Bash(xargs:*), Read
 model: sonnet
 ---
 

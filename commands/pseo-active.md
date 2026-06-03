@@ -4,7 +4,7 @@ description: |
   Also use when: portföyde birden fazla proje var ve sonraki komutların (`/pseo-status`, `/pseo-quickwin`, `/pseo-monthly`, `/pseo-driftcheck`) hangi projeye uygulanacağını belirten `shared/active.json` marker'ı set edilecek.
   Do not use when: yeni bir proje açma (`/pseo-init`), aktif projenin durumunu görme (`/pseo-status`) ya da tek seferlik bir komuta slug'ı argüman olarak doğrudan geçirmek yeterliyse.
 argument-hint: "<slug>"
-allowed-tools: Bash(python3:*), Bash(jq:*), Bash(ls:*), Read
+allowed-tools: Bash(python3:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Read
 model: sonnet
 ---
 
