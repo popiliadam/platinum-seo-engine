@@ -21,6 +21,7 @@
     "market":       { "type": "string", "description": "ISO 3166-1 alpha-2 country or region code (e.g. TR, NG). Resolution priority: project.config.market is the authoritative root (this field); defaults.market — if present in legacy overlays — is deprecated and MUST NOT be relied on by new skills (K11)." },
     "language": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["content_locale"],
       "properties": {
         "content_locale":  { "type": "string", "description": "IETF BCP 47 (e.g. tr-TR, en-NG)" },
@@ -52,6 +53,7 @@
     },
     "paths": {
       "type": "object",
+      "additionalProperties": false,
       "required": [
         "workspace_root", "excel_filename", "sf_exports_dir",
         "staging_dir", "reports_dir", "blog_dir", "backups_dir"
@@ -68,6 +70,7 @@
     },
     "gsc": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["site_url"],
       "properties": {
         "site_url":                { "type": "string", "format": "uri" },
@@ -76,6 +79,7 @@
     },
     "dataforseo": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["location_code", "language_code"],
       "properties": {
         "location_code":          { "type": "integer" },
@@ -134,7 +138,10 @@
     },
     "brand": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
+        "niche":       { "type": "string", "description": "Short brand niche/sector slug (e.g. bebek-guvenlik-bakim). Free-form metadata for content-skill context. Added to properties so closing `brand` (P1-03) keeps accepting this real key used by live configs." },
+        "description": { "type": "string", "description": "Human-readable one-line brand description. Free-form metadata. Added to properties for the same P1-03 reason as `niche`." },
         "patterns": {
           "type": "array",
           "items": { "type": "string" },
@@ -190,9 +197,9 @@
         "video_integration":       { "enum": ["none", "youtube", "vimeo", "self-hosted"], "default": "none", "description": "Phase 10. Video schema markup + render strategy." },
         "internal_data_sharing":   { "type": "boolean", "default": false, "description": "R-116. Internal data aggregate-only paylaşım izni. KVKK/GDPR." },
         "external_uniqueness_check": { "type": "boolean", "default": false, "description": "R-117. Pre-publish content uniqueness check (paragraph shingling vs SERP top-10), threshold ≥ 70%." },
-        "original_research_database": { "type": "array", "items": { "type": "object", "properties": { "id": { "type": "string" }, "title": { "type": "string" }, "summary": { "type": "string" }, "method": { "type": "string" }, "date": { "type": "string", "format": "date" }, "data_url": { "type": "string", "format": "uri" }, "applicable_topics": { "type": "array", "items": { "type": "string" }, "default": [], "description": "v1.4 R-121: topic relevance filter; empty = eligible everywhere." }, "phrasings": { "type": "array", "items": { "type": "string" }, "default": [], "description": "v1.4 R-121: rotation variants for same fact (anti-parrot)." }, "last_used_in_content_id": { "type": ["string", "null"], "default": null, "description": "v1.4 R-121: drift detection; last content piece that consumed this entry." }, "max_usage_per_month": { "type": "integer", "minimum": 1, "maximum": 12, "default": 3, "description": "v1.4 R-121: density cap; max times this entry may appear per month across content." } }, "required": ["id", "title"] }, "description": "R-114. Original research bank-driven. Skill bu array'den lookup; uydurma research yasak. v1.4: 4 R-121 enrichment field added." },
-        "experience_database":     { "type": "array", "items": { "type": "object", "properties": { "id": { "type": "string" }, "context": { "type": "string" }, "outcome": { "type": "string" }, "date": { "type": "string", "format": "date" }, "applicable_topics": { "type": "array", "items": { "type": "string" }, "default": [], "description": "v1.4 R-121: topic relevance filter; empty = eligible everywhere." }, "phrasings": { "type": "array", "items": { "type": "string" }, "default": [], "description": "v1.4 R-121: rotation variants for same fact (anti-parrot)." }, "last_used_in_content_id": { "type": ["string", "null"], "default": null, "description": "v1.4 R-121: drift detection; last content piece that consumed this entry." }, "max_usage_per_month": { "type": "integer", "minimum": 1, "maximum": 12, "default": 3, "description": "v1.4 R-121: density cap; max times this entry may appear per month across content." } }, "required": ["id", "context"] }, "description": "R-119, R-105. First-hand experience + expert quote bank-driven; skill bu array'den lookup. v1.4: 4 R-121 enrichment field added." },
-        "video_database":          { "type": "array", "items": { "type": "object", "properties": { "id": { "type": "string" }, "title": { "type": "string" }, "url": { "type": "string", "format": "uri" }, "embed_url": { "type": "string", "format": "uri" }, "duration_iso8601": { "type": "string" }, "thumbnail_url": { "type": "string", "format": "uri" } }, "required": ["id", "title", "url"] }, "description": "Phase 10. VideoObject schema markup için video bankası." },
+        "original_research_database": { "type": "array", "items": { "type": "object", "additionalProperties": false, "properties": { "id": { "type": "string" }, "title": { "type": "string" }, "summary": { "type": "string" }, "method": { "type": "string" }, "date": { "type": "string", "format": "date" }, "data_url": { "type": "string", "format": "uri" }, "applicable_topics": { "type": "array", "items": { "type": "string" }, "default": [], "description": "v1.4 R-121: topic relevance filter; empty = eligible everywhere." }, "phrasings": { "type": "array", "items": { "type": "string" }, "default": [], "description": "v1.4 R-121: rotation variants for same fact (anti-parrot)." }, "last_used_in_content_id": { "type": ["string", "null"], "default": null, "description": "v1.4 R-121: drift detection; last content piece that consumed this entry." }, "max_usage_per_month": { "type": "integer", "minimum": 1, "maximum": 12, "default": 3, "description": "v1.4 R-121: density cap; max times this entry may appear per month across content." } }, "required": ["id", "title"] }, "description": "R-114. Original research bank-driven. Skill bu array'den lookup; uydurma research yasak. v1.4: 4 R-121 enrichment field added." },
+        "experience_database":     { "type": "array", "items": { "type": "object", "additionalProperties": false, "properties": { "id": { "type": "string" }, "context": { "type": "string" }, "outcome": { "type": "string" }, "date": { "type": "string", "format": "date" }, "applicable_topics": { "type": "array", "items": { "type": "string" }, "default": [], "description": "v1.4 R-121: topic relevance filter; empty = eligible everywhere." }, "phrasings": { "type": "array", "items": { "type": "string" }, "default": [], "description": "v1.4 R-121: rotation variants for same fact (anti-parrot)." }, "last_used_in_content_id": { "type": ["string", "null"], "default": null, "description": "v1.4 R-121: drift detection; last content piece that consumed this entry." }, "max_usage_per_month": { "type": "integer", "minimum": 1, "maximum": 12, "default": 3, "description": "v1.4 R-121: density cap; max times this entry may appear per month across content." } }, "required": ["id", "context"] }, "description": "R-119, R-105. First-hand experience + expert quote bank-driven; skill bu array'den lookup. v1.4: 4 R-121 enrichment field added." },
+        "video_database":          { "type": "array", "items": { "type": "object", "additionalProperties": false, "properties": { "id": { "type": "string" }, "title": { "type": "string" }, "url": { "type": "string", "format": "uri" }, "embed_url": { "type": "string", "format": "uri" }, "duration_iso8601": { "type": "string" }, "thumbnail_url": { "type": "string", "format": "uri" } }, "required": ["id", "title", "url"] }, "description": "Phase 10. VideoObject schema markup için video bankası." },
         "disclaimer_templates":    { "type": "object", "additionalProperties": { "type": "string" }, "description": "R-51 profile-aware disclaimer template map (key=cluster_kind 'medical'|'legal'|'financial', value=HTML/markdown template). YMYL profile'ında zorunlu inject." },
         "image_model":             { "type": "string", "default": "nano-banana", "description": "R-72. Default image generation model. Plugin agnostik (Higgsfield veya equivalent), per-project override." }
       }
@@ -238,6 +245,7 @@
     "ai_bots":    { "type": "array", "items": { "type": "string" } },
     "thresholds": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
         "quality_gate_pass_score": { "type": "integer", "minimum": 0, "maximum": 100, "default": 70 },
         "citability_pass_score":   { "type": "integer", "minimum": 0, "maximum": 100, "default": 70 },
@@ -248,6 +256,7 @@
     },
     "workflow": {
       "type": "object",
+      "additionalProperties": false,
       "description": "Runtime workflow toggles. SP0/EX1 (v1.1.0): quality_iteration gates the new-blog 5-pass iteration loop; default false until L3 quality_gate lands in S18. Flip to true alongside the v1.1 release that ships the real L3 implementation.",
       "properties": {
         "quality_iteration": {
