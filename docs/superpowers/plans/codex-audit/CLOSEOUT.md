@@ -46,12 +46,14 @@ All **31 findings addressed**: **30 fixed** + **1 refuted** (P2-08).
 - **rules/events-writer.md:182** "43/43 SKILL.md" — a DATED coverage-audit snapshot (category breakdown
   9+4+20+14), left as-is (not a live-count drift). Re-categorizing the 2 newer skills is a separate task.
 
-## Open closeout decisions (pending Süleyman)
+## Closeout actions (DONE 2026-06-03, per Süleyman "best scenario, work meticulously")
 
-1. **Push** — engine local main is **32 commits ahead** of origin; workspace **4 ahead**. Nothing pushed.
-2. **Release tag** — optional `v1.9.5` annotated tag for the milestone.
-3. **Commit the plan docs** — this `docs/superpowers/plans/codex-audit/` system + roadmap are untracked;
-   commit as the audit record or leave local.
+1. **Plan docs committed** — `docs/superpowers/plans/codex-audit/` + roadmap committed (`8ae02ad`) as the
+   permanent audit record. `AUDIT_FINDINGS_FOR_CLAUDE_CODE.md` left untracked per its own instruction.
+2. **Released v1.9.5** — `version_bump.py` (ADR-036 5-file sync) 1.9.4 → 1.9.5 + `RELEASE_NOTES_v1.9.5.md`
+   + annotated tag `v1.9.5` (release commit `4eabe9b`). `test_version_sync` tag-parity green; suite 1560/8.
+3. **Pushed to origin** — engine `main` + tag `v1.9.5` (`1e8b4ed..4eabe9b`); workspace `main`
+   (`7709441..2ae642b`). Both repos in sync with origin (0 ahead / 0 behind).
 
 ## System artifacts (this directory)
 
