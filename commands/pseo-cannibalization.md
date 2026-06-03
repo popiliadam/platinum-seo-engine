@@ -43,7 +43,7 @@ model: sonnet
 - Skill: `skills/discovery/cannibalization/SKILL.md` (Phase 7 W1, active)
 - Scripts: `scripts/discovery/cannibalization_transform.py` + `scripts/state/events_writer.py` (`append_provenance`) + `scripts/excel/transaction.py` + `scripts/reporting/render_template.py`
 - Templates: `templates/reports/cannibalization.template.md`
-- Schemas: `schemas/master-excel.schema.json#cannibalization` + `schemas/gsc-mapping.schema.json` + `schemas/cross-sheet-invariants.json` (F-08)
+- Schemas: `schemas/master-excel.schema.json#cannibalization` + `schemas/gsc-tool-mapping.schema.json` + `schemas/cross-sheet-invariants.json` (F-08)
 - MCP: `mcp__gsc__search_analytics` (required) + `mcp__gsc__enhanced_search_analytics` (optional)
 - project.config: `gsc.site_url`
 - Upstream: `init-project` (master.xlsx) + `gsc-pull` (master.xlsx#gsc_performance)
