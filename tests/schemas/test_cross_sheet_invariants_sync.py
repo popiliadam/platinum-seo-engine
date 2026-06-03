@@ -11,10 +11,10 @@ authority cite alive while preventing silent drift in either direction.
 """
 from __future__ import annotations
 
-import inspect
 import json
-import re
 from pathlib import Path
+
+import openpyxl
 
 from scripts.validation import validate_invariants
 
@@ -86,31 +86,73 @@ def test_severity_consistency_for_implemented_rules():
     """Severity drift guard: validate_invariants.py F-NN severity ↔
     schema severity match.
 
-    Drift catch: severity'i sadece bir tarafta değiştirip diğer tarafı
-    unutmak (örn. F-13 severity HIGH→MEDIUM kod'da değişti ama schema'da
-    HIGH kaldı). Severity literal kod içinde ``severity="..."`` argument
-    ile döndürülür; ilk match SoT olarak alınır.
+    P0-01 fix (codex audit): the previous implementation read the severity
+    literal via ``re.search(r'severity="(\\w+)"', source)`` on each function's
+    body. That regex MISSED F-02/F-03/F-04 — their severity lives in the helper
+    ``_check_no_excel_formula``, not the function body — which is exactly how
+    the F-04 CRITICAL-vs-HIGH drift went undetected. Severity is now read from
+    each rule's RESULT dict (``_code_rule_meta``), so helper-delegated
+    severities are no longer a blind spot.
     """
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
     schema_severity = {r["id"]: r["severity"] for r in schema["rules"]}
+    code = _code_rule_meta()
 
-    mismatches: list[str] = []
-    for fn in validate_invariants._RULE_FUNCTIONS:
-        rule_id = fn.__name__.replace("check_", "").replace("_", "-")
-        if rule_id not in schema_severity:
-            continue  # Yön A test handles missing-from-schema
-        src = inspect.getsource(fn)
-        m = re.search(r'severity="(\w+)"', src)
-        if not m:
-            continue
-        code_sev = m.group(1)
-        sch_sev = schema_severity[rule_id]
-        if code_sev != sch_sev:
-            mismatches.append(
-                f"{rule_id}: code={code_sev!r} vs schema={sch_sev!r}"
-            )
-
+    mismatches = [
+        f"{rid}: code={meta['severity']!r} vs schema={schema_severity[rid]!r}"
+        for rid, meta in code.items()
+        if rid in schema_severity and schema_severity[rid] != meta["severity"]
+    ]
     assert not mismatches, (
         "Severity drift between validate_invariants.py and "
         f"cross-sheet-invariants.json: {mismatches}"
     )
+
+
+# ---------------------------------------------------------------------------
+# P0-01 semantic-binding: registry `rule` TEXT + `severity` must equal what
+# the implementation actually returns (not just the ID-set / a regex literal).
+# ---------------------------------------------------------------------------
+
+def _code_rule_meta() -> dict[str, dict]:
+    """Invoke each implemented check on an empty workbook + tmp workspace and
+    capture its canonical id/rule/severity from the returned result dict."""
+    import tempfile, pathlib
+    wb = openpyxl.Workbook()
+    if wb.active is not None:
+        wb.remove(wb.active)            # truly empty -> checks SKIP but still return rule/severity
+    out: dict[str, dict] = {}
+    with tempfile.TemporaryDirectory() as td:
+        ws_root = pathlib.Path(td)
+        (ws_root / "projects" / "demo" / "_state").mkdir(parents=True, exist_ok=True)
+        for fn in validate_invariants._RULE_FUNCTIONS:
+            res = fn(wb, "demo", workspace_root=ws_root)
+            out[res["id"]] = {"rule": res["rule"], "severity": res["severity"]}
+    return out
+
+
+def test_registry_rule_text_binds_to_implementation():
+    """Every IMPLEMENTED F-ID's registry `rule` text MUST equal the string the
+    implementation returns. Prevents the silent semantic drift where F-01 means
+    'status enum' in code but 'url subset' in the registry."""
+    schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+    reg = {r["id"]: r for r in schema["rules"]}
+    code = _code_rule_meta()
+    mism = []
+    for rid, meta in code.items():
+        if rid not in reg:
+            continue  # Direction-A test already guards missing-from-schema
+        if reg[rid]["rule"].strip() != meta["rule"].strip():
+            mism.append(f"{rid}: registry={reg[rid]['rule']!r} vs code={meta['rule']!r}")
+    assert not mism, "cross-sheet-invariants.json rule text drifted from implementation:\n" + "\n".join(mism)
+
+
+def test_registry_severity_binds_to_implementation():
+    """Severity must match too — read from the RESULT dict (not a source regex),
+    so helper-delegated severities (F-02/03/04) are no longer a blind spot."""
+    schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+    reg = {r["id"]: r["severity"] for r in schema["rules"]}
+    code = _code_rule_meta()
+    mism = [f"{rid}: registry={reg[rid]!r} vs code={m['severity']!r}"
+            for rid, m in code.items() if rid in reg and reg[rid] != m["severity"]]
+    assert not mism, "severity drift:\n" + "\n".join(mism)
