@@ -8,6 +8,12 @@ Usage:
 Uses string.Template ($key / ${key}) — stdlib only. Phase 9 reporting will
 upgrade to jinja2 if conditionals/loops become necessary.
 
+DIALECT BOUNDARY (P2-03): this renderer owns the ``string.Template`` family
+declared in ``templates/manifest.json`` (the ``templates/reports/`` *.template.md
+files). It does NOT understand ``{{PLACEHOLDER}}`` double-brace tokens — those
+belong to the content-generation skills and would be left verbatim here. The
+dialect-per-family contract is enforced by tests/reporting/test_template_dialect.py.
+
 Exit 0 success; exit 1 on missing file, malformed JSON, or unknown $key.
 Output goes to stdout; errors to stderr.
 """
