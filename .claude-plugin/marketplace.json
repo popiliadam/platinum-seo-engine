@@ -6,14 +6,14 @@
   },
   "metadata": {
     "description": "Platinum SEO Engine \u2014 autonomous SEO operations plugin. Two-repo architecture (engine logic + workspace data). Schema-locked, drift-checked, Excel+JSONL state.",
-    "version": "1.9.4",
+    "version": "1.9.5",
     "repository": "https://github.com/popiliadam/platinum-seo-engine"
   },
   "plugins": [
     {
       "name": "platinum-seo-engine",
       "source": "./",
-      "description": "v1.9.4 \u2014 45 skills, 20 schemas, 20 rules, 18 commands, 6 hooks, 4 MCP servers (gsc + dataforseo + ScraplingServer + sf; higgsfield user-level optional). Production-ready: drift-check AMBER (F-16 + F-17 PASS, F-13 historical kal\u0131nt\u0131), pytest 1427 passed + 11 skipped (regression s\u0131f\u0131r; cumulative through v1.9.4 AC-10 sheet projection cycle), 13/13 v1.x audit findings RESOLVED, 8/8 v1.3 audit finding RESOLVED, v1.4 deep-audit-fix + cleanup-batch closed, v1.5 audit closure (Phase-1+2+3, 10 finding + 4 yeni script), v1.6 S\u00fcleyman backlog closure: Phase-1 Y-03+Y-04 Phase 13 hook authoring (check_naming.py + validate_before_write.py) + Q-V1.5-HOOK-SCRIPTS-MISSING-01 RESOLVED final 4-of-4 + Phase-2 H-E events.schema event_type enum 10\u219212 additive (Option X3 schema_version bump iptali; ADR-018 paterni reuse) + Q-V1.4-AUDIT-HIGH-01 12/12 HIGH closed final + cleanup wave + Phase-3 Y-02 scripts/util/dfs_response.py SSOT (endpoint-aware dispatcher) + O-03 tech_audit + competitive_analysis dedup -78 sat\u0131r + Y-06 scripts/util/profile_aware_defaults.py (load_profile + cascade_default three-tier API) + 5 transform migrate (6 finding/Q-XXX + 4 yeni asset), Y-05 second production --apply own-tooling 2'inci dogfooding kan\u0131t, pre-publication security audit Wave 1 (drift s\u0131f\u0131r)."
+      "description": "v1.9.5 \u2014 45 skills, 20 schemas, 20 rules, 18 commands, 6 hooks, 4 MCP servers (gsc + dataforseo + ScraplingServer + sf; higgsfield user-level optional). Production-ready: drift-check AMBER (F-16 + F-17 PASS, F-13 historical kal\u0131nt\u0131), pytest 1427 passed + 11 skipped (regression s\u0131f\u0131r; cumulative through v1.9.4 AC-10 sheet projection cycle), 13/13 v1.x audit findings RESOLVED, 8/8 v1.3 audit finding RESOLVED, v1.4 deep-audit-fix + cleanup-batch closed, v1.5 audit closure (Phase-1+2+3, 10 finding + 4 yeni script), v1.6 S\u00fcleyman backlog closure: Phase-1 Y-03+Y-04 Phase 13 hook authoring (check_naming.py + validate_before_write.py) + Q-V1.5-HOOK-SCRIPTS-MISSING-01 RESOLVED final 4-of-4 + Phase-2 H-E events.schema event_type enum 10\u219212 additive (Option X3 schema_version bump iptali; ADR-018 paterni reuse) + Q-V1.4-AUDIT-HIGH-01 12/12 HIGH closed final + cleanup wave + Phase-3 Y-02 scripts/util/dfs_response.py SSOT (endpoint-aware dispatcher) + O-03 tech_audit + competitive_analysis dedup -78 sat\u0131r + Y-06 scripts/util/profile_aware_defaults.py (load_profile + cascade_default three-tier API) + 5 transform migrate (6 finding/Q-XXX + 4 yeni asset), Y-05 second production --apply own-tooling 2'inci dogfooding kan\u0131t, pre-publication security audit Wave 1 (drift s\u0131f\u0131r)."
     }
   ]
 }

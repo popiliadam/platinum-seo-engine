@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Claude Code Plugin](https://img.shields.io/badge/Claude_Code-plugin-7C3AED)](https://claude.ai/code)
 
-> Status: **v1.9.4** — production-ready · 45 skills · 18 commands · 6 hooks · 4 MCP servers (3 stdio + 1 HTTP)
+> Status: **v1.9.5** — production-ready · 45 skills · 18 commands · 6 hooks · 4 MCP servers (3 stdio + 1 HTTP)
 
 > **Schema-locked, drift-checked SEO automation for Claude Code.**
 > Turn manual SEO work into auditable, repeatable workflows — backed by JSON Schemas, append-only state, and a tool that audits itself.
@@ -248,7 +248,7 @@ Browse the full catalog: [`skills/`](skills/). Slash commands map 1:1 to commonl
 
 ## Status & roadmap
 
-**Current:** v1.9.4 — AC-10 sheet projection: `sf_import` now projects raw SF CSVs → master.xlsx's 6 SF sheets (schema-valid + idempotent), with the `tech_seo` issue-category enum solved by routing (no schema change). Live-proven on aluminumstation (1,427 tests passing, drift-check AMBER).
+**Current:** v1.9.5 — Codex audit remediation: 30 of 31 findings fixed + 1 refuted across governance, workspace contract, commands/hooks, schema validation, state/write paths, and docs. Every fix is locked by a regression test that reads ground truth (filesystem counts, live argparse, schemas, command bodies) so the same drift cannot silently return. Quality/correctness patch — no new features, no breaking changes (1,560 tests passing).
 
 The plugin is delivered in **15 phases**. Foundation phases (0–4) are complete; skill phases (5–13) deliver the ~45 skills in batches; phase 14 covers the workspace + CI + a full pilot run end-to-end. Phase 5 is the **GO/NO-GO gateway** — failing it sends the project back to foundation work rather than papering over gaps.
 
@@ -270,7 +270,7 @@ The plugin is delivered in **15 phases**. Foundation phases (0–4) are complete
 | 13 | Governance Final | done | 4 |
 | 14 | Workspace + CI + Pilot E2E | in progress | — |
 
-Detailed status: **[docs/PHASE_STATUS.md](docs/PHASE_STATUS.md)** · Open questions: **[docs/OPEN_QUESTIONS.md](docs/OPEN_QUESTIONS.md)** · Latest release: **[docs/RELEASE_NOTES_v1.9.4.md](docs/RELEASE_NOTES_v1.9.4.md)**.
+Detailed status: **[docs/PHASE_STATUS.md](docs/PHASE_STATUS.md)** · Open questions: **[docs/OPEN_QUESTIONS.md](docs/OPEN_QUESTIONS.md)** · Latest release: **[docs/RELEASE_NOTES_v1.9.5.md](docs/RELEASE_NOTES_v1.9.5.md)**.
 
 ---
 
