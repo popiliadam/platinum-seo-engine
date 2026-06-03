@@ -890,13 +890,12 @@ def _emit_provenance(
     grandparent is the workspace root expected by events_writer.
     """
     workspace_root = state_root.parent.parent  # projects/<slug> → projects → workspace
-    run_id = events_writer.next_run_id(project_slug, workspace_root=workspace_root)
     # source.kind enum (events.schema): manual | tool_computed | sf_csv | *_mcp.
     # An Excel projection by transaction.py is internally tool_computed —
     # it's the engine writing structured output, not a human key-by-key edit.
+    # run_id auto-allocated race-free under the append flock (P1-11).
     result = events_writer.append_provenance(
         project_id=project_slug,
-        run_id=run_id,
         source={"kind": "tool_computed"},
         operation=operation,
         target_excel_sheet=sheet,

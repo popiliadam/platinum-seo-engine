@@ -188,6 +188,10 @@ class EventResult:
     event_id: str
     path: Path
     bytes_written: int
+    # The event's run_id (provenance only). For auto-allocated provenance events
+    # (P1-11) this is the id claimed under the append flock; otherwise it mirrors
+    # the explicit run_id, or None for non-provenance kinds.
+    run_id: int | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -328,6 +332,77 @@ def _atomic_append_line(path: Path, payload: bytes) -> None:
                 pass
 
 
+def _scan_max_run_id(path: Path) -> int:
+    """Return the maximum integer provenance run_id in events.jsonl, or 0 if the
+    file is missing/empty/has none. Shared by next_run_id() (lock-free read) and
+    the race-free allocator (called under the append flock)."""
+    if not path.exists():
+        return 0
+    max_run = 0
+    try:
+        with path.open("r", encoding="utf-8") as fh:
+            for line in fh:
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                try:
+                    obj = json.loads(stripped)
+                except json.JSONDecodeError:
+                    continue
+                rid = obj.get("run_id")
+                if isinstance(rid, int) and rid > max_run:
+                    max_run = rid
+    except OSError as exc:
+        raise EventPathError(f"cannot read {path}: {exc}") from exc
+    return max_run
+
+
+def _atomic_append_allocating_run_id(
+    event: dict, path: Path, schema_path: Path
+) -> tuple[int, int]:
+    """Allocate a provenance run_id and append the event under ONE flock (P1-11).
+
+    The whole critical section — read current max run_id, claim max+1, validate,
+    serialize, write — runs while holding fcntl.flock(LOCK_EX) on events.jsonl, so
+    two concurrent allocators can never observe the same max and collide. Returns
+    (run_id, bytes_written). Validation happens AFTER run_id is assigned (a
+    provenance event without run_id would fail the schema).
+    """
+    fd = -1
+    try:
+        fd = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+    except OSError as exc:
+        raise EventPathError(f"cannot open {path}: {exc}") from exc
+    try:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+        except OSError as exc:
+            raise EventLockError(f"flock failed on {path}: {exc}") from exc
+        try:
+            # SAME lock that guards the append: scan max, then claim+write next.
+            event["run_id"] = _scan_max_run_id(path) + 1
+            _validate_event(event, schema_path)
+            payload = _serialize(event)
+            written = os.write(fd, payload)
+            if written != len(payload):
+                raise EventPathError(
+                    f"short write on {path}: wrote {written} of {len(payload)} bytes"
+                )
+            os.fsync(fd)
+            return event["run_id"], len(payload)
+        finally:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_UN)
+            except OSError:
+                pass
+    finally:
+        if fd != -1:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+
+
 def _serialize(event: dict) -> bytes:
     """JSON-encode an event to a UTF-8 bytes buffer with trailing newline."""
     text = json.dumps(event, ensure_ascii=False, separators=(",", ":"))
@@ -409,6 +484,7 @@ def append_event(
     *,
     redact: bool = True,
     schema_path: Path | None = None,
+    allocate_run_id: bool = False,
 ) -> EventResult:
     """
     Validate, redact, and atomically append a single event to events.jsonl.
@@ -441,7 +517,19 @@ def append_event(
     if redact:
         populated = _redact_recursive(populated)
 
-    # 3. Schema validation.
+    # 3a. Race-free allocation path (P1-11): assign run_id + validate + write all
+    # under one flock so concurrent provenance allocators cannot collide.
+    if allocate_run_id:
+        path = _events_path(project_id, workspace_root)
+        run_id, nbytes = _atomic_append_allocating_run_id(populated, path, schema_p)
+        return EventResult(
+            event_id=populated["event_id"],
+            path=path,
+            bytes_written=nbytes,
+            run_id=run_id,
+        )
+
+    # 3b. Schema validation.
     _validate_event(populated, schema_p)
 
     # 4. Serialize + size check.
@@ -455,13 +543,14 @@ def append_event(
         event_id=populated["event_id"],
         path=path,
         bytes_written=len(payload),
+        run_id=populated.get("run_id"),
     )
 
 
 def append_provenance(
     *,
     project_id: str,
-    run_id: int,
+    run_id: int | None = None,
     source: dict,
     operation: str,
     workspace_root: Path | None = None,
@@ -469,13 +558,21 @@ def append_provenance(
     schema_path: Path | None = None,
     **kwargs: Any,
 ) -> EventResult:
-    """Convenience wrapper for event_kind='provenance'. Passes kwargs through."""
+    """Convenience wrapper for event_kind='provenance'. Passes kwargs through.
+
+    run_id (P1-11): pass an explicit int to reuse an id (e.g. grouping N events
+    under one pipeline run), or leave it None to have the id allocated RACE-FREELY
+    inside the append flock. The allocated id is returned on EventResult.run_id.
+    Prefer None for single-event appends — calling next_run_id() then passing the
+    result is racy (the read happens outside the append lock).
+    """
     event: dict[str, Any] = {
         "event_kind": "provenance",
-        "run_id": run_id,
         "source": source,
         "operation": operation,
     }
+    if run_id is not None:
+        event["run_id"] = run_id
     event.update(kwargs)
     return append_event(
         event,
@@ -483,6 +580,7 @@ def append_provenance(
         workspace_root=workspace_root,
         redact=redact,
         schema_path=schema_path,
+        allocate_run_id=(run_id is None),
     )
 
 
@@ -589,27 +687,13 @@ def next_run_id(
 
     Scans events.jsonl, finds max integer run_id (provenance events only),
     and returns max+1. Returns 1 if file is missing or empty.
+
+    NOTE (P1-11): this lock-free read is inherently racy when used as
+    `next_run_id()` then `append_provenance(run_id=...)` — two callers can read
+    the same max. For single-event appends prefer `append_provenance(run_id=None)`
+    which allocates the id atomically under the append flock.
     """
-    path = _events_path(project_id, workspace_root)
-    if not path.exists():
-        return 1
-    max_run = 0
-    try:
-        with path.open("r", encoding="utf-8") as fh:
-            for line in fh:
-                stripped = line.strip()
-                if not stripped:
-                    continue
-                try:
-                    obj = json.loads(stripped)
-                except json.JSONDecodeError:
-                    continue
-                rid = obj.get("run_id")
-                if isinstance(rid, int) and rid > max_run:
-                    max_run = rid
-    except OSError as exc:
-        raise EventPathError(f"cannot read {path}: {exc}") from exc
-    return max_run + 1
+    return _scan_max_run_id(_events_path(project_id, workspace_root)) + 1
 
 
 # ---------------------------------------------------------------------------
