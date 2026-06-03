@@ -10,7 +10,7 @@ Bu sözlük spec içi terminolojinin canlı kataloğudur. Her teknik terim burad
 - **Gateway Phase** — Bir sonraki phase'lere geçişin koşullu olduğu phase (ör. Phase 5 GO/NO-GO). Acceptance kriteri geçmezse roadmap ilerlemez.
 - **Hook** — Olay tetikli script (session-start, pre/post-tool-use, user-prompt-submit). Plugin'in claude code lifecycle'ına bağlandığı yer.
 - **Hybrid mode** — v1.8 SF integration strategy: file-based sf-import remains authoritative + SF MCP adds operator-triggered crawl + ad-hoc query capability. File-drop fallback never deprecated (D-SF-07).
-- **Invariant** — Cross-sheet rule, master.xlsx içi sheet'ler arası kural. 28 CSR rule mevcut (v1.8 Phase 4 F-23 SF MCP eklendi); her Excel write sonrası denetlenir.
+- **Invariant** — Cross-sheet rule, master.xlsx içi sheet'ler arası kural. 31 CSR rule mevcut (`schemas/cross-sheet-invariants.json` `rules` SoT; v1.8 SF MCP invariant'ları dahil); her Excel write sonrası denetlenir.
 - **Manager Session** — Karar verici Claude session'ı. Kod yazmaz; plan yapar, worker yönlendirir, ADR yazar.
 - **Optional consumer** — A discovery/planning skill with `use_sf_mcp_live: bool` flag (default False); when True, calls SF MCP for live data instead of file-based fixtures. v1.8 Phase 5 wires tech-audit + schema-audit + on-page-audit + internal-links opt-in.
 - **Phase** — Roadmap'teki tek bir adım; kendi acceptance kriteri olan iş paketi.
