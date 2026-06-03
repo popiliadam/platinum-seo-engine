@@ -4,7 +4,7 @@ description: |
   Also use when: aktif projenin `project.config.profiles` array'inde `"local-service"` var; init-project çalışmış (master.xlsx hazır); GBP gap analysis 8 kategori (NAP / categories / photos / hours / attributes / posts / Q&A / reviews) triage gerekiyor; DFS budget mevcut (~3 credit/audit).
   Do not use when: profile != local-service (skill kendisi DURUR #6 ile skip eder ama gereksiz çağrı); master.xlsx yokken (`/pseo-init` önce); tech-audit (`/pseo-tech-audit`), GSC pull (`/pseo-gsc-pull`), DFS pull (`/pseo-dfs-pull`), schema audit (`/pseo-schema-audit`) gerekiyor — her birinin ayrı komutu var.
 argument-hint: "[<project-slug>]"
-allowed-tools: Bash(jq:*), Bash(python3:*), Bash(ls:*), Read
+allowed-tools: Bash(jq:*), Bash(python3:*), Bash(ls:*), Bash(grep:*), Read
 model: sonnet
 ---
 

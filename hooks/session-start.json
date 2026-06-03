@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ -n \"${PSEO_WORKSPACE_ROOT:-}\" ] && [ -f \"${PSEO_WORKSPACE_ROOT}/shared/active.json\" ]; then printf 'Platinum SEO Engine workspace detected: %s\\nActive project marker: %s\\n' \"${PSEO_WORKSPACE_ROOT}\" \"${PSEO_WORKSPACE_ROOT}/shared/active.json\"; cat \"${PSEO_WORKSPACE_ROOT}/shared/active.json\" 2>/dev/null || true; else printf 'No PSEO workspace bound (PSEO_WORKSPACE_ROOT unset or shared/active.json missing). Run /pseo-bootstrap-project to scaffold a project pack.\\n'; fi",
+            "command": "if [ -n \"${PSEO_WORKSPACE_ROOT:-}\" ] && [ -f \"${PSEO_WORKSPACE_ROOT}/shared/active.json\" ]; then printf 'Platinum SEO Engine workspace detected: %s\\nActive project marker: %s\\n' \"${PSEO_WORKSPACE_ROOT}\" \"${PSEO_WORKSPACE_ROOT}/shared/active.json\"; cat \"${PSEO_WORKSPACE_ROOT}/shared/active.json\" 2>/dev/null || true; else printf 'No PSEO workspace bound (PSEO_WORKSPACE_ROOT unset or shared/active.json missing). Run /pseo-init to scaffold a project pack.\\n'; fi",
             "timeout": 10,
             "statusMessage": "Loading PSEO project context..."
           }
