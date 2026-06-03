@@ -25,7 +25,7 @@ model: sonnet
 3. (optional) `mcp__dataforseo__on_page_content_parsing` per URL canlı cross-validate (~3 credit/URL, paid)
 4. Pure compute: `scripts/discovery/schema_audit_transform.py` (JSON-LD parse, schema.org type validate, gap analysis, statusEnum seed)
 5. master.xlsx `schema` sheet write via `scripts/excel/transaction.py`
-6. events.jsonl append: `event_kind=provenance + operation=ingest + source.kind=dataforseo_mcp` (DFS varsa) veya `source.kind=sf_export` (SF only)
+6. events.jsonl append: `event_kind=provenance + operation=ingest + source.kind=dataforseo_mcp` (DFS varsa) veya `source.kind=sf_csv` (SF only)
 7. Onay gate (workflow-run.schema awaiting_approval)
 8. `outputs/reports/{date}-schema-audit.md` render via `templates/reports/schema-audit.template.md`
 
@@ -45,6 +45,6 @@ DURUR (6 sentinel): SF export yok / strict_parse=true ile malformed JSON-LD / DF
 - Scripts: `scripts/discovery/schema_audit_transform.py` + `scripts/budget/check_budget.py` + `scripts/state/events_writer.py` (`append_provenance`) + `scripts/excel/transaction.py` + `scripts/reporting/render_template.py`
 - Templates: `templates/reports/schema-audit.template.md`
 - Rules: `rules/schema-first.md` + `rules/budget-events.md`
-- Schemas: `schemas/master-excel.schema.json#schema` + `schemas/dataforseo-mapping.schema.json`
+- Schemas: `schemas/master-excel.schema.json#schema` + `schemas/dataforseo-endpoint-mapping.schema.json`
 - MCP: `mcp__dataforseo__on_page_content_parsing` (optional, paid cross-validate)
 - Upstream: `init-project` (master.xlsx) + `sf-import` (`inbox/sf/{date}-{slug}.json`)
