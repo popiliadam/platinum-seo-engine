@@ -398,3 +398,113 @@ def test_list_runs_status_filter(tmp_path: Path) -> None:
                                      status_filter="done")
     assert {r.run_id for r in running} == {h2.run_id}
     assert {r.run_id for r in done} == {h1.run_id}
+
+
+# ---------------------------------------------------------------------------
+# Test 13 — P1-10: pause(reason=...) persists reason into run JSON + event meta
+# ---------------------------------------------------------------------------
+
+def test_pause_persists_reason(tmp_path: Path) -> None:
+    _setup(tmp_path)
+    handle = workflow_runner.create_run(
+        skill="pause-skill", project_slug="test-proj",
+        steps=[{"name": "go"}], workspace_root=tmp_path,
+    )
+    workflow_runner.pause(
+        handle.run_id, project_slug="test-proj",
+        reason="waiting for operator review", workspace_root=tmp_path,
+    )
+    re_read = workflow_runner.get(handle.run_id, project_slug="test-proj",
+                                  workspace_root=tmp_path)
+    # P1-10: the reason was previously accepted but silently dropped.
+    assert re_read.data["reason"] == "waiting for operator review"
+    # ... and mirrored into the emitted workflow event metadata.
+    paused = [e for e in _workflow_events(tmp_path) if e["workflow_action"] == "paused"]
+    assert paused and paused[-1]["notes"] == "waiting for operator review"
+
+
+# ---------------------------------------------------------------------------
+# Test 14 — P1-10: approve(notes=...) persists notes into run JSON + event meta
+# ---------------------------------------------------------------------------
+
+def test_approve_persists_notes(tmp_path: Path) -> None:
+    _setup(tmp_path)
+    handle = workflow_runner.create_run(
+        skill="approval-skill", project_slug="test-proj",
+        steps=[{"name": "draft"}, {"name": "publish"}], workspace_root=tmp_path,
+    )
+    workflow_runner.request_approval(
+        handle.run_id, project_slug="test-proj",
+        approver="user", subject="publish drafts", workspace_root=tmp_path,
+    )
+    workflow_runner.approve(
+        handle.run_id, project_slug="test-proj",
+        approver="user", notes="LGTM ship it", workspace_root=tmp_path,
+    )
+    re_read = workflow_runner.get(handle.run_id, project_slug="test-proj",
+                                  workspace_root=tmp_path)
+    # P1-10: notes was previously accepted but silently dropped.
+    assert re_read.data["notes"] == "LGTM ship it"
+    approved = [e for e in _workflow_events(tmp_path) if e["workflow_action"] == "approved"]
+    assert approved and approved[-1]["notes"] == "LGTM ship it"
+
+
+# ---------------------------------------------------------------------------
+# Test 15 — P1-10: retry() preserves prior ended_at in retry_history
+# ---------------------------------------------------------------------------
+
+def test_retry_preserves_prior_ended_at_in_history(tmp_path: Path) -> None:
+    _setup(tmp_path)
+    handle = workflow_runner.create_run(
+        skill="retry-skill", project_slug="test-proj",
+        steps=[{"name": "x"}], workspace_root=tmp_path,
+    )
+    workflow_runner.fail(handle.run_id, project_slug="test-proj",
+                         code="internal_error", message="boom",
+                         workspace_root=tmp_path)
+    failed_view = workflow_runner.get(handle.run_id, project_slug="test-proj",
+                                      workspace_root=tmp_path)
+    first_ended_at = failed_view.data["ended_at"]
+    assert first_ended_at  # terminal timing recorded on fail
+
+    workflow_runner.retry(handle.run_id, project_slug="test-proj",
+                          workspace_root=tmp_path)
+    retried_view = workflow_runner.get(handle.run_id, project_slug="test-proj",
+                                       workspace_root=tmp_path)
+    # retry() clears the top-level ended_at (the run is running again)...
+    assert "ended_at" not in retried_view.data
+    # ...but the prior terminal timing is preserved in retry_history (P1-10).
+    hist = retried_view.data["retry_history"]
+    assert len(hist) == 1
+    assert hist[0]["ended_at"] == first_ended_at
+    assert hist[0]["failure_reason"]["code"] == "internal_error"
+    assert hist[0]["failure_reason"]["message"] == "boom"
+
+
+# ---------------------------------------------------------------------------
+# Test 16 — P1-10: a failing event emit is non-blocking but VISIBLE on stderr
+# ---------------------------------------------------------------------------
+
+def test_emit_failure_is_visible_and_nonblocking(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _setup(tmp_path)
+    handle = workflow_runner.create_run(
+        skill="emit-skill", project_slug="test-proj",
+        steps=[{"name": "go"}], workspace_root=tmp_path,
+    )
+
+    def _boom(*args: object, **kwargs: object) -> None:
+        raise events_writer.EventWriterError("disk gone")
+
+    monkeypatch.setattr(events_writer, "append_workflow", _boom)
+    # The transition must still succeed (run JSON written) despite the emit blowing up.
+    workflow_runner.complete(handle.run_id, project_slug="test-proj",
+                             workspace_root=tmp_path)
+    re_read = workflow_runner.get(handle.run_id, project_slug="test-proj",
+                                  workspace_root=tmp_path)
+    assert re_read.status == "done"
+    # The swallowed failure is no longer silent — it surfaces a WARNING on stderr.
+    captured = capsys.readouterr()
+    assert "WARNING" in captured.err
+    assert "disk gone" in captured.err
