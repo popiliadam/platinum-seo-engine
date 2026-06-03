@@ -3,7 +3,7 @@
   "$id": "https://platinum-seo-engine/schemas/cross-sheet-invariants.json",
   "additionalProperties": false,
   "title": "Cross-Sheet Invariants — 31 CSR Registry v1.0",
-  "description": "Populated INSTANCE document (not a meta-schema) carrying the 31 Cross-Sheet Rules per §9.1. Top-level `rules` array is the source of truth consumed by the consistency_check tool. Per S3.5 pivot: instance documents live at `NAME.json`; if a paired meta-schema is ever needed it would go to `NAME.schema.json`. Verdict aggregation (§9.2/§17.2): any RED → RED; else any AMBER/WARN → AMBER; all PASS → GREEN. Severity-to-verdict: CRITICAL/HIGH → RED on FAIL, MEDIUM/LOW → AMBER on FAIL.",
+  "description": "Populated INSTANCE document (not a meta-schema) carrying the 31 Cross-Sheet Rules per §9.1. Top-level `rules` array is the source of truth consumed by the consistency_check tool. Per S3.5 pivot: instance documents live at `NAME.json`; if a paired meta-schema is ever needed it would go to `NAME.schema.json`. Verdict aggregation (§9.2/§17.2): any RED → RED; else any AMBER/WARN → AMBER; all PASS → GREEN. Severity-to-verdict: CRITICAL/HIGH → RED on FAIL, MEDIUM/LOW → AMBER on FAIL. P0-01 (codex audit Phase 1): the `rule` text + `severity` of every IMPLEMENTED F-ID is bound to scripts/validation/validate_invariants.py (the runtime source of truth) and locked by tests/schemas/test_cross_sheet_invariants_sync.py. Original §17.2 design meanings that the row-level validator does not yet enforce are preserved (not deleted) under the top-level `deferred_design_rules` array.",
   "schema_version": "1.0",
   "verdict_aggregation": "any RED → RED; else any AMBER/WARN → AMBER; all PASS → GREEN",
   "severity_to_verdict_map": {
@@ -15,43 +15,43 @@
   "rules": [
     {
       "id": "F-01",
-      "rule": "master_task.url ⊆ (crawl_sitemap.url ∪ external_urls)",
+      "rule": "master_task.status ⊆ statusEnum {TODO,ONGOING,EXISTS,DONE,BLOCKED,DEFERRED,CANCELED}",
       "severity": "CRITICAL",
       "category": "csr_foundation",
-      "rationale": "A task targeting an unknown URL is either a typo or a dangling reference; both produce unactionable entries that corrupt the DONE cascade and pollute completed_work.",
-      "computed_by": "consistency_check"
+      "rationale": "master_task.status must be one of the 7 canonical statusEnum values (ADR-018); any other token corrupts the DONE cascade and the §17.2 verdict aggregator. Enforced by validate_invariants.check_F_01.",
+      "computed_by": "validate_invariants"
     },
     {
       "id": "F-02",
-      "rule": "count(master_task WHERE status=DONE) == dashboard.R48",
+      "rule": "dashboard sheet contains no live `=COUNTIF(...)` formulas",
       "severity": "CRITICAL",
       "category": "csr_foundation",
-      "rationale": "Dashboard R48 is the headline DONE-count KPI; drift means stakeholders see wrong numbers. Also mirrored as CI-06 for the 8-invariant view.",
-      "computed_by": "dashboard_refresh"
+      "rationale": "The dashboard sheet must carry pre-computed values, never a live `=COUNTIF(...)` formula — Excel formulas re-evaluate on open and silently desync from the append-only state (rules/excel-discipline.md). Enforced by validate_invariants.check_F_02 (_check_no_excel_formula).",
+      "computed_by": "validate_invariants"
     },
     {
       "id": "F-03",
-      "rule": "count(master_task WHERE status=TODO) == dashboard.R49",
+      "rule": "dashboard sheet contains no live `=SUMIF(...)` formulas",
       "severity": "CRITICAL",
       "category": "csr_foundation",
-      "rationale": "TODO count feeds the whats-next priority queue sizing; drift desynchronizes reminder thresholds.",
-      "computed_by": "dashboard_refresh"
+      "rationale": "The dashboard sheet must carry pre-computed values, never a live `=SUMIF(...)` formula (rules/excel-discipline.md). Enforced by validate_invariants.check_F_03 (_check_no_excel_formula).",
+      "computed_by": "validate_invariants"
     },
     {
       "id": "F-04",
-      "rule": "count(master_task WHERE status=ONGOING) == dashboard.R50",
-      "severity": "HIGH",
+      "rule": "dashboard sheet contains no live `=AVERAGEIF(...)` formulas",
+      "severity": "CRITICAL",
       "category": "csr_foundation",
-      "rationale": "ONGOING count gates parallelization limits; auto-repair via dashboard_refresh (§9.3).",
-      "computed_by": "dashboard_refresh"
+      "rationale": "The dashboard sheet must carry pre-computed values, never a live `=AVERAGEIF(...)` formula (rules/excel-discipline.md). severity CRITICAL — mirrors F-02/F-03, the analogous no-live-formula invariants; the helper _check_no_excel_formula returns CRITICAL for all three (this is the severity the old regex sync test could not see, P0-01). Enforced by validate_invariants.check_F_04.",
+      "computed_by": "validate_invariants"
     },
     {
       "id": "F-05",
-      "rule": "completed_work.task_id ⊆ master_task WHERE status=DONE",
+      "rule": "every sheet present in workbook matches its master-excel.schema header column count",
       "severity": "CRITICAL",
-      "category": "csr_foundation",
-      "rationale": "A completed_work row referencing a non-DONE task means the DONE cascade §21.4 was partial — either master_task was reverted or the cascade aborted before step 5.",
-      "computed_by": "consistency_check"
+      "category": "schema_validation",
+      "rationale": "Every sheet present in the workbook must match its master-excel.schema required_columns header count (header row resolved via schema authority); a mismatch signals a schema-drifted or hand-edited sheet. Enforced by validate_invariants.check_F_05. (The original design meaning — completed_work.task_id ⊆ master_task WHERE status=DONE — is preserved in deferred_design_rules.)",
+      "computed_by": "validate_invariants"
     },
     {
       "id": "F-06",
@@ -71,67 +71,67 @@
     },
     {
       "id": "F-08",
-      "rule": "quick_wins.target_url ⊆ (crawl_sitemap ∪ gsc_performance)",
+      "rule": "quick_wins.url ⊆ (crawl_sitemap.url ∪ gsc_performance.url)",
       "severity": "HIGH",
       "category": "csr_foundation",
-      "rationale": "Quick wins must be either reachable (in sitemap) or already getting impressions (GSC). A URL in neither set is fictitious.",
-      "computed_by": "consistency_check"
+      "rationale": "Quick-win URLs must be reachable (crawl_sitemap) or already earning impressions (gsc_performance); a URL in neither reference set is fictitious. Sparse-pilot tolerance routes to AMBER via manual_triage when both reference sheets are absent. Enforced by validate_invariants.check_F_08.",
+      "computed_by": "validate_invariants"
     },
     {
       "id": "F-09",
-      "rule": "cluster_keywords.assigned_url ⊆ topical_map.assigned_url",
+      "rule": "master_task.task_id is unique across all rows",
       "severity": "HIGH",
       "category": "csr_foundation",
-      "rationale": "Every cluster keyword target must have a pillar home; otherwise the cluster is orphan and cluster→pillar reporting breaks.",
-      "computed_by": "consistency_check"
+      "rationale": "master_task.task_id must be unique across all rows; duplicate task_ids break the DONE-cascade keying and completed_work joins. Enforced by validate_invariants.check_F_09.",
+      "computed_by": "validate_invariants"
     },
     {
       "id": "F-10",
-      "rule": "cannibalization.pages ⊆ crawl_sitemap.url",
+      "rule": "url_normalizer(x) == x for every quick_wins.url (D-03 idempotent)",
       "severity": "HIGH",
-      "category": "csr_foundation",
-      "rationale": "Cannibalization rows referencing non-crawled pages are stale; SF re-import needed before acting.",
-      "computed_by": "consistency_check"
+      "category": "url_normalization",
+      "rationale": "Every quick_wins.url must be a fixed point of the D-03 url_normalizer (idempotent); a non-idempotent URL means the normalizer was bypassed at write time (boundary violation §6.6) and breaks cross-sheet JOINs. Enforced by validate_invariants.check_F_10.",
+      "computed_by": "validate_invariants"
     },
     {
       "id": "F-11",
-      "rule": "schema.url ⊆ crawl_sitemap.url",
+      "rule": "every _state/workflows/*.json has schema_version == \"1.0\"",
       "severity": "HIGH",
-      "category": "csr_foundation",
-      "rationale": "Schema audit rows for unknown URLs indicate a sitemap/crawl drift that must be resolved before schema fixes are applied.",
-      "computed_by": "consistency_check"
+      "category": "schema_validation",
+      "rationale": "Every _state/workflows/*.json must declare schema_version == \"1.0\" (ADR-019 / workflow-run.schema.json const). Enforced by validate_invariants.check_F_11.",
+      "computed_by": "validate_invariants"
     },
     {
       "id": "F-12",
-      "rule": "redirect_404.from_url ⊆ sf_response_codes WHERE status IN (301,302,404)",
+      "rule": "events.jsonl line count is monotonically non-decreasing",
       "severity": "HIGH",
-      "category": "csr_foundation",
-      "rationale": "Redirect/404 entries must be backed by actual SF response codes; fabricated rows cause redirect_chain and 404 sweep reports to double-count.",
-      "computed_by": "consistency_check"
+      "category": "row_count_integrity",
+      "rationale": "events.jsonl line count must be monotonically non-decreasing against the _state/events.snapshot.json sidecar — a shrink means the append-only audit log was truncated (rule append-only-state §3). Enforced by validate_invariants.check_F_12.",
+      "computed_by": "validate_invariants"
     },
     {
       "id": "F-13",
-      "rule": "robots_txt.disallowed == crawl_sitemap WHERE indexability='Non-indexable (robots)'",
+      "rule": "every event_kind=provenance row has run_id of integer type",
       "severity": "HIGH",
-      "category": "csr_foundation",
-      "rationale": "robots.txt declarations and SF-detected indexability must agree; a delta means one of the two is stale (cached robots or stale crawl).",
-      "computed_by": "consistency_check"
+      "category": "schema_validation",
+      "rationale": "Every event_kind=provenance row must carry a run_id of integer type (events.schema). Enforced by validate_invariants.check_F_13.",
+      "computed_by": "validate_invariants"
     },
     {
       "id": "F-14",
-      "rule": "gsc_performance.page ⊆ (crawl_sitemap ∪ redirect_targets)",
+      "rule": "every event_kind=workflow row has workflow_run_id matching {slug}-YYYY-MM-DD-{hash4}",
       "severity": "HIGH",
-      "category": "csr_foundation",
-      "rationale": "GSC may report impressions for redirected URLs for up to 6 months; accepting sitemap-OR-redirect-target union avoids false-positive orphan flags.",
-      "computed_by": "consistency_check"
+      "category": "schema_validation",
+      "rationale": "Every event_kind=workflow row must carry a workflow_run_id matching {slug}-YYYY-MM-DD-{hash4} (events.schema / ADR-020). Enforced by validate_invariants.check_F_14.",
+      "computed_by": "validate_invariants"
     },
     {
       "id": "F-15",
-      "rule": "cannibalization intent çakışması intent-matrix.json ile tutarlı",
+      "rule": "cannibalization intent çakışması intent-matrix.json ile tutarlı (manual triage)",
       "severity": "HIGH",
       "category": "csr_foundation",
-      "rationale": "Two pages ranking for the same query are only 'cannibalizing' when their intents overlap per intent-matrix.json — a product page + a blog post for the same query may be intentional. Requires manual triage per §9.3.",
-      "computed_by": "consistency_check"
+      "rationale": "Two pages ranking for the same query are only 'cannibalizing' when their intents overlap per intent-matrix.json — a product page + a blog post for the same query may be intentional. Requires manual triage per §9.3 (routes to AMBER, not RED). Enforced by validate_invariants.check_F_15.",
+      "computed_by": "validate_invariants"
     },
     {
       "id": "D-01",
@@ -179,7 +179,7 @@
       "severity": "HIGH",
       "category": "csr_foundation",
       "rationale": "Quick-win rows must point at URLs that the opportunity sheet has already triaged (canonical 'url | action' or freeform 'Optimize <url> for query X'); orphan quick_wins indicate that the opportunity intake step was skipped (Q-V1.2-OPP-COVERAGE-01 Phase B post-closeout schema-first override 17'inci uygulama).",
-      "computed_by": "consistency_check"
+      "computed_by": "validate_invariants"
     },
     {
       "id": "F-17",
@@ -187,7 +187,7 @@
       "severity": "HIGH",
       "category": "csr_data",
       "rationale": "Severity-typed columns (priority/level/impact carrying $ref severityEnum in master-excel.schema.json) must hold one of the four canonical values; any other token corrupts severity-aware reporting and breaks the verdict aggregator.",
-      "computed_by": "consistency_check"
+      "computed_by": "validate_invariants"
     },
     {
       "id": "F-18",
@@ -195,7 +195,7 @@
       "severity": "MEDIUM",
       "category": "csr_data",
       "rationale": "master_task.created_date (col K) must parse as ISO 8601; Excel-cached datetimes already pass, freeform strings require fromisoformat tolerance (Z → +00:00). Non-parseable cells break time-series reporting and the DONE cascade audit trail.",
-      "computed_by": "consistency_check"
+      "computed_by": "validate_invariants"
     },
     {
       "id": "F-19",
@@ -203,7 +203,7 @@
       "severity": "MEDIUM",
       "category": "schema_validation",
       "rationale": "Schema 1.3 (ADR-030 / Migration 0003) makes nested language.content_locale (BCP 47) + root market the canonical locale path; root locale and defaults.locale are forbidden via additionalProperties: false. Wave 2 fix Q-WAVE1-F19-VALIDATOR-01 collapses pre-1.3 reads onto the 1.3 path only.",
-      "computed_by": "consistency_check"
+      "computed_by": "validate_invariants"
     },
     {
       "id": "F-20",
@@ -211,7 +211,7 @@
       "severity": "MEDIUM",
       "category": "row_count_integrity",
       "rationale": "events_writer enforces a 64 KiB per-line cap so events.jsonl stays line-stream parseable on stdlib JSON readers; lines exceeding the cap indicate a writer bypass (rule append-only-state §3) and corrupt the audit-trail replay loop.",
-      "computed_by": "consistency_check"
+      "computed_by": "validate_invariants"
     },
     {
       "id": "F-21",
@@ -219,7 +219,7 @@
       "severity": "MEDIUM",
       "category": "schema_validation",
       "rationale": "Excel's hard cell-value limit is 32 767 characters; openpyxl raises IllegalCharacterError above this. Cells at or over the cap mean upstream prose was not summarized; downstream master.xlsx writes will fail and DURUR-3 fires.",
-      "computed_by": "consistency_check"
+      "computed_by": "validate_invariants"
     },
     {
       "id": "F-22",
@@ -227,7 +227,7 @@
       "severity": "MEDIUM",
       "category": "file_hash_integrity",
       "rationale": "transaction.py keep-7 FIFO rotation invariant; exceeding the cap means the rotation step was skipped and disk pressure accumulates. auto_repair_available=true — surplus backups can be deleted oldest-first without data loss.",
-      "computed_by": "consistency_check"
+      "computed_by": "validate_invariants"
     },
     {
       "id": "F-23",
@@ -235,7 +235,7 @@
       "severity": "HIGH",
       "category": "csr_mcp",
       "rationale": "v1.8 Phase 4 D-SF-01/D-SF-02 cross-sheet invariant: a workspace that has produced SF MCP crawl evidence MUST have the engine's tool registry advertising the 'sf' server, otherwise downstream sf-import handoff and tooling discovery (claude mcp list cross-check) silently desync. Mirrors Q-SF-MCP-PHASE-3-CLOSURE-FOLLOWUPS-01 schema-first catch — workflow state and registry advertisement must stay aligned. severity HIGH (not CRITICAL) per Manager spec — drift produces broken provenance lineage but does not corrupt master.xlsx. v1.9 Phase 5 enhancement: dual-registry check (engine-repo primary + workspace-registry fallback when PSEO_WORKSPACE_ROOT set). Backward compat: engine-repo only deployments work unchanged.",
-      "computed_by": "consistency_check"
+      "computed_by": "validate_invariants"
     },
     {
       "id": "F-24",
@@ -243,7 +243,7 @@
       "severity": "HIGH",
       "category": "csr_mcp",
       "rationale": "v1.9 Phase 2 D-V1.9-02 cross-sheet invariant — detects drift between .mcp.json transport config + mcp-tool-registry.json tool inventory. Orphan transport (.mcp.json server missing from registry) OR orphan inventory (registry server missing from .mcp.json) → FAIL. ScraplingServer (capital) in .mcp.json normalizes to scrapling (lowercase) in registry per D-SF-02 naming.md alignment. Category csr_mcp mirrors F-23 (the analogous .mcp.json↔registry MCP invariant): spec FE-1 proposed 'engine_consistency' but that value is NOT in consistency-report.schema.json's 8-category enum, so check_F_24 emits csr_mcp to keep the JSON registry aligned with the code's report category — see Q-V1.9-PHASE-2-WORKER-01.",
-      "computed_by": "consistency_check"
+      "computed_by": "validate_invariants"
     },
     {
       "id": "F-25",
@@ -251,15 +251,137 @@
       "severity": "HIGH",
       "category": "csr_mcp",
       "rationale": "v1.9 Phase 3 D-V1.9-10 — defensive check enforcing schema version coherence. Migration 0005 (v1.4→v1.5) adds sf block; enabled=true on v1.4 is impossible per Migration 0005 lock but defensive check catches manual misconfiguration. Category csr_mcp (mirrors F-23/F-24, the analogous MCP invariants): the consistency-report.schema.json 8-category enum has no SF-specific bucket, so check_F_25 emits csr_mcp. Version comparison is integer-tuple (split on '.'), NOT lexicographic — correct past '1.10' (D-V1.9-10).",
-      "computed_by": "consistency_check"
+      "computed_by": "validate_invariants"
     },
     {
       "id": "F-26",
-      "rule": "if _state/workflows/{run_id}.json shows sf-crawl-orchestrator status=paused|failed AND mcp__sf__sf_crawl_progress({crawl_id}) returns IN_PROGRESS, surface AMBER warning (orphan: workflow state + GUI state disagree)",
+      "rule": "if a project's _state/workflows/ has a paused/failed sf-crawl-orchestrator run whose crawl_id still reports IN_PROGRESS via sf_crawl_progress, surface AMBER (workflow state vs SF GUI disagree)",
       "severity": "MEDIUM",
       "category": "csr_mcp",
       "rationale": "v1.9 Phase 4 D-V1.9-11 — operator-level cleanup hint NOT blocking (AMBER not RED per spec v2.2 line 210). Optional MCP-aware check runs only when sf MCP responding within 1s health probe. SKIP if MCP unreachable (avoid blocking drift-check on MCP downtime). FIRST MEDIUM-severity v1.9 invariant (F-24/F-25 are HIGH). Category csr_mcp (mirrors F-23/F-24/F-25): the consistency-report.schema.json 8-category enum has no SF-specific bucket and spec FE-3's 'mcp_runtime' is narrative only (not in the closed enum), so check_F_26 emits csr_mcp.",
-      "computed_by": "consistency_check"
+      "computed_by": "validate_invariants"
+    }
+  ],
+  "deferred_design_rules": [
+    {
+      "id": "F-01",
+      "rule": "master_task.url ⊆ (crawl_sitemap.url ∪ external_urls)",
+      "severity": "CRITICAL",
+      "category": "csr_foundation",
+      "rationale": "A task targeting an unknown URL is either a typo or a dangling reference; both produce unactionable entries that corrupt the DONE cascade and pollute completed_work.",
+      "computed_by": "consistency_check",
+      "status": "deferred",
+      "note": "cross-sheet join rule; not yet enforced at validate_invariants row level — consistency_check tool scope. The active F-01 entry in `rules` carries the implemented meaning (status enum)."
+    },
+    {
+      "id": "F-02",
+      "rule": "count(master_task WHERE status=DONE) == dashboard.R48",
+      "severity": "CRITICAL",
+      "category": "csr_foundation",
+      "rationale": "Dashboard R48 is the headline DONE-count KPI; drift means stakeholders see wrong numbers. Also mirrored as CI-06 for the 8-invariant view.",
+      "computed_by": "dashboard_refresh",
+      "status": "deferred",
+      "note": "dashboard KPI count rule; not yet enforced at validate_invariants row level — dashboard_refresh tool scope. The active F-02 entry in `rules` carries the implemented meaning (no live =COUNTIF formulas)."
+    },
+    {
+      "id": "F-03",
+      "rule": "count(master_task WHERE status=TODO) == dashboard.R49",
+      "severity": "CRITICAL",
+      "category": "csr_foundation",
+      "rationale": "TODO count feeds the whats-next priority queue sizing; drift desynchronizes reminder thresholds.",
+      "computed_by": "dashboard_refresh",
+      "status": "deferred",
+      "note": "dashboard KPI count rule; not yet enforced at validate_invariants row level — dashboard_refresh tool scope. The active F-03 entry in `rules` carries the implemented meaning (no live =SUMIF formulas)."
+    },
+    {
+      "id": "F-04",
+      "rule": "count(master_task WHERE status=ONGOING) == dashboard.R50",
+      "severity": "HIGH",
+      "category": "csr_foundation",
+      "rationale": "ONGOING count gates parallelization limits; auto-repair via dashboard_refresh (§9.3).",
+      "computed_by": "dashboard_refresh",
+      "status": "deferred",
+      "note": "dashboard KPI count rule; not yet enforced at validate_invariants row level — dashboard_refresh tool scope. The active F-04 entry in `rules` carries the implemented meaning (no live =AVERAGEIF formulas, severity CRITICAL)."
+    },
+    {
+      "id": "F-05",
+      "rule": "completed_work.task_id ⊆ master_task WHERE status=DONE",
+      "severity": "CRITICAL",
+      "category": "csr_foundation",
+      "rationale": "A completed_work row referencing a non-DONE task means the DONE cascade §21.4 was partial — either master_task was reverted or the cascade aborted before step 5.",
+      "computed_by": "consistency_check",
+      "status": "deferred",
+      "note": "cross-sheet join rule; not yet enforced at validate_invariants row level — consistency_check tool scope. The active F-05 entry in `rules` carries the implemented meaning (schema header column count). mark-done is the design-time enforcement point for THIS rule."
+    },
+    {
+      "id": "F-08",
+      "rule": "quick_wins.target_url ⊆ (crawl_sitemap ∪ gsc_performance)",
+      "severity": "HIGH",
+      "category": "csr_foundation",
+      "rationale": "Quick wins must be either reachable (in sitemap) or already getting impressions (GSC). A URL in neither set is fictitious.",
+      "computed_by": "consistency_check",
+      "status": "deferred",
+      "note": "cross-sheet join rule; not yet enforced at validate_invariants row level — consistency_check tool scope. The active F-08 entry in `rules` carries the implemented meaning (quick_wins.url, not target_url)."
+    },
+    {
+      "id": "F-09",
+      "rule": "cluster_keywords.assigned_url ⊆ topical_map.assigned_url",
+      "severity": "HIGH",
+      "category": "csr_foundation",
+      "rationale": "Every cluster keyword target must have a pillar home; otherwise the cluster is orphan and cluster→pillar reporting breaks.",
+      "computed_by": "consistency_check",
+      "status": "deferred",
+      "note": "cross-sheet join rule; not yet enforced at validate_invariants row level — consistency_check tool scope. The active F-09 entry in `rules` carries the implemented meaning (master_task.task_id uniqueness)."
+    },
+    {
+      "id": "F-10",
+      "rule": "cannibalization.pages ⊆ crawl_sitemap.url",
+      "severity": "HIGH",
+      "category": "csr_foundation",
+      "rationale": "Cannibalization rows referencing non-crawled pages are stale; SF re-import needed before acting.",
+      "computed_by": "consistency_check",
+      "status": "deferred",
+      "note": "cross-sheet join rule; not yet enforced at validate_invariants row level — consistency_check tool scope. The active F-10 entry in `rules` carries the implemented meaning (quick_wins.url D-03 idempotency)."
+    },
+    {
+      "id": "F-11",
+      "rule": "schema.url ⊆ crawl_sitemap.url",
+      "severity": "HIGH",
+      "category": "csr_foundation",
+      "rationale": "Schema audit rows for unknown URLs indicate a sitemap/crawl drift that must be resolved before schema fixes are applied.",
+      "computed_by": "consistency_check",
+      "status": "deferred",
+      "note": "cross-sheet join rule; not yet enforced at validate_invariants row level — consistency_check tool scope. The active F-11 entry in `rules` carries the implemented meaning (workflow-run schema_version)."
+    },
+    {
+      "id": "F-12",
+      "rule": "redirect_404.from_url ⊆ sf_response_codes WHERE status IN (301,302,404)",
+      "severity": "HIGH",
+      "category": "csr_foundation",
+      "rationale": "Redirect/404 entries must be backed by actual SF response codes; fabricated rows cause redirect_chain and 404 sweep reports to double-count.",
+      "computed_by": "consistency_check",
+      "status": "deferred",
+      "note": "cross-sheet join rule; not yet enforced at validate_invariants row level — consistency_check tool scope. The active F-12 entry in `rules` carries the implemented meaning (events.jsonl monotonic line count)."
+    },
+    {
+      "id": "F-13",
+      "rule": "robots_txt.disallowed == crawl_sitemap WHERE indexability='Non-indexable (robots)'",
+      "severity": "HIGH",
+      "category": "csr_foundation",
+      "rationale": "robots.txt declarations and SF-detected indexability must agree; a delta means one of the two is stale (cached robots or stale crawl).",
+      "computed_by": "consistency_check",
+      "status": "deferred",
+      "note": "cross-sheet join rule; not yet enforced at validate_invariants row level — consistency_check tool scope. The active F-13 entry in `rules` carries the implemented meaning (provenance run_id integer type)."
+    },
+    {
+      "id": "F-14",
+      "rule": "gsc_performance.page ⊆ (crawl_sitemap ∪ redirect_targets)",
+      "severity": "HIGH",
+      "category": "csr_foundation",
+      "rationale": "GSC may report impressions for redirected URLs for up to 6 months; accepting sitemap-OR-redirect-target union avoids false-positive orphan flags.",
+      "computed_by": "consistency_check",
+      "status": "deferred",
+      "note": "cross-sheet join rule; not yet enforced at validate_invariants row level — consistency_check tool scope. The active F-14 entry in `rules` carries the implemented meaning (workflow_run_id pattern)."
     }
   ]
 }
