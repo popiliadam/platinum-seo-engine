@@ -1,7 +1,21 @@
-# requirements-lock.txt — pinned versions for reproducible installs (Q-PHASE15-LOCKFILE-01)
-# Generated: 2026-05-06 | Platform: darwin | Python: 3.14
-# Update with: pip freeze > requirements-lock.txt
-# CI matrix: ["3.10", "3.14"] (floor + current; .github/workflows/ci.yml)
+# requirements-lock.txt — pinned versions for reproducible installs (Q-PHASE15-LOCKFILE-01).
+# Pins the resolved versions of requirements.txt (direct deps) + their transitive
+# closure. CI installs THIS file (.github/workflows/ci.yml: pip install -r requirements-lock.txt).
+#
+# Python: 3.14 (current target). CI matrix: ["3.10", "3.14"] (floor + current).
+# Last regenerated: 2026-05-06 | Platform: darwin.
+#
+# Regenerate in a CLEAN venv so ONLY requirements.txt's closure is captured — a
+# bare `pip freeze` of a dev env leaks unrelated globals (that is how a phantom
+# `requests` pin once crept in here; P2-04). Keep this header, replace the pins:
+#     python3.14 -m venv /tmp/pseo-lock
+#     /tmp/pseo-lock/bin/pip install -r requirements.txt
+#     /tmp/pseo-lock/bin/pip freeze   # paste the output below this header
+#
+# Invariant (tests/ci/test_requirements_lock.py): every requirements.txt dep is
+# pinned here, and `requests` is pinned IFF a real engine .py imports it — today
+# none do (the dfs-pull SKILL.md `import requests` is an illustrative snippet;
+# the engine HTTP client is httpx, scripts/util/sf_mcp_client.py).
 attrs==26.1.0
 h11==0.16.0
 httpcore==1.0.9
@@ -14,4 +28,3 @@ piexif==1.1.3
 pluggy==1.6.0
 pytest==9.0.3
 PyYAML==6.0.3
-requests==2.33.1

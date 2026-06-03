@@ -1,5 +1,13 @@
 """Brand onboarding Stage A — Auto discovery via DFS + Scrapling.
 
+⚠️  STAGING-ONLY (P1-12) — real discovery deferred.
+    Every ``_fetch_*`` below is a *stub* that returns ``None`` / ``[]``; this
+    module performs NO live discovery today. The stub→live-MCP wiring lands in
+    Phase 11 Wave 2, and the full staging→canonical flow only goes live at
+    Phase 14 (workspace bring-up). Until then the module is non-destructive:
+    it never spends paid MCP credits (F-16 budget pre-flight) and never writes
+    project state — it only shapes draft candidates for operator review.
+
 Pipeline (per the plan/2026-05-21 G-AI-05 hybrid spec):
     1. DFS ``domain_analytics_whois_overview``     — domain creation
        date (founding-year proxy).
@@ -35,8 +43,16 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+
+def _current_year() -> int:
+    """Live UTC year — module-level so the experience-claim math stays
+    dynamic (P1-12: no hardcoded founding-year baseline) and tests can
+    monkeypatch it to assert the 'X+ yıl' computation tracks the calendar."""
+    return datetime.now(timezone.utc).year
 
 
 def discover(
@@ -76,7 +92,7 @@ def discover(
             {
                 "hint": "founding_year",
                 "claim_core": (
-                    f"{2026 - founding_year}+ yıl sektör tecrübesi "
+                    f"{_current_year() - founding_year}+ yıl sektör tecrübesi "
                     f"(domain {founding_year} kuruluş)"
                 ),
                 "evidence_url": domain,

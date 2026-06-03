@@ -1,5 +1,12 @@
 # Screaming Frog 24 MCP — Comprehensive Hybrid Integration Design (v2.2, MCP-primary pivot + multi-session execution)
 
+> ⚠️ **HISTORICAL DESIGN DOC (P3-01).** Dated 2026-05-26; this is the design
+> spec that drove the SF MCP integration and carries earlier call shapes that
+> have since evolved. For the CURRENT, authoritative SF contract see
+> `commands/pseo-sf-crawl.md` + the `sf-crawl-orchestrator` SKILL
+> (`skills/ingestion/sf-crawl-orchestrator/SKILL.md`). Preserved as-is for design
+> provenance — do not follow the tool-call shapes here verbatim.
+
 > **Status:** DRAFT v2.2 — MCP-primary semantic pivot + multi-session execution model. Operator clarified: "manuel 25'e yakın sf raporu ekliyorduk artık bu kısımı komple MCP'ye devredeceğiz" — meaning the orchestrator must FULLY delegate the 24-report (Tier 1 + Tier 2) export workflow to SF MCP via `sf_generate_report(save_report=True)`, replacing manual CSV drop. File-drop becomes the disaster-recovery fallback, not the authoritative path.
 > **Date:** 2026-05-26 (v1 + v2 + v2.1 + v2.2 same day)
 > **Supersedes:** v1 (narrow ingestion-only scope) → v2 (comprehensive integration matrix) → v2.1 (audit-revised) → **v2.2 (MCP-primary + multi-session)**

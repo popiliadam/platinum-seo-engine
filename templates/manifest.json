@@ -1,0 +1,35 @@
+{
+  "$comment": "P2-03 (Codex audit): declares the placeholder dialect each template family uses, so a template can never be rendered by the WRONG engine — which would silently leave placeholders unresolved with no error. Locked by tests/reporting/test_template_dialect.py. Every *.template.* file MUST belong to a family below.",
+  "version": "1.0",
+  "dialects": {
+    "string.Template": {
+      "syntax": "$var / ${var}",
+      "escape": "$$ emits a literal $",
+      "renderer": "scripts/reporting/render_template.py",
+      "forbidden": "{{...}} double-brace tokens (render_template leaves them verbatim)"
+    },
+    "double-brace": {
+      "syntax": "{{PLACEHOLDER}} (UPPER_SNAKE)",
+      "renderer": "skill-side token replacement by the content-generation skills",
+      "forbidden": "$var string.Template tokens (the content skills leave them verbatim)"
+    }
+  },
+  "families": [
+    {
+      "name": "reports",
+      "root": "templates/reports",
+      "glob": "*.template.md",
+      "dialect": "string.Template",
+      "renderer": "scripts/reporting/render_template.py",
+      "note": "Monthly/weekly/audit report bodies rendered by render_template.py (stdlib string.Template). Data comes from the reporting skills as a flat JSON dict of $key -> str."
+    },
+    {
+      "name": "content",
+      "root": "templates/content",
+      "glob": "*.template.*",
+      "dialect": "double-brace",
+      "renderer": "skill-side ({{UPPER_SNAKE}} replacement by new-blog / revision / faq-block / upload-instructions content skills)",
+      "note": "On-page content artifacts (HTML/MD) filled by the content-generation skills, NOT render_template.py. Tokens are {{UPPER_SNAKE}}."
+    }
+  ]
+}
