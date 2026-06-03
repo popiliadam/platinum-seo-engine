@@ -4,7 +4,7 @@ description: |
   Also use when: portföyde birden fazla proje var ve sonraki komutların (`/pseo-status`, `/pseo-quickwin`, `/pseo-monthly`, `/pseo-driftcheck`) hangi projeye uygulanacağını belirten `shared/active.json` marker'ı set edilecek.
   Do not use when: yeni bir proje açma (`/pseo-init`), aktif projenin durumunu görme (`/pseo-status`) ya da tek seferlik bir komuta slug'ı argüman olarak doğrudan geçirmek yeterliyse.
 argument-hint: "<slug>"
-allowed-tools: Bash(python3:*), Bash(jq:*), Bash(ls:*), Read
+allowed-tools: Bash(python3:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Read
 model: sonnet
 ---
 
@@ -22,11 +22,14 @@ model: sonnet
 
 `$1` verildiyse: workspace altında `projects/{slug}/project.config.json` var mı kontrol et, yoksa uyar; varsa `shared/active.json`'u atomik yaz (UTC ISO 8601 timestamp ile). Append-only state disiplini bu marker dosyasını HARİÇ TUTAR — `shared/active.json` deliberately mutable bir pointer'dır (rules/append-only-state.md sadece `_state/events.jsonl` ve workflow run JSON'ları için zorlayıcı; `shared/` portföy-genelinde yaşar).
 
-!`SLUG="$1"; if [ -n "$SLUG" ]; then if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş"; else WS="$PSEO_WORKSPACE_ROOT"; CFG="$WS/projects/$SLUG/project.config.json"; if [ ! -f "$CFG" ]; then echo "WARN: $CFG yok — yine de marker'ı yazacağım (Phase 5'te /pseo-init önerilir)"; fi; mkdir -p "$WS/shared"; python3 -c "
-import json, os, sys, tempfile
+!`SLUG="$1"; if [ -n "$SLUG" ]; then if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş"; else WS="$PSEO_WORKSPACE_ROOT"; CFG="$WS/projects/$SLUG/project.config.json"; if [ ! -f "$CFG" ]; then echo "WARN: $CFG yok — yine de marker'ı yazacağım (Phase 5'te /pseo-init önerilir)"; fi; mkdir -p "$WS/shared"; SLUG="$SLUG" python3 -c "
+import json, os, re, sys, tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-slug = '$SLUG'
+slug = os.environ['SLUG']
+if not re.fullmatch(r'[a-z0-9][a-z0-9-]*', slug):
+    print('ERROR: invalid slug (lowercase alnum + hyphen only): ' + repr(slug), file=sys.stderr)
+    sys.exit(2)
 ws = Path(os.environ['PSEO_WORKSPACE_ROOT']).expanduser()
 target = ws / 'shared' / 'active.json'
 target.parent.mkdir(parents=True, exist_ok=True)

@@ -4,7 +4,7 @@ description: |
   Also use when: portföye yeni bir SEO projesi alındı, `projects/{slug}/` klasörü ve `project.config.json` dosyasının schemaya uygun ilk hâli üretilecek; brief'te slug + domain + market biliniyor.
   Do not use when: mevcut bir projeye yeni veri yüklemek (`/pseo-status` veya ingestion skill'leri), aylık rapor (`/pseo-monthly`) ya da drift kontrol (`/pseo-driftcheck`) gerekiyorsa — her biri ayrı komut/skill ile çalışır.
 argument-hint: "<slug> [domain] [--market TR] [--locale tr-TR] [--profile local-service] [--schema-version 1.5] [--dry-run]"
-allowed-tools: Bash(python3:*), Bash(jq:*), Read
+allowed-tools: Bash(python3:*), Bash(jq:*), Bash(head:*), Read
 model: sonnet
 ---
 
