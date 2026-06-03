@@ -12,7 +12,7 @@
           },
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/security/check_secrets.sh\" \"${CLAUDE_PROJECT_DIR:-.}\"",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/security/check_secrets.sh\" --changed-since HEAD \"${CLAUDE_PROJECT_DIR:-.}\"",
             "timeout": 60,
             "statusMessage": "Secret leak scan..."
           }
