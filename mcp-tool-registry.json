@@ -417,5 +417,14 @@
         }
       ]
     }
+  },
+  "external_user_dependencies": {
+    "higgsfield": {
+      "transport": "user_external",
+      "not_in_mcp_json": true,
+      "tools": ["generate_image", "job_status"],
+      "required_by_skills": ["generate-images"],
+      "note": "User-level MCP configured in the operator's own client env (e.g. VS Code), NOT installed by this plugin and intentionally absent from .mcp.json + servers (F-24 safe). generate-images preflights mcp__higgsfield__generate_image and falls back via DURUR #5 when absent (P1-13)."
+    }
   }
 }

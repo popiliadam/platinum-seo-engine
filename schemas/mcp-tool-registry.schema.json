@@ -31,9 +31,43 @@
       "description": "What to do when `claude mcp list` returns a tool not listed in servers[].tools — strict fails audit, permissive records it with a warning.",
       "enum": ["strict", "permissive"],
       "default": "strict"
+    },
+    "external_user_dependencies": {
+      "type": "object",
+      "description": "Tool surfaces a skill needs that this plugin does NOT install — they must already exist in the operator's own MCP client (user-level). Kept OUT of `servers` (and .mcp.json) on purpose so the F-24 .mcp.json↔registry server-key invariant is not tripped (P1-13). Keys are the external server short-name (e.g. higgsfield).",
+      "additionalProperties": { "$ref": "#/definitions/externalUserDependency" }
     }
   },
   "definitions": {
+    "externalUserDependency": {
+      "type": "object",
+      "description": "A user-level external MCP dependency (P1-13). Deliberately NOT a `servers` entry / .mcp.json server, so F-24 (.mcp.json↔registry server-key sync) stays honest.",
+      "required": ["transport", "tools"],
+      "additionalProperties": false,
+      "properties": {
+        "transport": {
+          "type": "string",
+          "enum": ["user_external"],
+          "description": "user_external = configured per-user in the operator's MCP client, not installed by this plugin."
+        },
+        "not_in_mcp_json": {
+          "type": "boolean",
+          "description": "True asserts this dependency is intentionally absent from .mcp.json (keeps the F-24 invariant honest)."
+        },
+        "tools": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" },
+          "description": "Unprefixed tool names the skills call (e.g. generate_image → mcp__higgsfield__generate_image at runtime)."
+        },
+        "required_by_skills": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Skill names (skills/**/SKILL.md `name`) that declare these tools in mcp_tools."
+        },
+        "note": { "type": "string" }
+      }
+    },
     "serverName": {
       "type": "string",
       "description": "Canonical short server name. gsc + dataforseo + scrapling + sf are the four external feeds (sf added v1.8 Phase 1 D-SF-02 for Screaming Frog 24 native MCP, HTTP transport); platinum_seo_core is the plugin's own server; project_local is the escape hatch for per-project-only servers.",
