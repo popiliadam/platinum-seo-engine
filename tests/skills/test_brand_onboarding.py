@@ -13,7 +13,7 @@ Coverage (15 cases):
   10. profile enum 5-value full coverage (Principle 2 type-safe).
   11. Domain DNS validation socket.gethostbyname documented (mock-friendly).
   12. brand_identity 18-field + content_settings 14-field full enumeration.
-  13. project-config.schema.json v1.2 staging conformance (Draft7Validator).
+  13. project-config.schema.json v1.5 staging conformance (Draft7Validator).
   14. Plugin agnostik (F-16): .mcp.json byte-hash unchanged after skill creation.
   15. Foundational Principles 3-layer enforce (truth-verifiable + profile-aware
       + AI suistimal yasağı) explicit references.
@@ -393,7 +393,7 @@ def test_brand_identity_18_and_content_settings_14_enumerated(
 
 
 # ---------------------------------------------------------------------------
-# Test 13 — staging output is project-config.schema.json v1.2 conformant
+# Test 13 — staging output is project-config.schema.json v1.5 conformant
 # ---------------------------------------------------------------------------
 
 def test_staging_output_schema_conformance(
