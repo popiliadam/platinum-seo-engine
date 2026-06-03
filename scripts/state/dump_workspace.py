@@ -57,10 +57,16 @@ def _resolve_slug(workspace_root: Path, project_slug: str | None) -> str:
         raise FileNotFoundError(
             f"shared/active.json is not valid JSON: {exc}"
         ) from exc
-    slug = data.get("slug")
+    slug = data.get("active_project") or data.get("slug")
     if not slug:
         raise FileNotFoundError(
-            f"shared/active.json has no 'slug' key: {active}"
+            f"shared/active.json has no 'active_project' key: {active}"
+        )
+    if "active_project" not in data and "slug" in data:
+        print(
+            f"warning: shared/active.json uses legacy 'slug' key; rename to "
+            f"'active_project' ({active})",
+            file=sys.stderr,
         )
     return str(slug)
 
