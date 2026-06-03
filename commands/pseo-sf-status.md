@@ -4,7 +4,7 @@ description: |
   Also use when: SF MCP server live mı kontrol edilecek (`sf_list_allowed_base_directory` probe), aktif veya tüm projelerin son sf-crawl-orchestrator run özetini görme, allowed_directory mismatch tespit etme.
   Do not use when: yeni crawl tetikleme (`/pseo-sf-crawl`), genel workflow status (`/pseo-status` SF MCP Status H2 alt-bölümünü de gösterir), drift kontrol (`/pseo-driftcheck`).
 argument-hint: "[project-slug]"
-allowed-tools: Bash(curl:*), Bash(jq:*), Bash(python3:*), Bash(ls:*), Read
+allowed-tools: Bash(curl:*), Bash(jq:*), Bash(python3:*), Bash(ls:*), Bash(grep:*), Bash(head:*), Bash(sort:*), Bash(tail:*), Bash(xargs:*), Read
 model: sonnet
 ---
 

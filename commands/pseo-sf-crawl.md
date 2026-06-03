@@ -4,7 +4,7 @@ description: |
   Also use when: aktif projenin Screaming Frog MCP server'ı (`http://127.0.0.1:11435/mcp`) açık, `project.config.sf.mcp.enabled=true`; 24 raporluk Tier 1 + Tier 2 export döngüsü tetiklenecek; mid-loop crash sonrası `--resume <run_id>` ile devam ettiriliyor.
   Do not use when: SF MCP server kapalı (GUI'den önce başlat), manuel CSV drop (mevcut sf-import file-only path zaten çalışır), GSC ingestion (`/pseo-gsc-pull`), DFS pull (`/pseo-dfs-pull`).
 argument-hint: "<slug> [start_url] [--resume <run_id>]"
-allowed-tools: Bash(jq:*), Read
+allowed-tools: Bash(jq:*), Bash(curl:*), Bash(head:*), Read
 model: sonnet
 ---
 

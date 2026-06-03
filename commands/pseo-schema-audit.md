@@ -4,7 +4,7 @@ description: |
   Also use when: aktif projenin Screaming Frog export'u alındı (`projects/{slug}/sf-exports/{date}/raw/structured_data_all.csv`); sf-import skill çalışmış; on-page-audit / tech-audit ile birlikte triage; rich result eligibility kontrol; opsiyonel DFS content_parsing ile canlı schema cross-validate.
   Do not use when: SF export henüz yok (`sf-import` skill önce, DURUR #1); cannibalization (`/pseo-cannibalization`), quick-wins (`/pseo-quickwin`), tech-audit (`tech-audit` skill, ayrı); master.xlsx yokken (`/pseo-init` önce).
 argument-hint: "<project-slug> [--sf-export-date YYYY-MM-DD] [--cross-validate-dfs] [--use-sf-mcp-live] [--strict-parse]"
-allowed-tools: Bash(jq:*), Bash(python3:*), Bash(ls:*), Read
+allowed-tools: Bash(jq:*), Bash(python3:*), Bash(ls:*), Bash(head:*), Bash(sort:*), Read
 model: sonnet
 ---
 
