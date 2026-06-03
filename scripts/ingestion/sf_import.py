@@ -248,9 +248,10 @@ def project_and_write(
         counts[sheet] = result.rows_affected
 
     total_rows = sum(counts.values())
+    # run_id auto-allocated race-free under the append flock (P1-11) — the prior
+    # next_run_id() then append_provenance() two-step could collide concurrently.
     events_writer.append_provenance(
         project_id=project_slug,
-        run_id=events_writer.next_run_id(project_slug, workspace_root=workspace_root),
         source={
             "kind": "sf_csv",
             "source_folder": _rel_to_workspace(Path(raw_dir), workspace_root),
