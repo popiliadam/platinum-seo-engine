@@ -3,7 +3,7 @@
 # closure. CI installs THIS file (.github/workflows/ci.yml: pip install -r requirements-lock.txt).
 #
 # Python: 3.14 (current target). CI matrix: ["3.10", "3.14"] (floor + current).
-# Last regenerated: 2026-05-06 | Platform: darwin.
+# Last regenerated: 2026-06-04 | Platform: darwin.
 #
 # Regenerate in a CLEAN venv so ONLY requirements.txt's closure is captured — a
 # bare `pip freeze` of a dev env leaks unrelated globals (that is how a phantom
@@ -16,15 +16,24 @@
 # pinned here, and `requests` is pinned IFF a real engine .py imports it — today
 # none do (the dfs-pull SKILL.md `import requests` is an illustrative snippet;
 # the engine HTTP client is httpx, scripts/util/sf_mcp_client.py).
+anyio==4.13.0
 attrs==26.1.0
+certifi==2026.5.20
+et_xmlfile==2.0.0
 h11==0.16.0
 httpcore==1.0.9
 httpx==0.28.1
+idna==3.18
 iniconfig==2.3.0
 jsonschema==4.26.0
+jsonschema-specifications==2025.9.1
 openpyxl==3.1.5
-packaging==26.1
+packaging==26.2
 piexif==1.1.3
+pillow==12.2.0
 pluggy==1.6.0
+Pygments==2.20.0
 pytest==9.0.3
 PyYAML==6.0.3
+referencing==0.37.0
+rpds-py==2026.5.1
