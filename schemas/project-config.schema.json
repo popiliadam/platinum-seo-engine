@@ -83,7 +83,7 @@
       "required": ["location_code", "language_code"],
       "properties": {
         "location_code":          { "type": "integer" },
-        "language_code":          { "type": "string" },
+        "language_code":          { "type": "string", "pattern": "^[a-z]{2,3}(-[A-Za-z]{2,4})?$", "description": "ISO-like DataForSEO language code, e.g. 'tr', 'en', 'en-us', 'zh-Hant' — NOT a numeric locale id (codex-audit f4)" },
         "location_name":          { "type": "string" },
         "budget_credits_per_day": { "type": "integer", "minimum": 0, "default": 500 }
       }
