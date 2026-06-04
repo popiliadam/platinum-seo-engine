@@ -23,7 +23,7 @@
 - Plugin workspace yapısını **okur**, workspace state'ini **günceller**.
 - Workspace plugin'in varlığından habersiz (config dışında).
 - Plugin yolu workspace'e **CWD detection** + `.env`'deki `PSEO_WORKSPACE_ROOT` (canonical, ADR-035; `PSE_WORKSPACE_PATH` 1-yıl deprecated alias) ile bulunur.
-- Versionlama: Plugin SemVer (`plugin.json`); workspace proje config'leri `plugin_version_constraint` taşır.
+- Versionlama: Plugin SemVer (`plugin.json`); workspace proje config'leri `schema_version` taşır (config şema sürümü — şu an tüm projelerde `"1.5"`).
 
 ---
 
