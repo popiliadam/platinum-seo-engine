@@ -193,7 +193,7 @@ v1.8 added Screaming Frog 24's native MCP server as the **fourth MCP** in PSEO (
     "gsc":            { "command": "bash", "args": ["-c", "set -a; [ -f .env ] && source .env; set +a; exec npx -y mcp-server-gsc@0.3.0"] },
     "dataforseo":     { "command": "bash", "args": ["-c", "set -a; [ -f .env ] && source .env; set +a; exec npx -y dataforseo-mcp-server@2.8.10"] },
     "ScraplingServer":{ "command": "${SCRAPLING_BIN:-scrapling}", "args": ["mcp"] },
-    "sf":             { "url": "http://127.0.0.1:11435/mcp" }
+    "sf":             { "type": "http", "url": "http://127.0.0.1:11435/mcp" }
   }
 }
 ```

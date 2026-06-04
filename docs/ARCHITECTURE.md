@@ -151,7 +151,7 @@ sf-import projects to 6 sheets (`crawl_sitemap`, `inlinks`, `outlinks`, `redirec
 
 ### F-16 invariant baseline reset
 
-`.mcp.json` byte-byte invariant (47+ commits since v1.5) **intentionally broken** at v1.8 Phase 2 per ADR-039. New baseline: 543B (was 482B); new md5 `93523d41e14f90916fefb86d346bd702`. Future F-16 drift catches resume from new baseline post-v1.8 release.
+`.mcp.json` byte-byte invariant (47+ commits since v1.5) **intentionally broken** twice via ADR: at v1.8 Phase 2 per ADR-039 (482B→543B, sf added), then at v1.9.x per ADR-040 (543B→565B, sf `type:http` so it registers in `claude mcp list`). Current baseline: **565B; md5 `634c8ed5b7cf3c852d9b41e1c0e1d3b5`**. Future F-16 drift catches resume from this baseline.
 
 ### Plugin manifest counts (v1.8+)
 
