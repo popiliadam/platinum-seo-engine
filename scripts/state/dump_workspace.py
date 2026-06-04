@@ -4,10 +4,13 @@ One-shot read of the 5 data sources a manager session needs to triage state at
 a glance:
 
   1. _state/events.jsonl son N satır (parsed JSON)
-  2. outputs/master.xlsx#master_task TODO satır sayısı
+  2. master.xlsx#master_task TODO satır sayısı (project ROOT — the live
+     convention; init-project writes projects/<slug>/master.xlsx)
   3. _state/workflows/<run_id>.json içinde status="awaiting_approval" olanlar
   4. _state/backups/master-excel-<TIMESTAMP>.xlsx son N (mtime-sorted)
-  5. _state/consistency-report.json verdict (GREEN/AMBER/RED)
+  5. Drift verdict (GREEN/AMBER/RED): _state/consistency-report.json if a report
+     is persisted, else computed LIVE from the root master.xlsx via the invariant
+     evaluator (no report is persisted today, so this avoids a null verdict)
 
 CLI semantics:
   - --project <slug> opsiyonel. Eğer atlanırsa shared/active.json'daki
@@ -155,15 +158,45 @@ def _backups_recent(backups_dir: Path, n: int) -> List[str]:
     return [p.name for p in files[:n]]
 
 
-def _drift_verdict(report_path: Path) -> str | None:
-    if not report_path.exists():
-        return None
-    try:
-        data = json.loads(report_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return None
-    verdict = data.get("verdict")
-    return verdict if isinstance(verdict, str) else None
+def _drift_verdict(
+    report_path: Path,
+    workbook_path: Path | None = None,
+    slug: str | None = None,
+    workspace_root: Path | None = None,
+) -> str | None:
+    """Drift verdict for the manager summary.
+
+    A persisted consistency-report.json wins if present (a future drift-check
+    may write it). Otherwise — the live case today, where no report is persisted
+    — compute the verdict directly from the root master.xlsx via the invariant
+    evaluator so the summary shows a real GREEN/AMBER/RED instead of null.
+    Graceful: any read/eval error returns None.
+    """
+    if report_path.exists():
+        try:
+            data = json.loads(report_path.read_text(encoding="utf-8"))
+            verdict = data.get("verdict")
+            if isinstance(verdict, str):
+                return verdict
+        except (json.JSONDecodeError, OSError):
+            pass
+    if workbook_path and workbook_path.exists() and slug:
+        try:
+            import importlib.util
+
+            import openpyxl
+
+            vi_path = Path(__file__).resolve().parents[1] / "validation" / "validate_invariants.py"
+            spec = importlib.util.spec_from_file_location("vi_dump_gate", vi_path)
+            vi = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(vi)
+            wb = openpyxl.load_workbook(str(workbook_path), read_only=True, data_only=True)
+            agg = vi.aggregate_verdicts(vi.evaluate_all(wb, slug, workspace_root=workspace_root))
+            overall = agg.get("overall")
+            return overall if isinstance(overall, str) else None
+        except Exception:
+            return None
+    return None
 
 
 def dump_workspace(
@@ -189,11 +222,16 @@ def dump_workspace(
         "project": slug,
         "events_tail": _events_tail(state_dir / "events.jsonl", events_tail_n),
         "master_task_todo_count": _master_task_todo_count(
-            project_dir / "outputs" / "master.xlsx"
+            project_dir / "master.xlsx"
         ),
         "workflow_pending_approvals": _pending_approvals(state_dir / "workflows"),
         "backups_recent": _backups_recent(state_dir / "backups", backups_recent_n),
-        "drift_verdict": _drift_verdict(state_dir / "consistency-report.json"),
+        "drift_verdict": _drift_verdict(
+            state_dir / "consistency-report.json",
+            workbook_path=project_dir / "master.xlsx",
+            slug=slug,
+            workspace_root=workspace_root,
+        ),
     }
 
 
