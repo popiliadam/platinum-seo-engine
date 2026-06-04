@@ -64,8 +64,10 @@ def _write_events(project: Path, events: list[dict]) -> None:
 
 
 def _write_master_xlsx(project: Path, statuses: list[str]) -> None:
-    """Create outputs/master.xlsx with a master_task sheet whose column J
-    holds statusEnum values (header row = 1)."""
+    """Create master.xlsx at the project ROOT (the live convention — every
+    workspace project keeps master.xlsx at projects/<slug>/master.xlsx, and
+    init-project writes it there) with a master_task sheet whose column J holds
+    statusEnum values (header row = 1)."""
     wb = Workbook()
     if "Sheet" in wb.sheetnames:
         del wb["Sheet"]
@@ -75,7 +77,7 @@ def _write_master_xlsx(project: Path, statuses: list[str]) -> None:
     for i, status in enumerate(statuses, start=2):
         ws.cell(row=i, column=1, value=f"task-{i}")
         ws.cell(row=i, column=10, value=status)
-    wb.save(project / "outputs" / "master.xlsx")
+    wb.save(project / "master.xlsx")
 
 
 def _write_workflow(project: Path, run_id: str, status: str) -> None:
@@ -307,6 +309,24 @@ def test_drift_verdict_from_consistency_report(dump_module, tmp_path):
 
 
 # ---------- 12. drift verdict None when report missing ----------
+
+
+def test_drift_verdict_live_from_root_workbook_when_no_report(dump_module, tmp_path):
+    """No consistency-report.json is ever persisted today (the live case), so
+    drift_verdict must be computed LIVE from the root master.xlsx instead of
+    returning null. A master_task with the wrong column count -> F-05 CRITICAL
+    -> overall RED."""
+    project = _make_workspace(tmp_path, slug="demo")
+    wb = Workbook()
+    if "Sheet" in wb.sheetnames:
+        del wb["Sheet"]
+    ws = wb.create_sheet("master_task")
+    ws.append(["task_id", "status", "foo"])  # wrong column count -> F-05 RED
+    ws.append(["t-1", "TODO", "x"])
+    wb.save(project / "master.xlsx")
+
+    result = dump_module.dump_workspace(workspace_root=tmp_path, project_slug="demo")
+    assert result["drift_verdict"] == "RED"
 
 
 def test_drift_verdict_none_when_report_missing(dump_module, tmp_path):
