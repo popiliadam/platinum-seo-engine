@@ -21,7 +21,7 @@ description: |
   veya sahte (DURUR #4 AMBER + Süleyman manual confirm, hayali task
   mark-done YASAK Principle 3 anti-cheat).
 version: "1.0"
-status: active
+status: wip
 category: meta
 inputs:
   task_id:

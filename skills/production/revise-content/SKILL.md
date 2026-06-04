@@ -23,7 +23,7 @@ description: |
   revize gereksiz); R-87 section-targeted yasak ve scope=full
   manuel approve olmadan (DURUR #5).
 version: "1.0"
-status: active
+status: wip
 category: production
 inputs:
   project_slug:
