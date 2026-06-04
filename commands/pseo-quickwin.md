@@ -36,8 +36,8 @@ Bu komut şu sırayı tetikler:
 
 ## 3. Çalıştırma notları
 
-- Aktif `gsc_landing_query` sheet'i boşsa: zincir `gsc-pull` ile başlar; data var ise `quick-wins` skill'i doğrudan koşar.
-- Manuel pre-flight: master.xlsx'in `gsc_landing_query` sheet'i Read tool ile incelenebilir; yoksa `/pseo-gsc-pull` ile ingestion ayrı çalıştırılabilir.
+- Aktif `gsc_performance` sheet'i boşsa: zincir `gsc-pull` ile başlar; data var ise `quick-wins` skill'i doğrudan koşar.
+- Manuel pre-flight: master.xlsx'in `gsc_performance` sheet'i Read tool ile incelenebilir; yoksa `/pseo-gsc-pull` ile ingestion ayrı çalıştırılabilir.
 
 ## 4. Bağımlılıklar
 
