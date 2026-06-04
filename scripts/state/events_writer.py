@@ -224,10 +224,19 @@ def _resolve_workspace_root(workspace_root: Path | None) -> Path:
     )
 
 
+# Mirrors the project_id pattern in schemas/project-config.schema.json: a valid
+# slug starts with a letter and contains only lowercase alnum + hyphen. Enforced
+# before any mkdir so a bad active marker / typo cannot create a ghost project
+# tree, and an id with '..' or '/' cannot escape projects/ (codex-audit f5d).
+_SLUG_RE = re.compile(r"[a-z][a-z0-9-]*")
+
+
 def _events_path(project_id: str, workspace_root: Path | None) -> Path:
     """Build the events.jsonl path: {ws}/projects/{project_id}/_state/events.jsonl."""
-    if not isinstance(project_id, str) or not project_id:
-        raise EventPathError(f"project_id must be a non-empty string, got {project_id!r}")
+    if not isinstance(project_id, str) or not _SLUG_RE.fullmatch(project_id):
+        raise EventPathError(
+            f"project_id must match ^[a-z][a-z0-9-]*$ (got {project_id!r})"
+        )
     ws = _resolve_workspace_root(workspace_root)
     state_dir = ws / "projects" / project_id / "_state"
     state_dir.mkdir(parents=True, exist_ok=True)
