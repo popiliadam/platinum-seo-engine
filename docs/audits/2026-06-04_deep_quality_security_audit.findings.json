@@ -1,0 +1,446 @@
+{
+  "stats": {
+    "raw_findings": 34,
+    "unique_findings": 34,
+    "verified": 34,
+    "confirmed": 24,
+    "rejected_false_positive": 10
+  },
+  "confirmed": [
+    {
+      "title": "Non-atomic two-file rename in events.jsonl migration risks permanent row loss on crash",
+      "severity": "high",
+      "file": "scripts/state/migrate_legacy_events.py",
+      "line": "142-154",
+      "description": "migrate() commits the strict-file truncation and the legacy-archive update as TWO independent os.replace calls (strict_tmp.replace(events_path) on line 153, then legacy_tmp.replace(legacy_path) on line 154). These are not atomic as a pair. If the process is killed (or the host loses power) between line 153 and line 154, events.jsonl has already been rewritten WITHOUT the failing rows, but the legacy archive was never updated — so those rows are permanently lost. This directly violates the append-only-state guarantee the module is built to uphold (docstring lines 20-26 and the ADR-031 contract). The ordering is the most dangerous one possible: strict-first means the failure mode is data LOSS rather than (recoverable) duplication. The inline comment on line 142 (\"write both .tmp files first, then rename in pair\") and the docstring (\"rename the .tmp pair atomically once both are written\") assert an atomicity the code does not deliver. Secondary durability gap: strict_tmp/legacy_tmp are written with plain Path.write_text and never fsync'd, unlike the sibling modules transaction._atomic_save and workflow_runner._atomic_write_json which both fsync the tempfile and the parent dir before/after replace — so even each individual rename is not crash-durable.",
+      "evidence": "strict_tmp.write_text(\"\\n\".join(pass_lines) + \"\\n\", encoding=\"utf-8\")\n...\nlegacy_tmp.write_text(legacy_payload, encoding=\"utf-8\")\n\nstrict_tmp.replace(events_path)   # line 153 — events.jsonl loses fail rows HERE\nlegacy_tmp.replace(legacy_path)   # line 154 — archive committed only HERE",
+      "suggested_fix": "Make the legacy archive durable and committed BEFORE the strict file is shrunk: fsync legacy_tmp, then legacy_tmp.replace(legacy_path), fsync the dir, and only then fsync+replace the strict file. That way a crash leaves at most duplicate rows in the legacy archive (which the next idempotent run can de-dupe), never lost rows. Better still, mirror workflow_runner._atomic_write_json: write each tmp with fh.flush()+os.fsync(fh.fileno()), os.replace, then fsync the parent directory fd. Also correct the line-142 comment and the docstring (lines 20-26) to stop claiming pair-atomicity that os.replace cannot provide across two files.",
+      "dimension": "State integrity & immutability",
+      "confirm_votes": 3,
+      "lens_verdicts": [
+        "confirmed",
+        "confirmed",
+        "confirmed"
+      ],
+      "confirmed": true
+    },
+    {
+      "title": "events.jsonl migration rewrites the ledger without the append flock, dropping concurrent appends",
+      "severity": "high",
+      "file": "scripts/state/migrate_legacy_events.py",
+      "line": "60-80, 113-154",
+      "description": "migrate()/_classify_lines read the entire events.jsonl via read_text() (line 65) to build pass_lines, then later overwrite events.jsonl with only those snapshot rows (strict_tmp.replace on line 153). None of this is done under fcntl.flock — yet events_writer._atomic_append_line and _atomic_append_allocating_run_id acquire fcntl.flock(LOCK_EX) on exactly this file to serialize appends. Because the migration takes no lock, any event appended by events_writer AFTER the read snapshot but BEFORE the truncating replace is silently discarded: the rewrite truncates events.jsonl back to the snapshot contents. This is a lost-write / torn-read hazard on an append-only ledger that is documented as the budget/provenance single-source-of-truth (events_writer docstring §16.8). It is the same class of race that P1-11 added the in-lock run_id allocator to prevent, but the migration bypasses the lock entirely. The risk is bounded by 'migration is operator-run', but nothing in the code prevents it from running while a skill is mid-append.",
+      "evidence": "for lineno, raw in enumerate(events_path.read_text(encoding=\"utf-8\").splitlines(), start=1):  # snapshot read, no lock\n...\nstrict_tmp.replace(events_path)  # truncating rewrite, no lock — any append since the read is lost",
+      "suggested_fix": "Acquire the same exclusive lock events_writer uses before reading and for the whole classify→write critical section (open events.jsonl O_WRONLY|O_APPEND? no — open a dedicated lock fd / flock on the events.jsonl path) so an in-flight append cannot interleave with the truncating rewrite. At minimum, flock(LOCK_EX) on events.jsonl across _classify_lines + the two replaces. Alternatively, re-validate that the file is byte-identical to the snapshot immediately before replace (compare size/mtime under the lock) and abort if it changed.",
+      "dimension": "State integrity & immutability",
+      "confirm_votes": 3,
+      "lens_verdicts": [
+        "confirmed",
+        "confirmed",
+        "confirmed"
+      ],
+      "confirmed": true
+    },
+    {
+      "title": "Enum/ref columns reject null while typed columns accept it — update() silently drops valid rows with blank enum cells",
+      "severity": "high",
+      "file": "scripts/excel/transaction.py",
+      "line": "227-266, 766-788",
+      "description": "In _build_row_validator() every required_column is added to `required` (line 229), so every row must carry every column. For enum columns the synthesized schema is {\"type\":\"string\",\"enum\":[...]} (lines 237-239) and for ref columns it inlines statusEnum/severityEnum which are also {\"type\":\"string\",\"enum\":[...]} (lines 234-236) — neither permits null. But plain-string columns get [\"string\",\"null\"] (line 253) and typed columns get [json_type,\"null\"] (line 251). This asymmetry breaks the read-modify-write update() path: update() rebuilds the matched row from EVERY schema column by reading cells (lines 767-770), and openpyxl returns None for any blank cell. The merged row {**current, **set_} is then fully re-validated (line 776). If ANY enum/ref column in that pre-existing row is blank (None) — even one the update does not touch — validation fails with \"None is not of type 'string'\" and the whole update is rejected/skipped. The engine reads back blank enum cells it itself tolerated, then refuses to update the row. This is acknowledged in the codebase: data_hygiene_master_xlsx.py docstring (lines 130-132) says updates may be \"blocked by a separate row-level schema violation in another column\" and its report emits \"Deferred (blocked by row-level schema)\" (line 173). Effect: legitimate maintenance updates (e.g. priority P1->HIGH on master_task) silently no-op for any row with a blank status/primary_source cell.",
+      "evidence": "transaction.py:237-239  elif cenum:\\n    prop[\"type\"] = \"string\"\\n    prop[\"enum\"] = list(cenum)   # <-- no \"null\"\\n...\\ntransaction.py:251  prop[\"type\"] = [json_types, \"null\"]   # typed cols ARE nullable\\ntransaction.py:253  prop[\"type\"] = [\"string\", \"null\"]      # string cols ARE nullable\\n\\nReproduced live against master-excel.schema.json via _build_row_validator(schema,'master_task'):\\n  row with status=None ->\\n    ['status']: \"None is not of type 'string'\"\\n    ['status']: \"None is not one of ['TODO','ONGOING','EXISTS','DONE','BLOCKED','DEFERRED','CANCELED']\"\\n  same row with status='TODO' and every plain-string col = None -> [] (passes)\\n  primary_source=None (enum col) -> \"None is not of type 'string'\"\\ntech_seo sheet: impact=None (ref severityEnum) -> rejected; resolution=None (plain str) -> accepted.",
+      "suggested_fix": "Make enum/ref columns nullable consistently with typed/string columns, OR (better for update()) only validate the columns actually present/set rather than forcing the full required[] on a read-modify-write merge. Concretely: in _build_row_validator, for enum columns emit {\"type\":[\"string\",\"null\"], \"enum\": list(cenum)+[None]} (or drop them from required[]); for ref columns wrap as {\"anyOf\":[ref_def,{\"type\":\"null\"}]}. Alternatively give update() its own validator that validates only set_ keys + structural integrity, so an untouched blank enum cell cannot block an unrelated column edit. Add a regression test that update() succeeds on a row whose status/primary_source cell is blank.",
+      "dimension": "Schema & data validation",
+      "confirm_votes": 2,
+      "lens_verdicts": [
+        "confirmed",
+        "refuted",
+        "confirmed"
+      ],
+      "confirmed": true
+    },
+    {
+      "title": "F-12 append-only invariant is a no-op: no component ever writes the events.snapshot.json baseline it compares against",
+      "severity": "high",
+      "file": "scripts/validation/validate_invariants.py",
+      "line": "659-693",
+      "description": "F-12 is the engine's only enforcement of the append-only-state rule on events.jsonl (the immutable audit log). It compares the current non-empty line count of events.jsonl against a prior baseline stored in _state/events.snapshot.json under a 'lines' key, and FAILs only when cur_lines < prev_lines. However, NO component in the entire codebase ever writes events.snapshot.json. A whole-repo grep for 'events.snapshot' returns only two hits: (a) this read code, and (b) the rationale string inside cross-sheet-invariants.json. scripts/state/events_writer.py (the sole append path) has no snapshot writer — all of its append_* functions only append to events.jsonl. Because the sidecar never exists, prev_lines is permanently 0 (the except + .get('lines', 0) both default to 0), so 'cur_lines < 0' is never true and the FAIL branch is unreachable in practice. The invariant therefore cannot detect the exact failure it claims to guard — a truncation/rewrite of the append-only audit log. The function's own docstring states it should 'record the current line count for next run', but the function performs no write-back (correct for a read-only governance check, yet it means nothing else advances the baseline either). The net effect is a documented invariant that always passes vacuously.",
+      "evidence": "Docstring (line 661-663): \"...read previous-snapshot line count from a sidecar `_state/events.snapshot.json` if present; if not, assume monotonic and PASS, but record the current line count for next run.\" Code (675-688): `snap_path = pdir / \"_state\" / \"events.snapshot.json\"; prev_lines = 0; if snap_path.exists(): ... prev_lines = int(... .get(\"lines\", 0)) ...; if cur_lines < prev_lines: return ...FAIL...`. There is no `snap_path.write_text(...)` anywhere in the function (or module). Whole-repo `grep -rln 'events.snapshot'` => only validate_invariants.py + schemas/cross-sheet-invariants.json. `grep 'snapshot' scripts/state/events_writer.py` => no matches.",
+      "suggested_fix": "Either (a) make the snapshot a real baseline: have events_writer.append_* (or a dedicated maintenance step / the transaction commit path) write _state/events.snapshot.json with the current line count after each successful append, so F-12 has a moving baseline to compare against; or (b) replace the line-count heuristic with a content-aware check that does not depend on an unwritten sidecar (e.g. verify each existing line still parses and the file's first N event_ids match a recorded prefix), which also closes the truncate-and-rewrite-to-same-length blind spot. In both cases add an explicit FAIL-path test (see separate finding).",
+      "dimension": "Invariants & drift-check coverage",
+      "confirm_votes": 3,
+      "lens_verdicts": [
+        "confirmed",
+        "confirmed",
+        "confirmed"
+      ],
+      "confirmed": true
+    },
+    {
+      "title": "dump_workspace lists wrong backups directory — manager summary never shows any backup",
+      "severity": "medium",
+      "file": "scripts/state/dump_workspace.py",
+      "line": "153-158, 228",
+      "description": "`dump_workspace()` calls `_backups_recent(state_dir / \"backups\", ...)` and `_backups_recent` enumerates that directory with `iterdir()` filtered by `p.is_file()` (non-recursive). But the approved Excel writer (`scripts/excel/transaction.py:421` `backup_dir = state_dir / \"backups\" / \"master\"`) writes every backup one level deeper, into `_state/backups/master/master-<ISO>.xlsx`. The only entry directly under `_state/backups/` is the `master/` subdirectory, which fails the `is_file()` test, so the function returns an empty list in every real project. The manager state summary (`backups_recent`) therefore ALWAYS reports 'none' even when keep-7 rotation has up to 7 real backups present. The module docstring (lines 11-13) even describes the intended path as `_state/backups/master-excel-<TIMESTAMP>.xlsx`, which matches neither the lister path nor the writer path — three-way inconsistency.",
+      "evidence": "dump_workspace.py:228 `\"backups_recent\": _backups_recent(state_dir / \"backups\", backups_recent_n)`; _backups_recent:156 `files = [p for p in backups_dir.iterdir() if p.is_file()]`. transaction.py:421 `backup_dir = state_dir / \"backups\" / \"master\"` (write target). bootstrap_project.py:105 declares `\"backups_dir\": \"_state/backups\"`.",
+      "suggested_fix": "Point the lister at the actual backup directory: pass `state_dir / \"backups\" / \"master\"`, or make `_backups_recent` recurse (e.g. `backups_dir.rglob(\"*.xlsx\")`) and sort by mtime. Align the docstring path with the real `backups/master/master-<ISO>.xlsx` layout.",
+      "dimension": "Correctness & bugs",
+      "confirm_votes": 3,
+      "lens_verdicts": [
+        "confirmed",
+        "confirmed",
+        "confirmed"
+      ],
+      "confirmed": true
+    },
+    {
+      "title": "whats_next staleness check reads a non-existent 'completed_at' workflow field",
+      "severity": "medium",
+      "file": "scripts/meta/whats_next.py",
+      "line": "358-363",
+      "description": "`suggest_sf_crawl_when_stale` determines the newest completed sf-crawl-orchestrator run via `ts = _parse_iso_z(obj.get(\"completed_at\")) or _parse_iso_z(obj.get(\"updated_at\")) or _parse_iso_z(obj.get(\"created_at\"))`. The workflow run JSON written by `workflow_runner.py` never contains a `completed_at` key — on completion it sets `ended_at` (workflow_runner.py:468-469 and finish_step:694), and the schema only defines `ended_at`/`updated_at`/`created_at` (schemas/workflow-run.schema.json). So the intended 'completion timestamp' branch is dead and the staleness window is silently computed from `updated_at` instead of the true terminal timestamp `ended_at`. It happens to be approximately right because `updated_at` is refreshed on the done-transition, but the logic does not do what it states and would diverge if any later step ever bumps `updated_at` after completion. The correct field (`ended_at`) is never consulted.",
+      "evidence": "whats_next.py:359 `_parse_iso_z(obj.get(\"completed_at\"))` ; workflow_runner.py:468-469 `if new_status in (\"done\", \"failed\") and \"ended_at\" not in data: data[\"ended_at\"] = data[\"updated_at\"]` (no `completed_at` is ever written). grep of workflow_runner.py + schema confirms zero `completed_at` occurrences.",
+      "suggested_fix": "Replace `obj.get(\"completed_at\")` with `obj.get(\"ended_at\")` so the staleness computation uses the actual terminal timestamp the runner writes.",
+      "dimension": "Correctness & bugs",
+      "confirm_votes": 3,
+      "lens_verdicts": [
+        "confirmed",
+        "confirmed",
+        "confirmed"
+      ],
+      "confirmed": true
+    },
+    {
+      "title": "Unguarded MCP client call in bulk-escalation fallback can crash the whole batch",
+      "severity": "medium",
+      "file": "scripts/ingestion/scrapling_ops.py",
+      "line": "452-454",
+      "description": "In `bulk_tier_escalate`, when the bulk MCP response has an unrecognised shape (`_split_bulk_response` returns `{}`), the per-URL fallback executes `indexed = {u: mcp_clients[tier](url=u) for u in pending}`. Unlike every other MCP client invocation in this module (lines 446-449 bulk call, 304-307 in `tier_escalate`, 494-497 in `_attempt_single_tier`), this call is NOT wrapped in `try/except BaseException`. If any single URL's client raises (network error, MCP hiccup), the exception propagates out of `bulk_tier_escalate` and aborts the entire run, instead of being normalised into a per-URL 'durur' staging row. The module's whole design (TierResult capture, status='durur' rows) is to never let one URL failure unwind the batch; this branch breaks that invariant asymmetrically.",
+      "evidence": "scrapling_ops.py:452-454 `if not indexed:\\n    # Unknown shape -> per-URL fallback for this tier.\\n    indexed = {u: mcp_clients[tier](url=u) for u in pending}` — no surrounding try/except, contrasted with line 446-449 `try: bulk_resp = bulk_fn(...) except BaseException as exc: ...`.",
+      "suggested_fix": "Build the fallback dict by calling `_attempt_single_tier`/`tier_escalate` style per-URL with the same `try/except BaseException` guard, storing either the raw response or an error string per URL, so a single client exception is recorded as a failed attempt rather than aborting the batch.",
+      "dimension": "Correctness & bugs",
+      "confirm_votes": 3,
+      "lens_verdicts": [
+        "confirmed",
+        "confirmed",
+        "confirmed"
+      ],
+      "confirmed": true
+    },
+    {
+      "title": "migrate_legacy_events uses two sequential renames — crash between them loses archived rows",
+      "severity": "medium",
+      "file": "scripts/state/migrate_legacy_events.py",
+      "line": "145-154",
+      "description": "The migration writes the strict subset to `events.jsonl.tmp` and the legacy subset to `events.jsonl.legacy.tmp`, then commits with two independent `replace()` calls: `strict_tmp.replace(events_path)` (line 153) followed by `legacy_tmp.replace(legacy_path)` (line 154). These are not atomic as a pair. If the process is interrupted (crash, kill, power loss) after line 153 but before line 154, `events.jsonl` has already been overwritten with strict-only content (the schema-failing rows removed), while `events.jsonl.legacy` still holds only its prior content (the newly-archived rows never landed). The failing rows are then permanently lost — a direct violation of the append-only / no-data-loss guarantee this very module is meant to uphold (docstring lines 13-18, 'zero data-loss'). Ordering the legacy write first would make a mid-crash state at worst duplicate-archive (recoverable) rather than lose data.",
+      "evidence": "migrate_legacy_events.py:153-154 `strict_tmp.replace(events_path)\\n    legacy_tmp.replace(legacy_path)` — strict (lossy) rename precedes the legacy (preserving) rename, with no fsync/ordering guarantee that legacy is durable first.",
+      "suggested_fix": "Commit the legacy archive BEFORE truncating the source: `legacy_tmp.replace(legacy_path)` first, then `strict_tmp.replace(events_path)`. Optionally fsync the legacy file before the strict rename so the archived rows are durable before the source is shrunk.",
+      "dimension": "Correctness & bugs",
+      "confirm_votes": 2,
+      "lens_verdicts": [
+        "confirmed",
+        "refuted",
+        "confirmed"
+      ],
+      "confirmed": true
+    },
+    {
+      "title": "Drift-checker hardcodes statusEnum/severityEnum instead of deriving from schema — silent enum drift on additive bumps",
+      "severity": "medium",
+      "file": "scripts/validation/validate_invariants.py",
+      "line": "77-83",
+      "description": "validate_invariants.py defines _STATUS_ENUM_7 and _SEVERITY_ENUM_4 as hand-written frozenset copies of the canonical enums declared in schemas/master-excel.schema.json (definitions.statusEnum 7-value, definitions.severityEnum 4-value). check_F_01 (line 320) and check_F_17 (line 1236) validate workbook cells against these hardcoded copies. The module never loads the enum lists from the schema's definitions (confirmed: no `definitions['statusEnum']` / `.get('definitions')` enum read anywhere in the file), and there is no test pinning these frozensets to the schema (grep of tests/ shows no assertion linking _STATUS_ENUM_7/_SEVERITY_ENUM_4 to the schema definitions). The schema itself documents that statusEnum already grew additively from 4 to 7 values (ADR-018) and that future categories 'require additive bump (ADR-018 paterni)'. The next time statusEnum/severityEnum is extended in the schema, this drift-checker's copy will silently diverge: it would either flag newly-valid statuses as violations (false RED) or, if a value is removed, miss real drift. A drift detector that can itself drift from the schema undermines the single-source-of-truth guarantee.",
+      "evidence": "validate_invariants.py:77\\n_STATUS_ENUM_7: frozenset[str] = frozenset({\\n    \"TODO\", \"ONGOING\", \"EXISTS\", \"DONE\",\\n    \"BLOCKED\", \"DEFERRED\", \"CANCELED\",\\n})\\n_SEVERITY_ENUM_4: frozenset[str] = frozenset({\\n    \"LOW\", \"MEDIUM\", \"HIGH\", \"CRITICAL\",\\n})\\n# check_F_01 (line 320): if str(s) not in _STATUS_ENUM_7\\n# check_F_17 (line 1236): if str(v).upper() not in _SEVERITY_ENUM_4\\nNote: check_F_17 already dynamically discovers WHICH columns are severity-typed by reading $ref endswith '/severityEnum' (line 1222) from the schema — but then compares against the hardcoded set rather than the ref'd enum values, so the duplication is gratuitous.",
+      "suggested_fix": "Derive both enums at load time from schemas/master-excel.schema.json definitions (schema['definitions']['statusEnum']['enum'] and ['severityEnum']['enum']) instead of hardcoding, so the drift-checker is automatically in lock-step with the schema. If a literal copy is kept for readability, add a test asserting frozenset(schema_def_enum) == _STATUS_ENUM_7 (and severity) so an additive bump fails CI until the copy is updated.",
+      "dimension": "Schema & data validation",
+      "confirm_votes": 3,
+      "lens_verdicts": [
+        "confirmed",
+        "confirmed",
+        "confirmed"
+      ],
+      "confirmed": true
+    },
+    {
+      "title": "Legacy-events migration overwrites append-only events.jsonl with no backup and a non-atomic dual rename",
+      "severity": "medium",
+      "file": "scripts/state/migrate_legacy_events.py",
+      "line": "142-159",
+      "description": "This ADR-031 migration partitions events.jsonl into strict (pass) and .legacy (fail) rows. It writes two temp files then renames them as two SEPARATE os.replace() calls: strict_tmp.replace(events_path) at line 153, then legacy_tmp.replace(legacy_path) at line 154. Two issues for an append-only state file: (1) No backup of the original events.jsonl is taken before the in-place overwrite — unlike every config migration in scripts/migrations/* which writes a .bak alongside (confirmed: grep for bak/backup/copy2 in this file returns nothing). (2) The pair of renames is not atomic: if the process is killed after line 153 but before line 154, events.jsonl has already been replaced with pass-only rows while the failing rows have NOT yet been moved into .legacy — those legacy rows are lost permanently. There is also no os.fsync on either temp file before rename, so a crash can leave a truncated/empty events.jsonl on filesystems that reorder writes. rules/append-only-state.md treats events.jsonl as a ledger that 'must never overwrite or lose prior rows', and the module docstring itself cites that rule.",
+      "evidence": "migrate_legacy_events.py:145  strict_tmp.write_text(\"\\\\n\".join(pass_lines) + \"\\\\n\", ...)\\n...\\nmigrate_legacy_events.py:151  legacy_tmp.write_text(legacy_payload, ...)\\nmigrate_legacy_events.py:153  strict_tmp.replace(events_path)   # original events.jsonl gone here\\nmigrate_legacy_events.py:154  legacy_tmp.replace(legacy_path)   # crash before this -> fail rows lost\\n# No .bak of events.jsonl; no os.fsync on strict_tmp/legacy_tmp before replace.",
+      "suggested_fix": "Before overwriting, copy the original events.jsonl to events.jsonl.bak (or a timestamped backup under _state/backups/) — mirroring the migrations/* .bak discipline. Write+fsync the legacy file and rename it FIRST (so fail rows are durably preserved), then write+fsync+rename the strict file; and fsync each temp fd before os.replace. This guarantees that at no crash point are the legacy rows unrecoverable.",
+      "dimension": "Schema & data validation",
+      "confirm_votes": 3,
+      "lens_verdicts": [
+        "confirmed",
+        "confirmed",
+        "confirmed"
+      ],
+      "confirmed": true
+    },
+    {
+      "title": "Eight skills declare status: active in frontmatter while their bodies state status: wip (untruthful lifecycle declaration)",
+      "severity": "medium",
+      "file": "skills/production/new-blog/SKILL.md (+ 7 others listed in evidence)",
+      "line": "new-blog FM:22 vs BODY:529; full list in evidence",
+      "description": "The skill-frontmatter schema (schemas/skill-frontmatter.schema.json) defines the `status` enum precisely: 'active = production; deprecated = scheduled removal; wip = not yet auto-triggered.' Eight skills declare `status: active` in their machine-readable frontmatter but their bodies explicitly contradict this by stating `status: wip` with promotion deferred to a future phase gate: new-blog, faq-optimization, revise-content, generate-images, content-remediation (all 5 production skills), plus publishing/indexing-ping, publishing/verify-indexing, and meta/mark-done. The contradiction is strongest for the production skills, whose bodies also state their runtime scripts do not exist: new-blog/SKILL.md:240 says '`scripts/production/new_blog.py` does not yet exist', faq-optimization:234 says '`scripts/production/faq_optimization.py` does not exist', revise-content:217 says '`scripts/production/revise_content.py` does not yet exist'; the entire scripts/production/ directory is absent. So `status: active` (='production') is a false capability declaration: each skill claims production-ready status while admitting in-body it is WIP and (for production skills) has no implemented runtime. Why it matters: `status` is the canonical, schema-validated lifecycle contract. A reader, an orchestrator, or a future status-gating consumer that trusts the frontmatter is misled. The paired tests do not catch this — they assert only `status in {active, deprecated, wip}` (e.g. test_generate_images.py:62), never frontmatter↔body parity.",
+      "evidence": "FM `status: active` vs BODY `status: wip` per skill (verified line numbers):\n  production/new-blog        FM:22  BODY:529 ('This skill is `status: wip` until Phase 11 Wave 2 acceptance gate')\n  production/faq-optimization FM:29 BODY:542\n  production/revise-content  FM:26  BODY:471\n  production/generate-images FM:36  BODY:566\n  production/content-remediation FM:27 BODY:443\n  publishing/indexing-ping   FM:22  BODY:415\n  publishing/verify-indexing FM:21  BODY:495\n  meta/mark-done             FM:24  BODY:460\nSchema def: \"status\": {\"description\": \"... active = production; ... wip = not yet auto-triggered.\", \"enum\": [\"active\",\"deprecated\",\"wip\"]}. Runtime absence: `ls scripts/production` → no such directory; new-blog:240 / faq-optimization:234 / revise-content:217 each state the runtime module 'does not yet exist'.",
+      "suggested_fix": "Reconcile each skill so the frontmatter `status` matches reality. Either (a) flip frontmatter to `status: wip` for skills whose runtime does not yet exist and whose bodies say wip, or (b) if the manager has truly promoted them to active (the SKILL.md is the LLM-executed spec and no Python runtime is required), delete the stale 'Wave-Out Note' / 'status: wip' lines from each body. Then add a guard test (extend tests/skills/test_trigger_declaration_parity.py) that asserts no SKILL.md body contains a `status: wip` literal while its frontmatter declares `status: active`, so the two cannot drift again.",
+      "dimension": "Skill contract integrity",
+      "confirm_votes": 2,
+      "lens_verdicts": [
+        "confirmed",
+        "confirmed",
+        "uncertain"
+      ],
+      "confirmed": true
+    },
+    {
+      "title": "brand-onboarding description and report claim 'brand_identity 18' but schema, paired test, and its own Step 4 use 20 fields",
+      "severity": "medium",
+      "file": "skills/meta/brand-onboarding/SKILL.md",
+      "line": "6 (description), 71 (Principle 3), 230 (Step 10 report) vs 131-132 (Step 4)",
+      "description": "The brand-onboarding SKILL.md is internally inconsistent about the size of the brand_identity contract it captures. The user-facing frontmatter `description` (line 6: 'brand_identity 18 + content_settings 14'), the Principle 3 prose (line 71), and the Step 10 output report (line 230) all say 'brand_identity 18'. But the body Step 4 (lines 131-132) correctly says '20 alan sırası (v1.3 ADR-030 ile 18 → 20)' and lists 20 fields; the project-config schema actually defines 20 brand_identity properties (verified: schemas/project-config.schema.json brand_identity has 20 props, content_settings has 14); and the paired test enforces 20: tests/skills/test_brand_onboarding.py:378 `assert len(bi_props) == 20`. So the canonical contract is 20 fields, but the most visible declaration (the description that drives skill discovery/triggering) and two body statements understate it as 18. Why it matters: the description is the primary surface a router/operator reads to understand the skill's capability; advertising 18 fields when the wizard actually collects (and the test requires) 20 is a stale, untruthful capability declaration — the kind of SKILL.md/implementation mismatch this dimension targets.",
+      "evidence": "Line 6: '/pseo-brand-onboarding çağırır; brand_identity 18 + content_settings 14 + profile enum 5-value ...'\nLine 71: '3. **AI suistimal yasağı** — Skill brand_identity 18 + content_settings 14 alanını ASLA otomatik doldurmaz.'\nLine 230: 'chosen profile, 18 brand_identity + 14 content_settings field özet tablosu'\nLine 131-132 (correct): 'edilen alan AMBER + iterate (DURUR #3). 20 alan sırası (v1.3 ADR-030 ile 18 → 20: `pronoun_preference` + `formality` canonical eklendi ...)'\nTest: tests/skills/test_brand_onboarding.py:378 `assert len(bi_props) == 20, (...'brand_identity drifted from 20 fields (18 + ADR-030 v1.3 ...)')`\nSchema check (python): brand_identity props: 20; content_settings props: 14.",
+      "suggested_fix": "Update the three stale references to say 'brand_identity 20' (lines 6, 71, 230) so the description, Principle 3, and Step 10 report match the schema, the test, and Step 4. Optionally note the v1.3 ADR-030 18→20 migration inline (as Step 4 already does) to explain the 2 added canonical fields. Step 4's heading 'Brand identity 20-field interactive prompt' is already correct.",
+      "dimension": "Skill contract integrity",
+      "confirm_votes": 3,
+      "lens_verdicts": [
+        "confirmed",
+        "confirmed",
+        "confirmed"
+      ],
+      "confirmed": true
+    },
+    {
+      "title": "Tautological assertion that can never fail (asserts nothing)",
+      "severity": "medium",
+      "file": "tests/skills/test_geo_analysis.py",
+      "line": "589",
+      "description": "Inside test_normalize_helper_imported_not_copied, the first assertion is `assert hasattr(ga, \"_normalize_dfs_response\") or True`. Because of the `or True`, the expression is constant-true: it passes whether or not the attribute exists, so it verifies nothing. The inline comment `# may not re-export` shows the author knew the bare hasattr could fail and deliberately neutralized it instead of removing it. The test is not entirely broken (a genuine identity check follows at line 595: `assert ga_norm is dfs_pull._normalize_dfs_response`), but line 589 is dead, misleading code that reads like a real assertion in a suite otherwise held to a high bar. A future reader could copy this `... or True` pattern believing it is a valid hermetic check.",
+      "evidence": "tests/skills/test_geo_analysis.py:589\n    assert hasattr(ga, \"_normalize_dfs_response\") or True  # may not re-export\n    # Identity: even if not re-exported, the module-level binding must point\n    # at the same function object.\n    assert ga._build_llm_mention_rows.__module__ == ga.__name__\n    from scripts.discovery.geo_analysis_transform import _normalize_dfs_response as ga_norm\n    assert ga_norm is dfs_pull._normalize_dfs_response, (...)",
+      "suggested_fix": "Delete line 589 entirely (the identity check on line 595 is the real, stronger test — it already proves the symbol exists AND is the same object). If a separate 'symbol is present' assertion is desired, drop the `or True` and assert the actual invariant the docstring claims (e.g. `assert hasattr(ga, \"_normalize_dfs_response\")`), or remove the misleading docstring bullet (a) that promises a presence check the code no longer makes.",
+      "dimension": "Test quality & hermeticity",
+      "confirm_votes": 3,
+      "lens_verdicts": [
+        "confirmed",
+        "confirmed",
+        "confirmed"
+      ],
+      "confirmed": true
+    },
+    {
+      "title": "State-mutating --apply path of data_hygiene has zero test coverage",
+      "severity": "medium",
+      "file": "tests/maintenance/test_data_hygiene_master_xlsx.py",
+      "line": "127-129",
+      "description": "data_hygiene_master_xlsx.py ships a real workbook-mutating apply path: `_apply_priority_normalize()` (scripts/maintenance/data_hygiene_master_xlsx.py:122) calls `transaction.update()` to rewrite priority cells, and `main()`'s `--apply` branch (lines 219-227) invokes it plus `_format_apply_result()`. The test module covers only the read-only paths (`_scan_priority_drift`, `_format_audit`, and `--dry-run` byte-parity). The single test for the apply path, `test_apply_normalizes_and_then_idempotent`, is hard-skipped with `@pytest.mark.skip`, so the mutation logic, the P-code->severityEnum write, the idempotency claim, and the audit-trail append are never exercised. Per the project's own audit criteria ('missing coverage for critical state/migration/validation paths'), an untested state-mutating branch is a real gap — the idempotency property the module docstring promises ('apply on a clean workbook is idempotent (0 cells changed)') is asserted nowhere.",
+      "evidence": "tests/maintenance/test_data_hygiene_master_xlsx.py:127\n@pytest.mark.skip(reason=\"apply path requires transaction.py state dir + lock — covered by integration once Süleyman approves apply\")\ndef test_apply_normalizes_and_then_idempotent(tmp_path: Path) -> None:\n    \"\"\"Skipped scaffold — apply path requires workspace state-dir + lock\"\"\"\n\n# Production code that is consequently untested:\n# scripts/maintenance/data_hygiene_master_xlsx.py:146\n#   tx_result = transaction.update( ... )   # inside _apply_priority_normalize\n# scripts/maintenance/data_hygiene_master_xlsx.py:219-220\n#   if args.apply and changes:\n#       apply_result = _apply_priority_normalize(workbook_path, changes, args.project)",
+      "suggested_fix": "The skip reason claims the apply path 'requires transaction.py state dir + lock' — but the suite already drives transaction.update against tmp workbooks elsewhere (tests/scripts/test_transaction.py builds projects/{slug}/_state and exercises append/replace/update under tmp_path with real flock). Reuse that fixture pattern: build the synthetic dirty workbook under tmp_path/projects/demo-dental/master.xlsx with a sibling _state/ dir, run `hygiene.main([..., '--apply'])`, then assert (a) P-codes are rewritten to HIGH/MEDIUM/LOW, (b) a second --apply run reports 0 cells (idempotency), and (c) the audit markdown lists each change. This closes the gap without needing operator approval (it is a tmp workbook).",
+      "dimension": "Test quality & hermeticity",
+      "confirm_votes": 3,
+      "lens_verdicts": [
+        "confirmed",
+        "confirmed",
+        "confirmed"
+      ],
+      "confirmed": true
+    },
+    {
+      "title": "Seven core invariants (F-11, F-12, F-13, F-14, F-17, F-20, F-21) have no test that exercises their FAIL logic",
+      "severity": "medium",
+      "file": "tests/skills/test_drift_check.py",
+      "line": "1-1251",
+      "description": "Only F-16 and F-19 own dedicated test files (tests/scripts/test_validate_invariants_F16.py and _F19.py). The remaining state/schema invariants F-11 (workflow schema_version), F-12 (events.jsonl monotonic / append-only), F-13 (provenance run_id integer), F-14 (workflow_run_id pattern), F-17 (severityEnum), F-20 (64 KiB per-line cap), and F-21 (32767-char cell cap) are never called by any test with inputs that trigger their FAIL branch. A grep across the whole tests/ tree for check_F_11/12/13/14/17/20/21 returns zero direct callers, and the only F-NN references for these IDs in test_drift_check.py occur inside the 'all pass' and 'skip missing sheet' aggregate tests (lines 132-291) where the workbook/_state is empty, so each of these rules merely SKIPs or trivially PASSes. The actual rule logic — line-count comparison, regex matching, type checks, length thresholds, enum membership — is therefore unverified. This is exactly the gap that lets a rule silently regress (the codex P0-01 note in the sync test calls out that a comparable blind spot already let F-04's CRITICAL-vs-HIGH severity drift go undetected). For F-12 this compounds the no-op finding: there is neither a working baseline writer nor a test asserting the shrink path FAILs.",
+      "evidence": "`ls tests/scripts/ | grep invariant` => only test_validate_invariants_F16.py, test_validate_invariants_F19.py. `grep -rln 'check_F_12|check_F_13|check_F_14|check_F_17|check_F_20|check_F_21|check_F_11' tests/` => (no output). In test_drift_check.py the F-NN-keyed assertions cover F-01, F-08, F-15, F-16, F-18, F-22, F-23, F-24, F-25, F-26 with dedicated FAIL/PASS/SKIP cases, but F-11/12/13/14/17/20/21 appear only in by_id loops on an empty clean_wb (lines 144-155, 285-291) where they SKIP.",
+      "suggested_fix": "Add focused unit tests per rule that build the minimal failing input and assert verdict=='FAIL' plus the evidence/sample_violations: F-12 — write events.jsonl + an events.snapshot.json with a larger 'lines' value, assert FAIL (this also forces the snapshot-writer question above to be resolved); F-13 — a provenance row with string run_id; F-14 — a workflow row with a non-matching workflow_run_id; F-17 — a severity cell outside {LOW,MEDIUM,HIGH,CRITICAL}; F-20 — a >64 KiB line; F-21 — a >=32767-char cell; F-11 — a workflow JSON with schema_version != '1.0'. Mirror the F-16/F-19 dedicated-file pattern.",
+      "dimension": "Invariants & drift-check coverage",
+      "confirm_votes": 3,
+      "lens_verdicts": [
+        "confirmed",
+        "confirmed",
+        "confirmed"
+      ],
+      "confirmed": true
+    },
+    {
+      "title": "README's \"1,560 tests passing\" is stale (real: 1577 passed / 12 skipped) and unguarded",
+      "severity": "medium",
+      "file": "/Users/apple/Documents/platinum-seo-engine/README.md",
+      "line": "251",
+      "description": "The Status section hardcodes \"(1,560 tests passing)\". Running the suite from a clean checkout yields 1577 passed, 12 skipped (1589 collected). The 1,560 figure was the v1.9.5 release number; ~17 regression/lock tests were added in the post-v1.9.5 codex-audit commits (e.g. test_mcp_http_transport_declared, test_pillow_declared, ADR-040 guards) and the hardcoded README count was never reconciled. This is the exact rot the team identified one commit earlier: 6893f95 (P2-07) removed a hardcoded pytest count from marketplace.json and added a guard, explicitly noting 'version-bump preserves the body verbatim so the count rots every release.' But the guard regex (tests/docs/test_marketplace_no_hardcoded_pytest_count.py) only matches 'pytest\\s+\\d{3,}\\s+passed' in marketplace.json. README's differently-phrased '1,560 tests passing' lives in README.md and does not match, so it slipped through and is now wrong. No test guards it (grep for 1,560 / 'tests passing' across tests/ returns nothing).",
+      "evidence": "README.md:251: \"...no breaking changes (1,560 tests passing).\"  Actual `python3 -m pytest -q`: \"1577 passed, 12 skipped in 14.83s\" (1589 collected). Guard at tests/docs/test_marketplace_no_hardcoded_pytest_count.py:18 only inspects `.claude-plugin/marketplace.json` for `pytest\\s+\\d{3,}\\s+passed` — README phrasing is not covered.",
+      "suggested_fix": "Replace the parenthetical with a count-free phrasing matching what was already done for marketplace.json, e.g. \"(full pytest suite green; no regressions)\". If a number is desired, extend the P2-07-style guard to also scan README.md (and INSTALL.md), or anchor any test-count cite to a ground-truth counter. Note README:245 'CI runs ... 1,100+ pytest tests' is a soft lower bound and remains true — only the exact 1,560 on :251 is the drift.",
+      "dimension": "Documentation ↔ code drift",
+      "confirm_votes": 3,
+      "lens_verdicts": [
+        "confirmed",
+        "confirmed",
+        "confirmed"
+      ],
+      "confirmed": true
+    },
+    {
+      "title": "README Documentation table calls WORKFLOWS.md a \"43-skill catalog\" — contradicts the 45 used everywhere else (incl. the linked doc)",
+      "severity": "medium",
+      "file": "/Users/apple/Documents/platinum-seo-engine/README.md",
+      "line": "284",
+      "description": "The Documentation table row for WORKFLOWS.md reads 'The full 43-skill catalog with inputs/outputs.' Every other skill-count cite in the same README says 45 (lines 8, 40, 132) and the count-consistency test (tests/docs/test_count_consistency.py:171, test_skills_count_is_45) locks the filesystem at 45 SKILL.md files. The very document this row links to (docs/WORKFLOWS.md) was updated to 45 — its header line 3 says '45 skill' and its Toplam table line 137 sums to '45'. So the README description of the doc is stale and internally contradicts the rest of the README. The structural-count guard tests do not catch this because they assert against plugin.json / marketplace.json descriptions, not README prose ('43-skill catalog').",
+      "evidence": "README.md:284: \"| [`WORKFLOWS.md`](docs/WORKFLOWS.md) | The full 43-skill catalog with inputs/outputs |\". docs/WORKFLOWS.md:3: \"v1.8.0 release **45 skill**\"; docs/WORKFLOWS.md:137: \"| **Toplam** | **45** | **8 batch** |\". Filesystem: `find skills -name SKILL.md | wc -l` = 45.",
+      "suggested_fix": "Change '43-skill catalog' to '45-skill catalog' on README.md:284. Consider a guard that asserts the README's skill-count cites equal _count_skills() so this prose cite tracks the filesystem like the manifest cites already do.",
+      "dimension": "Documentation ↔ code drift",
+      "confirm_votes": 3,
+      "lens_verdicts": [
+        "confirmed",
+        "confirmed",
+        "confirmed"
+      ],
+      "confirmed": true
+    },
+    {
+      "title": "ARCHITECTURE.md v1 Acceptance Criteria cites stale counts (6 commands, 4 hooks, 20 CSR rules, 20 schemas) — contradicts the same file and the filesystem",
+      "severity": "medium",
+      "file": "/Users/apple/Documents/platinum-seo-engine/docs/ARCHITECTURE.md",
+      "line": "81-88",
+      "description": "The 'v1 Acceptance Criteria' block lists pre-v1.8 counts that no longer match reality and directly contradict the modern counts later in the SAME file. Line 81 '6 command (/pseo-*)' vs the real 18 commands (and ARCHITECTURE.md:159 itself says '18 commands'). Line 82 '4 hook' vs the real 6 hooks (and ARCHITECTURE.md:160 says '6 hooks'). Line 83 '20+ schema validation' while the canonical schema count is 21 (test_count_consistency._count_schemas, README:243). Line 88 'master.xlsx invariant check temiz (20 CSR rule)' while ground truth is 31 declared CSR rules / 24 implemented — locked by tests/docs/test_count_consistency.py (test_declared_invariant_count_is_31, test_implemented_invariant_count_is_24) and cited as 31 in docs/GLOSSARY.md and the drift-check SKILL. ARCHITECTURE.md is explicitly the 'living summary for human readers' (line 3, README:281), not a frozen spec, so these self-contradictory stale counts are real drift. The acceptance block was simply never updated when v1.8 added commands (+2), the hook set settled at 6, and the CSR registry grew to 31/24. The only ARCHITECTURE guard test (test_architecture_no_fictional_config.py) checks only for the fictional 'plugin_version_constraint' field and does not lock these counts.",
+      "evidence": "ARCHITECTURE.md:81 \"3. 6 command (`/pseo-*`) çalışıyor.\"  :82 \"4. 4 hook (session-start, pre/post-tool-use, user-prompt-submit) tetikleniyor.\"  :83 \"5. 20+ schema validation PASS (17 taşınan + 3 yeni).\"  :88 \"10. master.xlsx invariant check temiz (20 CSR rule).\"  — vs same file :159 \"18 commands/*.md files\", :160 \"6 hooks\". Filesystem: 18 commands, 6 hooks, 21 schemas. tests/docs/test_count_consistency.py:104 asserts declared==31, :112 asserts implemented==24.",
+      "suggested_fix": "Update the v1 Acceptance Criteria block: '6 command' → '18 commands', '4 hook' → '6 hooks (session-start, pre/post-tool-use, user-prompt-submit, stop, subagent-stop)', '20+ schema' → '21 schemas', and '(20 CSR rule)' → '(31 declared / 24 implemented CSR rules)'. Or, if the block is meant to record the historical v1.0 acceptance bar, label it as such ('v1.0 acceptance, historical') so it stops contradicting the current-state numbers in the rest of the file.",
+      "dimension": "Documentation ↔ code drift",
+      "confirm_votes": 3,
+      "lens_verdicts": [
+        "confirmed",
+        "confirmed",
+        "confirmed"
+      ],
+      "confirmed": true
+    },
+    {
+      "title": "Project slug flows into filesystem path construction without traversal validation",
+      "severity": "low",
+      "file": "/Users/apple/Documents/platinum-seo-engine/scripts/state/bootstrap_project.py",
+      "line": "83 (also workflow_runner.py:143-149)",
+      "description": "build_project_config() composes the on-disk workspace path directly from the operator-supplied --project slug via an f-string: workspace_root = f\"{workspace_root_env}/projects/{slug}\". The slug is never validated against a kebab-case/no-traversal regex here, so a value like '../../tmp/evil' or an absolute path would cause project.config.json (and downstream master.xlsx / _state) to be written outside the intended {workspace}/projects/ root. scripts/state/workflow_runner.py:_workflows_dir() has the same shape — it only rejects empty/non-string slugs (line 144-145) and then does ws / 'projects' / project_slug / '_state' / 'workflows', so a '..' segment would escape the project dir. This is a defense-in-depth gap rather than a remotely-exploitable vulnerability: the slug originates from the operator's own CLI argument / project.config.json, not from external untrusted input, and the pre-commit hook scripts/hooks/check_naming.py does enforce '^[a-z][a-z0-9-]*$' on committed skill/command/schema slugs. But the write path itself performs no validation, so a typo or a malicious config could place state files anywhere the process can write.",
+      "evidence": "bootstrap_project.py:83  `workspace_root = f\"{workspace_root_env}/projects/{slug}\"`  (slug = args.project, line 76, used unvalidated). workflow_runner.py:143-148  `def _workflows_dir(project_slug, workspace_root): if not isinstance(project_slug, str) or not project_slug: raise ValidationError(...)  ws = _resolve_workspace_root(...)  d = ws / \"projects\" / project_slug / \"_state\" / \"workflows\"  d.mkdir(parents=True, exist_ok=True)` — only empties are rejected; '..' segments are not.",
+      "suggested_fix": "Validate slug at the write boundary with the same contract the naming hook uses, e.g. `import re; if not re.fullmatch(r'[a-z][a-z0-9-]*', slug): sys.exit('invalid project slug')` in bootstrap_project.build_project_config(), and add the identical guard to workflow_runner._workflows_dir(). Optionally assert the resolved path stays under the workspace root: `assert (ws/'projects'/slug).resolve().is_relative_to(ws.resolve())`.",
+      "dimension": "Security",
+      "confirm_votes": 3,
+      "lens_verdicts": [
+        "confirmed",
+        "confirmed",
+        "confirmed"
+      ],
+      "confirmed": true
+    },
+    {
+      "title": "dfs_pull.py exceeds the 800-line file-size rule",
+      "severity": "low",
+      "file": "scripts/ingestion/dfs_pull.py",
+      "line": "1-1073",
+      "description": "Project rule sets an 800-line ceiling per file. `dfs_pull.py` is 1073 lines, the largest file in the ingestion scope. It bundles response-shape normalisation, budget pre-flight, the three-part TR workaround (A/B/C), staging-row builders, staging validation, the staging writer, and the CLI in one module.",
+      "evidence": "`wc -l scripts/ingestion/dfs_pull.py` → 1073.",
+      "suggested_fix": "Split into focused modules (e.g. `dfs_tr_workaround.py` for detect/honors/filter/http helpers, `dfs_staging.py` for row builders + envelope + validation, leaving `dfs_pull.py` as transform + CLI), each under 800 lines.",
+      "dimension": "Correctness & bugs",
+      "confirm_votes": 2,
+      "lens_verdicts": [
+        "confirmed",
+        "refuted",
+        "confirmed"
+      ],
+      "confirmed": true
+    },
+    {
+      "title": "Skill frontmatter tests rubber-stamp status and autonomy declarations instead of verifying them against the body/runtime",
+      "severity": "low",
+      "file": "tests/skills/test_generate_images.py",
+      "line": "62 (status assertion); tests/skills/test_indexing_ping.py:98 (safe_auto_execute assertion)",
+      "description": "The paired tests that are supposed to lock skill contract integrity assert only that `status` is a member of the enum (`assert fm['status'] in {'active','deprecated','wip'}`), which is tautological for any schema-valid file and cannot detect the frontmatter↔body status contradiction reported above. This identical weak assertion appears across the skill test suite (test_generate_images.py:62, test_brand_onboarding.py:125, test_cluster_map.py:204, test_content_remediation.py:64, etc.). Worse, test_indexing_ping.py:98 positively asserts `fm['autonomy']['safe_auto_execute'] is True`, which actively pins the unsafe autonomy declaration flagged in the high finding — so the test will resist any fix that gates the Indexing API submission. Why it matters: these tests give a false sense of contract coverage; they enforce schema membership but not truthfulness, and in one case entrench a rule-violating declaration. This is the mechanism by which the other findings went uncaught.",
+      "evidence": "test_generate_images.py:62 `assert fm[\"status\"] in {\"active\", \"deprecated\", \"wip\"}` (same line repeated in ~10 sibling test files per grep). test_indexing_ping.py:98 `assert fm[\"autonomy\"][\"safe_auto_execute\"] is True`. No test in tests/skills asserts frontmatter status equals body status, nor that an auto-execute skill lacks a forbidden autonomous-submission path.",
+      "suggested_fix": "Replace the tautological membership checks with assertions that bind to reality: (1) for each skill whose body contains a `status: wip` note, assert frontmatter `status == 'wip'` (and vice-versa) — ideally as one shared parametrized guard in test_trigger_declaration_parity.py; (2) change test_indexing_ping.py:98 to `is False` once the autonomy is corrected, and add a test asserting the body contains an Indexing-API consent gate. This converts the suite from rubber-stamping declarations to verifying them.",
+      "dimension": "Skill contract integrity",
+      "confirm_votes": 3,
+      "lens_verdicts": [
+        "confirmed",
+        "confirmed",
+        "confirmed"
+      ],
+      "confirmed": true
+    },
+    {
+      "title": "drift-check provenance test asserts a stale invariant count (invariants:21) and does not exercise the skill's real audit emission (contract says invariants:24)",
+      "severity": "low",
+      "file": "tests/skills/test_drift_check.py",
+      "line": "346-368",
+      "description": "test_provenance_event_emitted is the only test covering the skill's step-7 audit-event emission, but it hardcodes audit_target='invariants:21' and asserts that exact literal, while the skill's actual contract — skills/governance/drift-check/SKILL.md — emits audit_target='invariants:24' in four places (lines 58, 89, 231, 238), matching the 24 implemented rule functions (vi._RULE_FUNCTIONS has 24 entries; the consistency report test at line 321 even asserts len(report['checks'])==24). Worse, the test does not invoke the skill or any drift-check code path that produces the audit target: it directly calls events_writer.append_audit(..., audit_target='invariants:21', ...) with a literal it chose, then asserts that same literal came back. So it can never catch a drift between the documented '24' and whatever the skill emits — it is a self-fulfilling assertion against a number (21) that is already wrong relative to the current rule set. This is a 'test names an invariant-count but does not verify the real one' coverage hole and a documentation/test inconsistency in the self-governance surface.",
+      "evidence": "test (353): `audit_target=\"invariants:21\",` and (366): `assert rec[\"audit_target\"] == \"invariants:21\"`. SKILL.md (58): `...audit_action=\"accessed\" and audit_target=\"invariants:24\".`; (89) `(audit_action=accessed, audit_target=invariants:24).`; (231) `# audit_target=\"invariants:24\",`; (238) `\"audit_target\": \"invariants:24\",`. `python3 -c 'len(vi._RULE_FUNCTIONS)'` => 24. The audit value in the test is constructed by the test itself, not derived from evaluate_all/the skill.",
+      "suggested_fix": "Derive the count from the registry instead of hardcoding it (e.g. expected = f\"invariants:{len(validate_invariants._RULE_FUNCTIONS)}\") and assert the SKILL.md / runtime emission matches that, so the rule count, the SKILL.md contract, and the audit event stay bound. At minimum, fix the literal to 'invariants:24' to remove the stale-count inconsistency. Ideally drive the audit_target through the same helper the skill uses so the test exercises the real emission path rather than re-asserting its own input.",
+      "dimension": "Invariants & drift-check coverage",
+      "confirm_votes": 3,
+      "lens_verdicts": [
+        "confirmed",
+        "confirmed",
+        "confirmed"
+      ],
+      "confirmed": true
+    },
+    {
+      "title": "Several transform() functions are 4x the 50-line function limit (210-231 lines)",
+      "severity": "low",
+      "file": "scripts/planning/cluster_map_transform.py",
+      "line": "575-805",
+      "description": "The rules name functions >50 lines as a smell and 'fonksiyonlar <50 satir'. Four data-transform entry points run well past 200 lines as a single monolithic function (validation -> normalization -> scoring -> cluster assignment -> row building -> meta), which makes them hard to test in isolation and to review. cluster_map_transform.transform is 231 lines (L575-805); new_content_plan_transform.transform is 231 lines (L690-920); topical_map_transform.transform is 210 lines (L706-915); cannibalization_transform.transform is 178 lines (L267-444). Many secondary functions (aggregate at 161, transform variants at 100-134) also exceed the limit.",
+      "evidence": "AST scan (start-end line span) of scripts/:\nplanning/cluster_map_transform.py transform L575-805 = 231 lines\nplanning/new_content_plan_transform.py transform L690-920 = 231 lines\nplanning/topical_map_transform.py transform L706-915 = 210 lines\ndiscovery/cannibalization_transform.py transform L267-444 = 178 lines\nplanning/master_task_sync.py aggregate L652-812 = 161 lines\ndiscovery/quickwins_transform.py transform L247-412 = 166 lines",
+      "suggested_fix": "Decompose each oversized transform into named stages (e.g. _normalize_inputs, _score_rows, _assign_clusters, _build_rows, _build_meta) that the public transform() orchestrates in <50 lines. The codebase already does this pattern in places (topical_map has _select_pillars/_assign_clusters helpers) — apply it consistently to the monolithic bodies.",
+      "dimension": "Code quality & conventions",
+      "confirm_votes": 2,
+      "lens_verdicts": [
+        "confirmed",
+        "uncertain",
+        "confirmed"
+      ],
+      "confirmed": true
+    },
+    {
+      "title": "Duplicated GSC window-aggregation helper (_aggregate_window / _PageMetrics / _safe_int)",
+      "severity": "low",
+      "file": "scripts/ingestion/gsc_pull.py",
+      "line": "105-202",
+      "description": "gsc_pull.py and content_decay_transform.py each define their own _PageMetrics dataclass, _safe_int, and an _aggregate_window() that share the same non-trivial core: extract rows from the {\"rows\"|\"data\"} envelope, scan keys[] for the first http(s) entry, normalize_url, and bucket per-URL totals. content_decay only aggregates clicks; gsc_pull also sums impressions + impression-weighted position, so the divergence is real but the URL-detection + envelope-parsing scaffold is duplicated verbatim (including the identical scheme-prefix slice trick). Drift risk: a fix to the URL-key heuristic must be applied twice.",
+      "evidence": "Both files contain near-identical blocks:\ngsc_pull.py:166 for k in keys: if isinstance(k,str): k_stripped=k.strip(); if k_stripped[:7].lower()==\"http://\" or k_stripped[:8].lower()==\"https://\": page_raw=k_stripped; break\ncontent_decay_transform.py:244 for k in keys: if isinstance(k,str): k_stripped=k.strip(); if (k_stripped[:7].lower()==\"http://\" or k_stripped[:8].lower()==\"https://\"): page_raw=k_stripped; break\nPlus duplicate @dataclass _PageMetrics and identical _safe_int in both (gsc_pull.py:105/115, content_decay_transform.py:195/201).",
+      "suggested_fix": "Move the shared row-extraction + first-URL-key detection into a small util (e.g. scripts/util/gsc_rows.py iter_url_click_rows(payload)) returning (url, clicks, impressions, position) tuples; let each caller build its own _PageMetrics from that stream. Eliminates the duplicated parser while preserving the differing metric sets.",
+      "dimension": "Code quality & conventions",
+      "confirm_votes": 2,
+      "lens_verdicts": [
+        "confirmed",
+        "uncertain",
+        "confirmed"
+      ],
+      "confirmed": true
+    }
+  ],
+  "gaps": [
+    {
+      "area": "Content-generation pipeline: skills/production/* (new-blog, revise-content, faq-optimization, content-remediation, generate-images) plus the rules they cite (rules/content-llm-discipline.md, content-eeat-discipline.md, content-html-discipline.md, content-update-discipline.md). The semantic content invariants (R-XX) are enforced only by prose inside SKILL.md bodies; there is no deterministic Python validator/gate over the generated HTML/MD.",
+      "why": "This is the engine's highest business-risk surface: it writes the HTML/MD that goes live on client sites, and the rules encode constraints whose violation triggers Google penalties or breaks an explicit hard constraint (the AI-disclosure ban is flagged in MEMORY.md as something that must NEVER appear in visible HTML; content-llm-discipline.md states enforcement clauses like R-101 'self-contained intro check -> AMBER' and R-106 citation density caps). The audit's 'Skill contract integrity' dimension found frontmatter/lifecycle problems (e.g. 8 skills with status active/wip mismatch, brand-onboarding 18-vs-20 field claim) but did not verify the SEMANTIC rules these skills are supposed to apply at generation time. The paired tests (test_new_blog.py, test_revise_content.py, etc.) mostly assert staging-shape/frontmatter, not content conformance, and validate_before_write.py is purely a schema-path-pairing guard that never inspects generated content. So nothing deterministically prevents a generated page from carrying a forbidden AI-disclosure string, violating citation-density caps, or shipping a non-self-contained intro - the verification rests entirely on the LLM obeying SKILL.md prose. This is the same 'declared-but-unenforced invariant' failure mode as the confirmed F-12 no-op finding, but on the production content path rather than state.",
+      "suggested_focus": "Build/verify a deterministic post-generation content validator (or hook) that checks the testable R-XX invariants on the rendered HTML/MD before write: absence of any AI-disclosure phrasing in visible HTML, citation-density min/max, self-contained-intro regex (no 'bu yazida'/'yukarida gordugunuz gibi' back-references), and the html-discipline structural rules. Add fixtures of intentionally-violating generated content and assert the gate blocks them. Treat the content-*-discipline.md rules as the spec and confirm each 'Enforcement' clause maps to code or a test, not just to a skill prompt."
+    },
+    {
+      "area": "Rules-to-enforcement drift as a distinct risk class. Directory rules/ has 20 normative .md files; nine have ZERO test linkage: secrets-management.md, single-source-of-truth.md, time-discipline.md, glossary-discipline.md, skill-description-discipline.md, content-eeat-discipline.md, content-html-discipline.md, content-llm-discipline.md, content-update-discipline.md.",
+      "why": "rules/ is the engine's normative source-of-truth; each file declares an invariant the engine 'MUST' obey and many carry status: enforced. The audit's 'Documentation <-> code drift' dimension found drift at README/ARCHITECTURE level (stale 1,560-test count, 43-vs-45 catalog, ARCHITECTURE acceptance-criteria counts) but never checked whether the RULES match the code. Existing rule tests (tests/rules/) only validate frontmatter shape (test_frontmatter.py), one event_id format, and R-XX reference resolution - none assert behavioral conformance. So a rule can claim 'enforced' while nothing verifies it. Concretely, secrets-management.md mandates .env be gitignored, that code reads secrets via os.environ with fail-fast, and that secrets are NEVER logged - none of these is asserted by a test (the secret hook only pattern-scans staged diffs; it does not prove the runtime never logs a key). time-discipline.md and single-source-of-truth.md state invariants with no guard at all. This generalizes the confirmed 'F-12 append-only invariant is a no-op' and 'drift-checker hardcodes enums' findings to the governance layer.",
+      "suggested_focus": "For each rules/*.md marked status: enforced, locate the code/test/hook/CI step that actually enforces it and flag those with none (start with secrets-management.md, single-source-of-truth.md, time-discipline.md). Verify the testable secrets-management claims today: that no source file logs a value read from os.environ, and that .env is in .gitignore. Consider a meta-test mapping every enforced rule to >=1 enforcement artifact (mirroring the existing R-XX resolution test) so a rule cannot silently become aspirational."
+    },
+    {
+      "area": "project.config migration chain - partial test coverage and a non-atomic in-place write that diverges from the codebase's own atomic-write discipline. Files: scripts/migrations/0001..0003 + migration_0004/0005 (the bak_path.write_text then out_path.write_text in-place path) contrasted with the atomic _atomic_save in scripts/excel/transaction.py and scripts/state/workflow_runner.py.",
+      "why": "The config migration chain is the schema-versioning backbone: every project's project.config.json is upgraded 1.0 -> 1.5 through these scripts. The confirmed findings focus exclusively on the EVENTS.jsonl migration (events_writer / migrate_legacy_events non-atomic dual-rename). The config migrations carry the same write-safety bug class but were not examined: each does bak_path.write_text(original) then out_path.write_text(new) directly to the live file - no tempfile+fsync+os.replace - so a crash mid-write leaves a truncated/corrupt config (the .bak exists but recovery is manual and unguarded). This is striking because transaction.py and workflow_runner.py both implement textbook atomic writes (tempfile -> fsync -> os.replace -> dir fsync), making the migration layer an inconsistent island. Coverage is also uneven: only migration 0004 has a dedicated file under tests/migrations/; 0001/0002/0003/0005 are exercised only indirectly via a chain test, leaving per-migration idempotency/malformed-input/.bak-side-effect edge cases unverified.",
+      "suggested_focus": "Audit all five config migrations for crash-safety: decide whether the in-place write should adopt the tempfile+os.replace pattern used elsewhere, and whether a mid-write crash can corrupt project.config.json. Verify each migration is idempotent and tolerates already-migrated / out-of-order / missing-field inputs without loss. Confirm running a migration twice does not clobber a freshly written .bak (it currently overwrites the .bak with post-migration content on the second run)."
+    },
+    {
+      "area": "Robustness of external-API response parsing against malformed/partial payloads - the pure-transform ingestion layer. Files: scripts/ingestion/dfs_pull.py, scripts/util/dfs_response.py, scripts/ingestion/sf_projection.py, scripts/util/sf_issue_taxonomy.py.",
+      "why": "These transforms parse untrusted, schema-loose third-party MCP/API responses whose shape the code itself documents as unstable - dfs_pull.py has extensive comments about the dataforseo-mcp-server@2.8.9 wrapper that 'does not always forward location_code/language_code' and returns both flat and nested variants, with _coerce_int/_safe_int best-effort fallbacks throughout. This is a distinct risk class (defensive parsing of degraded/adversarial input) sitting between the audited 'Schema & data validation' (our own schemas) and 'Correctness & bugs' (applied in the findings to state/migration code, not the parse paths). A wrong-typed, deeply-nested, or partial DataForSEO/SF response could yield silently-wrong staging rows (e.g. a string where an int is expected, a missing tasks[].result, an empty serp_info) that then flow into master.xlsx via cluster-map with NO validation gate, since these are staging-only and bypass the transaction.py row validator. The sf-crawl false-positive history in MEMORY.md (same 8 URLs reported 'missing' across 6+ checks) is a real-world instance of this fragility class.",
+      "suggested_focus": "Fuzz/edge-test the response parsers with malformed fixtures: missing tasks/result/items, null vs absent location_code/language_code, flat-wrapper vs nested-task shape, wrong scalar types, oversized arrays. Assert each transform degrades gracefully (skip/label) rather than emitting a malformed staging row or raising unhandled. Cross-check the sf_projection/sf_issue_taxonomy 'missing URL' classification against a fixture reproducing the documented SF false-positive to confirm a live-verify guard exists in code, not just operator memory."
+    },
+    {
+      "area": "Supply-chain integrity of dependencies: requirements-lock.txt pins versions but has no hash provenance, and there is no automated vulnerability/yank check. Files: requirements.txt, requirements-lock.txt, .github/workflows/ci.yml.",
+      "why": "CI installs requirements-lock.txt but the lock has zero --hash entries (grep --hash = 0). Version pinning alone does not protect against a compromised/re-published artifact for a pinned version, a yank, or a typosquat in the transitive closure - and the lockfile header documents that deep transitives are deliberately left UNPINNED for 3.10 compatibility, widening the resolver's freedom on each runner. The engine handles live credentials (GSC/DFS/MCP) and writes to client production sites, so a poisoned dependency is a credible exfiltration path. This risk class is orthogonal to all nine audited dimensions (none covers dependency/CI supply chain); the confirmed findings touch deps only as a 3.10-pin correctness nit, not as a security posture. Severity is lower than the content/rules gaps and there is a documented rationale for the loose pinning, so this is a secondary follow-up rather than a P0.",
+      "suggested_focus": "Decide whether hash-pinning (pip install --require-hashes) is feasible given the 3.10/3.14 matrix, or add a dependency-audit CI step (pip-audit / Dependabot) to catch known CVEs and yanks. At minimum verify the unpinned transitive closure cannot resolve to a wildly different major on a runner, confirm .env is gitignored, and scan the pinned set for obvious typosquats."
+    }
+  ]
+}
