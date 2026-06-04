@@ -166,10 +166,11 @@ def test_parse_progress_response_shape() -> None:
 # ---------------------------------------------------------------------------
 
 def test_source_run_id_chaining_contract() -> None:
-    """The orchestrator's run_id flows into sf-import as --source-run-id;
-    the contract is that the value is a string token (no parsing/munging),
-    and sf-import's frontmatter declares source_run_id as type=string,
-    required=false. This test pins the contract by asserting both ends.
+    """The orchestrator's run_id chains into sf-import via its source_run_id
+    *frontmatter* input — NOT a --source-run-id CLI flag (sf_import's script
+    argparse rejects that, exit 2). The contract: the value is a string token
+    (no parsing/munging), and sf-import's frontmatter declares source_run_id
+    as type=string, required=false. This test pins the frontmatter contract.
     """
     # End 1: orchestrator's RunHandle.run_id is always a string (per
     # workflow_runner.create_run schema). The pure-transform helper makes
@@ -177,9 +178,10 @@ def test_source_run_id_chaining_contract() -> None:
     # confirms a representative run_id round-trips through helpers without
     # mutation.
     representative = "test-proj-20260526-abcdef"
-    # Pure-transform helpers do not touch run_id; the chaining happens at
-    # the orchestrator body's subprocess call. We assert the contract by
-    # verifying sf-import frontmatter has source_run_id declared.
+    # Pure-transform helpers do not touch run_id; the chaining happens at the
+    # sf-import skill-interpreter level (source_run_id frontmatter input), NOT
+    # via a subprocess CLI flag. We assert the contract by verifying sf-import
+    # frontmatter declares source_run_id.
     import yaml
     sf_import_md = (
         REPO_ROOT / "skills" / "ingestion" / "sf-import" / "SKILL.md"

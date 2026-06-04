@@ -449,8 +449,10 @@ workflow_runner.finish_step(handle.run_id, 4, project_slug=project_slug,
 ### Step 7 — `invoke_sf_import` (Q-SF-MCP-05 default YES — auto-invoke)
 
 Subprocess the existing sf-import skill to project the 24 raw CSVs into
-master.xlsx's 6 SF-derived sheets. `--source-run-id` chains provenance:
-sf-import's events.jsonl entry carries this orchestrator's run_id so
+master.xlsx's 6 SF-derived sheets. Provenance is chained via sf-import's
+`source_run_id` **frontmatter** input — NOT a CLI flag (passing
+`--source-run-id` to the script makes argparse exit 2; see the code note
+below): sf-import's events.jsonl entry carries this orchestrator's run_id so
 drift-check can correlate the two events later.
 
 ```python
