@@ -108,7 +108,10 @@ echo "============================================================"
 # Pre-compute changed file list once when in incremental mode (B2 perf).
 CHANGED_FILES_LIST=""
 if [ "$INCREMENTAL" = "1" ]; then
-  CHANGED_FILES_LIST=$(cd "$ROOT" && git diff --name-only "$INCREMENTAL_REF" 2>/dev/null || true)
+  # git diff lists tracked changes only; union in untracked-but-not-ignored
+  # files so a brand-new secret-bearing file can't slip the incremental gate
+  # (codex-audit f7). --exclude-standard keeps gitignored local .env WARN-only.
+  CHANGED_FILES_LIST=$(cd "$ROOT" && { git diff --name-only "$INCREMENTAL_REF" 2>/dev/null; git ls-files --others --exclude-standard 2>/dev/null; } | sort -u || true)
   if [ -z "$CHANGED_FILES_LIST" ]; then
     echo "INCREMENTAL: no files changed since $INCREMENTAL_REF (or git unavailable)"
   fi
