@@ -726,3 +726,52 @@ def test_update_starts_at_data_start_row_not_row_2(tmp_path: Path) -> None:
     assert check.cell(row=2, column=res_col).value == "ABOVE-UNTOUCHED"
     # The real data row at row 4 IS updated (positive path still works).
     assert check.cell(row=4, column=res_col).value == "FIXED"
+
+
+# ---------------------------------------------------------------------------
+# Deep-audit HIGH (2026-06-04) — nullable enum/ref columns
+#
+# update() rebuilds the matched row from EVERY column and re-validates the merge.
+# Enum/ref columns were non-nullable while typed/string columns were nullable, so
+# a pre-existing BLANK enum cell (None, which the engine itself tolerates on
+# write) made the full-row re-validation fail and silently rejected unrelated
+# edits. Enum/ref columns must be nullable, consistent with typed/string columns.
+# ---------------------------------------------------------------------------
+
+def test_update_succeeds_with_blank_enum_cell_in_untouched_column(tmp_path: Path) -> None:
+    """A blank enum/ref cell (impact) in a column update() does not touch must not
+    block an edit to another column (resolution)."""
+    proj, _ = _setup_project(tmp_path)
+    wb_path = proj / "master.xlsx"
+    # Seed a tech_seo data row whose `impact` (severityEnum ref) cell is BLANK,
+    # exactly as openpyxl reads an empty enum cell back (None).
+    seeded = [_tech_seo_row(detail="TARGET", impact=None)]
+    _seed_template_workbook(
+        wb_path, "tech_seo", _TECH_SEO_HEADERS,
+        header_row=3, data_start_row=4,
+        data_rows=[_tech_seo_values(r) for r in seeded],
+    )
+
+    result = transaction.update(
+        wb_path, "tech_seo",
+        where={"detail": "TARGET"},
+        set_={"resolution": "FIXED"},
+        project_slug="test-proj",
+    )
+    assert result.rows_affected == 1
+
+    check = load_workbook(wb_path)["tech_seo"]
+    res_col = _TECH_SEO_HEADERS.index("resolution") + 1
+    impact_col = _TECH_SEO_HEADERS.index("impact") + 1
+    assert check.cell(row=4, column=res_col).value == "FIXED"
+    # The untouched blank enum cell stays blank — not coerced, not blocking.
+    assert check.cell(row=4, column=impact_col).value is None
+
+
+def test_write_still_rejects_invalid_nonblank_enum(tmp_path: Path) -> None:
+    """Nullability must NOT weaken the enum constraint: a non-blank value outside
+    the enum is still rejected (only None becomes acceptable)."""
+    proj, _ = _setup_project(tmp_path)
+    wb_path = proj / "master.xlsx"
+    with pytest.raises(RowSchemaError):
+        transaction.append(wb_path, "tech_seo", [_tech_seo_row(impact="URGENT")], "test-proj")

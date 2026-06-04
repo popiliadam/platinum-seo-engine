@@ -233,10 +233,15 @@ def _build_row_validator(schema: dict, sheet: str, *, allow_extra: bool = False)
         cref = col.get("ref")
         if cref:
             ref_def = _resolve_definition_ref(schema, cref)
-            prop.update(ref_def)
+            # Nullable, consistent with typed/string columns below: a blank cell
+            # (None) is a valid sparse value. Without this, update()'s full-row
+            # re-validation rejects unrelated edits to any row that carries a
+            # blank enum/ref cell (deep-audit 2026-06-04 HIGH). A non-blank value
+            # is still constrained to the enum.
+            prop = {"anyOf": [ref_def, {"type": "null"}]}
         elif cenum:
-            prop["type"] = "string"
-            prop["enum"] = list(cenum)
+            prop["type"] = ["string", "null"]
+            prop["enum"] = list(cenum) + [None]
         elif ctype:
             # Allow None as well (sparse columns are common in Excel land).
             json_types = {
