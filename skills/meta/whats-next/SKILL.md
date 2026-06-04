@@ -2,8 +2,8 @@
 name: whats-next
 description: |
   Use when: kullanıcı "ne yapayım", "şimdi ne", "next step", "öncelikli
-  işler", "what to work on", "where do I start" der ya da SessionStart
-  hook tetiklenir.
+  işler", "what to work on", "where do I start" der ya da UserPromptSubmit
+  drift-router hook önerir.
   Also use when: yeni session açıldı, pending approval check gerek,
   decay/quick-wins prioritization istendi, tüm projeleri tarayıp en
   acil iş seçilecek.
@@ -39,7 +39,7 @@ triggers:
     "ne yapayım", "şimdi ne", "next step", "öncelikli işler",
     "what to work on", "where do I start", "öncelik sırası",
     "pending approval", "bekleyen onay"
-  hooks: ["SessionStart"]
+  hooks: ["UserPromptSubmit"]
   scheduled: []
 mcp_tools:
   required: []
@@ -306,7 +306,7 @@ Ties broken by `(kind, row_id)` for run-to-run stability.
 
 Whats-next **NEVER** invokes another skill. It reads, scores, and
 suggests. The caller (manager session, /whats-next slash, or
-SessionStart hook output) is responsible for picking and invoking the
+UserPromptSubmit drift-router hook output) is responsible for picking and invoking the
 recommended skill. This separation keeps the router bug surface small
 (read-only + one event emit) and lets the user override every
 recommendation.

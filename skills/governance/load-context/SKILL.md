@@ -2,7 +2,7 @@
 name: load-context
 description: |
   Use when: kullanıcı "fresh session başlat", "load context", "wakeup",
-  "manager session aç", "/pseo-active" der ya da yeni session ilk
+  "manager session aç", "context yükle" der ya da yeni session ilk
   promptu geliyor. Fresh manager session wakeup'ını codify eder; spec
   §13.2 + SESSION_PROTOCOL.md §2 7-step sequence'i executable yapar
   ve <15KB context budget verify eder.
@@ -40,7 +40,7 @@ consumes:
   - "init-project:docs/CONTEXT_LEDGER.md"
 produces: []
 triggers:
-  manual: ["/pseo-active"]
+  manual: []
   natural_language: |
     "fresh session başlat", "load context", "wakeup",
     "manager session aç", "session protocol başlat",
