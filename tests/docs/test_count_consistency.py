@@ -39,6 +39,12 @@ def _count_mcp_servers() -> int:
     return len(data.get("mcpServers", {}))
 
 
+def _count_schemas() -> int:
+    # README's canonical definition (line 243): all *.json in schemas/ =
+    # 20 *.schema.json + cross-sheet-invariants.json = 21.
+    return len(list((_REPO_ROOT / "schemas").glob("*.json")))
+
+
 def _plugin_desc() -> str:
     data = json.loads((_REPO_ROOT / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
     return data["description"]
@@ -69,6 +75,9 @@ def test_marketplace_json_counts_match_filesystem() -> None:
     assert f"{_count_skills()} skills" in desc
     assert f"{_count_commands()} commands" in desc
     assert f"{_count_mcp_servers()} MCP servers" in desc
+    # codex-audit finding 13: schema count was unbound (blurb said "20 schemas"
+    # while README + filesystem have 21). Lock it to the filesystem now.
+    assert f"{_count_schemas()} schemas" in desc
 
 
 def test_marketplace_json_has_no_stale_v17_counts() -> None:
