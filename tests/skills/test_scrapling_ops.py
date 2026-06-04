@@ -366,6 +366,40 @@ def test_bulk_variant_used_above_threshold() -> None:
         assert content is not None and url in content
 
 
+def test_bulk_fallback_per_url_client_error_does_not_crash_batch() -> None:
+    """When the bulk response has an unknown shape, the per-URL fallback runs
+    mcp_clients[tier](url=u). A single client raising there must NOT abort the
+    whole batch (deep-audit): it should be recorded as a failed attempt and the
+    URL escalates, mirroring every other guarded MCP call in the module."""
+    def _single_get(**kwargs: Any) -> dict[str, Any]:
+        return {"error": "403"}  # all fail at get → escalate to fetch
+
+    def _single_fetch(**kwargs: Any) -> dict[str, Any]:
+        if kwargs["url"] == "https://example.com/p0":
+            raise RuntimeError("mcp hiccup")  # the unguarded crash case
+        return {"content": f"<html>{kwargs['url']}</html>"}
+
+    def _single_stealthy(**kwargs: Any) -> dict[str, Any]:
+        return {"error": "still-blocked"}
+
+    def _bulk_unknown(**kwargs: Any) -> dict[str, Any]:
+        return {}  # unrecognised shape → forces the per-URL fallback
+
+    urls = [f"https://example.com/p{i}" for i in range(11)]  # > BULK_THRESHOLD
+    clients = {"get": _single_get, "fetch": _single_fetch, "stealthy_fetch": _single_stealthy}
+    bulk_clients = {"fetch": _bulk_unknown, "stealthy_fetch": _bulk_unknown}
+
+    # Must not raise — the batch completes for all 11 URLs.
+    results = scrapling_ops.bulk_tier_escalate(urls, clients, bulk_clients=bulk_clients)
+    assert len(results) == 11
+
+    by_url = {u: (tier, content, meta) for (u, tier, content, meta) in results}
+    # The URL whose fallback client raised is recorded as failed, not crashed.
+    assert by_url["https://example.com/p0"][0] is None
+    # A sibling URL still succeeded at the fetch tier.
+    assert by_url["https://example.com/p1"][0] == "fetch"
+
+
 def test_single_path_when_below_threshold() -> None:
     """When len(urls) <= 10 the bulk path is NOT taken even if
     bulk_clients are supplied — saves a needless bulk MCP call."""

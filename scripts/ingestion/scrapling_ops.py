@@ -450,8 +450,19 @@ def bulk_tier_escalate(
         else:
             indexed = _split_bulk_response(bulk_resp, pending)
             if not indexed:
-                # Unknown shape → per-URL fallback for this tier.
-                indexed = {u: mcp_clients[tier](url=u) for u in pending}
+                # Unknown shape → per-URL fallback for this tier. Guard each call
+                # so one client error does not abort the whole batch — mirrors the
+                # try/except BaseException on every other MCP call in this module
+                # (bulk above, tier_escalate, _attempt_single_tier).
+                indexed = {}
+                for u in pending:
+                    try:
+                        indexed[u] = mcp_clients[tier](url=u)
+                    except BaseException as exc:  # noqa: BLE001
+                        # Use the {"error": ...} shape so _normalize_response
+                        # records a real FAILURE (a bare string would be misread
+                        # as success content) and the URL escalates correctly.
+                        indexed[u] = {"error": f"fallback_error: {type(exc).__name__}: {exc}"}
 
         next_pending = []
         for u in pending:

@@ -153,7 +153,11 @@ def _pending_approvals(workflows_dir: Path) -> List[str]:
 def _backups_recent(backups_dir: Path, n: int) -> List[str]:
     if not backups_dir.exists():
         return []
-    files = [p for p in backups_dir.iterdir() if p.is_file()]
+    # Recurse: the approved Excel writer rotates backups into a master/ subdir
+    # (transaction.py writes _state/backups/master/master-<ISO>.xlsx), so a flat
+    # iterdir saw only the subdirectory and reported no backups even when the
+    # keep-7 rotation held real files.
+    files = [p for p in backups_dir.rglob("*.xlsx") if p.is_file()]
     files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
     return [p.name for p in files[:n]]
 
