@@ -128,7 +128,7 @@ The plugin enforces a **two-repo separation** between logic and data:
 │  platinum-seo-engine  (this)     │  reads │  platinum-seo-workspace          │
 │  ─────────────────────────────   │ ─────► │  ─────────────────────────────   │
 │  • skills/        (45 SKILL.md)  │        │  • projects/{slug}/              │
-│  • commands/      (18 slash cmds)│        │     ├ config.yaml                │
+│  • commands/      (18 slash cmds)│        │     ├ project.config.json        │
 │  • hooks/         (6 hooks)      │ writes │     ├ master.xlsx                │
 │  • schemas/       (21 JSON       │ ─────► │     ├ events.jsonl  (append-only)│
 │  • scripts/        Schemas)      │        │     └ workflows/{run_id}.json    │
