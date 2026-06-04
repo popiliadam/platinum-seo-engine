@@ -2,10 +2,15 @@
 # ============================================================================
 # check_append_only.sh — Pre-commit hook: jsonl non-append diff guard
 # ============================================================================
-# Per rules/append-only-state.md: events.jsonl + workflows/{run_id}.json
-# files MUST NOT be rewritten or have lines mutated/deleted; only new lines
-# may be appended. This hook scans staged .jsonl diffs and rejects any commit
-# that contains line deletions or in-place line edits.
+# Per rules/append-only-state.md, events.jsonl event logs MUST NOT be rewritten
+# or have lines mutated/deleted — only new lines may be appended. This hook scans
+# staged .jsonl diffs and rejects any commit containing line deletions or
+# in-place line edits.
+# NOTE: workflows/{run_id}.json are intentionally NOT checked here. They follow a
+# looser contract — the rule permits steps[] to grow and steps[i].status to
+# forward-flip (pending -> running -> done) in place — which a line-deletion diff
+# cannot distinguish from a violation. So this hook is .jsonl-only; the
+# workflow-run constraint is enforced via workflow-run.schema.json + workflow_runner.
 #
 # Usage:
 #   ./scripts/hooks/check_append_only.sh                    # default: --staged
