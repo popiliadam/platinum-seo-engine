@@ -24,7 +24,11 @@ _HOOK_SCRIPTS_DIR = _REPO / "scripts" / "hooks"
 _RULES_DIR = _REPO / "rules"
 
 # Wired into a hooks/*.json — run automatically by Claude Code.
-RUNTIME_HOOK_SCRIPTS = {"stop_validation.py", "subagent_output_validate.py"}
+RUNTIME_HOOK_SCRIPTS = {
+    "stop_validation.py",
+    "subagent_output_validate.py",
+    "validate_content_write.py",
+}
 
 # NOT wired into hooks/*.json — CI/pre-commit/manual guard helpers.
 GUARD_HOOK_SCRIPTS = {
