@@ -281,3 +281,119 @@ def test_audit_report_format_includes_event_id(tmp_path, migrate_module) -> None
     body = report.read_text(encoding="utf-8")
     assert "legacy_evid_42" in body
     assert "| 1 |" in body  # line number column
+
+
+# ---------------------------------------------------------------------------
+# Crash-safety + concurrency hardening (deep-audit HIGH findings, 2026-06-04)
+#
+# events.jsonl is the append-only ledger / SSoT. The original migration:
+#   (1) renamed strict (lossy) BEFORE legacy (preserving) — a crash between the
+#       two renames lost the failing rows permanently; and
+#   (2) read+rewrote the file with no flock — a concurrent append by the
+#       events_writer path could be silently dropped by the truncating rewrite.
+# These three tests lock in the hardened behavior.
+# ---------------------------------------------------------------------------
+
+def test_migrate_backs_up_original_events_before_overwrite(tmp_path, migrate_module) -> None:
+    """The COMPLETE original events.jsonl is backed up to events.jsonl.bak before
+    the in-place overwrite, so the pre-migration ledger is always recoverable."""
+    ws = _seed_events(tmp_path, [
+        _strict_provenance_event("ev-s1"),
+        _legacy_audit_missing_action("ev-l1"),
+        _strict_provenance_event("ev-s2"),
+    ])
+    project_pack = ws / "projects" / "test-proj"
+    events_path = project_pack / "_state" / "events.jsonl"
+    original = events_path.read_text(encoding="utf-8")
+
+    rc = migrate_module.migrate(ws, "test-proj")
+    assert rc == 0
+
+    backup_path = project_pack / "_state" / "events.jsonl.bak"
+    assert backup_path.exists(), "migration must back up the original events.jsonl"
+    # The backup holds the WHOLE original ledger (all 3 rows), not the strict subset.
+    assert backup_path.read_text(encoding="utf-8") == original
+
+
+def test_migrate_preserving_writes_complete_before_lossy_rewrite(
+    tmp_path, migrate_module, monkeypatch
+) -> None:
+    """The legacy archive AND the .bak backup are durable BEFORE the lossy
+    in-place rewrite of events.jsonl, so a failure of that rewrite loses no
+    data: the fail rows are already archived and events.jsonl is recoverable
+    from the backup."""
+    ws = _seed_events(tmp_path, [
+        _strict_provenance_event("ev-s1"),
+        _legacy_audit_missing_action("ev-l1"),
+        _legacy_top_level_missing("ev-l2"),
+    ])
+    project_pack = ws / "projects" / "test-proj"
+    legacy_path = project_pack / "_state" / "events.jsonl.legacy"
+    backup_path = project_pack / "_state" / "events.jsonl.bak"
+    original = (project_pack / "_state" / "events.jsonl").read_text(encoding="utf-8")
+
+    # Simulate a crash during the lossy in-place strict rewrite (the LAST step).
+    # raising=False so the spy is set even on the RED run where the helper does
+    # not exist yet (the test then fails cleanly on the missing OSError).
+    def _boom(fd, content):
+        raise OSError(5, "simulated crash during in-place strict rewrite")
+
+    monkeypatch.setattr(migrate_module, "_rewrite_locked_file", _boom, raising=False)
+
+    with pytest.raises(OSError, match="simulated crash"):
+        migrate_module.migrate(ws, "test-proj")
+
+    # Preserving writes already landed before the lossy rewrite was attempted:
+    legacy_rows = [l for l in legacy_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+    assert len(legacy_rows) == 2                       # fail rows archived
+    assert backup_path.read_text(encoding="utf-8") == original  # full original recoverable
+
+
+def test_migrate_rewrites_events_in_place_preserving_inode(tmp_path, migrate_module) -> None:
+    """events.jsonl must be rewritten IN PLACE (same inode), not replaced. The
+    events_writer append path flocks the data file itself, so an inode-swapping
+    rename would orphan a concurrent appender's lock and drop its write."""
+    ws = _seed_events(tmp_path, [
+        _strict_provenance_event("ev-s1"),
+        _legacy_audit_missing_action("ev-l1"),
+        _strict_provenance_event("ev-s2"),
+    ])
+    events_path = ws / "projects" / "test-proj" / "_state" / "events.jsonl"
+    inode_before = events_path.stat().st_ino
+
+    rc = migrate_module.migrate(ws, "test-proj")
+    assert rc == 0
+    assert events_path.stat().st_ino == inode_before, (
+        "events.jsonl must be rewritten in place (stable inode), not replaced"
+    )
+    strict_ids = {
+        json.loads(l)["event_id"]
+        for l in events_path.read_text(encoding="utf-8").splitlines() if l.strip()
+    }
+    assert strict_ids == {"ev-s1", "ev-s2"}
+
+
+def test_migrate_serializes_appends_with_exclusive_flock(
+    tmp_path, migrate_module, monkeypatch
+) -> None:
+    """The migration takes the same exclusive flock the events_writer append path
+    uses, so a concurrent append cannot be dropped by the truncating rewrite."""
+    ws = _seed_events(tmp_path, [
+        _strict_provenance_event("ev-s1"),
+        _legacy_audit_missing_action("ev-l1"),
+    ])
+    # RED-friendly: the migration must import fcntl to lock the append-only ledger.
+    assert hasattr(migrate_module, "fcntl"), "migration must import fcntl to serialize appends"
+
+    ops: list[int] = []
+    real_flock = migrate_module.fcntl.flock
+
+    def _flock_spy(fd, operation):
+        ops.append(operation)
+        return real_flock(fd, operation)
+
+    monkeypatch.setattr(migrate_module.fcntl, "flock", _flock_spy)
+
+    rc = migrate_module.migrate(ws, "test-proj")
+    assert rc == 0
+    assert migrate_module.fcntl.LOCK_EX in ops, "migration must acquire LOCK_EX on events.jsonl"
