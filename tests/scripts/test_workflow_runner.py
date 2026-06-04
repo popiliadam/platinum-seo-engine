@@ -47,6 +47,21 @@ def _workflow_events(tmp_path: Path, slug: str = "test-proj") -> list[dict]:
 # Test 1 — happy path: create + start_step + finish_step + complete
 # ---------------------------------------------------------------------------
 
+def test_create_run_rejects_traversal_slug(tmp_path: Path) -> None:
+    """project_slug flows into the on-disk workflows dir path; a traversal or
+    separator slug must be rejected (it passes the old non-empty check but would
+    escape projects/) — deep-audit defense-in-depth at the write boundary."""
+    _setup(tmp_path)
+    for bad in ("../evil", "a/b", "/abs", "Foo"):
+        with pytest.raises(workflow_runner.ValidationError):
+            workflow_runner.create_run(
+                skill="test-skill",
+                project_slug=bad,
+                steps=[{"name": "fetch"}],
+                workspace_root=tmp_path,
+            )
+
+
 def test_happy_path_create_run_complete(tmp_path: Path) -> None:
     _setup(tmp_path)
     handle = workflow_runner.create_run(

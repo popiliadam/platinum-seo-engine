@@ -141,8 +141,13 @@ def _resolve_workspace_root(workspace_root: Path | None) -> Path:
 
 
 def _workflows_dir(project_slug: str, workspace_root: Path | None) -> Path:
-    if not isinstance(project_slug, str) or not project_slug:
-        raise ValidationError(f"project_slug must be a non-empty string, got {project_slug!r}")
+    # Validate at the write boundary: the slug composes the on-disk path, so a
+    # traversal / separator / absolute value must not be able to escape projects/
+    # (matches the project_id slug contract in project-config.schema.json).
+    if not isinstance(project_slug, str) or not re.fullmatch(r"[a-z][a-z0-9-]*", project_slug):
+        raise ValidationError(
+            f"project_slug must match ^[a-z][a-z0-9-]*$, got {project_slug!r}"
+        )
     ws = _resolve_workspace_root(workspace_root)
     d = ws / "projects" / project_slug / "_state" / "workflows"
     d.mkdir(parents=True, exist_ok=True)

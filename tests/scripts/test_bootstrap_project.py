@@ -63,6 +63,21 @@ def env_with_ws_root(monkeypatch: pytest.MonkeyPatch) -> str:
     return WS_ROOT_FOR_TESTS
 
 
+def test_build_project_config_rejects_traversal_slug(env_with_ws_root: str) -> None:
+    """The project slug flows straight into the on-disk workspace_root path, so it
+    must not be able to escape projects/ via traversal / absolute / separator
+    chars (deep-audit defense-in-depth at the write boundary)."""
+    for bad in ("../evil", "../../etc/passwd", "/abs/path", "a/b", "Foo", ""):
+        with pytest.raises(SystemExit):
+            build_project_config(_make_args(project=bad))
+
+
+def test_build_project_config_accepts_valid_kebab_slug(env_with_ws_root: str) -> None:
+    """Regression: a normal kebab-case slug still builds without error."""
+    cfg = build_project_config(_make_args(project="dentnotion"))
+    assert cfg["project_id"] == "dentnotion"
+
+
 def test_help_runs() -> None:
     result = subprocess.run(
         [sys.executable, str(SCRIPT), "--help"],

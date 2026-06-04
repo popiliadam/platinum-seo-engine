@@ -41,6 +41,7 @@ import argparse
 import copy
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -74,6 +75,13 @@ def log(msg: str) -> None:
 
 def build_project_config(args: argparse.Namespace) -> dict:
     slug = args.project
+    # Validate at the write boundary: the slug composes the on-disk workspace_root
+    # path below, so a traversal / separator / absolute value must not be able to
+    # write outside projects/ (matches the project_id contract in
+    # project-config.schema.json + scripts/state/events_writer._SLUG_RE).
+    if not isinstance(slug, str) or not re.fullmatch(r"[a-z][a-z0-9-]*", slug):
+        log(f"ERROR: invalid project slug {slug!r} — must match ^[a-z][a-z0-9-]*$")
+        sys.exit(2)
     workspace_root_env = os.getenv("PSEO_WORKSPACE_ROOT")
     if not workspace_root_env:
         log("ERROR: PSEO_WORKSPACE_ROOT environment variable is not set.")
