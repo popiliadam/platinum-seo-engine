@@ -7,6 +7,11 @@ loads `master.xlsx` (data_only=True, read_only=True) plus _state side
 files (events.jsonl, workflows/*.json, backups/) and evaluates the 24
 invariants enumerated in §17.2 + the F-08 quick-wins URL subset rule.
 
+Single exception to read-only: F-12 records/advances a monotonic high-water
+line count to `_state/events.snapshot.json` (a derived governance baseline,
+not the SSoT) so the append-only shrink check is not vacuous. No other rule
+writes to the workspace.
+
 Each rule is a small Python function. NO DSL — that is a Phase 6+
 refactor candidate. The intent now is auditable, hand-verifiable
 governance: every rule is one short function, every function returns
@@ -656,11 +661,23 @@ def check_F_11(workbook: Any, project_slug: str, *,
     )
 
 
+def _write_events_snapshot(snap_path: Path, lines: int) -> None:
+    """Atomically record the events.jsonl high-water line count (F-12 baseline).
+
+    Written via tmp + replace so a crash can never leave a half-written sidecar.
+    The snapshot is a derived governance baseline, not the SSoT — events.jsonl
+    itself remains the single source of truth.
+    """
+    tmp = snap_path.with_suffix(snap_path.suffix + ".tmp")
+    tmp.write_text(json.dumps({"lines": int(lines)}), encoding="utf-8")
+    tmp.replace(snap_path)
+
+
 def check_F_12(workbook: Any, project_slug: str, *,
                workspace_root: Path | None = None, **_) -> dict:
-    """events.jsonl append-only — read previous-snapshot line count from
-    a sidecar `_state/events.snapshot.json` if present; if not, assume
-    monotonic and PASS, but record the current line count for next run."""
+    """events.jsonl append-only — compare the current line count against a
+    monotonic high-water baseline in `_state/events.snapshot.json`, FAIL on a
+    shrink, then record/advance the baseline for the next run."""
     rule = "events.jsonl line count is monotonically non-decreasing"
     pdir = _project_dir(project_slug, workspace_root)
     events_path = pdir / "_state" / "events.jsonl"
@@ -679,6 +696,12 @@ def check_F_12(workbook: Any, project_slug: str, *,
             prev_lines = int(json.loads(snap_path.read_text("utf-8")).get("lines", 0))
         except (OSError, json.JSONDecodeError, TypeError, ValueError):
             prev_lines = 0
+    # Record/advance the high-water baseline so the guard is not vacuous and a
+    # later shrink stays detectable. Until this producer existed (deep-audit
+    # 2026-06-04) nothing ever wrote the sidecar, so prev_lines was permanently
+    # 0 and the FAIL branch was unreachable. High-water (max) means a shrink
+    # keeps FAILing on subsequent runs until the rows are restored.
+    _write_events_snapshot(snap_path, max(prev_lines, cur_lines))
     if cur_lines < prev_lines:
         return _make_result(
             id_="F-12", severity="HIGH", verdict="FAIL",
