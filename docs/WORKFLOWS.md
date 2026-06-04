@@ -161,7 +161,7 @@ sf-crawl-orchestrator skill
     ↓ Step 4: Poll mcp__sf__sf_crawl_progress(crawl_id)
         └ max_wait_minutes default 180 (Q-SF-MCP-03)
     ↓ Step 5: 24-report iterate (Tier 1: 14 mandatory + Tier 2: 10 AMBER-tolerant)
-        ├ mcp__sf__sf_generate_report(report_name, save_report=True)
+        ├ mcp__sf__sf_generate_report(report_name, export_type="CSV", file_path=…)
         ├ Atomic move to temp_staging/_state/staging/sf-crawl-{run_id}/
         └ DURUR-orch-8: Tier 1 fail → rm -rf temp_staging + SystemExit(8)
     ↓ Step 6: Atomic mv temp_staging → projects/{slug}/sf-exports/{date}/raw/
