@@ -248,7 +248,7 @@ Browse the full catalog: [`skills/`](skills/). Slash commands map 1:1 to commonl
 
 ## Status & roadmap
 
-**Current:** v1.9.5 — Codex audit remediation: 30 of 31 findings fixed + 1 refuted across governance, workspace contract, commands/hooks, schema validation, state/write paths, and docs. Every fix is locked by a regression test that reads ground truth (filesystem counts, live argparse, schemas, command bodies) so the same drift cannot silently return. Quality/correctness patch — no new features, no breaking changes (1,560 tests passing).
+**Current:** v1.9.5 — Codex audit remediation: 30 of 31 findings fixed + 1 refuted across governance, workspace contract, commands/hooks, schema validation, state/write paths, and docs. Every fix is locked by a regression test that reads ground truth (filesystem counts, live argparse, schemas, command bodies) so the same drift cannot silently return. Quality/correctness patch — no new features, no breaking changes (full pytest suite green, no regressions).
 
 The plugin is delivered in **15 phases**. Foundation phases (0–4) are complete; skill phases (5–13) deliver the ~45 skills in batches; phase 14 covers the workspace + CI + a full pilot run end-to-end. Phase 5 is the **GO/NO-GO gateway** — failing it sends the project back to foundation work rather than papering over gaps.
 
@@ -281,7 +281,7 @@ Detailed status: **[docs/PHASE_STATUS.md](docs/PHASE_STATUS.md)** · Open questi
 | [`ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Vision, two-repo strategy, 10 disciplines, phase roadmap, v1 acceptance criteria |
 | [`INSTALL.md`](docs/INSTALL.md) | Requirements, install, configuration, first-run smoke test, troubleshooting |
 | [`CONTRIBUTING.md`](docs/CONTRIBUTING.md) | Manager/worker protocol, skill authoring, phase discipline |
-| [`WORKFLOWS.md`](docs/WORKFLOWS.md) | The full 43-skill catalog with inputs/outputs |
+| [`WORKFLOWS.md`](docs/WORKFLOWS.md) | The full 45-skill catalog with inputs/outputs |
 | [`GLOSSARY.md`](docs/GLOSSARY.md) | Spec terminology — every technical term defined once |
 | [`DECISIONS.md`](docs/DECISIONS.md) | Architecture Decision Records (append-only) |
 | [`PHASE_STATUS.md`](docs/PHASE_STATUS.md) | Current phase + history |

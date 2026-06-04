@@ -78,14 +78,14 @@ v1 release için TÜM şunlar geçmeli:
 
 1. Plugin Claude Code'da yükleniyor.
 2. ~45 skill çalışıyor (her kategori için en az 1 happy-path test).
-3. 6 command (`/pseo-*`) çalışıyor.
-4. 4 hook (session-start, pre/post-tool-use, user-prompt-submit) tetikleniyor.
-5. 20+ schema validation PASS (17 taşınan + 3 yeni).
+3. 18 command (`/pseo-*`) çalışıyor.
+4. 6 hook (session-start, pre/post-tool-use, user-prompt-submit, stop, subagent-stop) tetikleniyor.
+5. 21 schema validation PASS (schemas/*.json).
 6. Content rules input doc tamamen işlenmiş (Phase 10).
 7. Pilot proje (demo-dental) end-to-end: init → ingest → discovery → planning → reporting → production → publishing zinciri çalışıyor; drift-check GREEN; whats-next priority list doğru.
 8. CI pipeline 7 check PASS.
 9. `events.jsonl`'de tüm aktiviteler logged.
-10. master.xlsx invariant check temiz (20 CSR rule).
+10. master.xlsx invariant check temiz (31 declared / 24 implemented CSR rule).
 11. docs (ARCHITECTURE, GLOSSARY, WORKFLOWS) güncel; phase status doğru.
 12. Workspace repo açılmış, `.env.example` doğru, init-project ile yeni proje eklenebiliyor.
 13. Budget guardrail çalışıyor (DataForSEO çağrısı bütçeyi aşmıyor).
