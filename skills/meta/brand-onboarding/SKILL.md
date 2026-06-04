@@ -3,7 +3,7 @@ name: brand-onboarding
 description: |
   Use when: kullanıcı "yeni proje", "brand onboarding", "proje bootstrap",
   "wizard çalıştır", "yeni site ekle", "project-config oluştur" der ya da
-  /pseo-brand-onboarding çağırır; brand_identity 18 + content_settings 14
+  /pseo-brand-onboarding çağırır; brand_identity 20 + content_settings 14
   + profile enum 5-value Süleyman input'u alarak project-config.schema 1.5
   conformant staging output üretir.
   Also use when: workspace henüz yok (Phase 14 öncesi staging-only mode);
@@ -68,7 +68,7 @@ kabul edilmez.
    (DURUR #4). `profile_hint` boşsa domain heuristic suggest
    (TLD pattern, kelime regex) Süleyman'a sunulur — son kararı
    Süleyman verir (autonomy boundary).
-3. **AI suistimal yasağı** — Skill brand_identity 18 + content_settings
+3. **AI suistimal yasağı** — Skill brand_identity 20 + content_settings
    14 alanını ASLA otomatik doldurmaz. Her alan Süleyman input
    prompt'undan gelir; Süleyman boş bıraktıysa default eklenmez,
    prompt yeniden iterate edilir (DURUR #3) ve seçim AMBER ile
@@ -227,7 +227,7 @@ Onay komutu: Süleyman explicit "evet/onaylıyorum/y" yazar →
 ### Step 10 — Output report
 
 Süleyman'a `outputs/onboarding/{slug}-staging-config.json` path,
-chosen profile, 18 brand_identity + 14 content_settings field
+chosen profile, 20 brand_identity + 14 content_settings field
 özet tablosu, ve "Phase 14 init-project bu staging dosyasını
 input olarak okuyacak" notu raporlanır.
 

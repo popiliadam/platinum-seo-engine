@@ -350,7 +350,7 @@ def test_provenance_event_emitted(clean_wb_path: Path, tmp_path: Path,
     events_writer.append_audit(
         project_id=slug,
         audit_action="accessed",
-        audit_target="invariants:21",
+        audit_target="invariants:24",
         actor="drift-check",
         notes="verdict=GREEN fails=0",
         workspace_root=tmp_path,
@@ -363,7 +363,7 @@ def test_provenance_event_emitted(clean_wb_path: Path, tmp_path: Path,
     assert audits, "no event_kind=audit emitted"
     rec = audits[-1]
     assert rec["audit_action"] == "accessed"
-    assert rec["audit_target"] == "invariants:21"
+    assert rec["audit_target"] == "invariants:24"
     # Re-validate with the canonical events schema.
     Draft7Validator(events_schema).validate(rec)
 
