@@ -65,3 +65,12 @@ Append-only — superseded entry'ler işaretlenir, silinmez.
 **Context:** v1.8 SF MCP Hybrid Integration adds 4th MCP server `sf` to `.mcp.json` over HTTP transport (first HTTP MCP; existing 3 use stdio). 482B byte invariant F-16 (47+ commits since v1.5) requires controlled break.
 **Decision:** Append `"sf":{"url":"http://127.0.0.1:11435/mcp"}` to mcpServers. First deliberate F-16 break since v1.5; invariant resumes from new baseline (543B + new md5) post-v1.8. `scripts/util/sf_mcp_client.py` = reusable HTTP MCP client pattern per D-SF-14 (httpx; 3-retry exp backoff 1s/2s; 100KB cap per D-SF-05).
 **Consequences:** `tests/skills/{test_brand_onboarding,test_generate_images}.py` baselines rebased (v1.8 cite inline). Phase 3-7 Workers use `SfMcpClient`. Future HTTP MCPs reuse the pattern.
+
+---
+
+## ADR-040 — SF MCP HTTP transport made explicit (`type:http`); second controlled F-16 break
+**Date:** 2026-06-04
+**Status:** accepted
+**Context:** ADR-039 added `sf` to `.mcp.json` as a bare `{"url": ...}` (543B). Claude Code defaults an entry's transport to **stdio** when `type` is absent, so `sf` silently failed to register — absent from `claude mcp list` while the other 3 stdio servers appeared as `plugin:platinum-seo-engine:*`. This broke the `/pseo-sf-crawl` skill's `mcp__sf__*` wrapper path and made README.md:177 / INSTALL.md:119 ("should show sf connected") false. The httpx client (`sf_mcp_client.py`, D-SF-14) was unaffected (it hits the port directly). Codex audit 2026-06-04 P0-01.
+**Decision:** Add `"type": "http"` to the `sf` entry. Second deliberate F-16 byte-invariant break since v1.5 (482B→543B at v1.8/ADR-039; 543B→565B at v1.9.x). New baseline **565B + md5 `634c8ed5b7cf3c852d9b41e1c0e1d3b5`**. F-16 drift resumes from the new baseline.
+**Consequences:** `tests/skills/test_brand_onboarding.py` F-16 baseline rebased (565B/md5). New guard `tests/schemas/test_mcp_http_transport_declared.py` asserts any url-only entry declares `type:http` so this transport-shape bug cannot recur. Docs re-synced: ARCHITECTURE.md, INSTALL.md, README.md snippet. **Operator note:** the engine runs as an installed plugin — the running `mcp__sf__*` registration only updates after the plugin cache is refreshed (reinstall/update or restart Claude Code).
