@@ -15,6 +15,7 @@ referenced by a `hooks/*.json` handler.
 |--------|----------|-------|
 | `stop_validation.py` | `hooks/stop.json` | `Stop` — validates the session's final state before the turn ends |
 | `subagent_output_validate.py` | `hooks/subagent-stop.json` | `SubagentStop` — validates a subagent's output before it returns |
+| `validate_content_write.py` | `hooks/pre-tool-use.json` | `PreToolUse` — blocks a generated-blog HTML write (`outputs/{blog,content}/…/*.html`) that violates a RED content rule: the AI-disclosure ban + R-22/R-43/R-77/R-61. Calls `scripts/validation/content_validator.py` |
 
 > Note: `hooks/pre-tool-use.json` also wires `scripts/security/check_secrets.sh`
 > (a *security* helper, not under `scripts/hooks/`).
