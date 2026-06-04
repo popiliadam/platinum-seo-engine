@@ -296,6 +296,34 @@ def test_backups_recent_empty_when_dir_missing(dump_module, tmp_path):
     assert result["backups_recent"] == []
 
 
+# ---------- 9b. backups in the writer's master/ subdir are found (deep-audit) ----------
+
+
+def test_backups_recent_finds_writer_subdir_layout(dump_module, tmp_path):
+    """The approved Excel writer (transaction.py) rotates backups into
+    _state/backups/master/master-<ISO>.xlsx, NOT flat in _state/backups/. The
+    lister must find them there — a non-recursive iterdir saw only the master/
+    subdirectory and returned [], so the manager summary always reported 'none'
+    even with real backups present."""
+    project = _make_workspace(tmp_path, slug="demo")
+    master_dir = project / "_state" / "backups" / "master"
+    master_dir.mkdir(parents=True, exist_ok=True)
+    names: list[str] = []
+    base = time.time() - 60 * 60 * 24
+    for i in range(3):
+        name = f"master-2026-04-{i + 1:02d}T00-00-00Z.xlsx"
+        p = master_dir / name
+        p.write_bytes(b"\x50\x4b\x03\x04")
+        os.utime(p, (base + i * 60, base + i * 60))
+        names.append(name)
+
+    result = dump_module.dump_workspace(workspace_root=tmp_path, project_slug="demo")
+
+    recent = result["backups_recent"]
+    assert len(recent) == 3, f"writer-subdir backups must be listed; got {recent}"
+    assert recent[0] == names[-1]  # most-recent first
+
+
 # ---------- 11. drift verdict from consistency-report ----------
 
 

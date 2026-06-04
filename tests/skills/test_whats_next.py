@@ -395,7 +395,7 @@ def test_suggest_sf_crawl_when_stale(tmp_path: Path, slug: str) -> None:
         "status": "done",
         "created_at": "2026-05-26T10:00:00Z",
         "updated_at": "2026-05-26T11:00:00Z",
-        "completed_at": "2026-05-26T11:00:00Z",
+        "ended_at": "2026-05-26T11:00:00Z",
         "steps": [{"name": "complete", "status": "done"}],
     }
     (wf_dir / f"{fresh_run['run_id']}.json").write_text(
@@ -420,7 +420,7 @@ def test_suggest_sf_crawl_when_stale(tmp_path: Path, slug: str) -> None:
         "status": "done",
         "created_at": "2024-01-01T00:00:00Z",
         "updated_at": "2024-01-01T01:00:00Z",
-        "completed_at": "2024-01-01T01:00:00Z",
+        "ended_at": "2024-01-01T01:00:00Z",
         "steps": [{"name": "complete", "status": "done"}],
     }
     # Wipe fresh fixture, replace with stale-only state.
@@ -439,6 +439,49 @@ def test_suggest_sf_crawl_when_stale(tmp_path: Path, slug: str) -> None:
     # but above master_task_other), as documented in the SCORES table.
     assert whats_next.SCORES["sf_crawl_stale"] == 30
     assert whats_next.score_candidate({"kind": "sf_crawl_stale"}) == 30
+
+
+def test_sf_crawl_staleness_uses_ended_at_not_updated_at(tmp_path: Path, slug: str) -> None:
+    """Staleness must be measured from the run's terminal timestamp (ended_at —
+    the field workflow_runner actually writes), NOT from updated_at. The old code
+    read a non-existent `completed_at` and fell through to `updated_at`, so a
+    post-completion touch of updated_at would mask a long-stale crawl (deep-audit)."""
+    proj = _setup_ws(tmp_path, slug)
+    (proj / "project.config.json").write_text(
+        json.dumps({
+            "schema_version": "1.5",
+            "project_id": slug,
+            "domain": "https://example.com/",
+            "market": "TR",
+            "language": {"content_locale": "tr-TR"},
+            "sf": {"mcp": {"enabled": True, "url": "http://127.0.0.1:11435/mcp"}},
+        }, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    wf_dir = proj / "_state" / "workflows"
+    wf_dir.mkdir(parents=True, exist_ok=True)
+    # Crawl actually ENDED in 2024 (long stale), but updated_at was touched far in
+    # the future. Staleness must follow ended_at (2024), not updated_at (2099).
+    run = {
+        "schema_version": "1.0",
+        "run_id": f"{slug}-2024-01-01-endd",
+        "skill": "sf-crawl-orchestrator",
+        "project_slug": slug,
+        "status": "done",
+        "created_at": "2024-01-01T00:00:00Z",
+        "ended_at": "2024-01-01T01:00:00Z",
+        "updated_at": "2099-12-31T00:00:00Z",
+        "steps": [{"name": "complete", "status": "done"}],
+    }
+    (wf_dir / f"{run['run_id']}.json").write_text(
+        json.dumps(run, ensure_ascii=False), encoding="utf-8",
+    )
+
+    sug = whats_next.suggest_sf_crawl_when_stale(slug, workspace_root=tmp_path)
+    assert sug is not None, (
+        "a crawl that ENDED in 2024 is stale regardless of a later updated_at touch"
+    )
+    assert sug["last_seen"] == "2024-01-01"
 
 
 def test_router_event_emitted(

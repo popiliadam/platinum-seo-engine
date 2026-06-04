@@ -355,9 +355,12 @@ def suggest_sf_crawl_when_stale(
                 continue
             if obj.get("status") != "done":
                 continue
-            # Prefer completed_at; fall back to updated_at then created_at.
+            # Prefer ended_at — the terminal timestamp workflow_runner actually
+            # writes on the done/failed transition. (The old `completed_at` key is
+            # never emitted, so staleness silently fell through to updated_at,
+            # which a post-completion touch could make spuriously "fresh".)
             ts = (
-                _parse_iso_z(obj.get("completed_at"))
+                _parse_iso_z(obj.get("ended_at"))
                 or _parse_iso_z(obj.get("updated_at"))
                 or _parse_iso_z(obj.get("created_at"))
             )
