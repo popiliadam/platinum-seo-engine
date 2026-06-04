@@ -350,8 +350,7 @@ def _run_orchestrator(
     result = subprocess.run(
         ["python3", "-m", "scripts.ingestion.sf_import",
          "--project", project_slug,
-         "--sf-export-path", str(target_raw.parent),
-         "--source-run-id", handle.run_id],
+         "--sf-export-path", str(target_raw.parent)],
         capture_output=True, text=True, timeout=600,
     )
     if result.returncode != 0:
@@ -728,16 +727,20 @@ def test_sf_import_handoff_success(workspace: Path) -> None:
     )
 
     with patch("subprocess.run") as mock_sub:
-        # Simulate sf-import subprocess returning success with --source-run-id
-        # echoed back in stdout (chains provenance).
+        # Simulate sf-import subprocess returning success. The orchestrator must
+        # invoke sf_import with ONLY the real CLI flags — NO --source-run-id
+        # (sf_import argparse would exit 2); provenance chains via sf-import's
+        # source_run_id *frontmatter* input, not a script flag.
         def _run_side_effect(*args, **kwargs):
             call_args = args[0]
-            assert "--source-run-id" in call_args, \
-                "orchestrator must chain --source-run-id to sf-import"
+            assert "--source-run-id" not in call_args, \
+                "orchestrator must NOT pass --source-run-id (sf_import CLI rejects it, argparse exit 2; provenance chains via sf-import's source_run_id frontmatter input)"
+            assert "--project" in call_args and "--sf-export-path" in call_args, \
+                "orchestrator must invoke sf_import with --project + --sf-export-path"
             return subprocess.CompletedProcess(
                 args=call_args,
                 returncode=0,
-                stdout=f"sf-import OK source_run_id={call_args[call_args.index('--source-run-id') + 1]}",
+                stdout="sf-import OK",
                 stderr="",
             )
         mock_sub.side_effect = _run_side_effect
@@ -749,10 +752,11 @@ def test_sf_import_handoff_success(workspace: Path) -> None:
             project_config=cfg,
         )
 
-    # Verify the subprocess was invoked with --source-run-id matching the run.
+    # Verify the subprocess was invoked with the REAL sf_import CLI contract:
+    # no --source-run-id (provenance is a frontmatter input, not a script flag).
     args_list = mock_sub.call_args.args[0]
-    sri_index = args_list.index("--source-run-id")
-    assert args_list[sri_index + 1] == result["run_id"]
+    assert "--source-run-id" not in args_list
+    assert args_list[args_list.index("--project") + 1] == "test-proj"
 
     state = _latest_workflow(workspace)
     assert state["status"] == "done"
