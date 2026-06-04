@@ -28,6 +28,17 @@ _RAW_DIR = Path(
 )
 _ISSUES_CSV = _RAW_DIR / "issues_overview_report.csv"
 
+# The three "real-CSV" tests below read a staged SF crawl that lives under the
+# workspace repo's gitignored sf-exports/ (~1GB raw crawls, never committed). It
+# is present on the operator's machine but absent on CI and fresh clones, so
+# guard them — the hermetic routing tests above already give full logic coverage,
+# and the engine stays plugin-agnostic (no project data committed here). Matches
+# the repo's skip-when-fixture-absent pattern (cf. the SF MCP smoke test).
+_requires_real_csv = pytest.mark.skipif(
+    not _ISSUES_CSV.exists(),
+    reason=f"staged SF fixture absent (gitignored workspace data): {_ISSUES_CSV}",
+)
+
 
 def _read_issue_rows() -> list[dict]:
     with _ISSUES_CSV.open("r", encoding="utf-8-sig", newline="") as fh:
@@ -141,6 +152,7 @@ def test_route_case_insensitive() -> None:
 # Real-CSV: every row routes, split matches expectations, no out-of-enum
 # ---------------------------------------------------------------------------
 
+@_requires_real_csv
 def test_all_real_issues_route_without_crash() -> None:
     rows = _read_issue_rows()
     assert len(rows) == 42, "expected 42 real SF issues in the staged fixture"
@@ -153,6 +165,7 @@ def test_all_real_issues_route_without_crash() -> None:
             assert cat is None
 
 
+@_requires_real_csv
 def test_real_routing_split_matches_expectation() -> None:
     """tech_seo=30, robots_txt=9, redirect_404=3 across the 42 rows."""
     rows = _read_issue_rows()
@@ -163,6 +176,7 @@ def test_real_routing_split_matches_expectation() -> None:
     assert split == {"tech_seo": 30, "robots_txt": 9, "redirect_404": 3}
 
 
+@_requires_real_csv
 def test_real_tech_seo_categories_all_in_enum() -> None:
     rows = _read_issue_rows()
     cats = set()
