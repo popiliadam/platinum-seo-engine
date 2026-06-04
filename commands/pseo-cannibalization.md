@@ -14,7 +14,7 @@ model: sonnet
 
 ## 1. Aktif projeyi çöz
 
-!`if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş"; else PROJECT="${1:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/active.json" 2>/dev/null)}"; if [ -z "$PROJECT" ]; then echo "NO_ACTIVE_PROJECT — once /pseo-active <slug>"; else echo "active=$PROJECT days_back=${2:-28} min_impressions=${3:-10}"; fi; fi`
+!`if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş"; else PROJECT="${1:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/active.json" 2>/dev/null)}"; if [ -z "$PROJECT" ]; then echo "NO_ACTIVE_PROJECT — once /pseo-active <slug>"; else DB=28; MI=10; case " $ARGUMENTS " in *" --days-back "*) X="${ARGUMENTS##*--days-back }"; DB="${X%% *}";; esac; case " $ARGUMENTS " in *" --min-impressions "*) X="${ARGUMENTS##*--min-impressions }"; MI="${X%% *}";; esac; echo "active=$PROJECT days_back=$DB min_impressions=$MI"; fi; fi`
 
 ## 2. Skill chain
 

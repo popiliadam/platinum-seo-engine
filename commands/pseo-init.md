@@ -24,7 +24,7 @@ CLI flag'lerini `$ARGUMENTS`'tan parse et. Slug'ı `--project` olarak ilk argüm
 
 Dry-run önizleme (commit etmeden JSON üretip stdout'a yazar):
 
-!`if [ -n "$1" ]; then DOMAIN_FLAG=""; if [ -n "$2" ] && [[ "$2" != --* ]]; then DOMAIN_FLAG="--domain $2"; fi; PYTHONPATH="${CLAUDE_PLUGIN_ROOT}" python3 "${CLAUDE_PLUGIN_ROOT}/scripts/state/bootstrap_project.py" --project "$1" $DOMAIN_FLAG --dry-run 2>&1 | head -60; fi`
+!`if [ -n "$1" ]; then DOMAIN_FLAG=""; if [ -n "$2" ] && [[ "$2" != --* ]]; then DOMAIN_FLAG="--domain $2"; fi; EXTRA=""; case "$ARGUMENTS" in *--*) EXTRA="--${ARGUMENTS#*--}";; esac; PYTHONPATH="${CLAUDE_PLUGIN_ROOT}" python3 "${CLAUDE_PLUGIN_ROOT}/scripts/state/bootstrap_project.py" --project "$1" $DOMAIN_FLAG $EXTRA --dry-run 2>&1 | head -60; fi`
 
 Çıktıyı kullanıcıya sun ve onay iste. Onay alınana kadar `--dry-run` olmadan çağırma.
 
