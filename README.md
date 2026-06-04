@@ -210,7 +210,7 @@ Mid-loop crash recovery: `/pseo-sf-crawl <slug> --resume <run_id>` continues fro
 
 Live status table: `/pseo-sf-status` (4-column: project_slug, last_crawl_date, sf_mcp_connection_status, allowed_directory_path).
 
-Full setup: **[docs/INSTALL.md § Screaming Frog 24 MCP Setup](docs/INSTALL.md)** · Spec: **[docs/superpowers/specs/2026-05-26-sf-mcp-hybrid-integration-design.md](docs/superpowers/specs/2026-05-26-sf-mcp-hybrid-integration-design.md)** · ADR: **[ADR-039](docs/DECISIONS.md)**
+Full setup: **[docs/INSTALL.md § Screaming Frog 24 MCP Setup](docs/INSTALL.md)** · Spec: **[docs/superpowers/specs/2026-05-26-sf-mcp-hybrid-integration-design.md](docs/superpowers/specs/2026-05-26-sf-mcp-hybrid-integration-design.md)** · ADR: **[ADR-039](docs/DECISIONS.md)** + **[ADR-040](docs/DECISIONS.md)** (`type:http`)
 
 ---
 
@@ -239,7 +239,7 @@ Browse the full catalog: [`skills/`](skills/). Slash commands map 1:1 to commonl
   - `mcp-server-gsc` (Google Search Console, stdio)
   - `dataforseo-mcp-server` (DataForSEO, stdio)
   - `Scrapling` (stealthy site fetching, antibot fallback, stdio)
-  - `sf` (Screaming Frog 24 native MCP, **HTTP** `http://127.0.0.1:11435/mcp` — v1.8 ADR-039)
+  - `sf` (Screaming Frog 24 native MCP, **HTTP** `http://127.0.0.1:11435/mcp` — v1.8 ADR-039; `type:http` ADR-040)
 - **JSON Schema** (Draft 7) — 21 schemas in `schemas/` (20 `*.schema.json` + `cross-sheet-invariants.json`).
 - **Excel** as the operational data plane (`master.xlsx`), **JSONL** for the append-only event log.
 - **GitHub Actions** — CI runs schema validation, drift-check, lint, and 1,100+ pytest tests on every push.
