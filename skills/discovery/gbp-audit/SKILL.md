@@ -193,7 +193,6 @@ inbox_path.write_text(json.dumps(raw, ensure_ascii=False, indent=2))
 
 events_writer.append_provenance(
     project_id=project_slug,
-    run_id=events_writer.next_run_id(project_slug),
     source={"kind": "dataforseo_mcp", "mcp_server": "dataforseo",
             "mcp_tool": "dataforseo__business_data_business_listings_search",
             "response_bytes": len(json.dumps(raw))},
@@ -297,7 +296,6 @@ render_template(
 
 events_writer.append_provenance(
     project_id=project_slug,
-    run_id=events_writer.next_run_id(project_slug),
     source={"kind": "dataforseo_mcp", "mcp_server": "dataforseo",
             "mcp_tool": "dataforseo__business_data_business_listings_search",
             "response_bytes": len(json.dumps(raw))},

@@ -344,10 +344,10 @@ Two events — one per upstream paid call. Each carries `cost.credits`;
 
 ```python
 from scripts.state import events_writer
-rid = events_writer.next_run_id(project_slug)
-events_writer.append_provenance(
+# run_id=None auto-allocates race-free inside the append flock; reuse the
+# returned id to group both provenance events under one geo-analysis run.
+geo_run = events_writer.append_provenance(
     project_id=project_slug,
-    run_id=rid,
     source={"kind": "dataforseo_mcp", "mcp_server": "dataforseo",
             "mcp_tool": "dataforseo__ai_optimization_llm_mentions_search",
             "response_bytes": len(json.dumps(raw_llm))},
@@ -360,7 +360,7 @@ events_writer.append_provenance(
 )
 events_writer.append_provenance(
     project_id=project_slug,
-    run_id=rid,
+    run_id=geo_run.run_id,    # same run as the llm_mentions event above
     source={"kind": "dataforseo_mcp", "mcp_server": "dataforseo",
             "mcp_tool": "dataforseo__serp_organic_live_advanced",
             "response_bytes": len(json.dumps(raw_serp))},

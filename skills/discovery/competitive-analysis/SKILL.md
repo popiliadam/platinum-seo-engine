@@ -322,7 +322,6 @@ from scripts.state import events_writer
 # Scrapling — free, target_excel_sheet=null per staging-only.
 events_writer.append_provenance(
     project_id=project_slug,
-    run_id=events_writer.next_run_id(project_slug),
     source={
         "kind": "scrapling_mcp",
         "mcp_server": "ScraplingServer",
@@ -338,7 +337,6 @@ events_writer.append_provenance(
 # DataForSEO — paid, cost.credits populated.
 events_writer.append_provenance(
     project_id=project_slug,
-    run_id=events_writer.next_run_id(project_slug),
     source={
         "kind": "dataforseo_mcp",
         "mcp_server": "dataforseo",

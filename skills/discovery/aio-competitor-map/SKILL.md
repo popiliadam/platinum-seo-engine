@@ -318,10 +318,10 @@ dfs-pull → cluster-map; ADR-025).
 ```python
 from scripts.state import events_writer
 
-# DataForSEO — paid, cost.credits populated
-events_writer.append_provenance(
+# DataForSEO — paid, cost.credits populated. run_id=None auto-allocates
+# race-free; reuse the returned id to group both events under one run.
+aio_run = events_writer.append_provenance(
     project_id=project_slug,
-    run_id=events_writer.next_run_id(project_slug),
     source={
         "kind": "dataforseo_mcp",
         "mcp_server": "dataforseo",
@@ -340,10 +340,10 @@ events_writer.append_provenance(
     },
 )
 
-# Scrapling — free per URL
+# Scrapling — free per URL (same run as the DataForSEO event above)
 events_writer.append_provenance(
     project_id=project_slug,
-    run_id=events_writer.next_run_id(project_slug),
+    run_id=aio_run.run_id,
     source={
         "kind": "scrapling_mcp",
         "mcp_server": "ScraplingServer",

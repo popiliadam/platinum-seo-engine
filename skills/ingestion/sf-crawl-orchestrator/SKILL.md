@@ -520,7 +520,6 @@ envelope_path.write_text(json.dumps(envelope, ensure_ascii=False, indent=2),
 
 events_writer.append_provenance(
     project_id=project_slug,
-    run_id=events_writer.next_run_id(project_slug),
     source={
         # events.schema source.additionalProperties=false; only these keys are valid:
         "kind": "sf_mcp",

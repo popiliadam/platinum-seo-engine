@@ -267,10 +267,8 @@ workflow_runner.approve(
 
 ```python
 from scripts.state import events_writer
-rid = events_writer.next_run_id(project_slug)
 events_writer.append_provenance(
     project_id=project_slug,
-    run_id=rid,
     source={"kind": "tool_computed"},
     operation="project_excel",
     target_excel_sheet=None,            # bootstrap touches no sheet
