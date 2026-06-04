@@ -25,3 +25,18 @@ def test_dataforseo_version_lock_matches_mcp_json():
     assert lock == _dataforseo_version_from_mcp_json(), (
         f"registry dataforseo version_lock={lock!r} != .mcp.json version "
         f"{_dataforseo_version_from_mcp_json()!r}")
+
+
+def test_dataforseo_endpoint_mapping_schema_const_matches_mcp_json():
+    """The endpoint-mapping meta-schema's mcp_server_version const is a THIRD
+    surface (alongside .mcp.json and mcp-tool-registry.json) that must agree on
+    the pinned version. It lagged at 2.8.9 while .mcp.json pinned @2.8.10
+    (codex-audit finding 9). This test binds the const to .mcp.json so the next
+    bump cannot land in only one file."""
+    schema = json.loads(
+        (ROOT / "schemas" / "dataforseo-endpoint-mapping.schema.json").read_text(encoding="utf-8")
+    )
+    const = schema["properties"]["mcp_server_version"]["const"]
+    assert const == _dataforseo_version_from_mcp_json(), (
+        f"endpoint-mapping schema const={const!r} != .mcp.json version "
+        f"{_dataforseo_version_from_mcp_json()!r}")
