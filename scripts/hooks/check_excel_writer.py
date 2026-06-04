@@ -8,10 +8,21 @@ LibreOffice/Excel/openpyxl bypass are FORBIDDEN.
 
 Detection: scan staged diff for *.xlsx changes whose basename matches
 `master.xlsx` (current canonical) or `master-excel.xlsx` (legacy alias).
-Reject unless any of these "writer signals" are present:
-  1. Commit message contains "transaction.py" string.
-  2. Env var PSEO_EXCEL_WRITER=transaction.py (set by workspace runtime).
-  3. --allow-direct-edit flag (escape hatch for migration/recovery only).
+
+Two-layer policy (codex-audit f14 — the commit-message signal alone was
+spoofable, so it is now explicitly advisory + backed by an artifact gate):
+  ADVISORY writer-provenance signal (any one attests transaction.py was
+  *intended* — the commit-message form is honor-system and spoofable, NOT a
+  tamper-proof guarantee):
+    1. Commit message contains "transaction.py" string (weak fallback).
+    2. Env var PSEO_EXCEL_WRITER=transaction.py (set by workspace runtime).
+    3. --allow-direct-edit flag (escape hatch for migration/recovery only).
+  AUTHORITATIVE artifact gate — even WITH a writer signal, the committed
+  workbook MUST NOT be invariant-RED (validates the artifact itself, which no
+  commit-message text can fake). Fail-safe: if the workbook cannot be loaded or
+  evaluated (no workspace context, unreadable), the gate falls through to the
+  advisory signal so it never blocks spuriously. --allow-direct-edit bypasses
+  both layers for intentional migration/recovery.
 
 Usage:
     check_excel_writer.py [--staged|--working-tree] [--allow-direct-edit]
@@ -68,6 +79,36 @@ def _writer_signal_present(*, commit_msg_file: str | None) -> bool:
     return False
 
 
+def _workbook_invariant_red(rel_path: str) -> bool:
+    """AUTHORITATIVE artifact gate (codex-audit f14): True only when the changed
+    workbook is cleanly determined to be invariant-RED. Fail-safe — any inability
+    to load or evaluate returns False, so the advisory writer-signal path is
+    preserved and the guard never blocks spuriously."""
+    try:
+        import importlib.util
+
+        import openpyxl
+
+        wb_path = Path(rel_path).resolve()
+        if not wb_path.is_file() or "projects" not in wb_path.parts:
+            return False
+        parts = wb_path.parts
+        idx = parts.index("projects")
+        slug = parts[idx + 1]
+        ws_root = Path(*parts[:idx]) if idx > 0 else Path(os.sep)
+
+        vi_path = Path(__file__).resolve().parents[1] / "validation" / "validate_invariants.py"
+        spec = importlib.util.spec_from_file_location("vi_excel_gate", vi_path)
+        vi = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(vi)
+
+        wb = openpyxl.load_workbook(str(wb_path), read_only=True, data_only=True)
+        agg = vi.aggregate_verdicts(vi.evaluate_all(wb, slug, workspace_root=ws_root))
+        return agg.get("overall") == "RED"
+    except Exception:
+        return False
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         description="Pre-commit guard: master.xlsx writes must originate from "
@@ -102,6 +143,24 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if _writer_signal_present(commit_msg_file=args.commit_msg_file):
+        # Authoritative artifact gate: the writer signal is advisory; a RED
+        # workbook must not be waved through by commit-message text (codex f14).
+        red = [p for p in matches if _workbook_invariant_red(p)]
+        if red:
+            print(
+                "ERROR: writer signal present but the staged master.xlsx is "
+                "invariant-RED. The commit-message signal is advisory only and "
+                "cannot wave through a broken workbook.",
+                file=sys.stderr,
+            )
+            for path in red:
+                print(f"  - {path} (invariant verdict: RED)", file=sys.stderr)
+            print(
+                "Run drift-check and fix the violations, or use --allow-direct-edit "
+                "for an intentional migration/recovery commit.",
+                file=sys.stderr,
+            )
+            return 1
         return 0
 
     print(
