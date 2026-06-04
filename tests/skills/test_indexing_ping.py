@@ -95,7 +95,11 @@ def test_frontmatter_required_fields_present() -> None:
     assert fm["budget"]["uses_paid_mcp"] is False
     assert fm["budget"]["estimated_credits"] == 0
     assert fm["autonomy"]["confidence"] == "HIGH"
-    assert fm["autonomy"]["safe_auto_execute"] is True
+    # A Google Indexing API URL_UPDATED submit is consent-gated: it requires
+    # explicit operator approval each run and is never autonomous (2026-06-04
+    # deep audit — aligns the skill with the indexing-api-consent rule).
+    assert fm["autonomy"]["requires_approval"] is True
+    assert fm["autonomy"]["safe_auto_execute"] is False
 
 
 # ---------------------------------------------------------------------------

@@ -19,7 +19,7 @@ description: |
   yapılacak target URL'ler ile birlikte (DURUR #5 REJECT, redirect_404
   sheet'te action=410 satırları skip).
 version: "1.0"
-status: active
+status: wip
 category: publishing
 inputs:
   target_urls:
@@ -56,8 +56,8 @@ budget:
   estimated_credits: 0
 autonomy:
   confidence: HIGH
-  requires_approval: false
-  safe_auto_execute: true
+  requires_approval: true
+  safe_auto_execute: false
 ---
 
 # indexing-ping — publishing skill (Phase 12 Wave 1, W-G1)
@@ -73,7 +73,10 @@ surviving URL set via two parallel paths:
        "urlList": [...] }`. Reads `INDEXNOW_KEY` from `.env`; absent →
    AMBER skip indexnow path (DURUR #3).
 2. **Google Indexing API** — `mcp__gsc__submit_sitemap` per URL with
-   `URL_UPDATED` notification (per Google Indexing API docs).
+   `URL_UPDATED` notification (per Google Indexing API docs). **Never
+   autonomous** — a `URL_UPDATED` submit requires explicit operator approval
+   before each run (frontmatter `requires_approval: true`,
+   `safe_auto_execute: false`); autonomous submission is forbidden.
 
 The skill is **READ-ONLY** with respect to `master.xlsx`. F-1 schema
 authority: `redirect_404` and `robots_txt` sheets allowed_writers=null

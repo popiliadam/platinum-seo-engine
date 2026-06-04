@@ -33,7 +33,7 @@ description: |
     auto-upload WordPress credential exposure + plugin agnostik
     Ticimax/Ideasoft farklı API).
 version: "1.0"
-status: active
+status: wip
 category: production
 inputs:
   project_slug:
