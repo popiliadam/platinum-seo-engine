@@ -284,10 +284,10 @@ GSC event omits cost.
 
 ```python
 from scripts.state import events_writer
-rid = events_writer.next_run_id(project_slug)
-events_writer.append_provenance(
+# run_id=None auto-allocates race-free; reuse the returned id so the optional
+# GSC cross-ref event below is grouped under the same on-page-audit run.
+op_run = events_writer.append_provenance(
     project_id=project_slug,
-    run_id=rid,
     source={"kind": "dataforseo_mcp", "mcp_server": "dataforseo",
             "mcp_tool": "dataforseo__on_page_content_parsing",
             "response_bytes": len(json.dumps(raw_cp))},
@@ -301,7 +301,7 @@ events_writer.append_provenance(
 if use_gsc_cross_ref:
     events_writer.append_provenance(
         project_id=project_slug,
-        run_id=rid,
+        run_id=op_run.run_id,    # same run as the on_page_content_parsing event
         source={"kind": "gsc_mcp", "mcp_server": "gsc",
                 "mcp_tool": "gsc__search_analytics",
                 "response_bytes": len(json.dumps(raw_gsc))},

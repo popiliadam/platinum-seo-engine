@@ -308,7 +308,6 @@ the optional branch fires. Both target `target_excel_sheet=schema`.
 from scripts.state import events_writer
 events_writer.append_provenance(
     project_id=project_slug,
-    run_id=events_writer.next_run_id(project_slug),
     source={
         "kind": "sf_csv",
         "source_folder": str(sf_root.relative_to(workspace_root)),

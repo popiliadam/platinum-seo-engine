@@ -279,7 +279,6 @@ optional branch fires).
 from scripts.state import events_writer
 events_writer.append_provenance(
     project_id=project_slug,
-    run_id=events_writer.next_run_id(project_slug),
     source={"kind": "gsc_mcp", "mcp_server": "gsc",
             "mcp_tool": "gsc__enhanced_search_analytics",
             "response_bytes": len(json.dumps(raw_recent))},

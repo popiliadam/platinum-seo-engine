@@ -319,7 +319,6 @@ primary_source distribution.
 from scripts.state import events_writer
 events_writer.append_provenance(
     project_id=project_slug,
-    run_id=events_writer.next_run_id(project_slug),
     source={"kind": "local_aggregation",
             "module": "scripts.planning.master_task_sync",
             "sheets_aggregated": len(SOURCE_DEFS)},

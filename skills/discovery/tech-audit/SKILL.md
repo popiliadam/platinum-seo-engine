@@ -211,7 +211,6 @@ inbox_path.write_text(json.dumps(raw_lighthouse, ensure_ascii=False, indent=2))
 
 events_writer.append_provenance(
     project_id=project_slug,
-    run_id=events_writer.next_run_id(project_slug),
     source={"kind": "dataforseo_mcp", "mcp_server": "dataforseo",
             "mcp_tool": "dataforseo__on_page_lighthouse",
             "response_bytes": len(json.dumps(raw_lighthouse))},
@@ -319,7 +318,6 @@ populated):
 from scripts.state import events_writer
 events_writer.append_provenance(
     project_id=project_slug,
-    run_id=events_writer.next_run_id(project_slug),
     source={"kind": "dataforseo_mcp", "mcp_server": "dataforseo",
             "mcp_tool": "dataforseo__on_page_lighthouse+content_parsing",
             "response_bytes": len(json.dumps(raw_lighthouse))

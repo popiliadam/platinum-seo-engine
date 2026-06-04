@@ -374,7 +374,6 @@ transaction.append(
 from scripts.state import events_writer
 events_writer.append_provenance(
     project_id=project_slug,
-    run_id=events_writer.next_run_id(project_slug),
     source={"kind": "dataforseo_mcp", "mcp_server": "dataforseo",
             "mcp_tool": "dataforseo__dataforseo_labs_google_keyword_suggestions",
             "response_bytes": len(json.dumps(raw_sugg))},

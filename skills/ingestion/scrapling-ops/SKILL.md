@@ -264,7 +264,6 @@ data.json` → `outputs/reports/{date}-scrapling-ops.md`. Variables:
 from scripts.state import events_writer
 events_writer.append_provenance(
     project_id=project_slug,
-    run_id=events_writer.next_run_id(project_slug),
     source={
         "kind": "scrapling_mcp",
         "mcp_server": "ScraplingServer",

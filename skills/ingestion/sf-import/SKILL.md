@@ -266,7 +266,6 @@ record so the data lineage is `sf_csv → tool_computed`.
 from scripts.state import events_writer
 events_writer.append_provenance(
     project_id=project_slug,
-    run_id=events_writer.next_run_id(project_slug),
     source={
         "kind": "sf_csv",
         "source_folder": str(raw_dir.relative_to(workspace_root)),
