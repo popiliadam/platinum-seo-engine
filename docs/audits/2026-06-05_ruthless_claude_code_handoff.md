@@ -108,10 +108,11 @@ Evidence:
 - `scripts/security/check_secrets.sh:31-34`
 - `scripts/security/check_secrets.sh:145-163`
 
-The CI wrapper uses a narrow hardcoded `git grep -nE` pattern:
+The CI wrapper uses a narrow hardcoded `git grep -nE` pattern (literal credential
+tokens redacted below — see `scripts/ci/check_secrets.sh` for the real pattern):
 
 ```bash
-DATAFORSEO_PASSWORD=...|info@demo-agency|3bf73e0893f69b42|ghp_...
+DATAFORSEO_PASSWORD=...|info@<client-email>|<known-hash>|ghp_...
 ```
 
 The full scanner is stronger, but PreToolUse incremental mode intentionally skips structural checks for credential directories, `.env` files, key files, and chmod. Full scan being GREEN is useful, but the CI gate is not a comprehensive committed-secret defense.
