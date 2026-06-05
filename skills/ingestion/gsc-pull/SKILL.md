@@ -201,16 +201,17 @@ workflow_runner.approve(handle.run_id, project_slug=project_slug,
 
 ### Step 7 — `write_excel` (atomic, schema-validated)
 
-Single `transaction.append` call for the gsc_performance sheet. Goes
-through the single approved write path with backup, lock, schema
-validation, and post-write provenance event emission.
+Single idempotent `committer.commit` call for the gsc_performance sheet
+(replace — re-running refreshes the snapshot, never duplicates rows; routes
+through transaction.py: backup + lock + schema validation + provenance).
 
 ```python
-from scripts.excel import transaction
-transaction.append(
+from scripts.orchestration import committer
+committer.commit(
     workbook_path=workspace_root/"projects"/project_slug/"master.xlsx",
     sheet="gsc_performance",
     rows=gsc_performance_rows,
+    run_id=handle.run_id,
     project_slug=project_slug,
     writer="gsc-pull",
 )
@@ -301,7 +302,7 @@ Stop and flag the manager — do not patch, do not fall back.
    `gsc_pull.transform`).
 4. `master.xlsx#gsc_performance` column count or names don't match
    schema (`schemas/master-excel.schema.json#gsc_performance`).
-5. `transaction.append` raises `RowSchemaError` for `gsc_performance`.
+5. `committer.commit` raises `RowSchemaError` for `gsc_performance`.
 6. `workflow_runner.create_run` fails schema validation.
 7. `PSEO_WORKSPACE_ROOT` env unset and no explicit `workspace_root` arg
    passed to `workflow_runner` / `events_writer`.

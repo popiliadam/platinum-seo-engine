@@ -246,18 +246,20 @@ workflow_runner.approve(handle.run_id, project_slug=project_slug,
 
 ### Step 7 — `write_excel` (atomic, schema-validated)
 
-Single `transaction.append` call for the content_decay sheet. Goes
-through the single approved write path with backup, lock, schema
-validation, and post-write provenance event emission. **Note:** the
-transform module itself does NOT import `scripts.excel.transaction` —
-only the skill orchestrator layer does (cross-module IMPORT discipline).
+Single idempotent `committer.commit` call for the content_decay sheet
+(replace — re-running refreshes the snapshot, never duplicates rows; routes
+through transaction.py: backup + lock + schema validation + provenance).
+**Note:** the transform module itself does NOT import the committer
+(`scripts.orchestration.committer`) — only the skill orchestrator layer does
+(cross-module IMPORT discipline).
 
 ```python
-from scripts.excel import transaction
-transaction.append(
+from scripts.orchestration import committer
+committer.commit(
     workbook_path=workspace_root/"projects"/project_slug/"master.xlsx",
     sheet="content_decay",
     rows=content_decay_rows,
+    run_id=handle.run_id,
     project_slug=project_slug,
     writer="content-decay",
 )
@@ -363,7 +365,7 @@ Stop and flag the manager — do not patch, do not fall back.
 4. `master.xlsx#content_decay` column count or names don't match
    schema (`schemas/master-excel.schema.json#content_decay`,
    8 required_columns).
-5. `transaction.append` raises `RowSchemaError` for `content_decay`.
+5. `committer.commit` raises `RowSchemaError` for `content_decay`.
 6. `workflow_runner.create_run` fails schema validation.
 7. **Optional DFS `historical_rank_overview` invoked AND budget pre-
    flight FAILS** → STOP, transition to `awaiting_approval`. Manager
