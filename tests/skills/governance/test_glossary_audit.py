@@ -238,6 +238,67 @@ def test_acronym_whitelist_no_false_positive() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Test 7b — BEHAVIORAL missing-term detection (B6-02). The test above only
+# rubber-stamps that the whitelist is *mentioned*; this one actually RUNS the
+# documented Step 4 + Step 6 algorithm over a controlled fixture and asserts
+# the flagged vs allowed terms. The Step 4 candidate regex is sourced verbatim
+# from the live SKILL.md, so a revert of the 2+ token quantifier (B6-17,
+# `)+` → `)*`) makes single-token acronyms candidates and fails this test.
+# ---------------------------------------------------------------------------
+
+# Mirrors the documented Step 6 ACRONYM_WHITELIST (a representative subset).
+_FIXTURE_WHITELIST = frozenset({"JSON", "URL", "API", "HTML", "MCP", "GSC", "ADR"})
+
+
+def _candidate_regex_from_skill() -> re.Pattern[str]:
+    """Pull the Step 4 candidate-extraction pattern verbatim out of the
+    SKILL.md so this test exercises the documented heuristic (not a copy that
+    could silently drift from it)."""
+    m = re.search(r'candidates = re\.findall\(r"(.+?)", body\)', _skill_body())
+    assert m, "Step 4 candidate-extraction regex not found in SKILL.md"
+    return re.compile(m.group(1))
+
+
+def _is_rule_id(term: str) -> bool:
+    return bool(re.match(r"^[FDMR]-\d+$", term))
+
+
+def test_missing_term_detection_behavioral() -> None:
+    """Run the documented detection over a fixture; assert exact flagged set."""
+    pattern = _candidate_regex_from_skill()
+    glossary = {"Content Decay"}  # one known glossary term in the fixture
+    fixture_body = "\n".join([
+        "we run Quick Wins to rank pages",    # 'Quick Wins'   — 2-token, NOT in glossary
+        "the Content Decay sheet refreshes",  # 'Content Decay'— 2-token, IN glossary
+        "it emits JSON over an API here",     # single-token acronyms — NOT candidates
+        "a single Step token stands alone",   # 'Step'         — single token, NOT a candidate
+        "see rule F-01 for the detail",       # 'F-01'         — not a Title-Case span
+    ])
+    candidates = set(pattern.findall(fixture_body))
+
+    # Step 4 — the 2+ token requirement (B6-17): single tokens never qualify.
+    assert "Quick Wins" in candidates
+    assert "Content Decay" in candidates
+    for single in ("JSON", "API", "Step", "F-01"):
+        assert single not in candidates, (
+            f"{single!r} is a single token — the 2+ token heuristic must not "
+            f"flag it (B6-17 regex must require '+', not '*')"
+        )
+
+    # Step 6 — glossary membership + whitelist + rule-id filters.
+    missing = {
+        t for t in candidates
+        if t not in glossary
+        and t not in _FIXTURE_WHITELIST
+        and not _is_rule_id(t)
+    }
+    assert missing == {"Quick Wins"}, (
+        "missing-term detection should flag exactly 'Quick Wins' (the 2-token "
+        f"span absent from glossary), got {sorted(missing)}"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Test 8 — Orphan + missing → AMBER (NOT RED) Disiplin #8 paterni
 # ---------------------------------------------------------------------------
 

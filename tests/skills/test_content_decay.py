@@ -114,7 +114,8 @@ def test_frontmatter_validates(skill_frontmatter: dict,
     """
     SKILL.md frontmatter must:
       (a) parse as YAML,
-      (b) carry name=content-decay, status=wip, version="1.0",
+      (b) carry name=content-decay, status=active (asserted as a member of
+          the valid lifecycle set {active, deprecated, wip}), version="1.0",
           category=discovery,
       (c) declare project_slug as a required string input,
       (d) list mcp__gsc__enhanced_search_analytics in required tools,

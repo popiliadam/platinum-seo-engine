@@ -222,7 +222,7 @@ if budget_envelope["exceeded"]:
         subject="DFS historical_rank cross-check budget aşıldı; cap yükseltilsin mi?",
         step_index=3,
     )
-    raise BudgetGateError("DFS budget pre-flight failed; awaiting_approval")
+    raise check_budget.BudgetGateError("DFS budget pre-flight failed; awaiting_approval")
 ```
 
 ### Step 5 — `request_approval` (skill EXIT awaiting_approval)
@@ -266,9 +266,11 @@ transaction.append(
 ### Step 8 — `render_report`
 
 `render_template.py templates/reports/content-decay.template.md data.json`
-→ `outputs/reports/{date}-content-decay.md`. Variables: `$project_slug`,
-`$date`, `$days_back`, `$total_urls`, `$decay_count`, `$retired_count`,
-`$top_decay_url`, `$top_decay_delta`, `$report_summary`.
+→ `outputs/reports/{date}-content-decay.md`. Variables (all 13 the template
+references — render hard-fails on any missing): `$project_slug`, `$date`,
+`$days_back`, `$run_id`, `$total_urls`, `$rows_written`, `$decay_count`,
+`$retired_count`, `$top_decay_url`, `$top_decay_delta`, `$trend_distribution`,
+`$pillar_summary`, `$report_summary`.
 
 ### Step 9 — Provenance event
 
@@ -380,10 +382,10 @@ Stop and flag the manager — do not patch, do not fall back.
 ## Cross-references
 
 - Schemas: `schemas/master-excel.schema.json` (content_decay sheet,
-  8 required_columns at lines 158-170), `schemas/events.schema.json`
+  8 required_columns at lines 173-180), `schemas/events.schema.json`
   (`source.kind=gsc_mcp` / `dataforseo_mcp`,
   `target_excel_sheet=content_decay`),
-  `schemas/gsc-tool-mapping.schema.json` (D-03 invariant),
+  `schemas/cross-sheet-invariants.json` (D-03 invariant),
   `schemas/skill-frontmatter.schema.json` (this frontmatter).
 - Cross-modules (IMPORT-only): `scripts/state/workflow_runner.py`,
   `scripts/excel/transaction.py`, `scripts/state/events_writer.py`,

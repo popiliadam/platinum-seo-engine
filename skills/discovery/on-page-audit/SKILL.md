@@ -197,6 +197,7 @@ gsc_inbox = (
     / "inbox" / "gsc"
     / f"{today.isoformat()}-search_analytics-onpage-{project_slug}.json"
 )
+gsc_inbox.parent.mkdir(parents=True, exist_ok=True)  # DURUR #3 path-creation parity with Step 2
 gsc_inbox.write_text(json.dumps(raw_gsc, ensure_ascii=False, indent=2))
 ```
 
@@ -272,10 +273,13 @@ transaction.append(
 ### Step 8 — `render_report`
 
 `render_template.py templates/reports/on-page-audit.template.md data.json`
-→ `outputs/reports/{date}-on-page-audit.md`. Variables:
-`$project_slug`, `$date`, `$url_count`, `$credits_used`,
-`$action_monitor`, `$action_add_meta_h1`, `$action_rewrite`,
-`$action_patch`, `$action_no_gsc`, `$top_url`, `$top_impressions`.
+→ `outputs/reports/{date}-on-page-audit.md`. Variables (all 19 the
+template references — render hard-fails on any missing):
+`$project_slug`, `$date`, `$run_id`, `$url_count`, `$credits_used`,
+`$rows_on_page_audit`, `$action_monitor`, `$action_add_meta_h1`,
+`$action_rewrite`, `$action_patch`, `$action_no_gsc`, `$top_url`,
+`$top_target_query`, `$top_action`, `$top_clicks`, `$top_impressions`,
+`$raw_dfs_path`, `$raw_gsc_path`, `$report_summary`.
 
 ### Step 9 — Provenance event
 
@@ -509,8 +513,8 @@ ever passes native tool names + the SF call kwargs.
 
 `amber_warnings` is surfaced via the existing provenance event
 (an additional `source.kind=sf_mcp` event is emitted alongside the
-DFS+GSC events at Step 9) and the rendered report template
-variable `$amber_warnings`.
+DFS+GSC events at Step 9). It is NOT a report template variable — the
+on-page-audit template renders no `$amber_warnings` field.
 
 ## URL canonicalization (D-03 invariant)
 

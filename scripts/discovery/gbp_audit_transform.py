@@ -46,6 +46,61 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from scripts.budget import check_budget
+
+
+# ---------------------------------------------------------------------------
+# Exception hierarchy (mirrors tech_audit_transform's TechAuditError tree)
+# ---------------------------------------------------------------------------
+
+class GbpAuditError(Exception):
+    """Base for gbp-audit transform errors."""
+
+
+class BudgetExceededError(GbpAuditError):
+    """Projected DFS credits exceed the per-day cap — the run MUST route to
+    ``awaiting_approval`` (DURUR #1), never silently downgrade or skip."""
+
+
+def preflight_budget(
+    *,
+    estimated_credits: int,
+    project_config_path: str | Path,
+    events_path: str | Path,
+) -> dict:
+    """§16.8 budget pre-flight for the single paid DFS call (SKILL.md Step 2).
+
+    Mirrors ``tech_audit_transform.preflight_budget``'s contract — keyword-only
+    args, an envelope keyed ``projected_used`` / ``remaining_after`` (the
+    codebase-standard the sibling transforms + the SKILL.md DURUR #1 read),
+    ``BudgetExceededError`` on overage — but routes through the importable
+    ``check_budget.preflight`` SSoT (ADR-016) rather than re-subprocessing.
+    Raises ``BudgetExceededError`` when projected usage (trailing-24h spend +
+    ``estimated_credits``) breaches the cap, so the skill routes the run to
+    ``awaiting_approval`` per spec §10 instead of a silent downgrade.
+    """
+    raw = check_budget.preflight(
+        project_config_path=project_config_path,
+        events_path=events_path,
+        estimated_credits=estimated_credits,
+    )
+    envelope = {
+        "budget_per_day": raw["budget_per_day"],
+        "used_24h": raw["used_24h"],
+        "estimated_credits": raw["estimated_credits"],
+        "projected_used": raw["projected"],
+        "remaining_after": raw["remaining"],
+        "exceeded": raw["exceeded"],
+    }
+    if envelope["exceeded"]:
+        raise BudgetExceededError(
+            f"DFS budget pre-flight FAIL: projected={envelope['projected_used']} "
+            f"> budget={envelope['budget_per_day']} "
+            f"(used_24h={envelope['used_24h']}, estimate={estimated_credits}). "
+            "Route workflow to awaiting_approval per spec §10 (DURUR #1)."
+        )
+    return envelope
+
 
 def run(
     project_slug: str, workspace_root: Path | str | None = None

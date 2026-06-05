@@ -25,6 +25,7 @@ outputs:
   - "outputs/reports/{date}-quickwin.md"
   - "events.jsonl"
   - "inbox/gsc/{date}-detect_quick_wins-{slug}.json"
+  - "inbox/gsc/{date}-enhanced_search_analytics-{slug}.json"
 consumes:
   - "init-project:projects/{slug}/master.xlsx"
   - "sf-import:master.xlsx#crawl_sitemap"
@@ -266,14 +267,14 @@ Stop and flag the manager — do not patch, do not fall back.
 7. `PSEO_WORKSPACE_ROOT` env unset and no `workspace_root` arg passed.
 8. `project.config.json` missing `gsc.site_url`.
 9. `quickwins_transform.py` output is not schema-shaped.
-10. F-08 (target_url ⊆ crawl_sitemap ∪ gsc_performance) fails — flag
-    Wave 2 `drift-check` to expect a RED.
+10. F-08 (quick_wins.url ⊆ crawl_sitemap.url ∪ gsc_performance.url) fails
+    — flag Wave 2 `drift-check` to expect a RED.
 
 ## Cross-references
 
 - Schemas: `schemas/master-excel.schema.json` (quick_wins, opportunity,
   definitions), `schemas/events.schema.json`,
-  `schemas/gsc-tool-mapping.schema.json` (D-03 invariant),
+  `schemas/cross-sheet-invariants.json` (D-03 + F-08 invariants),
   `schemas/skill-frontmatter.schema.json`.
 - Cross-modules: `scripts/state/workflow_runner.py`,
   `scripts/excel/transaction.py`, `scripts/state/events_writer.py`,

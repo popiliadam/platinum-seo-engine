@@ -356,6 +356,7 @@ def _derive_status_and_work(
     instance: _SchemaInstance,
     *,
     dfs_confirmed: bool | None,
+    default_status: str = "TODO",
 ) -> tuple[str, str]:
     """Map a parsed schema instance + DFS confirmation flag → (status, remaining_work).
 
@@ -379,12 +380,14 @@ def _derive_status_and_work(
     missing_required = sorted(required - instance.props)
     if required and not instance.props:
         # Presence-only fallback (no blob) — we know the type exists but
-        # cannot prove props. Treat as EXISTS w/ remaining_work flag.
+        # cannot prove props, so no per-row gap analysis is possible. Seed
+        # the status from default_status (the SKILL.md input; frontmatter
+        # default "TODO", operator-overridable) rather than hardcoding it.
         note = (
             f"verify {instance.schema_type} required props "
             f"({', '.join(sorted(required))}) — SF reported type only, no JSON-LD blob"
         )
-        return "EXISTS", _decorate_dfs(note, dfs_confirmed)
+        return default_status, _decorate_dfs(note, dfs_confirmed)
 
     if missing_required:
         note = (
@@ -597,6 +600,7 @@ def transform(
     raw_dfs: dict | None = None,
     *,
     strict_parse: bool = False,
+    default_status: str = "TODO",
 ) -> dict:
     """Transform SF structured-data export (+ optional DFS payload) into
     schema-shaped rows for master.xlsx#schema.
@@ -613,11 +617,15 @@ def transform(
                 JsonLdParseError. When False (default) malformed rows are
                 dropped silently (the inbox-recovery file is the durable
                 witness; SKILL.md DURUR #3 documents this).
+        default_status: statusEnum seed for type-only rows (SF detected the
+                schema type but no JSON-LD blob, so props can't be verified).
+                Frontmatter default "TODO"; operator-overridable. Must be a
+                statusEnum member or SchemaAuditError is raised.
 
     Returns: {"schema": [<row>, ...], "meta": {...}}.
 
     Raises:
-        SchemaAuditError on bad input.
+        SchemaAuditError on bad input (incl. default_status outside statusEnum).
         JsonLdParseError on malformed JSON-LD when strict_parse=True.
         RowSchemaError on column / statusEnum drift.
     """
@@ -628,6 +636,11 @@ def transform(
     if raw_dfs is not None and not isinstance(raw_dfs, dict):
         raise SchemaAuditError(
             f"raw_dfs must be a dict or None, got {type(raw_dfs).__name__}"
+        )
+    if default_status not in _STATUS_ENUM:
+        raise SchemaAuditError(
+            f"default_status must be in statusEnum {sorted(_STATUS_ENUM)}, "
+            f"got {default_status!r}"
         )
 
     dfs_index = _index_dfs_schemas(raw_dfs) if raw_dfs is not None else {}
@@ -660,6 +673,7 @@ def transform(
 
             status, remaining = _derive_status_and_work(
                 inst, dfs_confirmed=dfs_confirmed,
+                default_status=default_status,
             )
 
             candidates.append(_Candidate(
@@ -790,6 +804,11 @@ def _parse_args(argv: Iterable[str]) -> argparse.Namespace:
         help="Raise JsonLdParseError on malformed JSON-LD (default: drop row).",
     )
     p.add_argument(
+        "--default-status", default="TODO",
+        help="statusEnum seed for type-only rows (SF type detected, no JSON-LD "
+             "blob); default TODO. Per the SKILL.md default_status input.",
+    )
+    p.add_argument(
         "--output-dir", default=None,
         help="If set, write schema_audit.json into this directory.",
     )
@@ -825,6 +844,7 @@ def main(argv: list[str]) -> int:
         result = transform(
             raw_sf, raw_dfs,
             strict_parse=args.strict_parse,
+            default_status=args.default_status,
         )
     except SchemaAuditError as exc:
         print(f"transform failed: {exc}", file=sys.stderr)

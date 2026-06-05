@@ -91,6 +91,78 @@ def _sum_last_24h(events_path: Path, now: datetime) -> float:
     return total
 
 
+class BudgetGateError(RuntimeError):
+    """Raised by a skill when a pre-flight budget check gates a paid MCP call.
+
+    The skill orchestrator catches/propagates this to transition a workflow run
+    to ``awaiting_approval`` instead of silently downgrading to a free path
+    (the false-success failure mode skills explicitly forbid). It is defined
+    here so the importable contract — ``preflight()`` + ``BudgetGateError`` —
+    lives in one module (content-decay Step 4b depends on both, B6-01).
+    """
+
+
+def preflight(
+    project_config_path: Path | str,
+    events_path: Path | str,
+    estimated_credits: float = 0,
+    now: datetime | None = None,
+) -> dict:
+    """Pre-flight budget envelope for an *about-to-run* paid MCP call.
+
+    Unlike :func:`main` (a CLI that reports current trailing-24h usage), this is
+    the importable contract skills depend on: it folds ``estimated_credits`` —
+    the cost the proposed call would add — into the trailing-24h DataForSEO
+    spend and reports whether the *projected* total would breach the per-day
+    cap. It is pure: no stdout, no ``sys.exit`` — raising/gating is the caller's
+    decision (see :class:`BudgetGateError`).
+
+    Returns an envelope (superset of :func:`main`'s keys)::
+
+        {"budget_per_day", "used_24h", "estimated_credits",
+         "projected", "remaining", "exceeded"}
+
+    where ``projected = used_24h + estimated_credits``,
+    ``remaining = budget_per_day - projected`` (may be negative), and
+    ``exceeded`` is True iff ``projected > budget_per_day``.
+
+    Raises ``BudgetGateError`` when the project-config is unreadable (missing,
+    malformed, or an invalid budget): ``_load_budget`` ``sys.exit``s for the CLI
+    path, but a library caller must get a catchable exception, never a process
+    kill — so that ``SystemExit`` is converted here (the "no sys.exit escapes"
+    contract this function promises).
+    """
+    if estimated_credits < 0:
+        raise ValueError(
+            f"estimated_credits must be >= 0, got {estimated_credits!r}"
+        )
+    if now is None:
+        now = datetime.now(timezone.utc)
+
+    try:
+        budget = _load_budget(Path(project_config_path))
+    except SystemExit as exc:
+        raise BudgetGateError(
+            f"budget pre-flight: project-config unreadable "
+            f"({project_config_path}): exit={exc.code}"
+        ) from exc
+    used = _sum_last_24h(Path(events_path), now)
+    projected = used + estimated_credits
+    remaining = budget - projected
+
+    def _fmt(n: float) -> int | float:
+        return int(n) if float(n).is_integer() else n
+
+    return {
+        "budget_per_day": budget,
+        "used_24h": _fmt(used),
+        "estimated_credits": _fmt(estimated_credits),
+        "projected": _fmt(projected),
+        "remaining": _fmt(remaining),
+        "exceeded": projected > budget,
+    }
+
+
 def _load_budget(config_path: Path) -> int:
     try:
         with config_path.open("r", encoding="utf-8") as fh:
