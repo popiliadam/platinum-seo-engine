@@ -13,9 +13,11 @@ a glance:
      evaluator (no report is persisted today, so this avoids a null verdict)
 
 CLI semantics:
-  - --project <slug> opsiyonel. Eğer atlanırsa shared/active.json'daki
+  - --project <slug> opsiyonel. Eğer atlanırsa önce BU session'ın marker'ı
+    (shared/sessions/<id>.json, $CLAUDE_CODE_SESSION_ID ile anahtarlı; AMO
+    batch 0c) bağlı projeyi belirler; marker yoksa shared/active.json'daki
     `active_project` key okunur (legacy `slug` fallback + deprecation uyarısı).
-    Active.json yoksa FileNotFoundError raise edilir.
+    İkisi de yoksa FileNotFoundError raise edilir.
   - --workspace-root  PSEO_WORKSPACE_ROOT environment variable'ından default
     alınır; --workspace-root flag explicit override.
 
@@ -45,10 +47,30 @@ from typing import List
 
 REPO_ROOT_DEFAULT = Path(__file__).resolve().parents[2]
 
+# Make ``scripts.*`` importable when run as a bare CLI: ``python3 scripts/state/
+# dump_workspace.py`` puts scripts/state/ on sys.path[0], not the repo root, so
+# the session-binding import below would otherwise fail outside pytest.
+if str(REPO_ROOT_DEFAULT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT_DEFAULT))
+
+from scripts.state.session_binding import (  # noqa: E402
+    current_session_id,
+    read_session_binding,
+)
+
 
 def _resolve_slug(workspace_root: Path, project_slug: str | None) -> str:
     if project_slug is not None:
         return project_slug
+    # AMO batch 0c: a session→project marker (this session, keyed by
+    # $CLAUDE_CODE_SESSION_ID in a command context) takes precedence over the
+    # workspace-global active.json. Absent marker -> the unchanged active.json
+    # resolution below (legacy 'slug' warning + missing-file raise preserved).
+    sid = current_session_id()
+    if sid:
+        bound = read_session_binding(sid, workspace_root)
+        if bound:
+            return bound
     active = workspace_root / "shared" / "active.json"
     if not active.exists():
         raise FileNotFoundError(
