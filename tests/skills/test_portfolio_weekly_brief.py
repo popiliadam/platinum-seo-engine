@@ -587,3 +587,18 @@ def test_smoke_e2e_pipeline(
     assert "| beta-test |" in rendered
     assert "| gamma-test |" in rendered
     assert "freshness_flag" in rendered
+    # Every $placeholder must be substituted EXCEPT $run_id — the K-06
+    # audit-trail placeholder a render-time hook injects later
+    # (test_run_id_coverage.py enforces $run_id in every report template;
+    # monthly_report.py's setdefault("run_id","$run_id") is the canonical
+    # idiom). Read identifiers from the RAW template (stripping $$ escapes
+    # — a $$var doc-literal is NOT a placeholder) and assert none but
+    # run_id survive into the render.
+    template_text = TEMPLATE_PATH.read_text(encoding="utf-8")
+    template_ids = set(re.findall(
+        r"\$\{?([A-Za-z_]\w*)\}?", template_text.replace("$$", ""))) - {"run_id"}
+    leaked = sorted(
+        i for i in template_ids
+        if re.search(r"\$\{?" + re.escape(i) + r"\}?", rendered)
+    )
+    assert not leaked, f"unsubstituted template placeholders: {leaked}"

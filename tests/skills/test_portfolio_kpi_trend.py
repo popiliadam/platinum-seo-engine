@@ -698,7 +698,7 @@ def test_smoke_e2e_pipeline_and_portfolio_config_validate(
 ) -> None:
     """End-to-end smoke: schema validation pass, build batch, snapshot
     JSON-serialisable, render markdown, ActiveProjectsCeilingError
-    surfaces on > 8 entries."""
+    surfaces on > 12 entries (soft cap raised 8→12; B1-02)."""
     # Portfolio config schema validate (positive).
     pkt.validate_portfolio_config(
         synthetic_portfolio_config, portfolio_config_schema,
@@ -749,17 +749,52 @@ def test_smoke_e2e_pipeline_and_portfolio_config_validate(
     assert "period_days: 30" in rendered
     for slug in ("alpha-test", "beta-test", "gamma-test"):
         assert f"`{slug}`" in rendered
+    # Every $placeholder must be substituted EXCEPT $run_id — the K-06
+    # audit-trail placeholder a render-time hook injects later
+    # (test_run_id_coverage.py enforces $run_id in every report template;
+    # monthly_report.py's setdefault("run_id","$run_id") is the canonical
+    # idiom). safe_substitute leaves any unmapped $token as a literal, so
+    # read identifiers from the RAW template (stripping $$ escapes — a
+    # $$var doc-literal is NOT a placeholder) and assert none but run_id
+    # survive.
+    template_text = TEMPLATE_PATH.read_text(encoding="utf-8")
+    template_ids = set(re.findall(
+        r"\$\{?([A-Za-z_]\w*)\}?", template_text.replace("$$", ""))) - {"run_id"}
+    leaked = sorted(
+        i for i in template_ids
+        if re.search(r"\$\{?" + re.escape(i) + r"\}?", rendered)
+    )
+    assert not leaked, f"unsubstituted template placeholders: {leaked}"
 
-    # Negative: > 8 active_projects triggers ActiveProjectsCeilingError.
+    # Positive: exactly 12 active_projects now VALIDATES. The schema soft
+    # cap was raised 8→12 when the live portfolio reached ~10 (B1-02); a
+    # 12-project portfolio must NOT raise (it broke at >8 before the fix).
+    at_capacity = dict(synthetic_portfolio_config)
+    at_capacity["active_projects"] = [
+        {
+            "slug": f"proj-{i}",
+            "workspace_path": f"proj-{i}",
+            "profile": ["b2b-saas"],
+            "priority": min(i, 10),  # schema caps priority at 10
+        }
+        for i in range(1, 13)  # 12 entries == ceiling (valid)
+    ]
+    pkt.validate_portfolio_config(at_capacity, portfolio_config_schema)
+    pkt.build_kpi_trend_batch(
+        portfolio_config=at_capacity, workspace_root=ws,
+        now=fixed_now, period_days=30,
+    )
+
+    # Negative: > 12 active_projects triggers ActiveProjectsCeilingError.
     over_capacity = dict(synthetic_portfolio_config)
     over_capacity["active_projects"] = [
         {
             "slug": f"proj-{i}",
             "workspace_path": f"proj-{i}",
             "profile": ["b2b-saas"],
-            "priority": i,
+            "priority": min(i, 10),  # schema caps priority at 10
         }
-        for i in range(1, 10)  # 9 entries > 8 ceiling
+        for i in range(1, 14)  # 13 entries > 12 ceiling
     ]
     with pytest.raises(
         (pkt.ActiveProjectsCeilingError, pkt.PortfolioConfigInvalidError),
