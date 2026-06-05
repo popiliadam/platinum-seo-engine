@@ -17,7 +17,11 @@ from pathlib import Path
 
 import pytest
 
-from scripts.hooks.validate_content_write import evaluate, is_content_html_path
+from scripts.hooks.validate_content_write import (
+    _resolve_profile,
+    evaluate,
+    is_content_html_path,
+)
 
 _REPO = Path(__file__).resolve().parents[2]
 _HOOK = _REPO / "scripts" / "hooks" / "validate_content_write.py"
@@ -134,3 +138,99 @@ def test_subprocess_stdin_blocks_on_disclosure() -> None:
         capture_output=True,
     )
     assert proc.returncode == 2
+
+
+# --------------------------------------------------------------------------
+# AMO batch 0c — _resolve_profile via the session-binding primitive.
+# Precedence: session marker (this session) -> shared/active.json (global);
+# workspace via resolve_workspace_root() (config -> env). Never raises.
+# --------------------------------------------------------------------------
+
+def _write_config(workspace: Path, project_id: str, **config: object) -> None:
+    cfg_dir = workspace / "projects" / project_id
+    cfg_dir.mkdir(parents=True, exist_ok=True)
+    (cfg_dir / "project.config.json").write_text(json.dumps(config), encoding="utf-8")
+
+
+def _write_marker(workspace: Path, session_id: str, project_id: str) -> None:
+    sessions = workspace / "shared" / "sessions"
+    sessions.mkdir(parents=True, exist_ok=True)
+    (sessions / f"{session_id}.json").write_text(
+        json.dumps({"active_project": project_id}), encoding="utf-8"
+    )
+
+
+def _write_active(workspace: Path, project_id: str) -> None:
+    shared = workspace / "shared"
+    shared.mkdir(parents=True, exist_ok=True)
+    (shared / "active.json").write_text(
+        json.dumps({"active_project": project_id}), encoding="utf-8"
+    )
+
+
+@pytest.fixture
+def isolated_ws(tmp_path, monkeypatch):
+    """Tmp workspace wired via $PSEO_WORKSPACE_ROOT, with $HOME pointed away from
+    the real ~/.config/pseo/config.json so resolve_workspace_root() uses the env."""
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    monkeypatch.setenv("PSEO_WORKSPACE_ROOT", str(ws))
+    monkeypatch.delenv("CLAUDE_CODE_SESSION_ID", raising=False)
+    return ws
+
+
+def test_resolve_profile_session_marker_binds_profile(isolated_ws):
+    sid = "sess-aaaa"
+    _write_marker(isolated_ws, sid, "proj-a")
+    _write_config(isolated_ws, "proj-a", profile="ymyl")
+    # a DIFFERENT global active.json must NOT win over the session marker
+    _write_active(isolated_ws, "proj-b")
+    _write_config(isolated_ws, "proj-b", profile="local-service")
+
+    assert _resolve_profile({"session_id": sid}) == "ymyl"
+
+
+def test_resolve_profile_no_marker_falls_back_to_active_json(isolated_ws):
+    _write_active(isolated_ws, "proj-b")
+    _write_config(isolated_ws, "proj-b", profile="local-service")
+
+    # session present but unbound (no marker) -> active.json profile (unchanged)
+    assert _resolve_profile({"session_id": "unbound-sess"}) == "local-service"
+
+
+def test_resolve_profile_profiles_list_first_element(isolated_ws):
+    _write_active(isolated_ws, "proj-b")
+    _write_config(isolated_ws, "proj-b", profiles=["b2b-saas", "ymyl"])
+
+    assert _resolve_profile({"session_id": "unbound"}) == "b2b-saas"
+
+
+def test_resolve_profile_no_workspace_returns_none(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.delenv("PSEO_WORKSPACE_ROOT", raising=False)
+
+    assert _resolve_profile({"session_id": "x"}) is None
+
+
+def test_resolve_profile_bad_config_returns_none(isolated_ws):
+    sid = "sess-bad"
+    _write_marker(isolated_ws, sid, "proj-a")
+    cfg_dir = isolated_ws / "projects" / "proj-a"
+    cfg_dir.mkdir(parents=True, exist_ok=True)
+    (cfg_dir / "project.config.json").write_text("{not json", encoding="utf-8")
+
+    assert _resolve_profile({"session_id": sid}) is None
+
+
+def test_resolve_profile_garbage_payload_never_raises(isolated_ws):
+    # workspace resolves, but a non-dict payload must never crash the gate
+    for garbage in (["not", "a", "dict"], "a string", 42):
+        assert _resolve_profile(garbage) is None  # type: ignore[arg-type]
+
+
+def test_resolve_profile_none_payload_returns_none(isolated_ws):
+    # no marker, no active.json, no session -> None (never raises)
+    assert _resolve_profile(None) is None

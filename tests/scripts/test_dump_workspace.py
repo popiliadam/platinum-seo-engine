@@ -127,6 +127,17 @@ def _write_active_json(workspace_root: Path, slug: str) -> None:
     )
 
 
+def _write_session_marker(workspace_root: Path, session_id: str, slug: str) -> None:
+    """AMO batch 0c: a session→project marker at shared/sessions/<sid>.json.
+    read_session_binding only needs the active_project key."""
+    sessions = workspace_root / "shared" / "sessions"
+    sessions.mkdir(parents=True, exist_ok=True)
+    (sessions / f"{session_id}.json").write_text(
+        json.dumps({"active_project": slug, "session_id": session_id}),
+        encoding="utf-8",
+    )
+
+
 # ---------- 1. explicit slug returns summary ----------
 
 
@@ -395,3 +406,68 @@ def test_explicit_slug_not_found_raises(dump_module, tmp_path):
 def test_module_exposes_main_for_cli(dump_module):
     assert hasattr(dump_module, "main")
     assert callable(dump_module.main)
+
+
+# ---------- 16. AMO batch 0c: session-marker precedence ----------
+# The session marker (shared/sessions/<sid>.json, keyed by $CLAUDE_CODE_SESSION_ID
+# in a command context) takes precedence over the workspace-global active.json.
+# When the marker is absent, behaviour is exactly today's (active.json incl. the
+# legacy 'slug' warning and the missing-file raise).
+
+_SID = "11111111-2222-3333-4444-555555555555"
+
+
+def test_dump_session_marker_wins_over_active_json(dump_module, tmp_path, monkeypatch):
+    _make_workspace(tmp_path, slug="alpha")  # the bound project must exist
+    _write_session_marker(tmp_path, _SID, "alpha")
+    _write_active_json(tmp_path, "beta")  # a DIFFERENT global active
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", _SID)
+
+    result = dump_module.dump_workspace(workspace_root=tmp_path, project_slug=None)
+
+    assert result["project"] == "alpha"  # marker beat active.json
+
+
+def test_resolve_slug_session_marker_beats_active_json(dump_module, tmp_path, monkeypatch):
+    _write_session_marker(tmp_path, _SID, "alpha")
+    _write_active_json(tmp_path, "beta")
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", _SID)
+
+    assert dump_module._resolve_slug(tmp_path, None) == "alpha"
+
+
+def test_resolve_slug_explicit_arg_beats_marker_and_active(dump_module, tmp_path, monkeypatch):
+    _write_session_marker(tmp_path, _SID, "alpha")
+    _write_active_json(tmp_path, "beta")
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", _SID)
+
+    assert dump_module._resolve_slug(tmp_path, "explicit") == "explicit"
+
+
+def test_resolve_slug_no_marker_falls_through_to_active_json(dump_module, tmp_path, monkeypatch):
+    # session id set but NO marker file -> today's active.json path unchanged
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", _SID)
+    _write_active_json(tmp_path, "beta")
+
+    assert dump_module._resolve_slug(tmp_path, None) == "beta"
+
+
+def test_resolve_slug_legacy_key_resolves_and_warns_without_marker(
+    dump_module, tmp_path, monkeypatch, capsys
+):
+    monkeypatch.delenv("CLAUDE_CODE_SESSION_ID", raising=False)
+    (tmp_path / "shared").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "shared" / "active.json").write_text(
+        json.dumps({"slug": "legacy-demo"}), encoding="utf-8"
+    )
+
+    assert dump_module._resolve_slug(tmp_path, None) == "legacy-demo"
+    assert "legacy 'slug' key" in capsys.readouterr().err
+
+
+def test_resolve_slug_raises_without_marker_and_without_active_json(
+    dump_module, tmp_path, monkeypatch
+):
+    monkeypatch.delenv("CLAUDE_CODE_SESSION_ID", raising=False)
+    with pytest.raises(FileNotFoundError, match=r"active\.json|bound"):
+        dump_module._resolve_slug(tmp_path, None)

@@ -42,6 +42,11 @@ if _PLUGIN_ROOT not in sys.path:
     sys.path.insert(0, _PLUGIN_ROOT)
 
 from scripts.validation.content_validator import validate_content  # noqa: E402
+from scripts.state.session_binding import (  # noqa: E402
+    current_session_id,
+    resolve_session_project,
+    resolve_workspace_root,
+)
 
 # Live published HTML surface: outputs/blog/ or outputs/content/ (the configured
 # blog_dir), but never a *.template.html.
@@ -96,20 +101,24 @@ def evaluate(payload: dict, *, profile: str | None = None) -> tuple[int, list[st
     return (0, [])
 
 
-def _resolve_profile() -> str | None:
+def _resolve_profile(payload: dict | None = None) -> str | None:
     """Best-effort active-project profile for the R-104 advisory band.
 
-    Never raises; returns ``None`` when no workspace/project/profile is bound.
+    Resolves the workspace via ``resolve_workspace_root()`` (config → env; AMO
+    batch 0a proved the env var alone is unreliable) and the project via the
+    session marker (THIS session, keyed by the hook ``payload`` session_id) with
+    a ``shared/active.json`` fallback. Never raises; returns ``None`` when no
+    workspace/project/profile is bound (strict=False + the outer try/except).
     """
-    workspace = os.environ.get("PSEO_WORKSPACE_ROOT")
-    if not workspace:
+    workspace = resolve_workspace_root()
+    if workspace is None:
         return None
     try:
-        marker = Path(workspace) / "shared" / "active.json"
-        if not marker.exists():
-            return None
-        active = json.loads(marker.read_text(encoding="utf-8"))
-        project_id = active.get("active_project")
+        project_id = resolve_session_project(
+            workspace,
+            session_id=current_session_id(payload),
+            strict=False,
+        )
         if not project_id:
             return None
         config_path = (
@@ -129,7 +138,7 @@ def main() -> int:
     try:
         raw = sys.stdin.read() or "{}"
         payload = json.loads(raw)
-        code, messages = evaluate(payload, profile=_resolve_profile())
+        code, messages = evaluate(payload, profile=_resolve_profile(payload))
         for message in messages:
             sys.stderr.write(f"[content-validator] {message}\n")
         return code
