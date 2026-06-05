@@ -230,14 +230,25 @@ not warrant blocking the audit.
 
 ### Step 6 — `transform` (pure compute, gap analysis + severity matrix)
 
-```bash
-python3 scripts/discovery/gbp_audit_transform.py \
-    --listing-json   inbox/dfs/{date}-gbp-listing-{slug}.json \
-    --output-dir     _state/transform/{run_id}/
+The transform is invoked as a **Python function**, not a CLI — the
+module exposes no `__main__`. `run()` is the single public entrypoint;
+it performs the profile gate, budget pre-flight, DFS fetch + Scrapling
+fallback (the MCP/budget boundary is stubbed at module level for the
+production orchestrator to wire), then the pure-compute per-category
+gap analysis (`_analyze_gaps`):
+
+```python
+from scripts.discovery import gbp_audit_transform
+result = gbp_audit_transform.run(
+    project_slug=project_slug,
+    workspace_root=workspace_root,    # or resolved via PSEO_WORKSPACE_ROOT
+)
+# result["status"] ∈ {"skipped", "awaiting_approval", "success"}
+# on success: result["gap_rows"] — schema-locked 7-col gbp_audit rows
 ```
 
-The transform applies the same `_normalize_dfs_response` shape
-adapter as tech-audit, then runs the per-category gap analysis:
+The gap analysis consumes the fetched listing dict directly and applies
+the per-category severity matrix:
 
 | Category    | Gap                          | Severity | Recommended action                                    |
 |-------------|------------------------------|----------|-------------------------------------------------------|
@@ -368,7 +379,8 @@ This skill MUST honor three feedback memory constraints:
   `scripts/state/events_writer.py`, `scripts/budget/check_budget.py`,
   `scripts/reporting/render_template.py`.
 - Transform: `scripts/discovery/gbp_audit_transform.py`
-  (`preflight_budget`, `transform`, severity matrix constants,
+  (`run` public entrypoint, `preflight_budget`, `_analyze_gaps` gap
+  analysis + severity matrix, `GbpAuditError`/`BudgetExceededError`
   exception hierarchy).
 - Tests: `tests/skills/test_gbp_audit.py` (≥4 cases incl. profile-gate
   skip + gap rows + severity assignment + budget pre-flight).
