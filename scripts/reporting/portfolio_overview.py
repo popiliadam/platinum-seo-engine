@@ -11,7 +11,7 @@ Idempotent: same input → byte-identical output. Plugin-agnostik: 0
 hardcoded slug values; iteration is driven by active_projects entirely.
 Does NOT write events.jsonl (Phase 9 W1 convention; Q-RP-01 deferred).
 
-Refs: schemas/portfolio-config.schema.json (v1.1, maxItems=8,
+Refs: schemas/portfolio-config.schema.json (v1.1, maxItems=12,
 cross_query.read_only=true), schemas/master-excel.schema.json (dashboard
 required_cells + master_task statusEnum), scripts/reporting/render_template.py.
 Pattern reference: scripts/planning/master_task_sync.py (Phase 8 W-D1).
@@ -49,7 +49,7 @@ DASHBOARD_KPI_CELLS: tuple[tuple[str, str], ...] = (
     ("R59", "last_audit_date"),
 )
 
-#: master_task statusEnum (master-excel.schema.json line 20).
+#: master_task statusEnum (master-excel.schema.json#/definitions/statusEnum).
 STATUS_ENUM: tuple[str, ...] = (
     "TODO", "ONGOING", "EXISTS", "DONE",
     "BLOCKED", "DEFERRED", "CANCELED",
@@ -57,7 +57,7 @@ STATUS_ENUM: tuple[str, ...] = (
 
 MASTER_TASK_DATA_START_ROW = 4
 MASTER_TASK_STATUS_COL_INDEX = 10  # J = 10 (1-based)
-ACTIVE_PROJECTS_MAX = 8
+ACTIVE_PROJECTS_MAX = 12
 DEFAULT_TEMPLATE_REL = "templates/reports/portfolio-overview.template.md"
 
 _SUMMABLE_KPIS: tuple[str, ...] = (
@@ -437,8 +437,13 @@ def _build_totals_summary(batch: PortfolioOverviewBatch) -> str:
 def build_report_markdown(
     *, batch: PortfolioOverviewBatch, template_text: str,
 ) -> str:
-    """Render markdown report via string.Template (render_template.py
-    compatible). Template owns the layout; this only injects $variables.
+    """Render markdown report via strict string.Template.substitute()
+    (the render_template.py convention — a missing key raises, never a
+    silently-leaked $placeholder). `$run_id` is the K-06 audit-trail
+    placeholder a render-time hook injects (events.jsonl.next_run_id), so
+    it defaults to the literal `$run_id` and survives the render intact —
+    matching monthly_report.py. Template owns the layout; this only
+    injects $variables.
     """
     data = {
         "generated_at": batch.run_date,
@@ -450,13 +455,19 @@ def build_report_markdown(
         "projects_table": _build_projects_table(batch),
         "totals_summary": _build_totals_summary(batch),
     }
+    # K-06 audit-trail placeholder: keep $run_id for the render-time hook.
+    data.setdefault("run_id", "$run_id")
     try:
-        return Template(template_text).safe_substitute(
+        return Template(template_text).substitute(
             {k: str(v) for k, v in data.items()}
         )
     except KeyError as exc:
         raise PortfolioOverviewError(
             f"template substitution failed - missing key: {exc.args[0]}"
+        ) from exc
+    except ValueError as exc:
+        raise PortfolioOverviewError(
+            f"template syntax error: {exc}"
         ) from exc
 
 

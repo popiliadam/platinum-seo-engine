@@ -6,13 +6,13 @@ description: |
   durumu", "active projects özet" der ya da portföy genelinde KPI
   karşılaştırması istediğinde tetiklenir.
   Also use when: portfolio.config.json `active_projects` listesi
-  doluyken (1-8 entry, schema maxItems=8); her aktif projenin
+  doluyken (1-12 entry, schema maxItems=12); her aktif projenin
   master.xlsx'i mevcut (eksikler graceful skip + warning); tek bir
   pass'te tüm aktif projelerin dashboard KPI snapshot + master_task
   status karşılaştırması raporlanır; weekly-summary ya da
   portfolio-weekly-brief öncesinde portfolio-wide tablo gerekiyor.
   Do not use when: portfolio.config.json yok (portfolio init önce
-  çalışmalı, DURUR PortfolioConfigMissingError); active_projects 8'i
+  çalışmalı, DURUR PortfolioConfigMissingError); active_projects 12'yi
   aşıyor (schema maxItems sentinel, DURUR ActiveProjectsCeilingError —
   fazla entry'leri pending_onboard'a taşı); cross_query.read_only !=
   true (schema const, DURUR ReadOnlyContractViolation); tek bir
@@ -66,7 +66,7 @@ autonomy:
 # portfolio-overview — reporting skill (Phase 9 Wave 1)
 
 Multi-project READ-ONLY aggregator. Iterates portfolio.config.json
-`active_projects` (max 8, schema-enforced) and pulls each project's
+`active_projects` (max 12, schema-enforced) and pulls each project's
 `master.xlsx#dashboard` KPI cells + locally-computed `master_task`
 status counts into a single portfolio overview snapshot + markdown
 report. **No MCP**, **no DFS**, **no budget pre-flight**, **no Excel
@@ -118,7 +118,7 @@ provenance governance refinement is deferred to Q-RP-01 (closeout).
 | 3 | `master.xlsx#master_task` (col J)   | openpyxl read_only=True |
 
 The 8 dashboard KPI cells are pulled verbatim per
-`schemas/master-excel.schema.json#dashboard required_cells` (lines 32-41):
+`schemas/master-excel.schema.json#dashboard required_cells`:
 `R10=total_pillars`, `R47=master_task_total`, `R48=master_task_done`,
 `R49=master_task_todo`, `R50=master_task_ongoing`,
 `R51=cannibalization_count`, `R52=quick_wins_count`,
@@ -162,7 +162,7 @@ Stop and flag the manager — do not patch, do not fall back.
    unreadable. Run portfolio init first.
 2. **PortfolioConfigInvalidError** — payload failed Draft 7 validation
    against `schemas/portfolio-config.schema.json`. Schema-first violation.
-3. **ActiveProjectsCeilingError** — `active_projects` > 8 (schema
+3. **ActiveProjectsCeilingError** — `active_projects` > 12 (schema
    `maxItems` sentinel). Move surplus to `pending_onboard`.
 4. **ReadOnlyContractViolation** — `cross_query.read_only != true`
    (schema `const: true`). The aggregator cannot run with read-only
@@ -211,12 +211,12 @@ events_writer.append_audit(
 
 - Schemas: `schemas/portfolio-config.schema.json` (v1.1 —
   ActiveProjectEntry required fields slug + workspace_path + profile +
-  priority; `active_projects.maxItems = 8`;
+  priority; `active_projects.maxItems = 12`;
   `cross_query.read_only = true` const),
-  `schemas/master-excel.schema.json#dashboard` (lines 32-41 —
-  `required_cells` 8 KPI cells + `forbidden_patterns` no-formula rule),
-  `schemas/master-excel.schema.json#master_task` (lines 269-303 —
-  `required_columns` 19 cols + `#/definitions/statusEnum` line 20),
+  `schemas/master-excel.schema.json#dashboard`
+  (`required_cells` 8 KPI cells + `forbidden_patterns` no-formula rule),
+  `schemas/master-excel.schema.json#master_task`
+  (`required_columns` 19 cols + `#/definitions/statusEnum`),
   `schemas/skill-frontmatter.schema.json` (this frontmatter).
 - Cross-modules (IMPORT-only): `scripts/reporting/render_template.py`
   (`string.Template` $var rendering convention).

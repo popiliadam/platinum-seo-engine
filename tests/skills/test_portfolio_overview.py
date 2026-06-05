@@ -12,7 +12,7 @@ portfolio.config.json + a tmp_path workspace tree.
 Schemas referenced:
   - schemas/portfolio-config.schema.json (v1.1)
   - schemas/skill-frontmatter.schema.json
-  - schemas/master-excel.schema.json#dashboard required_cells (lines 32-41)
+  - schemas/master-excel.schema.json#dashboard required_cells
 """
 
 from __future__ import annotations
@@ -73,7 +73,7 @@ def _synthetic_config(active_count: int = 2) -> dict:
             "display_name": f"Project {i+1}",
             "workspace_path": f"./workspace-{i+1}",
             "profile": ["e-commerce"],
-            "priority": i + 1,
+            "priority": min(i + 1, 10),  # schema caps priority at 10
         })
     return {
         "schema_version": "1.1",
@@ -177,7 +177,7 @@ def test_portfolio_config_schema_validate_pass(
     portfolio_config_schema: dict,
 ) -> None:
     """A valid synthetic portfolio.config payload (with active_projects
-    1-8 entries + cross_query.read_only=true) must pass validation
+    1-12 entries + cross_query.read_only=true) must pass validation
     cleanly via portfolio_overview.validate_portfolio_config().
     """
     config = _synthetic_config(active_count=3)
@@ -186,22 +186,30 @@ def test_portfolio_config_schema_validate_pass(
 
 
 # ---------------------------------------------------------------------------
-# Test 4 — active_projects 1-8 maxItems sentinel (9-entry rejected)
+# Test 4 — active_projects maxItems sentinel: 12 accepted, 13 rejected
 # ---------------------------------------------------------------------------
 
-def test_active_projects_maxitems_sentinel_rejects_9(
+def test_active_projects_maxitems_sentinel_12_ok_13_rejected(
     portfolio_config_schema: dict,
 ) -> None:
-    """Per schema portfolio-config.schema.json line 35:
-    `active_projects.maxItems = 8`. A payload with 9 entries must raise
-    PortfolioConfigInvalidError (Draft 7) OR ActiveProjectsCeilingError
-    (defensive domain guard); both are acceptable.
+    """The active_projects soft cap is the schema's `maxItems = 12`
+    (raised from 8 when the live portfolio reached ~10). A 12-entry
+    payload must VALIDATE cleanly — this is the runtime break B1 fixes,
+    where a real ~10-project portfolio previously tripped the stale
+    ceiling-8 guard. A 13-entry payload must raise
+    PortfolioConfigInvalidError (Draft 7 maxItems) OR
+    ActiveProjectsCeilingError (defensive domain guard); both acceptable.
     """
-    config = _synthetic_config(active_count=9)
+    # Positive: exactly 12 active_projects validates (no DURUR).
+    at_cap = _synthetic_config(active_count=12)
+    po.validate_portfolio_config(at_cap, portfolio_config_schema)
+
+    # Negative: 13 active_projects exceeds the ceiling.
+    over_cap = _synthetic_config(active_count=13)
     with pytest.raises(
         (po.PortfolioConfigInvalidError, po.ActiveProjectsCeilingError),
     ):
-        po.validate_portfolio_config(config, portfolio_config_schema)
+        po.validate_portfolio_config(over_cap, portfolio_config_schema)
 
 
 # ---------------------------------------------------------------------------
@@ -371,3 +379,46 @@ def test_template_render_smoke(
     # Snapshot count matches active count.
     assert snapshot["active_project_count"] == 2
     assert snapshot["skipped_project_count"] == 2  # no master.xlsx
+
+    # Every $placeholder must be substituted EXCEPT $run_id — the K-06
+    # audit-trail placeholder a render-time hook injects later
+    # (test_run_id_coverage.py enforces $run_id in every report template;
+    # build_report_markdown's setdefault("run_id","$run_id") keeps it
+    # literal). Read identifiers from the RAW template (stripping $$
+    # escapes — a $$var doc-literal is NOT a placeholder) and assert none
+    # but run_id survive into the render.
+    template_ids = set(re.findall(
+        r"\$\{?([A-Za-z_]\w*)\}?", template_text.replace("$$", ""))) - {"run_id"}
+    leaked = sorted(
+        i for i in template_ids
+        if re.search(r"\$\{?" + re.escape(i) + r"\}?", report)
+    )
+    assert not leaked, f"unsubstituted template placeholders: {leaked}"
+
+
+# ---------------------------------------------------------------------------
+# Test 9 — build_report_markdown uses strict .substitute() (B1-12):
+#          a template var the transform does not supply raises loudly
+# ---------------------------------------------------------------------------
+
+def test_build_report_markdown_raises_on_missing_key(
+    tmp_path: Path, portfolio_config_schema: dict,
+) -> None:
+    """B1-12: build_report_markdown renders via strict
+    string.Template.substitute() (the render_template.py convention its
+    docstring cites), so a template referencing a variable the transform
+    does NOT supply must raise PortfolioOverviewError — a LOUD failure,
+    not a silently-leaked literal $placeholder (the safe_substitute trap).
+    """
+    portfolio_root = tmp_path / "portfolio_ws"
+    portfolio_root.mkdir()
+    (portfolio_root / "projects" / "_portfolio").mkdir(parents=True)
+    config = _synthetic_config(active_count=1)
+    batch = po.aggregate(
+        portfolio_root=portfolio_root, config=config, run_date="2026-05-01",
+    )
+    bad_template = (
+        "# Overview $portfolio_id\nUnsupplied: $totally_unknown_var\n"
+    )
+    with pytest.raises(po.PortfolioOverviewError):
+        po.build_report_markdown(batch=batch, template_text=bad_template)

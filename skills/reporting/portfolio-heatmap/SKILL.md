@@ -16,7 +16,7 @@ description: |
   portfolio-weekly-brief sonrası "hangi proje hangi alanda yoğun"
   görselleştirmesi gerekiyor.
   Do not use when: portfolio.config.json yok (init-portfolio önce
-  çalışmalı, DURUR PortfolioConfigMissingError); active_projects 8'i
+  çalışmalı, DURUR PortfolioConfigMissingError); active_projects 12'yi
   aşıyor (schema maxItems sentinel, DURUR ActiveProjectsCeilingError);
   cross_query.read_only != true (schema const, DURUR
   ReadOnlyContractViolation); tek bir proje detayı isteniyorsa
@@ -36,7 +36,7 @@ inputs:
     type: string
     required: false
     default: "category"
-    description: "Heatmap kırılım ekseni. Enum: category | priority | primary_source. Default category. priority severityEnum (CRITICAL/HIGH/MEDIUM/LOW) üzerinden, primary_source 10-enum (master_task col C) üzerinden bucket üretir."
+    description: "Heatmap kırılım ekseni. Enum: category | priority | primary_source. Default category. priority severityEnum (CRITICAL/HIGH/MEDIUM/LOW) üzerinden, primary_source 11-enum (master_task col C) üzerinden bucket üretir."
 outputs:
   - "master.xlsx#none"
   - "projects/_portfolio/outputs/reports/{date}-portfolio-heatmap.md"
@@ -71,7 +71,7 @@ autonomy:
 # portfolio-heatmap — reporting skill (Phase 9 Wave 2)
 
 Multi-project READ-ONLY aggregator. Iterates `portfolio.config.json` v1.1
-`active_projects[]` (max 8, schema-enforced) and for each project pulls
+`active_projects[]` (max 12, schema-enforced) and for each project pulls
 density counts from four "opportunity" sheets — `opportunity`,
 `quick_wins`, `content_decay`, `cannibalization` — plus master_task
 breakdown along the requested `aggregate_dimension` axis (category /
@@ -100,7 +100,7 @@ tokens — used by the test suite as a schema-first guard (W-E3 paterni).
 | Name                  | Type   | Default     | Notes                                                                                                                                                            |
 |-----------------------|--------|-------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `portfolio_root`      | string | env         | Workspace root; falls back to `$PSEO_WORKSPACE_ROOT`.                                                                                                            |
-| `aggregate_dimension` | string | `"category"` | Enum {`category`, `priority`, `primary_source`}. `priority` uses `#/definitions/severityEnum` 4-value bucket; `primary_source` uses master_task col C 10-enum. |
+| `aggregate_dimension` | string | `"category"` | Enum {`category`, `priority`, `primary_source`}. `priority` uses `#/definitions/severityEnum` 4-value bucket; `primary_source` uses master_task col C 11-enum. |
 
 ## Outputs (artifacts produced)
 
@@ -133,13 +133,14 @@ provenance governance refinement is deferred to Q-RP-01.
 ## Schema authority
 
 - `schemas/portfolio-config.schema.json` v1.1 — `active_projects.maxItems
-  = 8`, `cross_query.read_only = true` const.
+  = 12`, `cross_query.read_only = true` const.
 - `schemas/master-excel.schema.json#master_task`:
   - col B `task` (free text)
-  - col C `primary_source` enum 10 values
+  - col C `primary_source` enum 11 values
     `[content_decay, quickwin, tech_fix, schema, pillar, manual, sxo,
-    cannibalization, redirect_404, internal_links]` (Q-IL-1 closure
-    added `internal_links`)
+    cannibalization, redirect_404, internal_links, new_content_plan]`
+    (Q-IL-1 closure added `internal_links`; v1.2 audit followup added
+    `new_content_plan`)
   - col F `category` (free text)
   - col G `priority` `#/definitions/severityEnum` 4 values
     `[CRITICAL, HIGH, MEDIUM, LOW]`
@@ -171,7 +172,7 @@ provenance governance refinement is deferred to Q-RP-01.
 6. Bucket by aggregate_dimension:
      category       → free-text cardinality buckets
      priority       → severityEnum 4-bucket (CRITICAL/HIGH/MEDIUM/LOW)
-     primary_source → 10-enum bucket (each value gets a deterministic
+     primary_source → 11-enum bucket (each value gets a deterministic
                        bucket even at zero count)
 7. Sort projects by (priority asc, slug asc) — deterministic.
 8. Render markdown report + JSON snapshot. Idempotent.
@@ -194,7 +195,7 @@ aggregate_dimension="category"        → free-text cardinality buckets
                                         from master_task col F
 aggregate_dimension="priority"        → fixed severityEnum 4 buckets
                                         (CRITICAL, HIGH, MEDIUM, LOW)
-aggregate_dimension="primary_source"  → fixed 10-enum buckets from
+aggregate_dimension="primary_source"  → fixed 11-enum buckets from
                                         master_task col C; every enum
                                         value surfaces a bucket
                                         (count 0 included)
@@ -202,9 +203,10 @@ aggregate_dimension="primary_source"  → fixed 10-enum buckets from
 
 The `primary_source` mode is the strict coverage mode — every enum
 value gets a row even at zero count, so reviewers can verify nothing is
-silently missing. The 10 enum values are `[content_decay, quickwin,
+silently missing. The 11 enum values are `[content_decay, quickwin,
 tech_fix, schema, pillar, manual, sxo, cannibalization, redirect_404,
-internal_links]` (Q-IL-1 closure added the `internal_links` value).
+internal_links, new_content_plan]` (Q-IL-1 closure added the
+`internal_links` value; the v1.2 audit followup added `new_content_plan`).
 
 ## DURUR conditions
 
@@ -214,7 +216,7 @@ Stop and flag the manager — do not patch, do not fall back.
    unreadable. Run init-portfolio first.
 2. **PortfolioConfigInvalidError** — payload failed Draft 7 validation
    against `schemas/portfolio-config.schema.json`. Schema-first violation.
-3. **ActiveProjectsCeilingError** — `active_projects` > 8 (schema
+3. **ActiveProjectsCeilingError** — `active_projects` > 12 (schema
    `maxItems` sentinel). Move surplus to `pending_onboard`.
 4. **ReadOnlyContractViolation** — `cross_query.read_only != true`
    (schema `const: true`). The aggregator cannot run with read-only
@@ -308,7 +310,7 @@ events_writer.append_audit(
 - Tests: `tests/skills/test_portfolio_heatmap.py` (≥6 cases incl.
   aggregate_dimension enum 3-sentinel, missing sheet schema-valid empty
   shape, multi-project merge, density normalization,
-  primary_source 10-enum coverage, natural_language min length,
+  primary_source 11-enum coverage, natural_language min length,
   forbidden tokens guard, READ-ONLY enforcement, path convention).
 - Pattern reference: `scripts/reporting/portfolio_overview.py`
   (W-E3 — `assert_read_only_module()` helper),

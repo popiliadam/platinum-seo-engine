@@ -8,7 +8,7 @@ description: |
   çapında bir aylık KPI roll-up + EditorialOverrides notları
   istendiğinde devreye girer.
   Also use when: portfolio.config.json v1.1 mevcut + active_projects
-  doluyken (1-8 entry, schema maxItems=8); her aktif proje için
+  doluyken (1-12 entry, schema maxItems=12); her aktif proje için
   master.xlsx ulaşılabilir; aylık 30 günlük dilim üzerinden
   exec_summary + keywords_up + pages_up + tech_seo_done +
   content_revised + new_content + next_month_plan toplaması
@@ -181,7 +181,7 @@ EditorialOverrides branches against the canonical Draft 7 schema.
 ## Transform contract
 
 `scripts/reporting/portfolio_monthly_roundup.py` (pure function,
-< 600 lines per ADR-027):
+< 600 lines — transform size gate; ADR-027 sets the < 1500L policy):
 
 - `build_portfolio_roundup(portfolio_config, workspace_root, now,
   period_end=None) -> PortfolioMonthlyRoundup` — top-level
@@ -251,7 +251,7 @@ Stop and flag the manager — do not patch, do not fall back.
    / unreadable. Run portfolio init first.
 2. **PortfolioConfigInvalidError** — payload failed Draft 7
    validation against `schemas/portfolio-config.schema.json`.
-3. **ActiveProjectsCeilingError** — `active_projects` > 8 (schema
+3. **ActiveProjectsCeilingError** — `active_projects` > 12 (schema
    `maxItems` sentinel). Move surplus to `pending_onboard`.
 4. **ReadOnlyContractViolation** — `cross_query.read_only != true`
    (schema `const: true`) OR transform module contains a forbidden
