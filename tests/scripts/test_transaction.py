@@ -780,3 +780,208 @@ def test_write_still_rejects_invalid_nonblank_enum(tmp_path: Path) -> None:
     wb_path = proj / "master.xlsx"
     with pytest.raises(RowSchemaError):
         transaction.append(wb_path, "tech_seo", [_tech_seo_row(impact="URGENT")], "test-proj")
+
+
+# ---------------------------------------------------------------------------
+# AMO batch 0f, SPEC 1 — backup-rotation glob fix
+#
+# _rotate_backups must scope its keep-7 FIFO budget to the SAME `master-*.xlsx`
+# glob that the F-22 invariant (validate_invariants.check_F_22) and
+# dump_workspace._backups_recent count. The previous all-files iterdir()
+# rotation let first-write `.empty` markers / stray tempfiles count against the
+# budget, so a newer marker could evict a real `master-*.xlsx` snapshot while
+# F-22 (counting only xlsx) still reported compliant — a silently lost backup.
+# `.empty` markers are vestigial once any real snapshot exists → pruned to zero.
+# ---------------------------------------------------------------------------
+
+def test_rotate_keeps_seven_xlsx_despite_newer_markers(tmp_path: Path) -> None:
+    proj, state = _setup_project(tmp_path)
+    backup_dir = state / "backups" / "master"
+    backup_dir.mkdir(parents=True, exist_ok=True)
+
+    # 7 real snapshots with OLDER lex-sortable timestamps (…12-00-00 … 12-00-06).
+    xlsx_names = [
+        f"master-2026-04-30T12-00-{i:02d}-000000Z.xlsx" for i in range(7)
+    ]
+    for name in xlsx_names:
+        (backup_dir / name).write_bytes(b"PK\x03\x04fake-xlsx")
+    # 3 `.empty` markers with NEWER timestamps (…12-00-10/11/12). Under the old
+    # all-files keep-7 these sort newest and evict the 3 oldest real snapshots.
+    marker_names = [
+        f"master-2026-04-30T12-00-{i}-000000Z.empty" for i in (10, 11, 12)
+    ]
+    for name in marker_names:
+        (backup_dir / name).write_bytes(b"")
+
+    transaction._rotate_backups(state)
+
+    survivors = sorted(p.name for p in backup_dir.glob("master-*.xlsx"))
+    assert survivors == sorted(xlsx_names), (
+        f"all 7 real xlsx snapshots must survive marker contention; got {survivors}"
+    )
+    assert len(survivors) == 7
+    # Markers are vestigial once real snapshots exist — pruned to zero.
+    assert list(backup_dir.glob("master-*.empty")) == []
+
+
+def test_rotate_keeps_lone_marker_when_no_snapshot_yet(tmp_path: Path) -> None:
+    """First-write contract: with NO real master-*.xlsx snapshot yet, the .empty
+    marker (the WriteResult.backup_path of a first write) must survive rotation —
+    it is the only evidence a backup preceded that write."""
+    proj, state = _setup_project(tmp_path)
+    backup_dir = state / "backups" / "master"
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    marker = backup_dir / "master-2026-04-30T12-00-00-000000Z.empty"
+    marker.write_bytes(b"")
+
+    transaction._rotate_backups(state)
+
+    assert marker.exists(), "lone first-write marker must not be pruned"
+
+
+# ---------------------------------------------------------------------------
+# AMO batch 0f, SPEC 2 — blocking-acquire option (parallel-write safety)
+#
+# Default (acquire_blocking=False) stays fail-fast (LockHeldError) — proven
+# unchanged by test_lock_contention_second_writer_fails_fast above. The new
+# opt-in acquire_blocking=True waits a BOUNDED deadline for the holder to
+# release (so a concurrent second writer's work is not silently lost), then
+# raises a typed LockTimeout distinct from LockHeldError.
+# ---------------------------------------------------------------------------
+
+def _holder_proc_timed(lock_path: str, hold_event_path: str, hold_seconds: float) -> None:
+    """Subprocess: acquire flock, signal ready, hold for hold_seconds, release."""
+    import fcntl as _fcntl
+    import os as _os
+    fd = _os.open(lock_path, _os.O_WRONLY | _os.O_CREAT, 0o644)
+    _fcntl.flock(fd, _fcntl.LOCK_EX | _fcntl.LOCK_NB)
+    Path(hold_event_path).touch()
+    time.sleep(hold_seconds)
+    _fcntl.flock(fd, _fcntl.LOCK_UN)
+    _os.close(fd)
+
+
+def _wait_for_holder(hold_event: Path, holder: "mp.Process") -> None:
+    for _ in range(300):
+        if hold_event.exists():
+            return
+        time.sleep(0.01)
+    holder.terminate()  # pragma: no cover
+    pytest.fail("holder process never acquired lock")  # pragma: no cover
+
+
+def _pin_sentinel_not_stale(lock_path: Path, holder: "mp.Process") -> None:
+    """Pin the lock sentinel to the holder's live pid + a far-future ts so
+    _acquire_lock's stale-reclaim does NOT unlink the inode the holder flocked
+    (mirrors test_lock_contention_second_writer_fails_fast)."""
+    lock_path.write_text(json.dumps({
+        "pid": holder.pid,
+        "ts": "2099-12-31T23:59:59.999999Z",
+    }), encoding="utf-8")
+
+
+def test_locktimeout_distinct_from_lockheld_error() -> None:
+    # Both derive from TransactionError (so broad `except TransactionError`
+    # handlers still catch them), but NEITHER is the other: a caller catching
+    # LockHeldError ("fail-fast") must not accidentally swallow LockTimeout
+    # ("waited and gave up"), and vice versa.
+    assert "LockTimeout" in transaction.__all__
+    assert issubclass(transaction.LockTimeout, transaction.TransactionError)
+    assert issubclass(transaction.LockHeldError, transaction.TransactionError)
+    assert not issubclass(transaction.LockTimeout, transaction.LockHeldError)
+    assert not issubclass(transaction.LockHeldError, transaction.LockTimeout)
+
+
+def test_acquire_blocking_waits_for_release_no_lost_write(tmp_path: Path) -> None:
+    proj, state = _setup_project(tmp_path)
+    wb_path = proj / "master.xlsx"
+    lock_path = state / "excel.lock"
+    # Writer A lands first; the workbook now exists carrying A's row.
+    transaction.append(
+        wb_path, "topical_map", [_topical_row(primary_keyword="A")], "test-proj"
+    )
+
+    hold_event = tmp_path / "holder-up"
+    holder = mp.Process(
+        target=_holder_proc_timed, args=(str(lock_path), str(hold_event), 0.5)
+    )
+    holder.start()
+    try:
+        _wait_for_holder(hold_event, holder)
+        _pin_sentinel_not_stale(lock_path, holder)
+
+        # Writer B opts into blocking acquire: it must WAIT for the holder to
+        # release (~0.5s) and THEN write — no silent lost write.
+        start = time.monotonic()
+        result = transaction.append(
+            wb_path, "topical_map", [_topical_row(primary_keyword="B")], "test-proj",
+            acquire_blocking=True,
+        )
+        waited = time.monotonic() - start
+    finally:
+        holder.join(timeout=5)
+        if holder.is_alive():  # pragma: no cover
+            holder.terminate()
+
+    assert result.rows_affected == 1
+    # Proof it actually blocked: fail-fast would have raised at ~0s, never here.
+    assert waited >= 0.3, f"writer B should have blocked ~0.5s, waited {waited:.3f}s"
+    wb = load_workbook(wb_path)
+    ws = wb["topical_map"]
+    primary_kw = {ws.cell(row=r, column=3).value for r in range(1, ws.max_row + 1)}
+    assert {"A", "B"} <= primary_kw, f"both writers must survive; got {primary_kw}"
+
+
+def test_acquire_blocking_times_out_raises_locktimeout(tmp_path: Path) -> None:
+    proj, state = _setup_project(tmp_path)
+    lock_path = state / "excel.lock"
+    hold_event = tmp_path / "holder-up"
+    # Hold for 5s — far longer than the 0.3s acquire deadline below, so the
+    # deadline fires first (kept short so the test is fast).
+    holder = mp.Process(
+        target=_holder_proc_timed, args=(str(lock_path), str(hold_event), 5.0)
+    )
+    holder.start()
+    try:
+        _wait_for_holder(hold_event, holder)
+        _pin_sentinel_not_stale(lock_path, holder)
+
+        start = time.monotonic()
+        with pytest.raises(transaction.LockTimeout):
+            transaction._acquire_lock(
+                lock_path, acquire_blocking=True, deadline_seconds=0.3
+            )
+        elapsed = time.monotonic() - start
+        # Bounded: it WAITED (polled past ~the deadline), not instant fail-fast,
+        # and did NOT hang for the holder's full 5s hold.
+        assert 0.25 <= elapsed < 4.0, f"expected ~0.3s bounded wait, got {elapsed:.3f}s"
+    finally:
+        holder.terminate()  # stop the 5s hold promptly
+        holder.join(timeout=5)
+
+
+def test_acquire_blocking_default_false_still_fails_fast(tmp_path: Path) -> None:
+    """Regression guard (SPEC-2c, explicit): the public default path is fail-fast.
+    Complements test_lock_contention_second_writer_fails_fast — here the contended
+    write returns FAST (no 30s blocking wait) AND raises LockHeldError, proving the
+    default did not silently flip to blocking."""
+    proj, state = _setup_project(tmp_path)
+    wb_path = proj / "master.xlsx"
+    lock_path = state / "excel.lock"
+    hold_event = tmp_path / "holder-up"
+    holder = mp.Process(
+        target=_holder_proc_timed, args=(str(lock_path), str(hold_event), 5.0)
+    )
+    holder.start()
+    try:
+        _wait_for_holder(hold_event, holder)
+        _pin_sentinel_not_stale(lock_path, holder)
+
+        start = time.monotonic()
+        with pytest.raises(LockHeldError):
+            transaction.append(wb_path, "topical_map", [_topical_row()], "test-proj")
+        elapsed = time.monotonic() - start
+        assert elapsed < 2.0, f"default must fail fast, not block; took {elapsed:.3f}s"
+    finally:
+        holder.terminate()
+        holder.join(timeout=5)
