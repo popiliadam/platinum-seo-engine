@@ -63,6 +63,12 @@ _DEFAULT_SCHEMA_PATH = _REPO_ROOT / "schemas" / "master-excel.schema.json"
 _BACKUPS_KEEP = 7
 _EXCEL_CELL_MAX_CHARS = 32_767  # openpyxl/Excel hard limit
 _LOCK_STALE_SECONDS = 5 * 60  # 5 minutes
+# acquire_blocking=True bounds: wait at most _LOCK_BLOCKING_DEADLINE_SECONDS for a
+# concurrent holder to release, polling every _LOCK_POLL_INTERVAL_SECONDS. Fixed
+# cadence (NOT exponential backoff) — adequate for a single-operator tool, and the
+# deadline keeps a wedged peer from hanging a writer forever.
+_LOCK_BLOCKING_DEADLINE_SECONDS = 30.0
+_LOCK_POLL_INTERVAL_SECONDS = 0.1
 
 # JSON-schema "type" → Python type tuple acceptable by openpyxl-bound rows.
 _TYPE_MAP: dict[str, tuple[type, ...]] = {
@@ -142,7 +148,17 @@ class CellValueTooLongError(TransactionError):
 
 
 class LockHeldError(TransactionError):
-    """Another writer currently holds the excel.lock sentinel."""
+    """Another writer currently holds the excel.lock sentinel (fail-fast path)."""
+
+
+class LockTimeout(TransactionError):
+    """acquire_blocking=True waited past its bounded deadline for excel.lock.
+
+    Distinct from LockHeldError so callers can tell "waited and gave up" from
+    "fail-fast refused immediately". A sibling under TransactionError (not a
+    LockHeldError subclass), so `except LockHeldError` never swallows a timeout,
+    yet a broad `except TransactionError` still catches both.
+    """
 
 
 class BackupDirUnwritableError(TransactionError):
@@ -358,8 +374,59 @@ def _is_stale(pid: int | None, ts: str | None) -> bool:
     return age > _LOCK_STALE_SECONDS
 
 
-def _acquire_lock(lock_path: Path) -> int:
-    """Acquire excel.lock via flock(LOCK_EX|LOCK_NB). Returns fd to hold."""
+def _flock_or_raise(
+    fd: int,
+    lock_path: Path,
+    *,
+    acquire_blocking: bool,
+    deadline_seconds: float,
+) -> None:
+    """flock(LOCK_EX) on `fd`. Closes `fd` before raising so it never leaks.
+
+    Default (acquire_blocking=False): ONE LOCK_NB attempt — a concurrent holder
+    raises LockHeldError immediately (byte-identical to the legacy fail-fast).
+
+    acquire_blocking=True: retry LOCK_NB on a fixed cadence until it succeeds or
+    `deadline_seconds` elapses, then raise LockTimeout. Bounded (never an
+    unbounded blocking LOCK_EX) so a wedged peer can't hang a writer forever.
+    Only EWOULDBLOCK (BlockingIOError = lock held) is retried; any other OSError
+    (e.g. ENOLCK) is a non-contention failure and raises at once even when
+    blocking.
+    """
+    deadline = time.monotonic() + deadline_seconds
+    while True:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return
+        except BlockingIOError as exc:
+            if not acquire_blocking:
+                os.close(fd)
+                raise LockHeldError(f"another writer holds {lock_path}") from exc
+            if time.monotonic() >= deadline:
+                os.close(fd)
+                raise LockTimeout(
+                    f"waited {deadline_seconds:g}s for {lock_path}, still held"
+                ) from exc
+            time.sleep(_LOCK_POLL_INTERVAL_SECONDS)
+        except OSError as exc:
+            os.close(fd)
+            raise LockHeldError(f"flock failed on {lock_path}: {exc}") from exc
+
+
+def _acquire_lock(
+    lock_path: Path,
+    *,
+    acquire_blocking: bool = False,
+    deadline_seconds: float = _LOCK_BLOCKING_DEADLINE_SECONDS,
+) -> int:
+    """Acquire excel.lock; return the fd to hold.
+
+    acquire_blocking=False (default): fail-fast — raise LockHeldError if another
+    writer holds the lock (unchanged behaviour; no regression for any caller).
+    acquire_blocking=True: wait up to `deadline_seconds` for the holder to
+    release, then raise LockTimeout. Opt-in parallel-write safety so a concurrent
+    second writer waits its turn instead of silently losing its work.
+    """
     # First, stale reclaim. Sentinel content is informational; flock provides
     # the actual mutual exclusion below.
     pid, ts = _read_sentinel(lock_path)
@@ -370,14 +437,10 @@ def _acquire_lock(lock_path: Path) -> int:
             pass
 
     fd = os.open(str(lock_path), os.O_WRONLY | os.O_CREAT, 0o644)
-    try:
-        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except BlockingIOError as exc:
-        os.close(fd)
-        raise LockHeldError(f"another writer holds {lock_path}") from exc
-    except OSError as exc:
-        os.close(fd)
-        raise LockHeldError(f"flock failed on {lock_path}: {exc}") from exc
+    _flock_or_raise(
+        fd, lock_path,
+        acquire_blocking=acquire_blocking, deadline_seconds=deadline_seconds,
+    )
 
     # Refresh sentinel content for the holder. Truncate + rewrite is OK:
     # this file is informational, not the durability target.
@@ -445,20 +508,40 @@ def _backup(target: Path, state_dir: Path) -> Path:
     return bp
 
 
+def _unlink_quietly(path: Path) -> None:
+    try:
+        path.unlink()
+    except FileNotFoundError:  # pragma: no cover
+        pass
+
+
 def _rotate_backups(state_dir: Path) -> None:
+    """Prune backups to the FIFO keep-7 budget, scoped to real snapshots.
+
+    The budget counts ONLY `master-*.xlsx` — the SAME glob the F-22 invariant
+    (validate_invariants.check_F_22) and dump_workspace._backups_recent use. The
+    previous all-files `iterdir()` rotation let first-write `.empty` markers (and
+    any stray tempfile) count against the keep-7 budget, so a newer marker could
+    evict a real `master-*.xlsx` snapshot while F-22 (which only counts xlsx)
+    still reported compliant — a silently lost recoverable backup.
+
+    `.empty` markers exist only to satisfy "a backup precedes the first write"
+    when there is nothing to copy; once any real snapshot exists they are
+    vestigial, so they are pruned to zero and never share the xlsx budget.
+    """
     backup_dir = state_dir / "backups" / "master"
     if not backup_dir.is_dir():
         return
-    # Lex-sort by name; timestamps are lex-sortable.
-    files = sorted(p for p in backup_dir.iterdir() if p.is_file())
-    excess = len(files) - _BACKUPS_KEEP
-    if excess <= 0:
-        return
-    for old in files[:excess]:
-        try:
-            old.unlink()
-        except FileNotFoundError:  # pragma: no cover
-            pass
+    # Lex-sort by name; the embedded ISO timestamps are lex-sortable (oldest 1st).
+    snapshots = sorted(backup_dir.glob("master-*.xlsx"))
+    excess = len(snapshots) - _BACKUPS_KEEP
+    for old in snapshots[:max(0, excess)]:
+        _unlink_quietly(old)
+    # Vestigial once a real snapshot exists; the lone first-write marker (no
+    # snapshot yet) is left intact as the only proof a backup preceded it.
+    if snapshots:
+        for marker in backup_dir.glob("master-*.empty"):
+            _unlink_quietly(marker)
 
 
 def _atomic_save(wb: Workbook, target: Path) -> None:
@@ -658,6 +741,7 @@ def write(
     state_root: Path | str | None = None,
     writer: str | None = None,
     allow_extra: bool = False,
+    acquire_blocking: bool = False,
 ) -> WriteResult:
     """
     Append-and-replace write: appends `rows` to `sheet`, atomically.
@@ -666,11 +750,13 @@ def write(
     Use update() for in-place mutation. The function name 'write' is
     retained for back-compat with the brief. allow_extra (P1-09): keep False to
     reject unknown row keys (typo guard); True restores the legacy skip.
+    acquire_blocking (default False = fail-fast): True waits a bounded deadline
+    for a concurrent holder instead of raising LockHeldError immediately.
     """
     return _write_or_append(
         workbook_path, sheet, rows, project_slug,
         schema_path=schema_path, state_root=state_root, writer=writer,
-        mode="append", allow_extra=allow_extra,
+        mode="append", allow_extra=allow_extra, acquire_blocking=acquire_blocking,
     )
 
 
@@ -684,13 +770,16 @@ def append(
     state_root: Path | str | None = None,
     writer: str | None = None,
     allow_extra: bool = False,
+    acquire_blocking: bool = False,
 ) -> WriteResult:
     """Append rows to the bottom of `sheet`. Alias for write(mode='append').
-    allow_extra (P1-09): keep False to reject unknown row keys; True skips them."""
+    allow_extra (P1-09): keep False to reject unknown row keys; True skips them.
+    acquire_blocking (default False = fail-fast): True waits a bounded deadline
+    for a concurrent holder instead of raising LockHeldError immediately."""
     return _write_or_append(
         workbook_path, sheet, rows, project_slug,
         schema_path=schema_path, state_root=state_root, writer=writer,
-        mode="append", allow_extra=allow_extra,
+        mode="append", allow_extra=allow_extra, acquire_blocking=acquire_blocking,
     )
 
 
@@ -704,6 +793,7 @@ def replace(
     state_root: Path | str | None = None,
     writer: str | None = None,
     allow_extra: bool = False,
+    acquire_blocking: bool = False,
 ) -> WriteResult:
     """Idempotent refresh: clear `sheet`'s data block, then write `rows`.
 
@@ -714,12 +804,13 @@ def replace(
     validation runs BEFORE the lock/clear, so an invalid payload leaves the
     sheet untouched. Same atomic envelope as append (backup → atomic_save →
     rotate, provenance emit). allow_extra (P1-09): keep False to reject unknown
-    row keys; True skips them.
+    row keys; True skips them. acquire_blocking (default False = fail-fast): True
+    waits a bounded deadline for a concurrent holder instead of raising at once.
     """
     return _write_or_append(
         workbook_path, sheet, rows, project_slug,
         schema_path=schema_path, state_root=state_root, writer=writer,
-        mode="replace", allow_extra=allow_extra,
+        mode="replace", allow_extra=allow_extra, acquire_blocking=acquire_blocking,
     )
 
 
@@ -733,13 +824,16 @@ def update(
     schema_path: Path | str | None = None,
     state_root: Path | str | None = None,
     writer: str | None = None,
+    acquire_blocking: bool = False,
 ) -> WriteResult:
     """
     Update existing rows where every key/value in `where` matches; apply
     `set_` to those rows. Returns rows_affected = number of matched rows.
 
     Raises if no rows match (callers should append() instead of silently
-    failing). Schema-validates the resulting row(s) end-to-end.
+    failing). Schema-validates the resulting row(s) end-to-end. acquire_blocking
+    (default False = fail-fast): True waits a bounded deadline for a concurrent
+    holder instead of raising LockHeldError immediately.
     """
     workbook_path = Path(workbook_path)
     schema_p = Path(schema_path) if schema_path else _DEFAULT_SCHEMA_PATH
@@ -755,7 +849,7 @@ def update(
         Path(state_root) if state_root else None, workbook_path, project_slug
     )
     lock_path = state_dir / "excel.lock"
-    fd = _acquire_lock(lock_path)
+    fd = _acquire_lock(lock_path, acquire_blocking=acquire_blocking)
     try:
         wb = _load_or_new(workbook_path)
         _ensure_sheet_with_header(wb, sheet, columns, _header_row(schema, sheet))
@@ -829,6 +923,7 @@ def _write_or_append(
     writer: str | None,
     mode: str,
     allow_extra: bool = False,
+    acquire_blocking: bool = False,
 ) -> WriteResult:
     if mode not in ("append", "replace"):
         raise TransactionError(f"unsupported mode: {mode!r}")
@@ -860,7 +955,7 @@ def _write_or_append(
         Path(state_root) if state_root else None, workbook_path, project_slug
     )
     lock_path = state_dir / "excel.lock"
-    fd = _acquire_lock(lock_path)
+    fd = _acquire_lock(lock_path, acquire_blocking=acquire_blocking)
     try:
         wb = _load_or_new(workbook_path)
         _ensure_sheet_with_header(wb, sheet, columns, _header_row(schema, sheet))
@@ -963,6 +1058,7 @@ __all__: Iterable[str] = (
     "FormulaPolicyViolation",
     "CellValueTooLongError",
     "LockHeldError",
+    "LockTimeout",
     "BackupDirUnwritableError",
     "WorkbookLockedByExcelError",
     "WorkbookCorruptError",
