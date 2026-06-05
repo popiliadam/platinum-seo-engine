@@ -9,6 +9,12 @@
             "command": "WS=\"${PSEO_WORKSPACE_ROOT:-}\"; MARKER=\"${WS}/shared/active.json\"; if [ -n \"$WS\" ] && [ -f \"$MARKER\" ]; then   PID=$(grep -oE '\"active_project\"[[:space:]]*:[[:space:]]*\"[^\"]*\"' \"$MARKER\" 2>/dev/null         | sed 's/.*\"\\([^\"]*\\)\"$/\\1/');   echo \"PSEO context: workspace=$WS project=${PID:-<none>}\"; else   echo \"PSEO context: no active project bound — run /pseo-init or set PSEO_WORKSPACE_ROOT\"; fi; echo \"Drift router: when uncertain about next step invoke the meta:whats-next skill (Phase 5+) — until then consult docs/PHASE_STATUS.md.\"",
             "timeout": 10,
             "statusMessage": "Injecting PSEO project context..."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/env_probe.py\"",
+            "timeout": 10,
+            "statusMessage": "AMO batch-0a env probe (temporary diagnostic)..."
           }
         ]
       }
