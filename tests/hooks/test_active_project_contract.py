@@ -1,12 +1,16 @@
 """tests/hooks/test_active_project_contract.py — active.json field-name contract (ADR-032).
 
 Coverage:
-  1. post-tool-use.json + user-prompt-submit.json read `active_project` (canonical, written
-     by /pseo-active and pseo-init.md), not the legacy `project_id` placeholder.
-  2. The two hooks that DO read active.json resolve the project id when the file contains
-     `{"active_project": "..."}` and silently no-op when the field is absent / file missing.
+  1. user-prompt-submit.json reads `active_project` (canonical, written by
+     /pseo-active and pseo-init.md), not the legacy `project_id` placeholder.
+  2. That direct reader resolves the project id when the file contains
+     `{"active_project": "..."}` and silently no-ops when the field is absent / file missing.
   3. Implementation-agnostic: the hook command may be Python or bash — invoked via `bash -c`
      to ride either implementation (Python one-liner pre-Tier-2.6, bash port post-Tier-2.6).
+  4. post-tool-use.json no longer reads active.json INLINE — AMO batch 0d extracted its
+     audit emitter to scripts/hooks/audit_post_tool_use.py, which resolves the project via
+     scripts.state.session_binding (session marker → canonical `active_project`). The
+     delegation keeps the ADR-032 field contract; test_post_tool_use_delegates_* locks it.
 """
 
 from __future__ import annotations
@@ -21,8 +25,10 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 HOOKS_DIR = REPO_ROOT / "hooks"
 
-# Hooks that read the active.json marker (the contract surface).
-ACTIVE_READERS = ("post-tool-use.json", "user-prompt-submit.json")
+# Hooks that read the active.json marker INLINE (the direct-reader contract surface).
+# post-tool-use.json is NO LONGER here: batch 0d delegates its resolution to the
+# audit script + session_binding (see test_post_tool_use_delegates_* below).
+ACTIVE_READERS = ("user-prompt-submit.json",)
 
 
 def _active_project_command(hook_filename: str) -> str:
@@ -90,3 +96,34 @@ def test_no_workspace_silent_skip() -> None:
     )
     assert proc.returncode == 0
     assert "no active project bound" in proc.stdout
+
+
+def test_post_tool_use_delegates_active_project_to_session_binding() -> None:
+    """post-tool-use.json no longer reads active.json inline; it invokes the batch-0d
+    audit script, which resolves the project via session_binding — the canonical
+    `active_project` field, never legacy `project_id`. ADR-032 contract preserved."""
+    spec = json.loads((HOOKS_DIR / "post-tool-use.json").read_text(encoding="utf-8"))
+    commands = [
+        h["command"]
+        for handlers in spec["hooks"].values()
+        for handler in handlers
+        for h in handler["hooks"]
+        if h.get("type") == "command"
+    ]
+    assert any("audit_post_tool_use.py" in c for c in commands), (
+        "post-tool-use.json must wire the batch-0d audit script"
+    )
+    # No command reads active.json inline anymore (resolution is delegated).
+    assert not any("active.json" in c for c in commands), (
+        "post-tool-use.json should delegate active.json resolution to the script, "
+        "not read it inline"
+    )
+
+    script = (REPO_ROOT / "scripts" / "hooks" / "audit_post_tool_use.py").read_text(encoding="utf-8")
+    assert "resolve_session_project" in script, "audit script must delegate to session_binding"
+
+    session_binding = (REPO_ROOT / "scripts" / "state" / "session_binding.py").read_text(encoding="utf-8")
+    assert '"active_project"' in session_binding, "session_binding must read canonical active_project"
+    assert '"project_id"' not in session_binding, (
+        "session_binding must not read the legacy project_id field from active.json (ADR-032)"
+    )

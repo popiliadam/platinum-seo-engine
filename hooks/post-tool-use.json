@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -c 'import json,os,sys,pathlib; ws=os.environ.get(\"PSEO_WORKSPACE_ROOT\"); marker=pathlib.Path(ws)/\"shared\"/\"active.json\" if ws else None; active=json.loads(marker.read_text(encoding=\"utf-8\")) if (marker and marker.exists()) else None; pid=(active or {}).get(\"active_project\"); raw=sys.stdin.read() or \"{}\"; data=json.loads(raw); tn=data.get(\"tool_name\") or \"unknown\"; ti=data.get(\"tool_input\") or {}; cmd=ti.get(\"command\",\"\") or \"\"; head=(cmd.split()[0] if cmd.strip() else \"<empty>\"); tgt=(head+\" [REDACTED args]\") if tn==\"Bash\" else (ti.get(\"file_path\") or ti.get(\"path\") or \"<no-target>\"); fp=ti.get(\"file_path\") or ti.get(\"path\") or \"\"; (sys.exit(0)) if not (ws and pid) else None; sys.path.insert(0, os.environ[\"CLAUDE_PLUGIN_ROOT\"]); from scripts.state.events_writer import append_audit, normalize_audit_action; audit_action=(\"modified\" if tn==\"Edit\" else ((\"modified\" if (fp and pathlib.Path(fp).exists()) else \"created\") if tn==\"Write\" else normalize_audit_action(tn, command=cmd))); append_audit(project_id=pid, audit_action=audit_action, audit_target=(tn+\":\"+str(tgt))[:480], actor=\"claude-code:hook:PostToolUse\", workspace_root=pathlib.Path(ws)); sys.exit(0)' || { echo 'WARNING: PSEO PostToolUse audit hook failed (non-blocking; audit event not recorded)' >&2; true; }",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/audit_post_tool_use.py\"",
             "timeout": 15,
             "statusMessage": "Audit event append..."
           },
