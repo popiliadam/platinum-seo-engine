@@ -238,13 +238,13 @@ runs first; only if YES does the 3-step filter execute.
 
 ## Schema Authority Compliance
 
-- **F-9:** events.jsonl `event_kind=work` (events.schema.json enum
+- **event_kind:** events.jsonl `event_kind=work` (events.schema.json enum
   4-value: provenance | work | audit | workflow; ADR-020 production
   output → work).
-- **F-14:** events.jsonl 5 required field zorunlu (schema_version
+- **events.schema:** events.jsonl 5 required field zorunlu (schema_version
   const "1.0", event_kind, event_id UUIDv4, timestamp UTC ISO 8601,
   project_id pattern `^[a-z][a-z0-9-]*$`); event_type 12-enum içinden
-  `content_revise` (FAQ enhance/add içerik revize semantiği — F-14
+  `content_revise` (FAQ enhance/add içerik revize semantiği — events.schema
   kanonik enum compliance).
 - **F-15:** master.xlsx[content_improve] 8 col + allowed_writers null
   → READ-ONLY consume; W-F3 + W-F4 candidate input source
@@ -451,15 +451,15 @@ strip), retry once; persistent fail → RED.
 - R-09 cap final check (10 standart / 15 cap 3000+ word /
   5 portfolio soft).
 
-**events.jsonl append (F-9 + F-14 enum compliance):**
+**events.jsonl append (events.schema enum compliance):**
 
-- `event_kind` = `work` (F-9 ADR-020 production output enum).
-- `event_type` = `content_revise` (F-14 12-enum: FAQ enhance/add
+- `event_kind` = `work` (ADR-020 production output enum).
+- `event_type` = `content_revise` (events.schema 12-enum: FAQ enhance/add
   içerik revize semantik kanonik mapping).
-- `schema_version` = `1.0` (F-14 const).
-- `event_id` = UUID v4 (F-14 required).
-- `timestamp` = UTC ISO 8601 (F-14 required).
-- `project_id` = `{input.project_slug}` (F-14 pattern
+- `schema_version` = `1.0` (events.schema const).
+- `event_id` = UUID v4 (events.schema required).
+- `timestamp` = UTC ISO 8601 (events.schema required).
+- `project_id` = `{input.project_slug}` (events.schema pattern
   `^[a-z][a-z0-9-]*$` slug regex).
 - `target` = `{input.url}`.
 - `mode` = `{input.mode}` (enhance | add).
@@ -512,7 +512,7 @@ Sadece şu artifact'lere yazılır (outputs § + produces §):
 
 - `outputs/blog/{slug}/article.html` (updated FAQ section + JSON-LD
   @graph FAQPage entity refresh).
-- `_state/events.jsonl` (append, F-9 + F-14 enum compliance).
+- `_state/events.jsonl` (append, events.schema enum compliance).
 
 ## WCAG 2.1 AA Accessibility (R-39)
 
@@ -542,4 +542,4 @@ Seçenek D Wave 1 baseline reuse).
 - `status: wip` (Phase 11 Wave 3+ stabilizasyon sonrası `active`
   promote).
 - Output schema_version: `1.0` (events.jsonl payload kontratı,
-  F-14 const).
+  events.schema const).

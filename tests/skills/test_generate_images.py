@@ -217,8 +217,8 @@ def test_events_jsonl_compliance():
         "events.schema event_type enum drifted: 'manual' missing"
     )
     # F-14 5-required-field surface still documented.
-    assert "schema_version" in text, "schema_version field missing (F-14)"
-    assert "project_id" in text, "project_id field missing (F-14)"
+    assert "schema_version" in text, "schema_version field missing (events.schema)"
+    assert "project_id" in text, "project_id field missing (events.schema)"
     fm = _parse_frontmatter(text)
     outputs_str = " ".join(fm.get("outputs", []))
     assert "events.jsonl" in outputs_str, (

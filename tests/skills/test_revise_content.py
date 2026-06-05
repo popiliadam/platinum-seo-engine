@@ -161,7 +161,7 @@ def test_change_summary_format():
 # --- Test 9: events.jsonl content_revise + schema-valid event_kind=work ---
 def test_events_event_type_content_revise():
     text = _read_skill_text()
-    assert "content_revise" in text, "content_revise event_type missing (F-8)"
+    assert "content_revise" in text, "content_revise event_type missing (events.schema)"
     assert "event_type" in text, "event_type field missing in routing"
     # B5-03: event_kind MUST be the schema-valid `work` — `production` is NOT
     # a member of the events.schema event_kind enum, and content_revise is a
