@@ -25,8 +25,8 @@ Promote to a general engine ONLY if a 4th workflow proves the abstraction earns 
 
 | Batch | Scope | Status | Prereq |
 |---|---|---|---|
-| **0a** | Cross-environment hook probe (empirically resolve session_id availability across VSCode/Mac-app/CLI) — **gates all binding code** | **PROMPT READY** → dispatch | — |
-| 0b | Binding substrate: `resolve_session_project` helper (strict/advisory) + `/pseo-bind` (session-id marker file) + 4 consumer wirings (dump_workspace, content-gate, audit hook, banners) + engine-root via CLAUDE_PLUGIN_ROOT | blocked on 0a | 0a |
+| **0a** | Cross-environment hook probe (empirically resolve session_id availability across VSCode/Mac-app/CLI) — **gates all binding code** | ✅ **BUILT + GREEN** (manager-verified: 1723 pass / 0 fail, +15 tests; additive-only hooks; no leak) — **awaiting operator cross-env data** | — |
+| 0b | Binding substrate: `resolve_session_project` helper (strict/advisory) + `/pseo-bind` (session-id marker file) + 4 consumer wirings (dump_workspace, content-gate, audit hook, banners) + engine-root via CLAUDE_PLUGIN_ROOT | blocked on **0a operator data** (need confirmed session_id field) | 0a |
 | 0c | Shared-resource safety: `portfolio.json` lock + backup-rotation glob fix + two-session-same-project guard | pending | 0b |
 | 0d | Blocking `master.xlsx` lock (bounded timeout → `paused`); precedes ANY parallel writer | pending | 0c |
 | 1a | Schema migrations: `_state/coverage/<run_id>.json` shape + `failure_reason.external` bool + confirm `paused` reuse | pending | 0 |
@@ -47,6 +47,7 @@ Promote to a general engine ONLY if a 4th workflow proves the abstraction earns 
 - **D5** Gates + correctness oracle built in Phase 2 ALONGSIDE the orchestrator, never deferred (G4 safety).
 - **D6** Verification = identity+content (provenance-stamped raw drops, hard-fail on mismatch), NOT exists+non-empty.
 - **D7** Probe-first: batch 0a is a diagnostic probe, dispatched before any binding code, to resolve O1 empirically.
+- **D8** Batch-0a guard-relaxation (Option A, authorized + manager-verified): wiring the probe into Stop and adding a manual companion script collided with 2 guard tests. Relaxed minimally — `test_stop_validation` count `== 1`→`>= 1` (still locks `stop_validation.py` as the FIRST Stop command); added a third `DIAGNOSTIC_HOOK_SCRIPTS` class so every hook script stays classified. Protective contracts preserved, not weakened.
 
 ## Provenance
 - Design hardened by 9-agent adversarial review: workflow run `wf_527271b3-931` (51 findings, conditional GO).

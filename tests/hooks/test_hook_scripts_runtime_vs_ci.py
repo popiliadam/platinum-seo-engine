@@ -28,6 +28,10 @@ RUNTIME_HOOK_SCRIPTS = {
     "stop_validation.py",
     "subagent_output_validate.py",
     "validate_content_write.py",
+    # AMO batch-0a TEMPORARY diagnostic probe — wired (as an appended command
+    # entry) into all five lifecycle events. Remove when the AMO session-binding
+    # mechanism is confirmed. See scripts/hooks/README.md §3.
+    "env_probe.py",
 }
 
 # NOT wired into hooks/*.json — CI/pre-commit/manual guard helpers.
@@ -36,6 +40,13 @@ GUARD_HOOK_SCRIPTS = {
     "check_excel_writer.py",
     "check_naming.py",
     "validate_before_write.py",
+}
+
+# Manual diagnostic / companion tools — NOT wired into hooks/*.json and NOT a
+# rules-cited enforcement guard. An operator runs them on demand. TEMPORARY
+# (AMO batch 0a); remove together with the probe. See scripts/hooks/README.md §3.
+DIAGNOSTIC_HOOK_SCRIPTS = {
+    "env_probe_report.py",
 }
 
 
@@ -81,6 +92,18 @@ def test_guard_hook_scripts_exist_unwired_and_rules_cited() -> None:
         )
 
 
+def test_diagnostic_hook_scripts_exist_and_are_unwired() -> None:
+    """Each diagnostic/companion tool exists and is NOT wired into a hooks/*.json
+    (it is run manually by an operator, not by the tool lifecycle)."""
+    hooks_blob = _hooks_json_blob()
+    for name in sorted(DIAGNOSTIC_HOOK_SCRIPTS):
+        assert (_HOOK_SCRIPTS_DIR / name).is_file(), f"diagnostic tool missing: {name}"
+        assert name not in hooks_blob, (
+            f"diagnostic tool {name} IS referenced by a hooks/*.json — it is meant "
+            f"to be manual-only; unwire it or reclassify"
+        )
+
+
 def test_every_hook_script_is_classified() -> None:
     """Every .py/.sh under scripts/hooks/ belongs to exactly one class, so no
     unclassified helper can hide (the P2-06 root cause)."""
@@ -88,18 +111,22 @@ def test_every_hook_script_is_classified() -> None:
         p.name for p in _HOOK_SCRIPTS_DIR.iterdir()
         if p.suffix in {".py", ".sh"}
     }
-    unclassified = on_disk - (RUNTIME_HOOK_SCRIPTS | GUARD_HOOK_SCRIPTS)
+    unclassified = on_disk - (
+        RUNTIME_HOOK_SCRIPTS | GUARD_HOOK_SCRIPTS | DIAGNOSTIC_HOOK_SCRIPTS
+    )
     assert not unclassified, (
-        f"scripts/hooks/ helpers not classified runtime-vs-guard: "
+        f"scripts/hooks/ helpers not classified runtime/guard/diagnostic: "
         f"{sorted(unclassified)} — add to the right set + scripts/hooks/README.md"
     )
 
 
 def test_readme_documents_both_classes() -> None:
-    """scripts/hooks/README.md must exist and name every helper in both
-    classes (P2-06 documentation requirement)."""
+    """scripts/hooks/README.md must exist and name every helper in all
+    classes — runtime, guard, AND diagnostic (P2-06 documentation requirement)."""
     readme = _HOOK_SCRIPTS_DIR / "README.md"
     assert readme.is_file(), "scripts/hooks/README.md (P2-06 wiring doc) is missing"
     text = readme.read_text(encoding="utf-8")
-    for name in sorted(RUNTIME_HOOK_SCRIPTS | GUARD_HOOK_SCRIPTS):
+    for name in sorted(
+        RUNTIME_HOOK_SCRIPTS | GUARD_HOOK_SCRIPTS | DIAGNOSTIC_HOOK_SCRIPTS
+    ):
         assert name in text, f"{name} not documented in scripts/hooks/README.md"
