@@ -27,9 +27,10 @@ Promote to a general engine ONLY if a 4th workflow proves the abstraction earns 
 |---|---|---|---|
 | **0a** | Cross-environment hook probe | ✅ **DONE + GREEN** (`e4c22c0`). **Operator data confirmed (VSCode):** `session_id` present+stable 5/5 events incl Stop; **hook `session_id` == command `$CLAUDE_CODE_SESSION_ID`** (proven via transcript namespace); `CLAUDE_PLUGIN_ROOT` reliable; `CLAUDE_ENV_FILE`/`PSEO_WORKSPACE_ROOT` unreliable. Mac-app/CLI re-check deferred to install-time. | — |
 | **0b** | Binding **PRIMITIVE**: `scripts/state/session_binding.py` (resolve_session_project strict/advisory + marker R/W + `~/.config/pseo/config.json` persistence + `session_ids_consistent`) + `/pseo-bind` + `session-marker.schema.json` + tests. Marker at `shared/sessions/<uuid>.json`. | ✅ **DONE + GREEN** (manager-verified 1749 pass / 0 fail; 23 tests; path-traversal+slug guards; atomic `os.replace`; +3 count-guard bumps) | 0a |
-| 0c | Wire 4 consumers to the primitive: `dump_workspace._resolve_slug`, `validate_content_write._resolve_profile`, post-tool-use audit hook, SessionStart/UserPromptSubmit banners + SessionStart `session_ids_consistent` self-check + tests | **READY to author** | 0b |
-| 0d | Shared-resource safety: `portfolio.json` lock + backup-rotation glob fix + two-session-same-project guard | pending | 0c |
-| 0e | Blocking `master.xlsx` lock (bounded timeout → `paused`); precedes ANY parallel writer | pending | 0d |
+| 0c | Wire the 2 **Python-script** consumers: `dump_workspace._resolve_slug` (strict, preserves legacy-'slug' + raises) + `validate_content_write._resolve_profile` (never-raise, session_id from stdin payload) + tests. No new command/schema. | **PROMPT READY** → dispatch | 0b |
+| 0d | Wire the **hook** consumers: post-tool-use audit attribution (H1 fix) + SessionStart/UserPromptSubmit banners + SessionStart `session_ids_consistent` self-check + tests (inline-hook-JSON edits) | pending | 0c |
+| 0e | Shared-resource safety: `portfolio.json` lock + backup-rotation glob fix + two-session-same-project guard | pending | 0d |
+| 0f | Blocking `master.xlsx` lock (bounded timeout → `paused`); precedes ANY parallel writer | pending | 0e |
 | 1a | Schema migrations: `_state/coverage/<run_id>.json` shape + `failure_reason.external` bool + confirm `paused` reuse | pending | 0 |
 | 1b | Ordered-sequence runner (`run_step.py`) + committer relocation + identity+content verify (idempotent `replace`) | pending | 1a |
 | 1c | Intent router (one-voice UserPromptSubmit; marker lifecycle session_id/turn_id/intent_id) | pending | 1a |
