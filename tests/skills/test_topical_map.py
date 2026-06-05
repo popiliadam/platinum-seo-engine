@@ -140,7 +140,7 @@ def test_frontmatter_validates(
 ) -> None:
     """SKILL.md frontmatter must:
       (a) parse as YAML,
-      (b) carry name=topical-map, status=wip, version="1.0",
+      (b) carry name=topical-map, status=active, version="1.0",
           category=planning,
       (c) declare project_slug + seed_keyword as required string inputs,
       (d) list keyword_ideas + related_keywords in required tools,

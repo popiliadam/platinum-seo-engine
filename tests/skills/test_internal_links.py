@@ -153,7 +153,7 @@ def test_frontmatter_validates(
 ) -> None:
     """SKILL.md frontmatter must:
       (a) parse as YAML,
-      (b) carry name=internal-links, status=wip, version="1.0",
+      (b) carry name=internal-links, status=active, version="1.0",
           category=planning,
       (c) declare project_slug as a required string input,
       (d) declare 0 required mcp_tools (SF CSV path), and DFS as optional,

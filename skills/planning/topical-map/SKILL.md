@@ -180,14 +180,20 @@ of a formal schema enum — promotion is a Phase 9+ governance decision.
 
 ## Invariants (cross-sheet)
 
-### F-09 — `cluster_keywords.assigned_url ⊆ topical_map.assigned_url`
+### F-09 (deferred join) — `cluster_keywords.assigned_url ⊆ topical_map.assigned_url`
 
-HIGH severity (`schemas/cross-sheet-invariants.json#F-09`). topical-map
-populates the **superset** side: every emitted row carries
-`assigned_url=""` until cluster-map (W-C1 sibling) or manual edits fill
-it. The cross-sheet check is run by the **drift-check** skill via
-`scripts/validation/validate_invariants.py` — NOT here. This skill
-validates only that its own row writes are F-09-compatible.
+This `cluster_keywords ⊆ topical_map` join is a **DEFERRED design rule**
+(`schemas/cross-sheet-invariants.json#/deferred_design_rules` → `F-09`,
+`computed_by=consistency_check`, `status=deferred`). It is **NOT** enforced
+today by `scripts/validation/validate_invariants.py` or the **drift-check**
+skill — that cross-sheet join awaits the `consistency_check` tool (Phase 9+).
+(Do not confuse it with the *active* `F-09` in
+`schemas/cross-sheet-invariants.json#/rules`, which validates a different
+thing: `master_task.task_id` uniqueness.) topical-map populates the
+**superset** side: every emitted row carries `assigned_url=""` until
+cluster-map (W-C1 sibling) or manual edits fill it; this skill guarantees
+only that its own row writes are F-09-compatible. Downstream cross-sheet
+enforcement is pending the consistency_check tool.
 
 ### D-01 — `topical_map.pillar ⊆ data/pillars.json`
 
@@ -474,8 +480,10 @@ Stop and flag the manager — do not patch, do not fall back.
   identity + 10-col tuple lock).
 - Phase 8 `cluster-map` (W-C1 sibling) consumes
   `master.xlsx#topical_map` as the F-09 superset before writing
-  `master.xlsx#cluster_keywords`; drift-check enforces the cross-sheet
-  invariant via `scripts/validation/validate_invariants.py`.
+  `master.xlsx#cluster_keywords`. The `cluster_keywords ⊆ topical_map`
+  join is a DEFERRED design rule (computed_by=consistency_check, Phase 9+)
+  — NOT yet enforced by drift-check /
+  `scripts/validation/validate_invariants.py`.
 
 ## Discipline checklist
 
