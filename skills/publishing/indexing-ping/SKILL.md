@@ -108,7 +108,8 @@ worker never invokes `transaction.append`, `transaction.update`, or
   redirect_deployed, backlink_outreach, manual` + 2 skill_<name>:
   `skill_content_remediation, skill_whats_next`). `indexing_submitted`
   is NOT in the enum;
-  emitting it would fail `Draft7Validator` and break the F-8 invariant.
+  emitting it would fail `Draft7Validator` and break the events.schema
+  event_type enum.
   The skill therefore writes `event_kind=work` + `event_type=manual`
   (free-form work record, `note` required and populated with the
   `host + url_count + submitted_count + failed_count` summary), and
@@ -288,13 +289,13 @@ Per-URL outcome dictionary build:
 
 `_state/events.jsonl` append. **Schema-first override** rationale (see
 Outputs section above): `event_type=indexing_submitted` would violate
-F-8 enum, so skill writes:
+the events.schema event_type enum, so skill writes:
 
 | Field            | Value                                          |
 |------------------|------------------------------------------------|
 | `schema_version` | `1.0`                                          |
 | `event_kind`     | `work` (events.schema enum, ADR-020)           |
-| `event_type`     | `manual` (F-8 closed-12 enum compliant)        |
+| `event_type`     | `manual` (closed-12 enum compliant)            |
 | `event_id`       | `manual_T-NNNN_<timestamp_compact>`            |
 | `task_id`        | `T-NNNN` (per-run minted, work events require) |
 | `timestamp`      | UTC ISO 8601                                   |
@@ -386,7 +387,7 @@ indexing_submitted` and listed `event_kind=work` / `event_type=
 indexing_submitted` under "Outputs". Worker authority applied:
 
 1. **Override 1 — `event_type` enum compliance.** `events.schema.json`
-   declares `event_type` as a closed 12-value enum (F-8); the brief's
+   declares `event_type` as a closed 12-value enum; the brief's
    `indexing_submitted` is NOT in it. Skill writes `event_type=manual`
    instead and shifts the indexing-specific fields into the schema's
    purpose-built `indexing_ping` sub-object (events.schema
@@ -415,7 +416,7 @@ fixes per Phase 11 lesson 28 matrix).
 - `schemas/skill-frontmatter.schema.json` (8 required fields, category
   enum 8 values, status enum 3 values).
 - `schemas/events.schema.json` (event_kind enum 4 values, event_type
-  closed 12-value enum F-8, indexing_ping sub-object
+  closed 12-value enum, indexing_ping sub-object
   `properties.indexing_ping`, ADR-020 workflow kind).
 - `schemas/master-excel.schema.json` (18 sheets — `redirect_404` and
   `robots_txt` columns; F-1 allowed_writers=null discipline).

@@ -111,7 +111,7 @@ It never calls `transaction.append`, `transaction.update`, or
 `transaction.delete` against the workbook. The only state mutation is
 the audit append to `_state/events.jsonl` (event_kind=`work` per
 ADR-020 + events.schema event_kind discriminator; event_type=`manual`
-per F-14 enum).
+per events.schema enum).
 
 ## 🔴 KRİTİK — Plugin Agnostik MCP Boundary (F-16, Süleyman Seçenek D)
 
@@ -307,7 +307,7 @@ eksik veya `HIGGSFIELD_API_KEY` env yok):
 - AMBER warning emit: image generation skip.
 - upload-instructions.md Section B "manual upload required, fallback
   hero used" mark.
-- events.jsonl `event_type=manual` (F-14 enum), `event_kind=work`
+- events.jsonl `event_type=manual` (events.schema enum), `event_kind=work`
   (ADR-020 event_kind discriminator).
 
 **DURUR #2.** Higgsfield budget aşımı (`estimated_credits` 5 cap) →
@@ -419,16 +419,16 @@ revise-content Section C intact when applicable):
    (R-65 + R-62 alignment)
 ```
 
-`_state/events.jsonl` append (audit, F-14 + ADR-020 compliance):
+`_state/events.jsonl` append (audit, events.schema + ADR-020 compliance):
 
 | Field            | Value                                                                          |
 |------------------|--------------------------------------------------------------------------------|
-| `schema_version` | `"1.0"` (events.schema F-14 const)                                              |
+| `schema_version` | `"1.0"` (events.schema const)                                              |
 | `event_kind`     | `"work"` (ADR-020 event_kind discriminator)                                     |
-| `event_type`     | `"manual"` (success AND DURUR #5 fallback) — F-14 12-enum                       |
+| `event_type`     | `"manual"` (success AND DURUR #5 fallback) — events.schema 12-enum                       |
 | `event_id`       | UUID v4                                                                         |
 | `timestamp`      | UTC ISO 8601                                                                    |
-| `project_id`     | `{input.project_slug}` (F-14 pattern `^[a-z][a-z0-9-]*$`)                       |
+| `project_id`     | `{input.project_slug}` (events.schema pattern `^[a-z][a-z0-9-]*$`)                       |
 | `note`           | `image_generated: kind={image_kind} model={image_model} plan_id={new_content_plan_id}` (note-encoded provenance) |
 | `actor`          | `agent:generate-images` (canonical code block)                                 |
 | `image_kind`     | `{input.image_kind}` (default `hero`)                                          |
@@ -553,7 +553,7 @@ schema authority + intent preservation = doğru fit.
 - `schemas/master-excel.schema.json` (`new_content_plan` 14 col Phase
   10 +3 col additive: `image_prompt`, `alt_text`, `content_type`).
 - `schemas/events.schema.json` (event_kind=`work` ADR-020 discriminator;
-  event_type 12-enum F-14: `manual` for success AND DURUR #5 fallback).
+  event_type 12-enum events.schema: `manual` for success AND DURUR #5 fallback).
 - `schemas/skill-frontmatter.schema.json` (8 required fields, category
   enum 8 values, status enum 3 values, `mcp_tools.required` advisory).
 - `.mcp.json` (4 servers: `gsc`, `dataforseo`, `ScraplingServer`, `sf`;

@@ -422,7 +422,7 @@ Principle 1).
 
 | Field            | Value                                          |
 |------------------|------------------------------------------------|
-| `event_type`     | `content_new`  (events.schema F-8 enum)        |
+| `event_type`     | `content_new`  (events.schema event_type enum) |
 | `event_kind`     | `work`         (events.schema enum, ADR-020)   |
 | `schema_version` | `1.0`                                          |
 | `actor`          | `skill:new-blog`                               |

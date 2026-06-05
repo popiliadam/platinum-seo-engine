@@ -324,7 +324,7 @@ def test_r58_robots_map_read_only_contract() -> None:
 
 def test_events_event_type_schema_first_override() -> None:
     """Schema-first override (lesson 7+23): events.schema.json event_type
-    is a closed 10-value enum (F-8). Brief sketched
+    is a closed 12-value enum (events.schema.json). Brief sketched
     'indexing_submitted' which is NOT in the enum. Skill writes
     event_type=manual + populates indexing_ping sub-object instead."""
     text = _skill_text()
@@ -342,7 +342,7 @@ def test_events_event_type_schema_first_override() -> None:
         (SCHEMAS / "events.schema.json").read_text("utf-8")
     )
     enum = schema["properties"]["event_type"]["enum"]
-    assert "manual" in enum, "F-8 enum drifted: 'manual' missing"
+    assert "manual" in enum, "events.schema event_type enum drifted: 'manual' missing"
     # Brief's 'indexing_submitted' must NOT be in the enum (proves override
     # was necessary).
     assert "indexing_submitted" not in enum, (
