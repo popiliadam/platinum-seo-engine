@@ -33,6 +33,14 @@ RUNTIME_HOOK_SCRIPTS = {
     # Edit/Write/Bash audit event to THIS session's bound project (session marker
     # → shared/active.json fallback). See scripts/hooks/README.md §1.
     "audit_post_tool_use.py",
+    # AMO batch-1c intent router — wired into hooks/user-prompt-submit.json
+    # (replaces the legacy inline static-bash advisory command, so there is ONE
+    # voice per prompt). Classifies the prompt: a Tier-1 canonical match injects a
+    # one-line `/pseo-run <workflow> <slug>` instruction + writes the
+    # intent_declared marker; Tier-2 falls back to the whats-next advisory and
+    # supersedes any stale intent. Re-emits the `PSEO context:` line.
+    # See scripts/hooks/README.md §1.
+    "intent_router.py",
     # AMO batch-0a TEMPORARY diagnostic probe — wired (as an appended command
     # entry) into all five lifecycle events. Remove when the AMO session-binding
     # mechanism is confirmed. See scripts/hooks/README.md §3.

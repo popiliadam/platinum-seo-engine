@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "http://platinum-seo-engine/schemas/intent-marker",
+  "title": "Intent Marker v1.0",
+  "description": "Shape of {workspace_root}/shared/sessions/{session_id}.intent.json — the AMO L1 intent marker written by the UserPromptSubmit intent router (scripts/hooks/intent_router.py) on EVERY prompt. On a Tier-1 canonical match (the prompt names a known workflow) the router injects a one-line '/pseo-run <workflow> <slug>' instruction into the model context AND writes this marker with status='declared' (a workflow is now owed this turn). On a Tier-2 prompt (no match, or >=2 workflows collide) the router rewrites the marker with status='superseded', so a stale cross-turn intent never lingers. There is exactly ONE marker per session, REWRITTEN every prompt — so it always reflects the CURRENT turn: the router ASSIGNS turn_id/intent_id itself because no per-turn id is proven in the hook payload across VSCode/Mac-app/CLI, only session_id (AMO batch 0a probe). Read by the Stop-hook denetçi (AMO batch 2c): if a turn declared an intent but ended WITHOUT the workflow running, the denetçi flags/forces it; the orchestrator/denetçi flips status to 'consumed' when the run actually starts (a LATER batch sets that; declared here for the contract). Lives workspace-GLOBAL under shared/sessions/ beside the session-binding marker (session-marker.schema.json), keyed by the SAME session UUID.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["session_id", "turn_id", "intent_id", "status", "declared_at"],
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "description": "Marker schema version (ADR-018 const discipline). Optional — the marker is rewritten on every prompt, so it is not in required[]; declared here so a future bump can discriminate older markers."
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Claude session UUID — identical to the binding marker's session_id and the hook stdin session_id (AMO batch 0a). Pins this intent to ONE of the user's parallel sessions."
+    },
+    "turn_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Router-ASSIGNED per-prompt ordering/audit stamp (e.g. '<iso>-<rand>'). NOT a hook-payload field — no per-turn id is proven across editors, so the router generates it. 'Current-turn only' is delivered structurally: one marker, rewritten every prompt."
+    },
+    "intent_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Router-ASSIGNED unique id (uuid4 hex) for this declared intent — lets the denetçi/orchestrator correlate this declaration with the eventual workflow run."
+    },
+    "status": {
+      "enum": ["declared", "superseded", "consumed"],
+      "description": "declared — set by the router on a Tier-1 canonical match (a workflow is owed this turn). superseded — set by the router on a later Tier-2 prompt that changes/abandons intent, so the denetçi never blocks on a stale cross-turn intent. consumed — set by the orchestrator/denetçi (a LATER batch) when the workflow run actually starts."
+    },
+    "workflow": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Matched canonical workflow key (e.g. 'monthly'). REQUIRED when status='declared' (see allOf). Same key grammar as project/workflow slugs."
+    },
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Project slug this session is bound to (resolve_session_project). MAY be absent when the session is unbound — the router still declares the intent but tells the user to /pseo-bind first; it NEVER fabricates a slug."
+    },
+    "command": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The exact instruction the router injected, e.g. '/pseo-run monthly demo-furniture' (or '/pseo-run monthly <slug>' when unbound). REQUIRED when status='declared'."
+    },
+    "declared_at": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Local ISO 8601 timestamp the marker was written (datetime.now().isoformat())."
+    },
+    "prompt_excerpt": {
+      "type": "string",
+      "maxLength": 160,
+      "description": "OPTIONAL redaction-safe excerpt (<=160 chars, whitespace-collapsed) of the prompt that DECLARED the intent — audit only; the router NEVER stores the full prompt and never adds an excerpt to a superseded marker."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": ["status"],
+        "properties": { "status": { "const": "declared" } }
+      },
+      "then": { "required": ["workflow", "command"] }
+    }
+  ]
+}
