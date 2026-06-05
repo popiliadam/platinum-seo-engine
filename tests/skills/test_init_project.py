@@ -43,6 +43,7 @@ import yaml
 from jsonschema import Draft7Validator
 
 from scripts.state import events_writer, workflow_runner
+from scripts.state.portfolio_writer import register_project
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCHEMAS = REPO_ROOT / "schemas"
@@ -59,6 +60,11 @@ WORKSPACE_STAGING = Path(
     )
 )
 PILOT_SLUG = "dentnotion"
+
+# Deterministic timestamp for portfolio registration in tests. register_project
+# takes created_at as a parameter (pure/testable), so tests pin it rather than
+# relying on wall-clock — matching the value the old step-6 mirror hardcoded.
+_FIXED_CREATED_AT = "2026-04-30T00:00:00.000000Z"
 
 
 # ---------------------------------------------------------------------------
@@ -123,30 +129,6 @@ def _copy_master_xlsx(slug: str, ws: Path) -> tuple[Path, str, bool]:
         f"templates/master-excel.xlsx missing — bootstrap impossible"
     shutil.copyfile(TEMPLATE_XLSX, target)
     return target, _sha256(target), True
-
-
-def _register_portfolio(slug: str, ws: Path, *, domain: str, market: str) -> Path:
-    """Mirror skill step 6: append-only portfolio entry. Returns the
-    portfolio.json path."""
-    shared = ws / "shared"
-    shared.mkdir(parents=True, exist_ok=True)
-    p = shared / "portfolio.json"
-    if p.exists():
-        portfolio = json.loads(p.read_text("utf-8"))
-    else:
-        portfolio = {"schema_version": "1.0", "projects": []}
-    if slug not in {entry["slug"] for entry in portfolio["projects"]}:
-        portfolio["projects"].append({
-            "slug": slug,
-            "domain": domain,
-            "market": market,
-            "created_at": "2026-04-30T00:00:00.000000Z",
-        })
-    p.write_text(
-        json.dumps(portfolio, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    return p
 
 
 # ---------------------------------------------------------------------------
@@ -278,7 +260,7 @@ def test_idempotent_run(tmp_path: Path) -> None:
     # First run.
     cfg_path1 = _bootstrap(slug, ws)
     xlsx_path1, sha1, created1 = _copy_master_xlsx(slug, ws)
-    portfolio_path1 = _register_portfolio(slug, ws, domain="https://example.com/", market="TR")
+    portfolio_path1 = register_project(ws, slug, domain="https://example.com/", market="TR", created_at=_FIXED_CREATED_AT)
     assert created1 is True
     cfg1 = json.loads(cfg_path1.read_text("utf-8"))
     portfolio1 = json.loads(portfolio_path1.read_text("utf-8"))
@@ -291,7 +273,7 @@ def test_idempotent_run(tmp_path: Path) -> None:
     # Second run — same inputs, --force on config (mirrors skill step 4).
     cfg_path2 = _bootstrap(slug, ws, force=True)
     xlsx_path2, sha2, created2 = _copy_master_xlsx(slug, ws)
-    portfolio_path2 = _register_portfolio(slug, ws, domain="https://example.com/", market="TR")
+    portfolio_path2 = register_project(ws, slug, domain="https://example.com/", market="TR", created_at=_FIXED_CREATED_AT)
     assert created2 is False, "second run must NOT recreate master.xlsx"
     assert sha2 == sha1, (
         f"F1 violation: master.xlsx mutated on rerun "
@@ -430,19 +412,19 @@ def test_portfolio_json_valid(tmp_path: Path) -> None:
     minimal shape (schema_version + projects[]). Append-only contract:
     adding a second project does NOT remove the first."""
     ws = tmp_path
-    p1 = _register_portfolio("alpha", ws, domain="https://alpha.example/", market="TR")
+    p1 = register_project(ws, "alpha", domain="https://alpha.example/", market="TR", created_at=_FIXED_CREATED_AT)
     portfolio_after_alpha = json.loads(p1.read_text("utf-8"))
     assert portfolio_after_alpha["schema_version"] == "1.0"
     assert {entry["slug"] for entry in portfolio_after_alpha["projects"]} == {"alpha"}
 
-    p2 = _register_portfolio("beta", ws, domain="https://beta.example/", market="NG")
+    p2 = register_project(ws, "beta", domain="https://beta.example/", market="NG", created_at=_FIXED_CREATED_AT)
     portfolio_after_beta = json.loads(p2.read_text("utf-8"))
     slugs = {entry["slug"] for entry in portfolio_after_beta["projects"]}
     assert slugs == {"alpha", "beta"}, \
         "portfolio.json broke append-only contract"
 
     # Re-add alpha — must dedup.
-    _register_portfolio("alpha", ws, domain="https://alpha.example/", market="TR")
+    register_project(ws, "alpha", domain="https://alpha.example/", market="TR", created_at=_FIXED_CREATED_AT)
     portfolio_dedup = json.loads(p2.read_text("utf-8"))
     assert len(portfolio_dedup["projects"]) == 2, "duplicate slug entry created"
 

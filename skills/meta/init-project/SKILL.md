@@ -222,25 +222,21 @@ Append the project to `{workspace_root}/shared/portfolio.json` (creates
 the file + parent dir if missing). Append-only: existing entries are
 preserved; only the new slug entry is added.
 
+The append is delegated to `scripts/state/portfolio_writer.register_project`,
+which runs the read-modify-write under a single `fcntl.flock(LOCK_EX)` on the
+file so two parallel `init-project` runs cannot lose an update. The on-disk
+shape is unchanged — `{"schema_version": "1.0", "projects": [{slug, domain,
+market, created_at}, …]}`, `indent=2`, trailing newline, `ensure_ascii=False` —
+and re-registering an existing slug is an idempotent no-op (dedup on slug).
+
 ```python
-shared_dir = workspace_root / "shared"
-shared_dir.mkdir(parents=True, exist_ok=True)
-portfolio_path = shared_dir / "portfolio.json"
-if portfolio_path.exists():
-    portfolio = json.loads(portfolio_path.read_text("utf-8"))
-else:
-    portfolio = {"schema_version": "1.0", "projects": []}
-existing = {p["slug"] for p in portfolio["projects"]}
-if project_slug not in existing:
-    portfolio["projects"].append({
-        "slug": project_slug,
-        "domain": domain,
-        "market": market,
-        "created_at": utc_iso_z(),
-    })
-portfolio_path.write_text(
-    json.dumps(portfolio, ensure_ascii=False, indent=2) + "\n",
-    encoding="utf-8",
+from scripts.state.portfolio_writer import register_project
+register_project(
+    workspace_root,
+    project_slug,
+    domain,
+    market,
+    created_at=utc_iso_z(),
 )
 ```
 
@@ -384,6 +380,7 @@ Stop and flag the manager — do not patch, do not fall back.
 - Cross-modules: `scripts/state/bootstrap_project.py` (CLI),
   `scripts/state/workflow_runner.py` (state machine),
   `scripts/state/events_writer.py` (provenance),
+  `scripts/state/portfolio_writer.py` (portfolio registry, flock-guarded),
   `scripts/excel/bootstrap_excel.py` (template generator).
 - Template: `templates/master-excel.xlsx`.
 - Tests: `tests/skills/test_init_project.py` (5 cases; idempotency,
