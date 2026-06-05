@@ -7,9 +7,9 @@ projects/demo-dental/sf-exports/2026-04-27/raw/ in workspace-staging
 (26 CSV files, Tier 1 14/14 + Tier 2 9/10 — search_console_all is the
 canonical AMBER exemption).
 
-Cross-module IMPORT-only discipline:
-  - scripts.excel.transaction       (atomic per-sheet write + backup FIFO 7)
-  - scripts.state.workflow_runner   (5-step run shell)
+Cross-module IMPORT-only discipline (sf_import.py is a plain CLI — no
+workflow_runner run shell):
+  - scripts.excel.transaction       (idempotent replace + backup FIFO 7)
   - scripts.state.events_writer     (sf_csv provenance event)
 
 Schemas referenced:
@@ -44,7 +44,7 @@ import yaml
 from jsonschema import Draft7Validator
 
 from scripts.excel import transaction
-from scripts.state import events_writer, workflow_runner
+from scripts.state import events_writer
 
 
 # ---------------------------------------------------------------------------
@@ -258,9 +258,11 @@ def test_tier2_search_console_all_amber(
 
 def test_sheet_populate_crawl_sitemap(tmp_path: Path) -> None:
     """Project a minimal real-pilot crawl_sitemap row and write it via
-    transaction.append. The test runs against a fresh workbook in tmp_path
-    so it never touches workspace-staging — the live execution proof
-    appears in the worker package, not the test suite."""
+    transaction.replace — the SAME write path sf_import.project_and_write uses
+    (replace, NOT append: re-importing a batch refreshes rather than
+    duplicates). The test runs against a fresh workbook in tmp_path so it
+    never touches workspace-staging — the live execution proof appears in the
+    worker package, not the test suite."""
     workbook = tmp_path / "projects" / PILOT_SLUG / "master.xlsx"
     workbook.parent.mkdir(parents=True, exist_ok=True)
 
@@ -280,7 +282,7 @@ def test_sheet_populate_crawl_sitemap(tmp_path: Path) -> None:
             "action": "n/a",
         },
     ]
-    result = transaction.append(
+    result = transaction.replace(
         workbook_path=workbook,
         sheet="crawl_sitemap",
         rows=rows,
@@ -288,16 +290,29 @@ def test_sheet_populate_crawl_sitemap(tmp_path: Path) -> None:
         writer="sf-import",
     )
     assert result.rows_affected == 2
-    # Validate physical write: re-open and count data rows.
+
+    # Physical write proof: the sheet exists and grew to hold the rows.
     from openpyxl import load_workbook
-    wb = load_workbook(str(workbook))
-    assert "crawl_sitemap" in wb.sheetnames
-    ws = wb["crawl_sitemap"]
-    # Header row 1 + 2 data rows = max_row 3. Spec stores header_row=3 in the
-    # logical schema but the writer always lays out as row 1 = header,
-    # rows 2..N = data (decoupled from Excel display row choice).
-    data_rows = ws.max_row - 1
-    assert data_rows >= 1, f"crawl_sitemap must carry ≥ 1 row; got {data_rows}"
+    ws1 = load_workbook(str(workbook))["crawl_sitemap"]
+    max_row_after_first = ws1.max_row  # header block (data_start_row-1) + 2 rows
+
+    # Idempotency — the reason sf-import uses replace, NOT append: re-importing
+    # the same batch must REFRESH in place, not duplicate. The sheet must not
+    # grow; `append` would push max_row from N to N+2. (Robust to the sheet's
+    # header_row layout — we compare growth, not an absolute data-row count.)
+    again = transaction.replace(
+        workbook_path=workbook,
+        sheet="crawl_sitemap",
+        rows=rows,
+        project_slug=PILOT_SLUG,
+        writer="sf-import",
+    )
+    assert again.rows_affected == 2, "replace must refresh, not accumulate"
+    ws2 = load_workbook(str(workbook))["crawl_sitemap"]
+    assert ws2.max_row == max_row_after_first, (
+        f"replace must refresh in place; sheet grew "
+        f"{max_row_after_first}→{ws2.max_row} (rows duplicated)"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -305,10 +320,14 @@ def test_sheet_populate_crawl_sitemap(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 def test_sitemap_xcheck_mcp() -> None:
-    """The skill cross-checks SF-discovered URLs against GSC sitemaps.
-    We mock mcp__gsc__list_sitemaps as a callable returning a typical
-    payload shape; the xcheck function counts overlap and produces a
-    diagnostic summary that downstream feeds crawl_sitemap rows.
+    """Sitemap cross-check — Phase-X DEFERRED capability (B3-02).
+
+    The sitemap cross-check is NOT implemented in sf_import.py (no
+    mcp__gsc__list_sitemaps call, no sf_sitemap_xcheck module); the GSC tools
+    are `optional` in the frontmatter. This test exercises only inline mocks —
+    it documents the INTENDED diagnostic shape for when the capability lands at
+    the manager/caller layer, not a shipped contract. It is kept (green) as the
+    design witness; the parity test above locks the demotion.
     """
 
     def mock_list_sitemaps(siteUrl: str) -> dict:
@@ -360,8 +379,9 @@ def test_sitemap_xcheck_mcp() -> None:
     assert metrics["sf_crawled_urls"] == 2
     assert "in_both_marker" in metrics
 
-    # DURUR #4: when mcp__gsc__list_sitemaps raises, the skill must NOT
-    # silently downgrade — it raises. Verify the contract by simulating it.
+    # DURUR #4 (deferred): when the cross-check lands, a mcp__gsc__list_sitemaps
+    # failure must NOT silently downgrade — it raises. Documented here as the
+    # intended contract for the future Wave (not exercised by the shipped CLI).
     def failing_list_sitemaps(siteUrl: str) -> dict:
         raise RuntimeError("auth/network/scope")
 
@@ -374,8 +394,10 @@ def test_sitemap_xcheck_mcp() -> None:
 # ---------------------------------------------------------------------------
 
 def test_atomic_write_backup_created(tmp_path: Path) -> None:
-    """Every transaction.append produces a backup under
-    _state/backups/master/. After 8 writes only 7 survive (FIFO rotation).
+    """Every transaction.replace (the sf-import write path) produces a backup
+    under _state/backups/master/. After 8 writes only 7 survive (FIFO
+    rotation) — replace shares append's atomic envelope (backup → atomic_save
+    → rotate).
     """
     workbook = tmp_path / "projects" / PILOT_SLUG / "master.xlsx"
     workbook.parent.mkdir(parents=True, exist_ok=True)
@@ -393,7 +415,7 @@ def test_atomic_write_backup_created(tmp_path: Path) -> None:
             "status": "EXISTS",
             "action": "n/a",
         }]
-        result = transaction.append(
+        result = transaction.replace(
             workbook_path=workbook,
             sheet="crawl_sitemap",
             rows=rows,
@@ -583,8 +605,10 @@ def test_frontmatter_validates_against_schema(
     skill_frontmatter_schema: dict,
 ) -> None:
     """SKILL.md frontmatter must validate against
-    schemas/skill-frontmatter.schema.json (Draft 7). Plus the F5 invariant:
-    no `outputs.*` int values may leak in the body protocol example.
+    schemas/skill-frontmatter.schema.json (Draft 7). Plus the B3-03 lock: the
+    body describes the REAL deterministic CLI — it must NOT re-introduce the
+    fictional `workflow_runner` run-shell contract (sf_import.py calls neither
+    create_run nor complete; DURUR signalling is exit-code based).
     """
     text = SKILL_MD.read_text("utf-8")
     parts = text.split("---", 2)
@@ -598,16 +622,57 @@ def test_frontmatter_validates_against_schema(
         f"{[('/'.join(str(p) for p in e.absolute_path) or '<root>', e.message) for e in errs]}"
     )
 
-    # F5: in the body, every outputs.* example value must be a string.
+    # B3-03: the shipped impl is a plain CLI (print + exit codes). The body
+    # must not CALL a workflow_runner run shell. We match the call form (with
+    # an open paren) so the prose disclaimer ("no `workflow_runner.create_run`")
+    # is allowed while an actual `workflow_runner.create_run(...)` call is not.
     body = parts[2]
-    # Locate the workflow_runner.complete(...) outputs example block.
-    m = re.search(r"workflow_runner\.complete\([^)]*outputs=\{(.+?)\}\s*\)",
-                  body, re.DOTALL)
-    assert m, "expected an outputs={...} example in the body protocol"
-    outputs_block = m.group(1)
-    # Every value after a colon must be quoted (string literal), not bare int.
-    bad = re.findall(r":\s*(\d+)\s*[,}]", outputs_block)
-    assert not bad, (
-        f"F5 violation: outputs.* example carries int literals {bad!r}; "
-        "must be string-typed"
+    assert "workflow_runner.create_run(" not in body, (
+        "sf-import body must not call workflow_runner.create_run( — it is a "
+        "deterministic CLI (see scripts/ingestion/sf_import.py)"
+    )
+    assert "workflow_runner.complete(" not in body, (
+        "sf-import body must not call workflow_runner.complete( — main() prints "
+        "a stdout summary and returns 0 (no string-typed outputs dict)"
+    )
+
+
+def test_required_mcp_tools_match_what_impl_invokes() -> None:
+    """B3-02: a tool declared `mcp_tools.required` must actually be invoked by
+    the shipped implementation. sf-import's deterministic core (sf_import.py)
+    reads SF CSVs from disk and writes Excel — it invokes NO MCP tool. The GSC
+    sitemap tools (the sole consumers) power the Phase-X-deferred sitemap
+    cross-check, so `required` must be empty and they live under `optional`.
+    Declaring a tool `required` that the code never calls over-promises a
+    dependency — exactly the contract bug this test locks out.
+    """
+    text = SKILL_MD.read_text(encoding="utf-8")
+    fm = yaml.safe_load(text.split("---", 2)[1])
+    mcp = fm.get("mcp_tools") or {}
+    required = mcp.get("required") or []
+    optional = mcp.get("optional") or []
+
+    impl_src = (
+        REPO_ROOT / "scripts" / "ingestion" / "sf_import.py"
+    ).read_text(encoding="utf-8")
+
+    # Forward-regression guard: if `required` is ever repopulated, each tool
+    # must at least appear in the shipped source (a coarse substring check — the
+    # two hard assertions below are the precise behavioral locks for this
+    # finding). Today `required == []`, so this loop is a no-op by design.
+    for tool in required:
+        assert tool in impl_src, (
+            f"{tool!r} is declared mcp_tools.required but never invoked in "
+            "sf_import.py — demote it to optional or wire it (B3-02)"
+        )
+
+    # Regression lock for the specific finding: the deferred cross-check's tool
+    # must be optional (demoted), not required, and not silently dropped.
+    assert "mcp__gsc__list_sitemaps" not in required, (
+        "mcp__gsc__list_sitemaps powers the Phase-X-deferred sitemap "
+        "cross-check; it must be optional, not required"
+    )
+    assert "mcp__gsc__list_sitemaps" in optional, (
+        "the demoted GSC sitemap tool must be declared optional (deferred "
+        "enrichment), not removed entirely"
     )
