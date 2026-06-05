@@ -30,8 +30,9 @@ Promote to a general engine ONLY if a 4th workflow proves the abstraction earns 
 | 0c | Wire the 2 **Python-script** consumers: `dump_workspace._resolve_slug` (strict, preserves legacy-'slug' + raises) + `validate_content_write._resolve_profile` (never-raise, session_id from stdin payload) + tests. No new command/schema. | ✅ **DONE + GREEN** (manager-verified 1762 pass / 0 fail; +13 tests; both contracts preserved; file-relative sys.path bootstrap for bare-CLI; no count-guard trip) | 0b |
 | 0d | **Audit H1 fix** (review's highest-value Phase-0 change): extract the PostToolUse inline-python audit into a testable `scripts/hooks/audit_post_tool_use.py` that attributes events to the **session-bound** project (marker → active.json fallback) + classify RUNTIME + tests. Stops silent cross-project `events.jsonl` corruption under multi-window. | ✅ **DONE + GREEN** (manager-verified 1775 pass / 0 fail; +13 tests; session-bound attribution; ADR-032 delegation contract *strengthened*; env_probe intact; redaction parity; 2 approved out-of-scope test migrations) | 0c |
 | 0d.1 | **Polish (deferred, low-priority):** SessionStart/UserPromptSubmit banners show the session-bound project + SessionStart `session_ids_consistent` self-check. Cosmetic/advisory, not correctness. | deferred | 0d |
-| 0e | Shared-resource safety: `portfolio.json` lock + backup-rotation glob fix + two-session-same-project guard | pending | 0d |
-| 0f | Blocking `master.xlsx` lock (bounded timeout → `paused`); precedes ANY parallel writer | pending | 0e |
+| 0e | `portfolio.json` concurrency safety (lock its read-modify-write; investigate write mechanism first, DURUR if model-executed-only) | **PROMPT READY** (parallel w/ 0f) | 0d |
+| 0f | `transaction.py`: backup-rotation glob fix + **blocking master.xlsx lock** (`acquire_blocking` opt-in, bounded → `LockTimeout`; default fail-fast unchanged) | **PROMPT READY** (parallel w/ 0e) | 0d |
+| ~~two-session-same-project guard~~ | Deferred edge-case (per-project locks already prevent corruption; one-window-per-project discipline covers it) — fresh manager may pick up post-Phase-0 | deferred | — |
 | 1a | Schema migrations: `_state/coverage/<run_id>.json` shape + `failure_reason.external` bool + confirm `paused` reuse | pending | 0 |
 | 1b | Ordered-sequence runner (`run_step.py`) + committer relocation + identity+content verify (idempotent `replace`) | pending | 1a |
 | 1c | Intent router (one-voice UserPromptSubmit; marker lifecycle session_id/turn_id/intent_id) | pending | 1a |
@@ -57,3 +58,56 @@ Promote to a general engine ONLY if a 4th workflow proves the abstraction earns 
 ## Provenance
 - Design hardened by 9-agent adversarial review: workflow run `wf_527271b3-931` (51 findings, conditional GO).
 - Spec committed: `f00dfb4`.
+
+---
+
+## MANAGER PROTOCOL & CONTINUATION — read this if you are a FRESH manager session
+
+You are taking over the AMO build mid-flight (the prior manager hit its context limit). Everything you
+need is durable. **Onboard by reading, in order:** (1) the spec
+`docs/superpowers/specs/2026-06-05-agentic-orchestration-multiproject-design.md`; (2) this whole file
+(batch table + decisions D1-D10 + build model); (3) memory `project_amo_initiative.md`; (4) the existing
+worker prompts `docs/superpowers/plans/amo/batch-0a..0d-WORKER-PROMPT.md` — they are your TEMPLATES.
+
+**The per-batch loop you run:**
+1. **Author** a self-contained worker prompt (copy a batch-0a..0d prompt's shape: HARD RULES — no Task/Agent,
+   baseline-first `PSEO_WORKSPACE_ROOT=/Users/apple/Documents/platinum-seo-workspace python3 -m pytest -q`,
+   TDD, scope-lock, no-commit; WHY; CONFIRMED facts; ORIENT; SCOPE; SPEC; TDD; METHOD; DURUR; REPORT).
+   Save it as `docs/superpowers/plans/amo/batch-XX-WORKER-PROMPT.md` AND paste the fenced block to Süleyman.
+2. Süleyman pastes it to a fresh **Opus-4.8 1M** worker and relays the REPORT.
+3. **VERIFY (never trust blindly):** run the full suite yourself (record `passed >= baseline` + `0 failed`);
+   `git status --short` (scope = ONLY the batch's files); `git diff` the risky bits (security, public
+   contracts/ADRs, any out-of-scope migration). Read new security-sensitive code.
+4. If the worker added a `commands/*.md` or `schemas/*.json` → **apply the count-guard bumps** (D10):
+   `.claude-plugin/plugin.json` + `.claude-plugin/marketplace.json` counts + `tests/schemas/test_json_schema_draft_consistency.py` assert.
+5. **Green + clean → commit + push** (`git add <files>` → conventional `feat(...)/docs:` message ending
+   `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>` → `git push origin main`).
+6. Update this file (batch → ✅ DONE) + memory. Author the next batch.
+
+**Standing authorizations (Süleyman, 2026-06-05) — do NOT re-ask these:**
+- Manager **verifies → commits → pushes** every green+verified batch without per-batch approval (Süleyman
+  delegates all non-critical decisions; "EN KRİTİK: ben karar veririm, sadece kritik onay alırım").
+- A worker MAY migrate out-of-scope test/guard files when a scoped change unavoidably breaks them
+  ("Option 1 / best scenario") — verify the migration *preserves/strengthens* the contract, never weakens it.
+- Count-guard manifest bumps are the manager's job (workers surface, manager applies).
+
+**Accelerator strategy (Süleyman approved 2026-06-05):**
+- **Bigger batches:** with 1M-context workers, merge cohesive single-concern work; split only on a hard
+  dependency (a schema must freeze before its consumer) or genuinely distinct concerns. (Prior batches were
+  deliberately small for ≤5%; you may size up.)
+- **Parallel worker windows 🔥:** dispatch FILE-DISJOINT batches in 2-3 windows at once; verify each report
+  independently. (This is the multi-window capability we're building, applied to our own build.)
+
+**Remaining batches:** 0e + 0f (Phase 0, file-disjoint → parallel; prompts authored). Then Phases 1-4 per
+spec §5/§7 (1a-1d orchestrator, 2a-2c gates+oracle, 3 replicate, 4 portfolio) + cross-cutting (e2e stub
+harness, self-upgrade versioning, ACTIVE_PROJECTS_MAX consolidation). Author each from spec §7 + a template.
+
+**Recurring gotchas (bit prior batches):**
+- **D10** count-consistency immune system (above).
+- A script run as a **bare CLI** may need a file-relative `sys.path` bootstrap (anchor `parents[N]`, NOT
+  `CLAUDE_PLUGIN_ROOT`, to avoid an installed-plugin copy shadowing the working tree) — see dump_workspace (0c).
+- A **new wired hook script** must be added to `RUNTIME_HOOK_SCRIPTS` + `scripts/hooks/README.md` or
+  `test_hook_scripts_runtime_vs_ci.py` fails (env_probe 0a, audit_post_tool_use 0d set the pattern).
+- Filesystem tests MUST monkeypatch `HOME` (the binding reads `~/.config/pseo/config.json`).
+- Binding key = the Claude session UUID, identical from hook stdin `session_id` and command env
+  `$CLAUDE_CODE_SESSION_ID` (D9, proven). Marker = `<workspace>/shared/sessions/<uuid>.json`.
