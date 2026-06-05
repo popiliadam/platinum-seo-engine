@@ -103,7 +103,7 @@ WRITER_REGISTRY: dict[str, frozenset[str]] = {
     "quick_wins":       frozenset({"quick-wins"}),
     "opportunity":      frozenset({"quick-wins"}),
     "new_content_plan": frozenset({"new-content-plan"}),
-    "content_improve":  frozenset({"content-remediation"}),
+    "content_improve":  frozenset({"content-decay"}),
     "content_decay":    frozenset({"content-decay"}),
     # Ingestion / audit sheets.
     "gsc_performance":  frozenset({"gsc-pull"}),

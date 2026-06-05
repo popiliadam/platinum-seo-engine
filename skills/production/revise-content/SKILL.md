@@ -231,8 +231,8 @@ extraction lives in Step 4; the 3-step filter runs between Step 5
   5-value W-F1 worker tarafından uygulanıyor; bu skill profile
   field'ı **var olduğu varsayımıyla** consume eder (Principle 2
   switch).
-- **F-8:** events.jsonl `event_type=content_revise` (10-enum içinden
-  4'üncü değer).
+- **F-8:** events.jsonl `event_type=content_revise` (events.schema
+  12-value enum).
 
 ## Routing (8-Step Workflow)
 
@@ -404,7 +404,7 @@ rename).
 **events.jsonl append (F-8 enum):**
 
 - `event_type` = `content_revise`
-- `event_kind` = `production`
+- `event_kind` = `work`
 - `schema_version` = `1.0`
 - `actor` = `skill:revise-content`
 - `target` = `{url}`

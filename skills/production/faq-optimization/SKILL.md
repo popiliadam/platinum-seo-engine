@@ -243,7 +243,7 @@ runs first; only if YES does the 3-step filter execute.
   output → work).
 - **F-14:** events.jsonl 5 required field zorunlu (schema_version
   const "1.0", event_kind, event_id UUIDv4, timestamp UTC ISO 8601,
-  project_id pattern `^[a-z][a-z0-9-]*$`); event_type 10-enum içinden
+  project_id pattern `^[a-z][a-z0-9-]*$`); event_type 12-enum içinden
   `content_revise` (FAQ enhance/add içerik revize semantiği — F-14
   kanonik enum compliance).
 - **F-15:** master.xlsx[content_improve] 8 col + allowed_writers null
@@ -454,7 +454,7 @@ strip), retry once; persistent fail → RED.
 **events.jsonl append (F-9 + F-14 enum compliance):**
 
 - `event_kind` = `work` (F-9 ADR-020 production output enum).
-- `event_type` = `content_revise` (F-14 10-enum: FAQ enhance/add
+- `event_type` = `content_revise` (F-14 12-enum: FAQ enhance/add
   içerik revize semantik kanonik mapping).
 - `schema_version` = `1.0` (F-14 const).
 - `event_id` = UUID v4 (F-14 required).
