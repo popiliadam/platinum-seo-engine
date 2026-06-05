@@ -181,23 +181,25 @@ workflow_runner.approve(handle.run_id, project_slug=project_slug,
 
 ### Step 7 — `write_excel` (atomic, schema-validated)
 
-Two `transaction.append` calls — one per sheet. Both go through the
-single approved write path with backup, lock, schema validation, and
-post-write provenance event emission.
+Two idempotent `committer.commit` calls — one per sheet (replace — re-running
+refreshes the snapshot, never duplicates rows; routes through transaction.py:
+backup + lock + schema validation + provenance).
 
 ```python
-from scripts.excel import transaction
-transaction.append(
+from scripts.orchestration import committer
+committer.commit(
     workbook_path=workspace_root/"projects"/project_slug/"master.xlsx",
     sheet="quick_wins",
     rows=quick_wins_rows,
+    run_id=handle.run_id,
     project_slug=project_slug,
     writer="quick-wins",
 )
-transaction.append(
+committer.commit(
     workbook_path=workspace_root/"projects"/project_slug/"master.xlsx",
     sheet="opportunity",
     rows=opportunity_rows,
+    run_id=handle.run_id,
     project_slug=project_slug,
     writer="quick-wins",
 )
@@ -262,7 +264,7 @@ Stop and flag the manager — do not patch, do not fall back.
 2. Raw JSON inbox path cannot be created (workspace path missing).
 3. URL normalization output drifts from schema (mismatch invariant).
 4. `master.xlsx#quick_wins` column count or names don't match schema.
-5. `transaction.append` raises `RowSchemaError`.
+5. `committer.commit` raises `RowSchemaError`.
 6. `workflow_runner.create_run` fails schema validation.
 7. `PSEO_WORKSPACE_ROOT` env unset and no `workspace_root` arg passed.
 8. `project.config.json` missing `gsc.site_url`.
