@@ -14,6 +14,7 @@ import threading
 from pathlib import Path
 
 import pytest
+from jsonschema import Draft7Validator
 
 from scripts.state import events_writer, workflow_runner
 from scripts.state.workflow_runner import (
@@ -523,3 +524,94 @@ def test_emit_failure_is_visible_and_nonblocking(
     captured = capsys.readouterr()
     assert "WARNING" in captured.err
     assert "disk gone" in captured.err
+
+
+# ---------------------------------------------------------------------------
+# Test 17 — AMO 1a: fail(external=True) persists failure_reason.external=true
+#           AND the run JSON still validates against the schema (spec D4).
+# ---------------------------------------------------------------------------
+
+def test_fail_external_persists_and_validates(tmp_path: Path) -> None:
+    """AMO batch 1a (spec D4): an EXTERNAL dependency failure (GSC/DFS outage,
+    quota, network) is recorded via fail(..., external=True). The persisted
+    failure_reason.external is True, and the run JSON the runner just wrote still
+    validates against workflow-run.schema.json — proving `external` is a
+    schema-legal additive discriminator, NOT a new failure code."""
+    _setup(tmp_path)
+    handle = workflow_runner.create_run(
+        skill="ext-skill", project_slug="test-proj",
+        steps=[{"name": "fetch_gsc"}], workspace_root=tmp_path,
+    )
+    workflow_runner.fail(
+        handle.run_id, project_slug="test-proj",
+        code="mcp_error", message="GSC outage", external=True,
+        workspace_root=tmp_path,
+    )
+    re_read = workflow_runner.get(handle.run_id, project_slug="test-proj",
+                                  workspace_root=tmp_path)
+    assert re_read.data["failure_reason"]["external"] is True
+
+    schema = json.loads(
+        workflow_runner._DEFAULT_SCHEMA_PATH.read_text(encoding="utf-8")
+    )
+    errors = list(Draft7Validator(schema).iter_errors(re_read.data))
+    assert errors == [], errors
+
+
+# ---------------------------------------------------------------------------
+# Test 18 — AMO 1a: the default fail() path is byte-identical (no "external" key)
+# ---------------------------------------------------------------------------
+
+def test_fail_without_external_has_no_external_key(tmp_path: Path) -> None:
+    """AMO batch 1a: the default fail() path (no external arg) must stay
+    byte-identical — failure_reason carries NO 'external' key, so every existing
+    fail() call and its persisted JSON are unchanged. Absent => internal."""
+    _setup(tmp_path)
+    handle = workflow_runner.create_run(
+        skill="int-skill", project_slug="test-proj",
+        steps=[{"name": "x"}], workspace_root=tmp_path,
+    )
+    workflow_runner.fail(
+        handle.run_id, project_slug="test-proj",
+        code="internal_error", message="logic bug",
+        workspace_root=tmp_path,
+    )
+    re_read = workflow_runner.get(handle.run_id, project_slug="test-proj",
+                                  workspace_root=tmp_path)
+    assert "external" not in re_read.data["failure_reason"]
+
+
+# ---------------------------------------------------------------------------
+# Test 19 — AMO 1a: external-failure-allow-end REUSES the existing `paused`
+#           state (no new `blocked` state); the edges + round-trip already exist.
+# ---------------------------------------------------------------------------
+
+def test_paused_reuse_for_external_failure_contract(tmp_path: Path) -> None:
+    """AMO batch 1a (spec D4): the denetçi (batch 2c) maps an external failure
+    onto the EXISTING `paused` state to allow turn-end. Confirm — without any
+    code change — that the (running→paused) and (paused→running) edges it relies
+    on already exist, and the running→pause()→resume() round-trip works."""
+    # Contract: both edges already exist in the literal transition table.
+    assert ("running", "paused") in workflow_runner._ALLOWED_TRANSITIONS
+    assert ("paused", "running") in workflow_runner._ALLOWED_TRANSITIONS
+
+    # Round-trip the denetçi relies on: running → paused (paused_at) → running.
+    _setup(tmp_path)
+    handle = workflow_runner.create_run(
+        skill="ext-pause-skill", project_slug="test-proj",
+        steps=[{"name": "go"}], workspace_root=tmp_path,
+    )
+    workflow_runner.pause(
+        handle.run_id, project_slug="test-proj",
+        reason="external dependency unavailable", workspace_root=tmp_path,
+    )
+    paused = workflow_runner.get(handle.run_id, project_slug="test-proj",
+                                 workspace_root=tmp_path)
+    assert paused.status == "paused"
+    assert paused.data["paused_at"]
+
+    workflow_runner.resume(handle.run_id, project_slug="test-proj",
+                           workspace_root=tmp_path)
+    resumed = workflow_runner.get(handle.run_id, project_slug="test-proj",
+                                  workspace_root=tmp_path)
+    assert resumed.status == "running"

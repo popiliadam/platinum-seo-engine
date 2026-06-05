@@ -1,0 +1,91 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "http://platinum-seo-engine/schemas/coverage",
+  "title": "Coverage Record v1.0",
+  "description": "Shape of projects/{slug}/_state/coverage/{run_id}.json — the INDEPENDENT per-run coverage proof the AMO orchestrator (run_step.py, batch 1b) writes after each step and the denetçi Stop-hook (batch 2c) + correctness oracle read to decide pass / block / paused. Lives OUTSIDE events.jsonl on purpose: event_type is a closed exactly-12 enum (spec D3), so coverage is a dedicated file, never a 13th event_type. verification_class per step lets the <=5% structured-error metric NEVER count a model_attested (judgment) step as code_verified (structured). run_id reuses workflow-run.schema.json's grammar so a coverage record joins 1:1 to its workflow run.",
+  "type": "object",
+  "required": ["run_id", "steps", "required_satisfied", "verdict"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "description": "ADR-018/019 const discipline; lets a future migration discriminate older coverage records. Optional (not in required[])."
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*-[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-f0-9]{4}$",
+      "description": "Joins 1:1 to workflow-run.schema.json run_id (identical grammar): {project_slug}-{YYYY-MM-DD}-{hash4}."
+    },
+    "project_slug": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Project this run belongs to (matches projects/{slug}/). Optional."
+    },
+    "engine_version": {
+      "type": "string",
+      "minLength": 1,
+      "description": "plugin.json version stamped at run start (spec section 8 self-upgrade versioning); orchestrator may assert artifact_version == plugin version on resume. Optional."
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 0,
+      "description": "One entry per executed step, in execution order.",
+      "items": {
+        "type": "object",
+        "required": ["name", "verification_class", "status"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Step identifier, stable across runs; matches the workflow-run steps[].name (e.g. 'fetch_gsc')."
+          },
+          "verification_class": {
+            "type": "string",
+            "enum": ["code_verified", "model_attested"],
+            "description": "code_verified = a structured step gated by identity+content (counts toward the <=5% oracle). model_attested = a judgment step (e.g. blog generation) the orchestrator records as RAN but does NOT verify for quality — NEVER counted as verified."
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "running", "satisfied", "missing", "failed", "skipped"],
+            "description": "Coverage status. satisfied = verified/attested as required; missing = a required step that did not run (denetçi blocks); failed = ran but the identity+content gate rejected its artifact."
+          },
+          "observed_mcp": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "description": "MCP/native tool ids actually observed for this step (e.g. 'mcp__gsc__search_analytics', 'sf_load_crawl'), from events.jsonl source.mcp_tool — feeds the observed-subset-of-declared reconciliation (spec section 4 lint #2)."
+          },
+          "input_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rows/items the step's transform received from the raw artifact (denominator for the silent-skip ratio gate, spec section 7 1b)."
+          },
+          "scored_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rows/items the transform actually committed (numerator). A high silent-skip ratio HARD-FAILS the step in 1b."
+          }
+        }
+      }
+    },
+    "required_satisfied": {
+      "type": "boolean",
+      "description": "True iff every required (code_verified) step reached status=satisfied. The denetçi's core non-start gate."
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["pass", "incomplete", "paused", "failed"],
+      "description": "Run-level coverage verdict the denetçi keys on: pass (all required satisfied) | incomplete (a required step missing -> block + Turkish fix command) | paused (an external dependency failed, failure_reason.external=true -> allow turn-end, flag) | failed (an internal gate rejection)."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC ISO 8601 when the coverage record was first written. Optional."
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC ISO 8601 updated on every coverage write. Optional."
+    }
+  }
+}
