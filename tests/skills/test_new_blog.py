@@ -425,3 +425,38 @@ def test_read_only_contract_no_transaction_writes() -> None:
         f"READ-ONLY contract violation: skill body invokes "
         f"transaction.* writes: {forbidden_writes}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Test 17 — R-121 rotation reads append-only events.jsonl, not completed_work
+# ---------------------------------------------------------------------------
+
+def test_r121_rotation_append_only_not_completed_work_write() -> None:
+    """B5-02: the R-121 bank-rotation logic must read its usage counter from
+    the append-only _state/events.jsonl content_new events — the only state
+    surface this READ-ONLY skill writes (lines 101-106). It must NOT prescribe
+    reading from or writing to master.xlsx[completed_work]
+    (allowed_writers=null, F-1); that sheet is owned by the done-protocol /
+    mark-done skill."""
+    text = _skill_text()
+
+    # Isolate the R-121 section (its heading → the next '## ' heading).
+    start = text.index("## R-121")
+    end = text.index("\n## ", start + 1)
+    r121 = text[start:end]
+
+    # Rotation usage source is the append-only events.jsonl content_new log.
+    assert "events.jsonl" in r121 and "content_new" in r121, (
+        "R-121 rotation must cite the append-only _state/events.jsonl "
+        "content_new events as its usage source"
+    )
+    # No master.xlsx[completed_work] WRITE prescribed (records/carrying verbs).
+    assert "completed_work` row carrying" not in r121, (
+        "R-121 still prescribes a master.xlsx[completed_work] write "
+        "(F-1 allowed_writers=null; contradicts the READ-ONLY claim)"
+    )
+    # Step 3 rotation must NOT count usage FROM completed_work rows.
+    assert not re.search(r"count usage in[\s\S]{0,60}completed_work", r121), (
+        "R-121 Step 3 must count usage from events.jsonl content_new events, "
+        "not master.xlsx[completed_work]"
+    )

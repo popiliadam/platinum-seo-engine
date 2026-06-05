@@ -80,9 +80,11 @@ report.json`.
 
 W-G4 (`verify-indexing`) is the verification counterpart of W-G1
 (`indexing-ping`). The Indexing API submit/verify protocol per
-docs/ARCHITECTURE.md §24.4 expects the verify call **24-72 hours after
-submit**: GSC needs that window to crawl/process the URL, and shorter
-windows produce false `not_indexed` readings.
+docs/superpowers/specs/2026-04-30-platinum-seo-engine-design.md §24
+(Autonomous System Considerations; §24.5 Outcome Verification Loop)
+expects the verify call **24-72 hours after submit**: GSC needs that
+window to crawl/process the URL, and shorter windows produce false
+`not_indexed` readings.
 
 **Order discipline (Wave 2 dispatch):**
 1. W-G1 `indexing-ping` runs first; emits work events with
@@ -114,10 +116,12 @@ elapsed; rerun ≥24h after called_at".
   (lesson 7+23+31 worker authority, 4th convergent application after
   Wave 1 W-G1/W-G2/W-G3): the brief sketched
   `event_type=indexing_verified` but `events.schema.json` declares
-  `event_type` as a closed 10-value WORK-only enum (`content_new,
-  content_revise, content_remove, tech_fix, quickwin_applied,
-  pillar_launch, schema_fix, redirect_deployed, backlink_outreach,
-  manual`). `indexing_verified` is NOT in the enum — it is also
+  `event_type` as a closed 12-value WORK-only enum (10 legacy:
+  `content_new, content_revise, content_remove, tech_fix,
+  quickwin_applied, pillar_launch, schema_fix, redirect_deployed,
+  backlink_outreach, manual` + 2 skill_<name>:
+  `skill_content_remediation, skill_whats_next`). `indexing_verified`
+  is NOT in the enum — it is also
   irrelevant here because **`event_type` is WORK-only** and this skill
   emits `event_kind=audit`. The schema's allOf rule for `audit` kind
   requires `audit_action`, `audit_target`, `actor` (no `event_type` or
@@ -133,9 +137,10 @@ elapsed; rerun ≥24h after called_at".
   - `event_id=verify_indexing_{url_hash8}_{timestamp_compact}`
   - `indexing_ping` sub-object reused as informational payload: the
     schema's `verified_at` + `verified_coverage` fields are precisely
-    designed for this verification leg (events.schema.json L206-218
-    documents it as "GSC urlInspection result timestamp (§24.4, 24h
-    later)"). Although `indexing_ping` is annotated WORK-only, an
+    designed for this verification leg (events.schema.json
+    `properties.indexing_ping.verified_at` documents it as "GSC
+    urlInspection result timestamp (§24.4, 24h later)"). Although
+    `indexing_ping` is annotated WORK-only, an
     `additionalProperties=false` violation would only fire on
     out-of-schema keys; reusing this sub-object on an audit event
     requires confirmation. **Defensive choice**: this skill carries
@@ -429,7 +434,7 @@ event_kind. Worker authority applied — this is the 4th convergent
 schema-first override after Wave 1 W-G1 / W-G2 / W-G3 (lesson 31):
 
 1. **Override 1 — `event_type` is WORK-only.** events.schema.json
-   declares `event_type` as a closed 10-value enum that applies only
+   declares `event_type` as a closed 12-value enum that applies only
    to `event_kind=work`. The audit allOf rule (events.schema.json
    allOf[2]) requires `audit_action`, `audit_target`, `actor` and does
    NOT require `event_type`. Skill therefore omits `event_type`
@@ -477,11 +482,11 @@ application strengthens lesson 31 paterni production-ready signal.
   enum 8 values, status enum 3 values).
 - `schemas/events.schema.json` (event_kind enum 4 values, audit
   required fields `audit_action / audit_target / actor`, audit_action
-  enum 6 values, indexing_ping sub-object L206-218 WORK-only,
-  ADR-020 workflow kind).
+  enum 6 values, indexing_ping sub-object `properties.indexing_ping`
+  WORK-only, ADR-020 workflow kind).
 - `schemas/master-excel.schema.json` (18 sheets — `completed_work` 6
   columns; F-1 allowed_writers null discipline).
-- `schemas/project-config.schema.json` v1.2 (singular profile field,
+- `schemas/project-config.schema.json` v1.5 (singular profile field,
   Phase 11 W-F1 cascade fix; 5-value enum).
 - ADR-020 (event_kind=workflow vs work routing, audit semantic).
 - ADR-028 (Phase 7 lesson — generic shape-name anti-pattern; ADR text
