@@ -33,13 +33,14 @@ Promote to a general engine ONLY if a 4th workflow proves the abstraction earns 
 | 0e | `portfolio.json` concurrency safety. **DURUR (case c):** the only writer is model-executed inline python in `init-project/SKILL.md` Step 6 (no callable code to lock; the test has a hand-copied mirror). Manager approved **Option 1**. → see **0e2**. | DURUR'd → 0e2 | 0d |
 | 0e2 | Option-1 build: extract flock-guarded `scripts/state/portfolio_writer.py` + rewire `init-project` Step 6 to call it + convert the test mirror to an import + concurrency TDD. Behavior-preserving (identical JSON shape). | ✅ **DONE + GREEN** (manager-verified 1789 pass / 0 fail; +8 tests; flock(LOCK_EX) RMW, ftruncate, no-lost-update 10/10 vs old 1/10; mirror→import; shape+readers intact) | 0e |
 
-> ## 🎉 PHASE 0 COMPLETE (2026-06-05) — `66fcd1e` + 0e2 pending commit
+> ## 🎉 PHASE 0 COMPLETE (2026-06-05) — committed `09674c5`, pushed origin/main (0/0)
 > Per-session project binding foundation is shipped + green: session-id marker binding (0a-0c), session-aware
 > audit attribution (0d), and parallel-write safety (0e2 portfolio.json + 0f transaction.py). Full suite 1789
-> pass / 0 fail. **Next: Faz 1 (orchestrator) — a FRESH manager session takes over via FRESH-MANAGER-BOOTSTRAP.md.**
+> pass / 0 fail. **FRESH MANAGER SESSION took over 2026-06-05 via FRESH-MANAGER-BOOTSTRAP.md → now driving Faz 1.**
+> **Faz 1 START: batch 1a prompt AUTHORED (`batch-1a-WORKER-PROMPT.md`), awaiting dispatch to a worker.**
 | 0f | `transaction.py`: backup-rotation glob fix + **blocking master.xlsx lock** (`acquire_blocking` opt-in, bounded → `LockTimeout`; default fail-fast unchanged) | ✅ **DONE + GREEN** (manager-verified 1781 pass / 0 fail; +6 tests; default byte-identical/no-regression; fd-leak-safe; `LockTimeout` sibling of `LockHeldError`; rotation scoped to `master-*.xlsx` + vestigial-marker prune) | 0d |
 | ~~two-session-same-project guard~~ | Deferred edge-case (per-project locks already prevent corruption; one-window-per-project discipline covers it) — fresh manager may pick up post-Phase-0 | deferred | — |
-| 1a | Schema migrations: `_state/coverage/<run_id>.json` shape + `failure_reason.external` bool + confirm `paused` reuse | pending | 0 |
+| 1a | Schema migrations: NEW `schemas/coverage.schema.json` (run_id/steps[{name,verification_class,status,observed_mcp[],input_count,scored_count}]/required_satisfied/verdict) + additive `failure_reason.external` bool (both schema copies + `fail()` writer) + confirm `paused` reuse (transition-edge test, no code). D10: draft-count 21→22 + marketplace "22→23 schemas". | 📝 **PROMPT AUTHORED** (`batch-1a-WORKER-PROMPT.md`); awaiting dispatch | 0 ✅ |
 | 1b | Ordered-sequence runner (`run_step.py`) + committer relocation + identity+content verify (idempotent `replace`) | pending | 1a |
 | 1c | Intent router (one-voice UserPromptSubmit; marker lifecycle session_id/turn_id/intent_id) | pending | 1a |
 | 1d | Reference workflow `monthly-maintenance` + `/pseo-run` + operator-remediation surface (Turkish fix-command) | pending | 1b,1c |
