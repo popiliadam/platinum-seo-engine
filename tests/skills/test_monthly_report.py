@@ -435,6 +435,26 @@ def test_plugin_agnostik_no_slug_literal() -> None:
         )
 
 
+# --- Test 9: B2-01 no-write contract (events.jsonl READ-ONLY) ------------
+
+def test_skill_md_carries_no_runnable_block() -> None:
+    """B2-01 regression lock: monthly-report SKILL.md must contain NO
+    runnable ``python`` fence. The 'Q-RP-01 RESOLVED' block that called
+    ``events_writer.append_audit(...)`` was removed — events.jsonl stays
+    READ-ONLY for this skill until Q-RP-01 actually resolves (Phase 14+),
+    as the frontmatter (safe_auto_execute, outputs[] excludes events.jsonl),
+    the command, and events-writer.md all already encode. A runnable block
+    here would make an agent append to append-only state on every autonomous
+    run — the exact side effect the rest of the system forbids.
+    """
+    body = SKILL_PATH.read_text(encoding="utf-8")
+    assert "```python" not in body, (
+        "monthly-report SKILL.md must carry no runnable python block "
+        "(B2-01 no-write contract; events.jsonl READ-ONLY, Q-RP-01 deferred). "
+        "The append_audit mentions that remain must stay non-runnable prose."
+    )
+
+
 # --- Test 9: master_task READ-ONLY + REVIZE 3 (no events.jsonl write) ----
 
 def test_master_task_read_only_no_openpyxl_write() -> None:
