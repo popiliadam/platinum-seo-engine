@@ -13,6 +13,8 @@ Exempt paths (historical narrative + spec docs):
     ``docs/DECISIONS.md``, ``docs/DECISIONS_ARCHIVE.md``,
     ``docs/OPEN_QUESTIONS.md``
   - ``docs/superpowers/`` subtree (specs + plans)
+  - ``docs/audits/`` subtree (audit reports + machine-readable findings
+    that *quote* forbidden aliases as verbatim evidence, not as live refs)
   - the ``templates/`` directory itself (the files reference each
     other in headers / metadata)
   - this test file
@@ -48,6 +50,7 @@ EXEMPT_RELATIVE_PATHS = {
 EXEMPT_GLOB_RELATIVE = ("docs/RELEASE_NOTES_v*.md",)
 EXEMPT_PREFIXES = (
     Path("docs/superpowers"),
+    Path("docs/audits"),
     Path("templates"),
     Path(".git"),
     Path(".claude"),
