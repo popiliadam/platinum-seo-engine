@@ -215,8 +215,9 @@ within one page). The two rules compose — both fire pre-publish.
    - e-commerce / local-service / portfolio: 1 experience + 0 research
      entry per content
 3. **Rotation (30-day).** For each remaining candidate, count usage in
-   `master.xlsx[completed_work]` rows where `bank_entry_id == entry.id`
-   AND `timestamp >= now - 30d`. Skip if
+   the append-only `_state/events.jsonl` `content_new` work events whose
+   `note` records `bank_entry_id == entry.id` AND
+   `timestamp >= now - 30d`. Skip if
    `count >= entry.max_usage_per_month`; rotate to a different entry or
    to a different `phrasings[]` form of the same entry.
 
@@ -224,12 +225,16 @@ If all candidates fail the 3-step filter, the skill emits AMBER and
 retries with `phrasings[]` rotation; 2x AMBER same pass → RED upgrade
 (manual review).
 
-**Post-publish state mutation** (atomic with the `events.jsonl` audit
-append in Step 12): each selected entry's `last_used_in_content_id` is
-set to the new blog id; the `master.xlsx[completed_work]` row carrying
-this content also records the `bank_entry_id`(s) used. The rotation
-counter at Step 3 above reads from this same `completed_work` log on
-the next invocation — single source of truth.
+**Post-publish usage record** (in the `events.jsonl` audit append at
+Step 12): the `content_new` work event records the `bank_entry_id`(s)
+used inside its `note` field — the append-only `_state/events.jsonl` is
+the **only** state surface this skill writes (consistent with the
+READ-ONLY claim above). The rotation counter at Step 3 reads from this
+same append-only `content_new` event log on the next invocation —
+single source of truth. The skill does **NOT** write
+`master.xlsx[completed_work]` (`allowed_writers=null` — F-1); if a
+durable `completed_work` row is later required, the done-protocol /
+mark-done skill owns that append.
 
 **Schema enablement (v1.4, commit `8e07e1c`):** each bank entry exposes
 `applicable_topics`, `phrasings`, `last_used_in_content_id`,
@@ -417,7 +422,7 @@ Principle 1).
 
 | Field            | Value                                          |
 |------------------|------------------------------------------------|
-| `event_type`     | `content_new`  (events.schema F-8 enum)        |
+| `event_type`     | `content_new`  (events.schema event_type enum) |
 | `event_kind`     | `work`         (events.schema enum, ADR-020)   |
 | `schema_version` | `1.0`                                          |
 | `actor`          | `skill:new-blog`                               |
@@ -518,7 +523,7 @@ Expected: schema_version `"1.2"`, profile.enum array of 5 strings.
   W-F1 v1.2 + Phase 11 cascade still applies for `profile` singular).
 - `schemas/master-excel.schema.json` (18 sheets — `internal_links` and
   `content_gaps` are NOT among them; F-4 schema authority).
-- `schemas/events.schema.json` (event_type enum 10 values, event_kind
+- `schemas/events.schema.json` (event_type enum 12 values, event_kind
   enum 4 values).
 - `schemas/skill-frontmatter.schema.json` (8 required fields, category
   enum 8 values, status enum 3 values).

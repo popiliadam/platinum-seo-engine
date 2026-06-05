@@ -33,7 +33,10 @@ if str(_REPO_ROOT) not in sys.path:
 PRIMARY_SOURCE_ENUM: tuple[str, ...] = (
     "content_decay", "quickwin", "tech_fix", "schema", "pillar",
     "manual", "sxo", "cannibalization", "redirect_404", "internal_links",
-)  #: master_task col C primary_source 10-enum (Q-IL-1 internal_links).
+    "new_content_plan",
+)  #: master_task col C primary_source 11-enum (Q-IL-1 internal_links;
+#: +new_content_plan v1.2 audit followup — lockstep with
+#: master-excel.schema.json#master_task col C, additive per ADR-018).
 PRIORITY_ENUM: tuple[str, ...] = ("CRITICAL", "HIGH", "MEDIUM", "LOW")
 SHEET_READ_SPECS: tuple[tuple[str, str, int], ...] = (
     ("opportunity", "B", 5), ("quick_wins", "J", 5),
@@ -41,7 +44,7 @@ SHEET_READ_SPECS: tuple[tuple[str, str, int], ...] = (
 )
 SHEET_NAMES: tuple[str, ...] = tuple(s[0] for s in SHEET_READ_SPECS)
 MASTER_TASK_DATA_START_ROW = 4
-ACTIVE_PROJECTS_MAX = 8
+ACTIVE_PROJECTS_MAX = 12
 AGGREGATE_DIMENSION_ENUM: frozenset[str] = frozenset(
     {"category", "priority", "primary_source"})
 DEFAULT_AGGREGATE_DIMENSION = "category"
@@ -248,7 +251,7 @@ def _master_task_to_dicts(rows: list[tuple]) -> list[dict]:
 def _bucket_master_task(
     rows: Sequence[Mapping[str, Any]], *, aggregate_dimension: str,
 ) -> dict[str, int]:
-    """Bucket master_task rows. primary_source → 10-enum (every value
+    """Bucket master_task rows. primary_source → 11-enum (every value
     gets a bucket); priority → severityEnum 4-bucket; category →
     free-text cardinality."""
     if aggregate_dimension == "primary_source":

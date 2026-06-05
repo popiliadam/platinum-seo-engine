@@ -205,8 +205,13 @@ Pure compute via `scripts/discovery/schema_audit_transform.py`:
 python3 scripts/discovery/schema_audit_transform.py \
     --raw-sf inbox/sf/{date}-schema-{slug}.json \
     [--strict-parse] \
+    [--default-status TODO] \
     --output-dir _state/transform/{run_id}/
 ```
+
+`--default-status` (default `TODO`) seeds the statusEnum value for
+type-only rows (SF detected the schema type but no JSON-LD blob, so props
+can't be verified); it threads to `transform(..., default_status=...)`.
 
 Produces a JSON array (`schema`) shaped to the master-excel schema
 (5 columns: schema_type, status, location, scope, remaining_work). URL

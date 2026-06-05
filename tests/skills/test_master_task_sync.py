@@ -10,10 +10,10 @@ Every test is fully data-driven with synthetic upstream sheet rows
 shaped like Phase 7 + Phase 8 Wave 1 master writer outputs.
 
 Schemas referenced:
-  - schemas/master-excel.schema.json#master_task (lines 269-303 —
-    required_columns + allowed_writers + writer_scope + protected_columns)
+  - schemas/master-excel.schema.json#/sheets/master_task
+    (required_columns + allowed_writers + writer_scope + protected_columns)
   - schemas/skill-frontmatter.schema.json
-  - schemas/events.schema.json (source.kind=local_aggregation,
+  - schemas/events.schema.json (source.kind=tool_computed,
     target_excel_sheet=master_task)
 """
 
@@ -196,7 +196,7 @@ def test_frontmatter_validates(
 ) -> None:
     """SKILL.md frontmatter must:
       (a) parse as YAML,
-      (b) carry name=master-task-sync, status=wip, version="1.0",
+      (b) carry name=master-task-sync, status=active, version="1.0",
           category=planning,
       (c) declare project_slug as a required string input,
       (d) declare 0 required mcp_tools (local aggregation; no MCP),
@@ -205,7 +205,7 @@ def test_frontmatter_validates(
     """
     fm = skill_frontmatter
     assert fm["name"] == "master-task-sync"
-    assert fm["status"] in {"active", "deprecated", "wip"}
+    assert fm["status"] == "active"
     assert fm["version"] == "1.0"
     assert fm["category"] == "planning"
 

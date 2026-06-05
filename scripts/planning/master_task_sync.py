@@ -62,9 +62,9 @@ Pure function discipline (mirrors other Phase 7/8 transforms):
     payload is consumed (intentionally absent — this is local SSoT scope).
   - 0 hardcoded slug values (plugin agnostik).
 
-Refs: schemas/master-excel.schema.json#master_task (lines 269-303 —
-required_columns + allowed_writers + writer_scope + protected_columns),
-schemas/events.schema.json (source.kind=local_aggregation,
+Refs: schemas/master-excel.schema.json#/sheets/master_task
+(required_columns + allowed_writers + writer_scope + protected_columns),
+schemas/events.schema.json (source.kind=tool_computed,
 target_excel_sheet=master_task), spec §8.5 (master_task SSoT discipline),
 ADR-018 (per-row jsonschema), ADR-021 (state run shape).
 Pattern reference: scripts/planning/internal_links_transform.py (Phase 8

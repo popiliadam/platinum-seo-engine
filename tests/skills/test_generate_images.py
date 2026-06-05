@@ -184,19 +184,41 @@ def test_f13_image_style_profile_aware():
     assert "Principle 2" in text, "Principle 2 (Profile-Aware) header missing"
 
 
-# --- Test 10: events.jsonl F-9 (event_kind=work) + F-14 (event_type, project_id) ---
+# --- Test 10: events.jsonl emits event_type=manual (schema-valid) + work kind ---
 def test_events_jsonl_compliance():
+    """generate-images emits event_type=`manual` on BOTH the success path
+    and the DURUR #5 fallback — `content_new` would require
+    url+url_normalized+after+pillar, which a standalone hero regenerate
+    cannot satisfy (events.schema URL-bearing work-event constraint). The
+    canonical events_writer block already emits `manual`; this pins the docs
+    (table + READ-ONLY narrative + References) to the same value and asserts
+    it is schema-valid (B5-01)."""
     text = _read_skill_text()
-    # F-9 event_kind=work (ADR-020 production output enum)
+    # event_kind=work (ADR-020 event_kind discriminator)
     assert "event_kind" in text, "event_kind field missing"
-    assert "work" in text, "work enum value missing (F-9 ADR-020)"
-    # F-14 event_type 10-enum
+    assert "work" in text, "work enum value missing (ADR-020)"
     assert "event_type" in text, "event_type field missing"
-    assert "content_new" in text, "content_new enum value missing (F-14 success)"
-    assert "manual" in text, "manual enum value missing (F-14 DURUR #5 fallback)"
-    # F-14 5-required-field
-    assert "schema_version" in text, "schema_version field missing (F-14)"
-    assert "project_id" in text, "project_id field missing (F-14)"
+    # B5-01: the success path must NOT be documented as content_new.
+    assert not re.search(r"content_new[^\n]{0,30}success", text), (
+        "generate-images success path must emit event_type=manual, not "
+        "content_new (standalone hero regen cannot satisfy the events.schema "
+        "url+pillar requirement for content_new)"
+    )
+    # Canonical events_writer block pins the emitted value to manual.
+    assert re.search(r'event_type\s*=\s*"manual"', text), (
+        'canonical events_writer block must emit event_type="manual"'
+    )
+    # Emitted event_type must be schema-valid (closed 12-value enum).
+    schema = json.loads(
+        (REPO_ROOT / "schemas" / "events.schema.json").read_text("utf-8")
+    )
+    event_type_enum = schema["properties"]["event_type"]["enum"]
+    assert "manual" in event_type_enum, (
+        "events.schema event_type enum drifted: 'manual' missing"
+    )
+    # F-14 5-required-field surface still documented.
+    assert "schema_version" in text, "schema_version field missing (events.schema)"
+    assert "project_id" in text, "project_id field missing (events.schema)"
     fm = _parse_frontmatter(text)
     outputs_str = " ".join(fm.get("outputs", []))
     assert "events.jsonl" in outputs_str, (

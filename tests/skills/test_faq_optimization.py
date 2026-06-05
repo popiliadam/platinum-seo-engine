@@ -154,13 +154,13 @@ def test_events_jsonl_compliance():
     text = _read_skill_text()
     # F-9 event_kind=work (ADR-020 production output enum)
     assert "event_kind" in text, "event_kind field missing"
-    assert "work" in text, "work enum value missing (F-9 ADR-020)"
+    assert "work" in text, "work enum value missing (ADR-020)"
     # F-14 event_type=content_revise (10-enum compliance)
     assert "event_type" in text, "event_type field missing"
-    assert "content_revise" in text, "content_revise enum value missing (F-14)"
+    assert "content_revise" in text, "content_revise enum value missing (events.schema)"
     # F-14 5-required-field
-    assert "schema_version" in text, "schema_version field missing (F-14)"
-    assert "project_id" in text, "project_id field missing (F-14)"
+    assert "schema_version" in text, "schema_version field missing (events.schema)"
+    assert "project_id" in text, "project_id field missing (events.schema)"
     fm = _parse_frontmatter(text)
     outputs_str = " ".join(fm.get("outputs", []))
     assert "events.jsonl" in outputs_str, (

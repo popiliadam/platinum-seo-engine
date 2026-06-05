@@ -16,8 +16,17 @@ Covers ``scripts/meta/brand_onboarding_write.write_bank_entries``:
 from __future__ import annotations
 
 import json
+from pathlib import Path
+
+from jsonschema import Draft7Validator
 
 from scripts.meta.brand_onboarding_write import write_bank_entries
+
+_SCHEMA_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "schemas"
+    / "project-config.schema.json"
+)
 
 
 def test_write_appends_to_existing_bank(tmp_workspace_factory) -> None:
@@ -125,3 +134,48 @@ def test_write_rejects_research_entry_without_url(tmp_workspace_factory) -> None
     result = write_bank_entries(project_slug="test", review_output=review_output)
     assert result["status"] == "error"
     assert "url" in result["error"].lower()
+
+
+def test_post_write_config_validates_against_schema(tmp_workspace_factory) -> None:
+    """B4-05/B4-08 regression: the project.config.json produced by Stage C
+    MUST validate clean against schemas/project-config.schema.json.
+
+    The schema's experience_database / original_research_database item
+    defs are ``additionalProperties: false``; before B4-05 the writer's
+    R-44 evidence fields (claim_core, evidence_url, evidence_type,
+    verified_date) and R-114 research fields (methodology, sample_size,
+    url, publication_date, key_findings) were rejected. This guards the
+    bank-write contract against schema drift permanently.
+    """
+    project = tmp_workspace_factory(slug="test", profiles=["ymyl"])
+    review_output = {
+        "approved_experience": [
+            {
+                "claim_core": "10 yıl BDDK lisanslı e-para tecrübesi",
+                "evidence_url": "https://example.com/hakkimizda",
+                "evidence_type": "site_reference",
+                "verified_date": "2026-06-05",
+            },
+        ],
+        "approved_research": [
+            {
+                "title": "2026 fintech survey",
+                "url": "https://example.com/survey",
+                "methodology": "N=500, online questionnaire",
+                "sample_size": 500,
+                "publication_date": "2026-06-01",
+                "key_findings": ["finding A", "finding B"],
+            },
+        ],
+        "topic_candidates": ["e-para", "BDDK"],
+    }
+    result = write_bank_entries(project_slug="test", review_output=review_output)
+    assert result["status"] == "success"
+
+    config = json.loads((project / "project.config.json").read_text(encoding="utf-8"))
+    schema = json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
+    errors = sorted(Draft7Validator(schema).iter_errors(config), key=str)
+    assert errors == [], (
+        "post-write project.config.json fails schema validation: "
+        + "; ".join(f"{list(e.path)}: {e.message}" for e in errors)
+    )

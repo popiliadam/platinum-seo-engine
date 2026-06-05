@@ -43,10 +43,11 @@ $projects_block
     `cross_query.read_only=true`),
   - `schemas/master-excel.schema.json#master_task` (col K
     `created_date` + col L `done_date` + statusEnum),
-  - `schemas/events.schema.json#event_type` (10 enum:
+  - `schemas/events.schema.json#event_type` (12 enum:
     content_new / content_revise / content_remove / tech_fix /
     quickwin_applied / pillar_launch / schema_fix /
-    redirect_deployed / backlink_outreach / manual),
+    redirect_deployed / backlink_outreach / manual /
+    skill_content_remediation / skill_whats_next),
   - `schemas/monthly-report.schema.json#gscTotals` (stub subset
     LOCAL approximation paterni — W-E1 + W-E2 reuse).
 - Şablon: `templates/reports/portfolio-kpi-trend.template.md`

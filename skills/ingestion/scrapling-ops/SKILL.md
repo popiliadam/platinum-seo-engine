@@ -254,9 +254,10 @@ target in Phase 6. The staging file is the durable artifact.
 ### Step 8 — `render_report`
 
 `render_template.py templates/reports/scrapling-ops.template.md
-data.json` → `outputs/reports/{date}-scrapling-ops.md`. Variables:
-`$project_slug`, `$date`, `$url_count`, `$ok_count`, `$durur_count`,
-`$tier_counts`, `$scenario`, `$staging_path`.
+data.json` → `outputs/reports/{date}-scrapling-ops.md`. Variables (must
+match the template's `$tokens` exactly): `$project_slug`, `$date`,
+`$scenario`, `$url_count`, `$max_urls`, `$tier_distribution`,
+`$staging_path`, `$run_id`.
 
 ### Step 9 — Provenance event (`source.kind=scrapling_mcp`)
 
@@ -354,4 +355,6 @@ Stop and flag the manager — do not patch, do not fall back.
   DURUR, bulk threshold, max_urls budget).
 - Templates: `templates/scrapling/.gitkeep` placeholder kept untouched
   per ADR-025 — per-scenario sub-schemas land with Phase 7+ skills.
-- ADR: ADR-025 (Phase 7+ defer), ADR-026 (Q-015 hard cap).
+- ADR: ADR-025 (Phase 7+ scenario sub-schema defer). The `max_urls` cap is
+  DURUR #6 — no accepted ADR governs the URL-count budget (ADR-026 is the
+  unrelated DECISIONS byte-cap; Q-015 → ADR-025 per OPEN_QUESTIONS.md).

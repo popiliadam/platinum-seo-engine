@@ -5,8 +5,9 @@ Coverage (16 tests, lesson 32 self-extending positive drift):
   2. Inputs/Outputs structure — 2 inputs (week_start required + week_end optional),
      2 outputs (events.jsonl + report markdown). master.xlsx ABSENT.
   3. natural_language ≥30-char block (lesson 8 sentinel).
-  4. consumes 4 entries (project-config + drift-check events + gsc_performance +
-     template).
+  4. consumes 3 entries — the ACTUAL inline reads (drift-check
+     consistency-report + portfolio.json + template); gsc_performance +
+     budget_credits_per_day are Phase-14+ deferred (B2-03 reconcile).
   5. DURUR #1 — events.jsonl empty week range SKIP documented.
   6. DURUR #2 — budget_credits_per_day missing AMBER + 500 default documented.
   7. DURUR #3 — drift-check output unavailable AMBER documented.
@@ -40,6 +41,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import sys
 from pathlib import Path
 
 import pytest
@@ -72,6 +74,19 @@ def _skill_body() -> str:
     text = SKILL_PATH.read_text(encoding="utf-8")
     m = re.match(r"^---\n.*?\n---\n", text, re.DOTALL)
     return text[m.end():] if m else text
+
+
+def _inline_orchestration_blocks() -> list[str]:
+    """Extract the runnable python blocks from the '## Inline Orchestration'
+    section of SKILL.md (Block 1-3). These blocks ARE the skill's runtime —
+    there is no separate scripts/reporting/monitoring_weekly.py (option b,
+    Q-V1.2-MONITORING-WEEKLY-MISSING-SCRIPT-01). Scoped to the orchestration
+    section so unrelated future code fences cannot leak in."""
+    text = SKILL_PATH.read_text(encoding="utf-8")
+    start = text.index("## Inline Orchestration")
+    nxt = text.find("\n## ", start + 1)  # next H2 ends the section
+    section = text[start:nxt] if nxt != -1 else text[start:]
+    return re.findall(r"```python\n(.*?)```", section, re.DOTALL)
 
 
 # ---------------------------------------------------------------------------
@@ -180,23 +195,40 @@ def test_natural_language_min_length() -> None:
 # Test 4 — consumes contract (4 entries: config + drift events + gsc + template)
 # ---------------------------------------------------------------------------
 
-def test_consumes_contract_four_sources() -> None:
-    """consumes[] declares the 4 upstream READ sources (no master.xlsx WRITE
-    consume — Phase 9 reporting paterni read-only aggregator)."""
+def test_consumes_contract_actual_reads() -> None:
+    """consumes[] reflects the ACTUAL inline reads (B2-03 reconcile):
+    drift-check consistency-report.json (Block 1) + init-project
+    portfolio.json (Block 2) + the report template. The Phase-14+ future
+    reads (project-config budget_credits_per_day + master.xlsx
+    gsc_performance) are documented in prose as deferred placeholders and
+    must NOT appear in consumes[] — which is the orchestrator dependency
+    graph of REAL reads, not aspirational ones."""
     fm = _parse_frontmatter(SKILL_PATH)
     consumes = fm.get("consumes", [])
     assert isinstance(consumes, list)
-    assert len(consumes) == 4, (
-        f"consumes[] must declare 4 sources (project-config + drift-check "
-        f"events + gsc_performance + template); got {len(consumes)}: "
-        f"{consumes}"
+    assert len(consumes) == 3, (
+        f"consumes[] must declare the 3 actual inline reads (drift-check "
+        f"consistency-report + portfolio.json + template); got "
+        f"{len(consumes)}: {consumes}"
     )
-    # Specific upstream authority references.
     joined = " | ".join(consumes)
-    assert "project-config" in joined and "budget_credits_per_day" in joined
-    assert "drift-check" in joined and "events.jsonl" in joined
-    assert "gsc_performance" in joined
+    assert "drift-check" in joined and "consistency-report" in joined, (
+        "consumes[] must declare drift-check consistency-report.json (the "
+        "actual Block 1 read), not the events.jsonl invariants filter"
+    )
+    assert "portfolio.json" in joined, (
+        "consumes[] must declare shared/portfolio.json (the actual Block 2 read)"
+    )
     assert "monitoring-weekly.template.md" in joined
+    # Phase-14+ future reads must NOT masquerade as live dependency edges.
+    assert "gsc_performance" not in joined, (
+        "master.xlsx[gsc_performance] is a Phase-14+ future read; the inline "
+        "runtime never opens master.xlsx (B2-03 reconcile)"
+    )
+    assert "budget_credits_per_day" not in joined, (
+        "project-config[budget_credits_per_day] is a Phase-14+ future read; "
+        "the inline runtime never opens project-config (B2-03 reconcile)"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -449,8 +481,8 @@ def test_foundational_principles_three_layer() -> None:
       P1 — Truth-Verifiable: report data sourced from events.jsonl +
            master.xlsx, no fabrication.
       P2 — Profile-Aware: severity thresholds adapt to project-config.profile
-           (5-enum: ymyl / e-commerce / b2b-saas / local-business /
-           personal-brand).
+           (5-enum: e-commerce / ymyl / local-service / b2b-saas /
+           portfolio — the REAL schemas/project-config.schema.json values).
       P3 — Anti-Cheap-Content: no LLM prose generation, no invented
            week-over-week percentages."""
     body = _skill_body()
@@ -460,16 +492,23 @@ def test_foundational_principles_three_layer() -> None:
         r"Principle 1.{0,200}Truth-Verifiable", body, re.DOTALL | re.IGNORECASE,
     ), "Principle 1 (Truth-Verifiable) section missing"
 
-    # P2 — Profile-Aware (5-enum)
+    # P2 — Profile-Aware (5-enum). The enum MUST match the real
+    # schemas/project-config.schema.json values (B2-07 fix): the prior
+    # local-business / personal-brand values do not exist in that schema.
     assert re.search(
         r"Principle 2.{0,200}Profile-Aware", body, re.DOTALL | re.IGNORECASE,
     ), "Principle 2 (Profile-Aware) section missing"
-    # 5-value profile enum referenced.
     for profile in ("ymyl", "e-commerce", "b2b-saas",
-                    "local-business", "personal-brand"):
+                    "local-service", "portfolio"):
         assert profile in body.lower(), (
-            f"Principle 2 must reference all 5 profile enum values; "
+            f"Principle 2 must reference all 5 real profile enum values; "
             f"missing {profile!r}"
+        )
+    # The non-schema values must NOT reappear (B2-07 regression lock).
+    for bogus in ("local-business", "personal-brand"):
+        assert bogus not in body.lower(), (
+            f"non-schema profile value {bogus!r} must not appear — "
+            f"schemas/project-config.schema.json has no such enum member"
         )
 
     # P3 — Anti-Cheap-Content
@@ -536,4 +575,123 @@ def test_scheduled_cron_monday_9am_report_only() -> None:
     )
     assert entry["mode"] == "report-only", (
         f"mode must be 'report-only'; got {entry.get('mode')!r}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 17 — EXECUTION: run the inline orchestration against a tmp workspace
+# ---------------------------------------------------------------------------
+
+def test_inline_orchestration_executes_against_tmp_workspace(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """B2-04: a REAL execution test (not a prose-grep). Runs the inline
+    Block 1-3 orchestration — which *is* the skill's runtime — against a
+    tmp workspace and asserts the actual side-effects, not the words on the
+    page:
+      - a report file is written with the 5 documented sections;
+      - the drift counts from consistency-report.json actually flow into
+        the report (truth-verifiable — proves the runtime really read it);
+      - the GSC + budget sections honestly announce the Phase-14+ deferral
+        (B2-02 stub-mark verified at the runtime, not just the doc);
+      - exactly ONE events.jsonl audit row is appended (event_kind=audit +
+        audit_action=accessed + audit_target=reports:monitoring-weekly:* +
+        actor=agent:monitoring-weekly, no event_type, no 5σ second row);
+      - NO master.xlsx is written (Phase 9 read-only invariant)."""
+    blocks = _inline_orchestration_blocks()
+    assert len(blocks) >= 3, (
+        f"expected >=3 runnable inline blocks (Block 1-3); got {len(blocks)}"
+    )
+
+    slug = "demo-project"  # matches ^[a-z][a-z0-9-]*$; not a real plugin slug
+    ws = tmp_path / "ws"
+
+    # Block 1 input: _state/cache/consistency-report.json (drift-check output).
+    cache_dir = ws / "projects" / slug / "_state" / "cache"
+    cache_dir.mkdir(parents=True)
+    (cache_dir / "consistency-report.json").write_text(
+        json.dumps({
+            "red_count": 2, "amber_count": 1, "green_count": 17,
+            "verdict": "AMBER",
+        }),
+        encoding="utf-8",
+    )
+    # Block 2 input: shared/portfolio.json.
+    shared_dir = ws / "shared"
+    shared_dir.mkdir(parents=True)
+    (shared_dir / "portfolio.json").write_text(
+        json.dumps({"projects": [{
+            "slug": slug, "completion_percentage": 42.5,
+            "active_oq_count": 3, "recent_events_count_7day": 9,
+        }]}),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setenv("PSEO_PROJECT_ID", slug)
+    monkeypatch.setenv("PSEO_WORKSPACE_ROOT", str(ws))
+    monkeypatch.setenv("MONITORING_WEEK_START", "2026-04-20")
+    monkeypatch.setenv("MONITORING_WEEK_END", "2026-04-26")
+    # os.getcwd() must be the repo root so the on-disk template resolves and
+    # `from scripts.state import events_writer` imports. Report + events still
+    # land under the tmp workspace (PSEO_WORKSPACE_ROOT), never the real tree.
+    monkeypatch.chdir(REPO_ROOT)
+
+    saved_path = list(sys.path)
+    try:
+        ns: dict = {}
+        exec(  # noqa: S102 — executing the skill's own documented runtime
+            compile("\n".join(blocks), "<monitoring-weekly-inline>", "exec"),
+            ns,
+        )
+    finally:
+        sys.path[:] = saved_path
+
+    # 1. Report file written with the 5 documented sections.
+    report_dir = ws / "projects" / slug / "outputs" / "reports"
+    reports = list(report_dir.glob("*-monitoring-weekly.md"))
+    assert len(reports) == 1, f"expected exactly 1 report file, got {reports}"
+    report = reports[0].read_text(encoding="utf-8")
+    for header in ("## Exec Summary", "## Drift Section",
+                   "## GSC Anomaly Section", "## Budget Burn Section",
+                   "## Escalations"):
+        assert header in report, f"report missing section header {header!r}"
+    assert slug in report
+    assert "2026-04-20" in report and "2026-04-26" in report
+
+    # 2. Truth-verifiable: the drift counts from consistency-report.json must
+    #    actually reach the report (proves the runtime read the real input).
+    assert "RED=2" in report and "AMBER=1" in report and "GREEN=17" in report, (
+        "drift counts from consistency-report.json did not reach the report — "
+        "the runtime did not actually read the drift output"
+    )
+    assert "AMBER" in report  # severity: amber_count>0 and red_count<5
+
+    # 3. GSC + budget sections honestly surface the Phase-14+ deferral (B2-02).
+    assert "Phase 14+" in report, (
+        "placeholder sections must honestly surface the Phase-14+ deferral, "
+        "not imply an active 5σ/budget alarm"
+    )
+
+    # 4. Exactly ONE events.jsonl audit row (no 5σ second row this Wave).
+    events_path = ws / "projects" / slug / "_state" / "events.jsonl"
+    assert events_path.is_file(), "audit event row was not appended"
+    lines = [
+        L for L in events_path.read_text(encoding="utf-8").splitlines()
+        if L.strip()
+    ]
+    assert len(lines) == 1, f"expected exactly 1 audit row, got {len(lines)}"
+    evt = json.loads(lines[0])
+    assert evt["event_kind"] == "audit"
+    assert evt["audit_action"] == "accessed"
+    assert evt["audit_target"].startswith("reports:monitoring-weekly:")
+    assert evt["actor"] == "agent:monitoring-weekly"
+    assert "event_type" not in evt, (
+        "audit event must NOT carry event_type (WORK-only enum; schema-first "
+        "override) — events.schema.json rejects it for event_kind=audit"
+    )
+
+    # 5. READ-ONLY: no master.xlsx written anywhere under the project tree.
+    assert not list((ws / "projects" / slug).rglob("master.xlsx")), (
+        "monitoring-weekly must NOT write master.xlsx (Phase 9 8-reporting "
+        "no-write invariant)"
     )

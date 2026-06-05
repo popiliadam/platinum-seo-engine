@@ -166,6 +166,13 @@ init-project supports an explicit operator opt-in:
 # Operator-side invocation (CLI):
 #   /pseo-init my-slug --schema-version=1.5
 #
+# NOTE: `--schema-version` is a SKILL / slash-command-layer flag only.
+# It is NEVER forwarded to scripts/state/bootstrap_project.py — that
+# CLI's argparse has no --schema-version option and would reject the
+# argument. The skill layer interprets the flag and, when set, gates the
+# Migration 0005 subprocess below; the bootstrap CLI is invoked (Step 4)
+# without it.
+#
 # Inside the skill protocol: after Step 4, if the operator passed the
 # explicit `--schema-version=1.5` flag AND the resulting
 # project.config.json carries schema_version other than "1.5"
@@ -298,24 +305,38 @@ All `outputs.*` values are STRING-TYPED artifact paths (workflow-run
 schema constraint; F5 rule). Numeric counts go in events.jsonl, not
 in workflow_run.outputs.
 
-## Mandatory Cascade — brand-onboarding (Phase 3 G-AI-05)
+## Planned Cascade — brand-onboarding (Phase 3 G-AI-05; Phase-14 deferral)
 
-After Step 10 emits `complete`, init-project MUST emit a
-`cascade: brand-onboarding` event to `_state/events.jsonl`. The
-skill auto-runner picks this up and invokes `brand-onboarding`
-with the freshly scaffolded project slug. The 3-stage bank-seed
-pipeline (Stages A + B + C) populates
+> **PLANNED (Phase 14) — not yet wired.** The cascade auto-runner and the
+> `cascade: brand-onboarding` event mechanism described here do NOT exist
+> in the current codebase: no skill auto-runner consumes a cascade event,
+> and `init-project` reaches terminal `status=done` at Step 10 with no
+> downstream gate. This section documents the INTENDED Phase-14 behavior,
+> mirroring `brand-onboarding`'s own staging→canonical deferral framing.
+
+Once the cascade auto-runner exists (Phase 14), after Step 10 emits
+`complete` init-project will emit a `cascade: brand-onboarding` event to
+`_state/events.jsonl`; the auto-runner will pick it up and invoke
+`brand-onboarding` with the freshly scaffolded project slug, whose 3-stage
+bank-seed pipeline (Stages A + B + C) populates
 `content_settings.experience_database` and
 `content_settings.original_research_database`.
 
-Init is not considered "complete" until brand-onboarding Stage C
-writes successfully:
-- **YMYL profile:** init blocks until ≥3 approved experience
-  entries are seeded (DURUR #9 BANK-SEED-PROFILE-MIN-NOT-MET).
-- **Non-YMYL profile:** init blocks until ≥1 approved experience
-  entry OR operator explicit-skip via decisions map.
+**Planned completion gate (Phase 14, once the cascade is live):** init
+will not be considered "complete" until brand-onboarding Stage C writes
+successfully —
+- **YMYL profile:** ≥3 approved experience entries seeded (DURUR #9
+  BANK-SEED-PROFILE-MIN-NOT-MET).
+- **Non-YMYL profile:** ≥1 approved experience entry OR operator
+  explicit-skip via decisions map.
 
-Why this cascade exists: the May 2026 Core Update emphasizes
+**Today (pre-Phase-14):** Step 10's `complete` IS terminal — there is no
+cascade emission and no completion gate. Bank seeding is a separate,
+operator-initiated `brand-onboarding` run. The paired test
+(`tests/skills/test_init_project.py`) asserts this terminal-`done`
+contract.
+
+Why this cascade is planned: the May 2026 Core Update emphasizes
 "original, helpful, people-first content" and penalizes
 "automated, ad-bloated, repetitive content". Empty banks (the
 pre-Phase-3 default state of all 9 projects) trivially pass

@@ -165,7 +165,7 @@ def test_frontmatter_validates(
 ) -> None:
     """SKILL.md frontmatter must:
       (a) parse as YAML;
-      (b) carry name=weekly-summary, status=wip, version="1.0",
+      (b) carry name=weekly-summary, status=active, version="1.0",
           category=reporting;
       (c) declare project_slug as required string input;
       (d) declare 0 mcp_tools (LOCAL aggregation, no MCP);
@@ -531,3 +531,135 @@ def test_transform_is_read_only_no_excel_writes() -> None:
         "scripts.state.events_writer import is forbidden in weekly_summary "
         "(REVIZE 3 — no events.jsonl writes; Q-RP-01 deferred to Phase 14)"
     )
+
+
+# ---------------------------------------------------------------------------
+# Test 10 — DURUR #2: WorkspaceRootUnsetError is now reachable (B2-06)
+# ---------------------------------------------------------------------------
+
+def test_workspace_root_unset_raises_when_unresolvable(tmp_path: Path) -> None:
+    """B2-06 / SKILL.md DURUR #2: main() raises WorkspaceRootUnsetError (a
+    typed WeeklySummaryError) when --workspace-root cannot be resolved to a
+    projects/{slug}/ directory. This is the documented stop condition #2 made
+    real — previously the class was declared + exported but never raised, so
+    an unresolvable workspace surfaced as a generic WorkbookMissingError or
+    argparse error instead of the typed envelope the contract promises.
+
+    The split is semantic: projects/{slug}/ ABSENT → WorkspaceRootUnsetError;
+    projects/{slug}/ present but master.xlsx absent → WorkbookMissingError
+    (see test_workbook_missing_raises)."""
+    # WorkspaceRootUnsetError is a subclass of the base envelope.
+    assert issubclass(ws.WorkspaceRootUnsetError, ws.WeeklySummaryError)
+
+    # projects/{slug}/ does not exist under this workspace root.
+    empty_ws = tmp_path / "no-projects-here"
+    empty_ws.mkdir()
+    with pytest.raises(ws.WorkspaceRootUnsetError):
+        ws.main([
+            "--project-slug", "demo-project",
+            "--workspace-root", str(empty_ws),
+        ])
+
+    # An empty --workspace-root is also unresolvable.
+    with pytest.raises(ws.WorkspaceRootUnsetError):
+        ws.main([
+            "--project-slug", "demo-project",
+            "--workspace-root", "",
+        ])
+
+
+# ---------------------------------------------------------------------------
+# Test 11 — DURUR #1: WorkbookMissingError when project dir exists, no workbook
+# ---------------------------------------------------------------------------
+
+def test_workbook_missing_raises(tmp_path: Path) -> None:
+    """SKILL.md DURUR #1: projects/{slug}/ EXISTS but master.xlsx is absent →
+    WorkbookMissingError. This is the other side of the B2-06 split: a present
+    project dir without a workbook is a workbook problem, NOT a workspace-root
+    problem."""
+    project_root = tmp_path / "ws" / "projects" / "demo-project"
+    project_root.mkdir(parents=True)  # dir exists; master.xlsx intentionally absent
+    with pytest.raises(ws.WorkbookMissingError):
+        ws.main([
+            "--project-slug", "demo-project",
+            "--workspace-root", str(tmp_path / "ws"),
+        ])
+
+
+# ---------------------------------------------------------------------------
+# Test 12 — DURUR #3: TemplateMissingError from build_report_markdown
+# ---------------------------------------------------------------------------
+
+def test_template_missing_raises(
+    synthetic_sheets: dict[str, list[dict]], tmp_path: Path,
+) -> None:
+    """SKILL.md DURUR #3: build_report_markdown raises TemplateMissingError
+    when the template file is not on disk (reachable today; previously
+    untested)."""
+    batch = ws.aggregate(
+        project_slug="demo-project", sheets=synthetic_sheets,
+        work_events=[], week_end=date(2026, 4, 26),
+    )
+    missing = tmp_path / "nope" / "weekly-summary.template.md"
+    with pytest.raises(ws.TemplateMissingError):
+        ws.build_report_markdown(
+            batch=batch, generated_at="2026-04-27T08:00:00Z",
+            template_path=missing,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Test 13 — DURUR #4: WeeklySummaryError envelope on bad project_slug
+# ---------------------------------------------------------------------------
+
+def test_weekly_summary_error_on_bad_slug() -> None:
+    """SKILL.md DURUR #4: aggregate raises the WeeklySummaryError base
+    envelope on an empty / blank / non-string project_slug (reachable today;
+    previously untested)."""
+    for bad in ("", "   ", None):
+        with pytest.raises(ws.WeeklySummaryError):
+            ws.aggregate(
+                project_slug=bad, sheets={}, work_events=[],
+                week_end=date(2026, 4, 26),
+            )
+
+
+# ---------------------------------------------------------------------------
+# Test 14 — Idempotency / byte-stability (SKILL.md discipline checklist)
+# ---------------------------------------------------------------------------
+
+def test_idempotent_byte_stable_output(
+    synthetic_sheets: dict[str, list[dict]], synthetic_events: Path,
+) -> None:
+    """SKILL.md discipline checklist ('Idempotency: same workbook + frozen
+    events + frozen clock → byte-stable report + snapshot'). Runs the
+    aggregate → render / snapshot pipeline twice with a fixed generated_at and
+    frozen inputs and asserts BYTE-identical markdown + snapshot JSON — the
+    guarantee was claimed in the docstring but never actually exercised."""
+    generated_at = "2026-04-27T08:00:00Z"
+    work_events = ws.read_events_jsonl(
+        synthetic_events, date(2026, 4, 20), date(2026, 4, 26),
+        event_kind=ws.EVENT_KIND_WORK,
+    )
+
+    def render_once() -> tuple[str, str]:
+        batch = ws.aggregate(
+            project_slug="demo-project", sheets=synthetic_sheets,
+            work_events=work_events, week_end=date(2026, 4, 26),
+        )
+        md = ws.build_report_markdown(
+            batch=batch, generated_at=generated_at, template_path=TEMPLATE_PATH,
+        )
+        snap = json.dumps(
+            ws.build_snapshot(batch=batch, generated_at=generated_at),
+            ensure_ascii=False, indent=2, sort_keys=True,
+        )
+        return md, snap
+
+    md1, snap1 = render_once()
+    md2, snap2 = render_once()
+    assert md1 == md2, "report markdown not byte-stable across identical runs"
+    assert snap1 == snap2, "snapshot JSON not byte-stable across identical runs"
+    # Byte-level equality — the SKILL.md guarantee is byte-IDENTICAL output.
+    assert md1.encode("utf-8") == md2.encode("utf-8")
+    assert snap1.encode("utf-8") == snap2.encode("utf-8")

@@ -6,7 +6,7 @@ description: |
   taglemesi", "hangi makaleyi yazalım" der ya da /pseo-new-content-plan
   çağırır. Phase 7 content-gaps staging JSON'ını (DFS keyword_ideas
   candidate inventory) okur, opsiyonel keyword_overview + search_intent
-  enrichment ekler ve `master.xlsx#new_content_plan` sheet'ine 11-col
+  enrichment ekler ve `master.xlsx#new_content_plan` sheet'ine 14-col
   schema-locked row üretir.
   Also use when: aktif projenin master.xlsx#cluster_keywords sheet'i
   cluster-map skill tarafından doldurulmuş; budget pre-flight PASS;
@@ -124,7 +124,7 @@ test override (mirrors workflow_runner / events_writer).
 ## Outputs (artifacts produced)
 
 - `projects/{slug}/master.xlsx#new_content_plan` — one row per planned
-  article (11 cols, schema-locked).
+  article (14 cols, schema-locked).
 - `projects/{slug}/outputs/reports/{date}-new-content-plan.md` —
   human-readable summary (top planned keywords, TIVL distribution,
   cluster coverage).
@@ -305,10 +305,14 @@ python3 scripts/planning/new_content_plan_transform.py \
 ```
 
 Produces a JSON array (`new_content_plan`) shaped to the master-excel
-schema (11 columns: id, title, url_slug, primary_keyword,
+schema (14 columns: id, title, url_slug, primary_keyword,
 monthly_volume, assigned_cluster, target_word_count, priority,
-created_date, tivl_tag, lifecycle_status). The transform is
-idempotent: same input → byte-identical output.
+created_date, tivl_tag, lifecycle_status, image_prompt, alt_text,
+content_type). The last three (Phase-10 additive: `image_prompt`,
+`alt_text`, `content_type`) default to empty string at plan time and
+are materialised later by `new-blog` / `generate-images` (R-71/R-72/R-77
+image discipline + content_type enum). The transform is idempotent:
+same input → byte-identical output.
 
 If `meta.row_count == 0`, the skill SKIPS write_excel and emits a
 "no new content candidates" notice (clean exit, not error).
@@ -424,7 +428,7 @@ Stop and flag the manager — do not patch, do not fall back.
    raises `ValueError("Unrecognized DFS response shape")`. STOP, the
    wrapper version drift is an ADR-level event.
 3. `master.xlsx#new_content_plan` column count or names don't match
-   schema (`schemas/master-excel.schema.json#new_content_plan`, 11
+   schema (`schemas/master-excel.schema.json#new_content_plan`, 14
    columns). STOP, schema-first violation.
 4. `transaction.append` raises `RowSchemaError` (e.g.,
    `monthly_volume` not int, `status` not in statusEnum, `tivl_tag`
@@ -448,8 +452,9 @@ Stop and flag the manager — do not patch, do not fall back.
 ## Cross-references
 
 - Schemas: `schemas/master-excel.schema.json`
-  (new_content_plan sheet, 11 required_columns + statusEnum +
-  tivl_tag enum + lifecycle_status enum), `schemas/events.schema.json`
+  (new_content_plan sheet, 14 required_columns + statusEnum +
+  tivl_tag enum + lifecycle_status enum + content_type enum),
+  `schemas/events.schema.json`
   (`source.kind=dataforseo_mcp`,
   `target_excel_sheet=new_content_plan`),
   `schemas/skill-frontmatter.schema.json` (this frontmatter; budget
@@ -481,7 +486,7 @@ Stop and flag the manager — do not patch, do not fall back.
 - [x] TODO/fallback YASAK — every DURUR raises, none silently downgrade.
 - [x] Schema-first — frontmatter validates against Draft 7 schema; budget
       block additionalProperties:false (Q-W-A4-01); new_content_plan row
-      shape locked to 11-col master-excel tuple.
+      shape locked to 14-col master-excel tuple.
 - [x] Plugin-agnostik — no slug literals; transform has 0 hardcoded slug.
 - [x] ADR-013: `Use when`/`Also use when`/`Do not use when` are STRING
       content inside `description`, not separate fields.

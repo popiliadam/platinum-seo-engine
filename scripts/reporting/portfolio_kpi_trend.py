@@ -4,10 +4,10 @@
 Multi-project READ-ONLY daily time-series aggregator. period_days range
 [7,90], default 30. Per active project: tasks_added (master_task col K
 created_date), tasks_done (col L done_date status=DONE), work_events
-density per event_type 10-enum (events.jsonl event_kind=work). LOCAL
+density per event_type 12-enum (events.jsonl event_kind=work). LOCAL
 approximation paterni (W-E1+W-E2): gscTotals stub all keys=0 until GSC
 longitudinal Phase 6+. Schema authority: portfolio-config v1.1,
-master-excel master_task K/L, events event_type 10 enum,
+master-excel master_task K/L, events event_type 12 enum,
 monthly-report gscTotals stub. Outputs:
 projects/_portfolio/outputs/reports/{date}-portfolio-kpi-trend.md +
 inbox/local/{date}-portfolio-kpi-trend.json + master.xlsx#none. Q-RP-01
@@ -38,7 +38,7 @@ STATUS_ENUM: tuple[str, ...] = (
     "TODO", "ONGOING", "EXISTS", "DONE", "BLOCKED", "DEFERRED", "CANCELED",
 )
 PERIOD_DAYS_MIN, PERIOD_DAYS_MAX, PERIOD_DAYS_DEFAULT = 7, 90, 30
-ACTIVE_PROJECTS_MAX = 8
+ACTIVE_PROJECTS_MAX = 12
 WRITER_NAME = "portfolio_kpi_trend"
 DEFAULT_TEMPLATE_REL = "templates/reports/portfolio-kpi-trend.template.md"
 

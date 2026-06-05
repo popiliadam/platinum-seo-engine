@@ -18,6 +18,7 @@ inputs:
 outputs:
   - "outputs/reports/{date}-drift-{slug}.md"
   - "_state/consistency-report-{slug}.json"
+  - "_state/events.snapshot.json"
   - "events.jsonl"
 consumes:
   - "init-project:projects/{slug}/master.xlsx"
@@ -85,6 +86,10 @@ list.
 
 - `projects/{slug}/outputs/reports/{date}-drift-{slug}.md` — human report.
 - `projects/{slug}/_state/consistency-report-{slug}.json` — schema-valid JSON.
+- `projects/{slug}/_state/events.snapshot.json` — the F-12 monotonic
+  high-water `events.jsonl` line count (a derived governance baseline; the
+  one workspace write this otherwise read-only check performs — see
+  `scripts/validation/validate_invariants.py` `_write_events_snapshot`).
 - `projects/{slug}/_state/events.jsonl` — single `event_kind=audit` entry
   (`audit_action=accessed`, `audit_target=invariants:24`).
 

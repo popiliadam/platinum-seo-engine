@@ -1,6 +1,6 @@
 """tests/skills/governance/test_schema_validate.py — schema-validate skill (Phase 13 W-H1).
 
-Coverage (9 tests, lesson 29 self-extending positive drift over upper bound 6-8):
+Coverage (14 tests, lesson 29 self-extending positive drift over upper bound 6-8):
   1. Frontmatter required 8-field Draft7 validity (skill-frontmatter.schema.json).
   2. Inputs/Outputs structure — 2 inputs (schema_path + strict), 2 outputs
      (events.jsonl + report markdown). master.xlsx ABSENT.
@@ -22,6 +22,11 @@ Coverage (9 tests, lesson 29 self-extending positive drift over upper bound 6-8)
       mcp_tools=[] required + optional empty.
   12. Foundational Principles 3-layer — truth-verifiable + profile-aware
       (5-enum) + AI suistimal yasağı.
+  13. SF MCP tool-mapping schema in the runtime sweep — sf-mcp-tool-
+      mapping.schema.json exists under schemas/ (glob auto-discovers it),
+      Draft7-validates, and its sample instance validates (v1.8 Phase 4).
+  14. F-23 SF MCP invariant registered in cross-sheet-invariants.json
+      (v1.8 Phase 4 additive registry presence).
 
 Discipline:
   - Every assertion derives from a schema authority (schemas/*) or

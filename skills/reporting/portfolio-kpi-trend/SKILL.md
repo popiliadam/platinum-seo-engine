@@ -7,14 +7,14 @@ description: |
   "tasks done over time", "event density" der ya da N günlük (7-90)
   portföy çapında trend tablosu istediğinde tetiklenir.
   Also use when: portfolio.config.json `active_projects` doluyken
-  (1-8 entry, schema maxItems=8); her aktif projenin master.xlsx +
+  (1-12 entry, schema maxItems=12); her aktif projenin master.xlsx +
   _state/events.jsonl ulaşılabilir; period_days 7-90 aralığında bir
-  zaman pencere için günlük tasks_done axis + per event_type 10 enum
+  zaman pencere için günlük tasks_done axis + per event_type 12 enum
   bucket density lazım; weekly-summary ya da portfolio-weekly-brief
   öncesinde uzun pencere kıyaslama gerekiyor; LOCAL approximation
   yeterli (GSC longitudinal Phase 6+ sonrasına ertelendi).
   Do not use when: portfolio.config.json yok (init-portfolio önce
-  çalışmalı, DURUR PortfolioConfigMissingError); active_projects 8'i
+  çalışmalı, DURUR PortfolioConfigMissingError); active_projects 12'yi
   aşıyor (schema maxItems sentinel, DURUR ActiveProjectsCeilingError
   — fazla entry'leri pending_onboard'a taşı); cross_query.read_only
   != true (schema const, DURUR ReadOnlyContractViolation);
@@ -68,13 +68,13 @@ autonomy:
 
 Multi-project READ-ONLY time series aggregator. Iterates
 `projects/_portfolio/portfolio.config.json` `active_projects[]`
-(max 8, schema-enforced) and for each project produces a daily
+(max 12, schema-enforced) and for each project produces a daily
 trend axis spanning `period_days` (7-90, default 30) covering:
 
 - `tasks_done` per day (from `master.xlsx#master_task` col L
   `done_date`),
 - `tasks_added` per day (col K `created_date`),
-- `work_events` density bucketed by the 10-value `event_type`
+- `work_events` density bucketed by the 12-value `event_type`
   enum (from per-project `_state/events.jsonl`, `event_kind=work`).
 
 This skill follows the **convention authority** established by
@@ -129,25 +129,25 @@ write tokens — used by the test suite as a schema-first guard
 
 ## Schema authority
 
-`schemas/master-excel.schema.json#master_task` (lines 269-303):
+`schemas/master-excel.schema.json#master_task`:
 
 - col K = `created_date` (`type: date`) — drives `tasks_added` per day.
 - col L = `done_date` (`type: date`) — drives `tasks_done` per day.
 - col J = `status` (`#/definitions/statusEnum`) — only DONE rows
   count toward `tasks_done` (cross-validated with `done_date`).
 
-`schemas/events.schema.json#event_type` (lines 147-162) — closed
-10-value enum. Each event_type gets its own density bucket per
-project per period:
+`schemas/events.schema.json#event_type` — closed 12-value enum.
+Each event_type gets its own density bucket per project per period:
 
 - `content_new`, `content_revise`, `content_remove`, `tech_fix`,
   `quickwin_applied`, `pillar_launch`, `schema_fix`,
-  `redirect_deployed`, `backlink_outreach`, `manual`.
+  `redirect_deployed`, `backlink_outreach`, `manual`,
+  `skill_content_remediation`, `skill_whats_next`.
 
 `schemas/portfolio-config.schema.json` v1.1:
 
 - `active_projects[].slug` + `workspace_path` drive iteration.
-- `active_projects.maxItems = 8` enforced
+- `active_projects.maxItems = 12` enforced
   (DURUR `ActiveProjectsCeilingError`).
 - `cross_query.read_only = true` const enforced
   (DURUR `ReadOnlyContractViolation`).
@@ -183,7 +183,7 @@ established by `monthly_report.py` (W-E1) and `weekly_summary.py`
      - if missing: emit warning, append empty trend (graceful skip).
      - else: scan master_task col K + L for in-window dates;
        scan events.jsonl for in-window event_kind=work events.
-     - bucket events by event_type (10 enum), tally per day.
+     - bucket events by event_type (12 enum), tally per day.
      - bucket tasks_done by done_date, tasks_added by created_date.
 6. Sort projects by (priority asc, slug asc) — deterministic.
 7. Build per-project daily series (no gaps in the date axis).
@@ -212,7 +212,7 @@ Stop and flag the manager — do not patch, do not fall back.
    or unreadable. Run init-portfolio first.
 2. **PortfolioConfigInvalidError** — payload failed Draft 7
    validation against `schemas/portfolio-config.schema.json`.
-3. **ActiveProjectsCeilingError** — `active_projects` > 8 (schema
+3. **ActiveProjectsCeilingError** — `active_projects` > 12 (schema
    `maxItems` sentinel). Move surplus to `pending_onboard`.
 4. **ReadOnlyContractViolation** — `cross_query.read_only != true`
    (schema `const: true`). The aggregator cannot run with read-only
@@ -265,10 +265,10 @@ events_writer.append_audit(
 ## Cross-references
 
 - Schemas: `schemas/portfolio-config.schema.json` v1.1
-  (`active_projects.maxItems = 8`; `cross_query.read_only = true`
+  (`active_projects.maxItems = 12`; `cross_query.read_only = true`
   const), `schemas/master-excel.schema.json#master_task` cols K +
-  L (date-typed columns; `#/definitions/statusEnum` line 20),
-  `schemas/events.schema.json#event_type` (10 enum line 150-161),
+  L (date-typed columns; `#/definitions/statusEnum`),
+  `schemas/events.schema.json#event_type` (12 enum),
   `schemas/monthly-report.schema.json#gscTotals` (stub subset),
   `schemas/skill-frontmatter.schema.json` (this frontmatter).
 - Cross-modules (IMPORT-only): `scripts/reporting/render_template.py`
@@ -279,7 +279,7 @@ events_writer.append_audit(
 - Tests: `tests/skills/test_portfolio_kpi_trend.py` (≥6 cases incl.
   schema validate + period_days range sentinel + multi-project
   time series merge + empty events tolerance + trend line
-  continuity + event_type 10 enum coverage + natural_language min
+  continuity + event_type 12 enum coverage + natural_language min
   length + forbidden tokens guard + read-only enforcement + path
   convention).
 - Pattern reference: `scripts/reporting/portfolio_overview.py`
@@ -319,7 +319,7 @@ events_writer.append_audit(
 - [x] period_days range 7-90 sentinel (PeriodDaysOutOfRangeError).
 - [x] LOCAL approximation transparent — gscTotals stub annotated
       inline + in this SKILL.md (W-E1 + W-E2 paterni reuse).
-- [x] event_type 10 enum coverage — every enum value gets a bucket
+- [x] event_type 12 enum coverage — every enum value gets a bucket
       (assert in test).
 - [x] natural_language phrases ≥ 30 char (min length sentinel
       asserted by test).

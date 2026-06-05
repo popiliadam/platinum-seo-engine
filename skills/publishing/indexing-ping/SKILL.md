@@ -29,7 +29,7 @@ inputs:
   submission_type:
     type: string
     required: true
-    description: "Enum: indexnow, google_indexing_api, both. Invalid değer DURUR #2 ABORT. 'indexnow' sadece IndexNow REST POST; 'google_indexing_api' sadece mcp__gsc__submit_sitemap path; 'both' iki path paralel çalışır."
+    description: "Enum: indexnow, google_indexing_api, both. Invalid değer DURUR #2 ABORT. 'indexnow' sadece IndexNow REST POST; 'google_indexing_api' şu an sitemap-submit path (mcp__gsc__submit_sitemap = sitemap.xml submit, per-URL DEĞİL); per-URL Google Indexing API URL_UPDATED ayrı consent-gated mekanizma, Wave 2 sonrası wire edilecek; 'both' iki path paralel çalışır."
 outputs:
   - "_state/events.jsonl"
   - "outputs/indexing/{date}-submission-report.json"
@@ -72,11 +72,16 @@ surviving URL set via two parallel paths:
        "keyLocation": "https://<domain>/<key>.txt",
        "urlList": [...] }`. Reads `INDEXNOW_KEY` from `.env`; absent →
    AMBER skip indexnow path (DURUR #3).
-2. **Google Indexing API** — `mcp__gsc__submit_sitemap` per URL with
-   `URL_UPDATED` notification (per Google Indexing API docs). **Never
-   autonomous** — a `URL_UPDATED` submit requires explicit operator approval
-   before each run (frontmatter `requires_approval: true`,
-   `safe_auto_execute: false`); autonomous submission is forbidden.
+2. **Sitemap submission (current Google-side path)** —
+   `mcp__gsc__submit_sitemap` submits the project `sitemap.xml` document
+   (NOT per-URL); Google then crawls the URLs it lists. This is the only
+   Google-side path wired in Wave 1. The **per-URL Google Indexing API
+   `URL_UPDATED`** mechanism (`indexing.googleapis.com/v3/
+   urlNotifications:publish`) is a **separate, consent-gated integration
+   NOT yet wired** — to be added post-Wave-2. **Never autonomous** — a
+   `URL_UPDATED` submit requires explicit operator approval before each
+   run (frontmatter `requires_approval: true`, `safe_auto_execute:
+   false`); autonomous submission is forbidden.
 
 The skill is **READ-ONLY** with respect to `master.xlsx`. F-1 schema
 authority: `redirect_404` and `robots_txt` sheets allowed_writers=null
@@ -97,17 +102,21 @@ worker never invokes `transaction.append`, `transaction.update`, or
 
 - `_state/events.jsonl` — audit append. **Schema-first override** (lesson
   7+23 worker authority): the brief sketched `event_type=indexing_submitted`
-  but `events.schema.json` declares `event_type` as a **closed 10-value
-  enum** (`content_new, content_revise, content_remove, tech_fix,
-  quickwin_applied, pillar_launch, schema_fix, redirect_deployed,
-  backlink_outreach, manual`). `indexing_submitted` is NOT in the enum;
-  emitting it would fail `Draft7Validator` and break the F-8 invariant.
+  but `events.schema.json` declares `event_type` as a **closed 12-value
+  enum** (10 legacy: `content_new, content_revise, content_remove,
+  tech_fix, quickwin_applied, pillar_launch, schema_fix,
+  redirect_deployed, backlink_outreach, manual` + 2 skill_<name>:
+  `skill_content_remediation, skill_whats_next`). `indexing_submitted`
+  is NOT in the enum;
+  emitting it would fail `Draft7Validator` and break the events.schema
+  event_type enum.
   The skill therefore writes `event_kind=work` + `event_type=manual`
   (free-form work record, `note` required and populated with the
   `host + url_count + submitted_count + failed_count` summary), and
   populates the schema's purpose-built `indexing_ping` sub-object
-  (events.schema.json L206-218: `attempted, call_type, response_code,
-  called_at, verified_at, verified_coverage`). `task_id` is required on
+  (events.schema.json `properties.indexing_ping`: `attempted, call_type,
+  response_code, called_at, verified_at, verified_coverage`). `task_id`
+  is required on
   work events; the skill mints `T-NNNN` from a per-run counter.
 - `outputs/indexing/{date}-submission-report.json` — human-readable
   per-run report with `submitted_count, failed_urls[], rejected_urls[]
@@ -254,8 +263,13 @@ inline retry, NOT global retry).
 
 Sadece `submission_type in [google_indexing_api, both]` ise çalışır.
 
-`mcp__gsc__submit_sitemap` per URL with `URL_UPDATED` notification.
-Per Google Indexing API docs: 200/204 success, 429 quota, 5xx server.
+`mcp__gsc__submit_sitemap` submits the project `sitemap.xml` document
+(sitemap-level submission, NOT per-URL). Per GSC sitemap API: 200/204
+success, 429 quota, 5xx server. The per-URL Google Indexing API
+`URL_UPDATED` path (`indexing.googleapis.com/v3/urlNotifications:publish`)
+is a separate, consent-gated integration **not yet wired** — wiring is
+deferred to post-Wave-2 and stays gated behind explicit per-run operator
+approval (`requires_approval: true`); autonomous submission is forbidden.
 
 **DURUR #4 trigger.** GSC API 5xx / timeout → AMBER + retry-once
 exponential backoff (1s base, 2x). Retry fail → mark URL failed,
@@ -275,13 +289,13 @@ Per-URL outcome dictionary build:
 
 `_state/events.jsonl` append. **Schema-first override** rationale (see
 Outputs section above): `event_type=indexing_submitted` would violate
-F-8 enum, so skill writes:
+the events.schema event_type enum, so skill writes:
 
 | Field            | Value                                          |
 |------------------|------------------------------------------------|
 | `schema_version` | `1.0`                                          |
 | `event_kind`     | `work` (events.schema enum, ADR-020)           |
-| `event_type`     | `manual` (F-8 closed-10 enum compliant)        |
+| `event_type`     | `manual` (closed-12 enum compliant)            |
 | `event_id`       | `manual_T-NNNN_<timestamp_compact>`            |
 | `task_id`        | `T-NNNN` (per-run minted, work events require) |
 | `timestamp`      | UTC ISO 8601                                   |
@@ -373,12 +387,12 @@ indexing_submitted` and listed `event_kind=work` / `event_type=
 indexing_submitted` under "Outputs". Worker authority applied:
 
 1. **Override 1 — `event_type` enum compliance.** `events.schema.json`
-   declares `event_type` as a closed 10-value enum (F-8); the brief's
+   declares `event_type` as a closed 12-value enum; the brief's
    `indexing_submitted` is NOT in it. Skill writes `event_type=manual`
    instead and shifts the indexing-specific fields into the schema's
-   purpose-built `indexing_ping` sub-object (events.schema L206-218).
-   Compliance restored without schema bump (Phase 12 hedef 0 schema
-   bump).
+   purpose-built `indexing_ping` sub-object (events.schema
+   `properties.indexing_ping`). Compliance restored without schema bump
+   (Phase 12 hedef 0 schema bump).
 2. **Override 2 — Frontmatter `outputs[]` is artifact refs, not event
    payload fields.** The brief's "Outputs" mixed conceptual layers.
    Frontmatter outputs[] now lists `_state/events.jsonl` and
@@ -402,8 +416,8 @@ fixes per Phase 11 lesson 28 matrix).
 - `schemas/skill-frontmatter.schema.json` (8 required fields, category
   enum 8 values, status enum 3 values).
 - `schemas/events.schema.json` (event_kind enum 4 values, event_type
-  closed 10-value enum F-8, indexing_ping sub-object L206-218,
-  ADR-020 workflow kind).
+  closed 12-value enum, indexing_ping sub-object
+  `properties.indexing_ping`, ADR-020 workflow kind).
 - `schemas/master-excel.schema.json` (18 sheets — `redirect_404` and
   `robots_txt` columns; F-1 allowed_writers=null discipline).
 - `schemas/project-config.schema.json` v1.2 (singular profile field,
