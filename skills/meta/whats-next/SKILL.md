@@ -331,12 +331,12 @@ DURUR — those are AMBER (return empty candidate list, continue).
 ## Cross-references
 
 - Schemas: `schemas/skill-frontmatter.schema.json` (frontmatter),
-  `schemas/events.schema.json` (event_kind=work, event_type=manual,
+  `schemas/events.schema.json` (event_kind=work, event_type=skill_whats_next,
   task_id pattern, note required), `schemas/workflow-run.schema.json`
   (outputs string-typed, F5).
 - Cross-modules: `scripts/state/workflow_runner.py`,
   `scripts/state/events_writer.py`, `openpyxl` (read-only).
-- Tests: `tests/skills/test_whats_next.py` (5 cases incl. live
-  workspace-staging pilot smoke).
+- Tests: `tests/skills/test_whats_next.py` (7 cases; all tmp_path
+  fixtures — no live workspace-staging side effects).
 - ADRs: ADR-013 (use_when string), ADR-019 (retry_count), ADR-020
   (event_kind=workflow), ADR-021 (`_state/` path).

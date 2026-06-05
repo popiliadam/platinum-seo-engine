@@ -18,7 +18,7 @@ Coverage (15 tests):
   12. completed_work F-12 6-col required_columns enforcement.
   13. master_task ONGOING/TODO → DONE transition + statusEnum compliance
       (ONGOING NOT in_progress; brief-drift schema-first override).
-  14. events.jsonl event_type schema-first override — F-8 closed-10 enum
+  14. events.jsonl event_type schema-first override — F-08 closed-10 enum
       compliance (event_type=manual or quickwin_applied; task_completed
       NEVER emitted, brief drift detected).
   15. Plugin-agnostik (no slug hardcode) + Foundational Principles 3-layer
@@ -416,11 +416,11 @@ def test_master_task_status_enum_schema_first_override() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test 14 — events.jsonl event_type schema-first override (F-8 closed-10)
+# Test 14 — events.jsonl event_type schema-first override (F-08 closed-10)
 # ---------------------------------------------------------------------------
 
 def test_events_jsonl_event_type_schema_first_override() -> None:
-    """events.schema.json declares event_type as closed 10-value enum (F-8
+    """events.schema.json declares event_type as closed 10-value enum (F-08
     WORK-only). Brief suggested 'task_completed' but it's NOT in the enum.
     Skill must branch event_type=quickwin_applied (if primary_source=quickwin
     + cluster+before+after) OR event_type=manual (default fallback W-G1
@@ -474,8 +474,8 @@ def test_events_jsonl_event_type_schema_first_override() -> None:
             or "never be emitted" in text.lower()), (
         "Skill must explicitly state task_completed is NEVER emitted"
     )
-    # F-8 + lesson 7+23+31 references
-    assert "F-8" in text, "F-8 enum invariant reference missing"
+    # F-08 + lesson 7+23+31 references
+    assert "F-08" in text, "F-08 enum invariant reference missing"
     assert "lesson 7" in text.lower() or "lesson 7+23" in text.lower(), (
         "lesson 7+23 worker schema-first override authority reference missing"
     )
