@@ -6,7 +6,7 @@ description: |
   "gsc_performance sheet yenile" der ya da /pseo-gsc-pull çağırır.
   Also use when: aktif projenin master.xlsx'i mevcut; gsc_performance sheet'i
   güncellenmesi gerekiyor (recent vs previous window delta); F-08 invariant
-  (target_url ⊆ crawl_sitemap ∪ gsc_performance) tetiklenmeden önce
+  (quick_wins.url ⊆ (crawl_sitemap.url ∪ gsc_performance.url)) tetiklenmeden önce
   gsc_performance dolu olmalı; quick-wins / content-decay downstream skill'leri
   bu veriye bağımlı.
   Do not use when: quick-win opportunity scoring (quick-wins skill), content
@@ -219,10 +219,11 @@ transaction.append(
 ### Step 8 — `render_report`
 
 `render_template.py templates/reports/gsc-pull.template.md data.json`
-→ `outputs/reports/{date}-gsc-pull.md`. Variables: `$project_slug`,
-`$date`, `$days_back`, `$total_urls`, `$top_rising_url`,
-`$top_rising_delta_pct`, `$top_decay_url`, `$top_decay_delta_pct`,
-`$report_summary`.
+→ `outputs/reports/{date}-gsc-pull.md`. Variables (must match the
+template's `$tokens` exactly — `render_template.main` hard-fails on any
+mismatch): `$project_slug`, `$date`, `$days_back`, `$row_count_recent`,
+`$row_count_previous`, `$unique_urls`, `$top_5_pages`, `$delta_summary`,
+`$run_id`, `$rows_written`.
 
 ### Step 9 — Provenance event
 
@@ -336,4 +337,6 @@ Stop and flag the manager — do not patch, do not fall back.
 - [x] F5: `outputs.*` values are STRING-TYPED (artifact paths or
       stringified counts), never raw ints.
 - [x] F-08 unblock: gsc_performance population satisfies the
-      target_url ⊆ crawl_sitemap ∪ gsc_performance invariant precondition.
+      quick_wins.url ⊆ (crawl_sitemap.url ∪ gsc_performance.url) invariant
+      precondition (the active F-08 rule enforced by check_F_08; the deferred
+      `target_url` form is disclaimed in cross-sheet-invariants.json).

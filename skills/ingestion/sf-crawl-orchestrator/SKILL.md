@@ -494,6 +494,9 @@ the envelope JSON in inbox/sf-mcp/ carries the per-report manifest).
 ```python
 import json
 from scripts.state import events_writer
+# SSoT tier frozensets (hoisted — used by both the envelope manifest below and
+# the report status table further down).
+from scripts.ingestion.sf_import import TIER1_REQUIRED, TIER2_RECOMMENDED
 workflow_runner.start_step(handle.run_id, 6, project_slug=project_slug)
 
 envelope = {
@@ -506,7 +509,7 @@ envelope = {
         "exported_count": len(exported),
         "amber_warnings": amber_warnings,
     },
-    "reports": [{"canonical_name": r, "tier": "required" if r in tier1_required else "recommended"}
+    "reports": [{"canonical_name": r, "tier": "required" if r in TIER1_REQUIRED else "recommended"}
                 for r in exported],
 }
 envelope_path = (
@@ -537,7 +540,24 @@ events_writer.append_provenance(
 )
 
 # Render report via templates/reports/sf-crawl.template.md.
+# render_template.render() uses safe_substitute (see its docstring): any
+# template $token not supplied here stays visible in the report (non-fatal)
+# rather than discarding a completed 24-report crawl over a cosmetic gap.
 from scripts.reporting import render_template
+
+# Status table counters derived from `exported` + the SSoT tier frozensets
+# (imported at the top of this step). In
+# the success path every Tier 1 report exported (else DURUR-orch-8 rolled the
+# run back) so tier1_failed/tier1_missing are 0; Tier 2 misses are the AMBER set.
+t1_exported = sum(1 for r in exported if r in TIER1_REQUIRED)
+t2_exported = sum(1 for r in exported if r in TIER2_RECOMMENDED)
+t2_missing = len(TIER2_RECOMMENDED) - t2_exported
+
+# Per-phase durations are read back from the workflow run's recorded step
+# timings (workflow_runner persists started_at/finished_at per step). A phase
+# with no recorded duration renders as "n/a" — never a fabricated number.
+timings: dict[str, str] = {}  # {"preflight": ..., "poll": ..., "export": ..., "handoff": ..., "total": ...}
+
 report_path = render_template.render(
     template_path=workspace_root / "templates" / "reports" / "sf-crawl.template.md",
     output_path=workspace_root / "projects" / project_slug
@@ -546,10 +566,28 @@ report_path = render_template.render(
         "project_slug": project_slug,
         "date": today,
         "crawl_id": crawl_id,
+        "run_id": handle.run_id,
         "exported_count": str(len(exported)),
         "amber_count": str(len(amber_warnings)),
         "amber_warnings": "\n".join(f"- {w}" for w in amber_warnings) or "_(none)_",
-        "run_id": handle.run_id,
+        # 24-report status table (Tier 1 14 required + Tier 2 10 recommended).
+        "tier1_exported": str(t1_exported), "tier1_failed": "0", "tier1_missing": "0",
+        "tier2_exported": str(t2_exported), "tier2_failed": str(len(amber_warnings)),
+        "tier2_missing": str(t2_missing),
+        "total_failed": str(len(amber_warnings)), "total_missing": str(t2_missing),
+        "tier1_status": "PASS (14/14 required)",
+        "tier2_status": f"{t2_exported}/10 exported ({t2_missing} AMBER)",
+        # sf-import subprocess handoff result (Step 7 `result`).
+        "sf_import_exit_code": str(result.returncode),
+        "sf_import_sheet_summary": (result.stdout.strip().splitlines() or ["(no stdout)"])[-1],
+        # Durations from the run record (absent phase → "n/a", not fabricated).
+        "duration_preflight": timings.get("preflight", "n/a"),
+        "duration_poll": timings.get("poll", "n/a"),
+        "duration_export": timings.get("export", "n/a"),
+        "duration_handoff": timings.get("handoff", "n/a"),
+        "total_duration": timings.get("total", "n/a"),
+        "recommendations": "_(none)_" if not amber_warnings
+                           else "Review the AMBER Tier 2 gaps before the next crawl.",
     },
 )
 
@@ -664,11 +702,13 @@ error (transient network), the operator can:
   `scripts/util/sf_mcp_client.py` (Phase 2; NOT used here — orchestrator
   body calls MCP via `mcp__sf__sf_*` wrapper form; sf_mcp_client is for
   Phase 5 consumer skills with `use_sf_mcp_live=True`).
-- Tests: `tests/skills/test_sf_crawl_orchestrator.py` (10 cases:
-  happy_path_24_reports + 8 DURUR cases + sf-import handoff),
-  `tests/scripts/test_sf_crawl_orchestrator.py` (6 cases: pure-transform
-  helper coverage), `tests/smoke/test_sf_mcp_smoke.py` (1 case live MCP
-  skipif).
+- Tests: `tests/skills/test_sf_crawl_orchestrator.py` (11 cases: 10
+  functional — happy_path_24_reports + 8 DURUR cases + sf-import handoff —
+  plus 1 frontmatter-validation bonus),
+  `tests/scripts/test_sf_crawl_orchestrator_helpers.py` (16 cases:
+  pure-transform helper coverage — enumerate_reports / move_with_rollback /
+  parse_progress_response / build_export_plan / ndjson_to_csv),
+  `tests/smoke/test_sf_mcp_smoke.py` (1 case live MCP skipif).
 - Companion skill: `skills/ingestion/sf-import/SKILL.md` (frontmatter
   adds `source_run_id` optional input in Phase 3; body 8-step protocol
   UNCHANGED per D-SF-07).

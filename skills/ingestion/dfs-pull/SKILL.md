@@ -37,11 +37,6 @@ inputs:
     required: false
     default: "tr"
     description: "DFS language_code; varsayılan 'tr' = Turkish."
-  cluster:
-    type: string
-    required: false
-    default: "uncategorized"
-    description: "cluster_keywords sheet'inde A sütununa yazılacak cluster ismi."
 outputs:
   - "_state/staging/dfs_keyword_overview_{date}_{slug}.json"
   - "_state/staging/dfs_search_volume_{date}_{slug}.json"
@@ -98,7 +93,11 @@ the TR forwarding workaround block is DFS-specific.
 | `keywords`       | array   | —                | Required. Seed keyword list; transforms drive credits.  |
 | `location_code`  | integer | 2792             | DFS Turkey. Workaround gates the response server-side.  |
 | `language_code`  | string  | "tr"             | DFS Turkish.                                            |
-| `cluster`        | string  | "uncategorized"  | cluster_keywords col A.                                 |
+
+> **Removed input — `cluster`:** dfs-pull is staging-only (D-003); it never
+> writes `cluster_keywords`. Cluster assignment is the Phase 8 `cluster-map`
+> skill's job, which consumes the staging JSON. The old `cluster` input
+> promised a sheet write the body explicitly forbids, so it was dropped.
 
 `workspace_root` is resolved via `PSEO_WORKSPACE_ROOT` env or explicit
 test override (mirrors workflow_runner / events_writer).
@@ -232,12 +231,12 @@ or wrapper shapes uniformly, then builds two staging payloads:
 
 ```bash
 python3 scripts/ingestion/dfs_pull.py \
-    --raw-overview inbox/dfs/{date}-keyword_overview-{slug}.json \
-    --raw-volume   inbox/dfs/{date}-search_volume-{slug}.json \
+    --raw-overview  inbox/dfs/{date}-keyword_overview-{slug}.json \
+    --raw-volume    inbox/dfs/{date}-search_volume-{slug}.json \
     --location-code 2792 \
     --language-code tr \
     --staging-dir   _state/staging/ \
-    --slug          {project_slug}
+    --project-slug  {project_slug}
 ```
 
 Produces two staging JSON files (`dfs_keyword_overview_*.json` and
@@ -262,24 +261,28 @@ workflow_runner.request_approval(
 
 ### Step 8 — `write_staging` (atomic, schema-validated)
 
-Two `dfs_pull.write_staging()` calls — one per DFS tool. Each writes a
-self-contained staging JSON (overwrite-idempotent) under
-`projects/{slug}/_state/staging/`. Schema validated by
-`_validate_staging_payload()` before write — `StagingSchemaError` on
-drift. NO `transaction.append` here; staging-only.
+One `dfs_pull.write_staging()` call persists both DFS tools in a single
+pass from the `transform()` `result` dict. Each non-`None` tool is
+written to its own self-contained staging JSON (overwrite-idempotent)
+under the `staging_dir`, named `dfs_{tool}_{date}_{slug}.json` (the
+function calls `dfs_pull.staging_filename(tool=…, date=…, project_slug=…)`
+internally). Schema validated by `_validate_staging_payload()` before
+write — `StagingSchemaError` on drift. NO `transaction.append` here;
+staging-only. The call returns a `{tool: path}` dict; tools whose payload
+is `None` are skipped (no key).
 
 ```python
 from scripts.ingestion import dfs_pull
-overview_path = dfs_pull.write_staging(
-    payload=overview_staging_payload,   # _staging_table_dict() output
-    output_path=workspace_root/"projects"/project_slug/"_state"/"staging"
-                / dfs_pull.staging_filename("keyword_overview", today, project_slug),
+# `result` is the transform() output:
+#   {"keyword_overview": <staging|None>, "search_volume": <staging|None>, "meta": {…}}
+staging_paths = dfs_pull.write_staging(
+    result,
+    staging_dir=workspace_root / "projects" / project_slug / "_state" / "staging",
+    project_slug=project_slug,
+    date=today.isoformat(),
 )
-volume_path = dfs_pull.write_staging(
-    payload=volume_staging_payload,
-    output_path=workspace_root/"projects"/project_slug/"_state"/"staging"
-                / dfs_pull.staging_filename("search_volume", today, project_slug),
-)
+overview_path = staging_paths.get("keyword_overview")
+volume_path = staging_paths.get("search_volume")
 ```
 
 **No F-09 entanglement at this stage** — opportunity-sheet shared-writer

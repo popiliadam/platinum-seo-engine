@@ -31,6 +31,37 @@ def _die(msg: str) -> None:
     sys.exit(1)
 
 
+def render(
+    template_path: Path | str,
+    output_path: Path | str,
+    variables: dict,
+) -> Path:
+    """Render a ``$variable`` Markdown template to ``output_path``; return it.
+
+    Programmatic counterpart to :func:`main` for skill bodies that already hold
+    the variables in memory (e.g. sf-crawl-orchestrator Step 8) — no data.json
+    round-trip. Substitution is ``string.Template`` (the same dialect ``main``
+    owns; see the DIALECT BOUNDARY note above).
+
+    Unlike the strict CLI ``main`` (whose data.json is generated to match the
+    template, so a missing key is real drift worth failing on), this wrapper is
+    invoked at the FINAL step of an expensive, side-effectful run. It uses
+    ``safe_substitute`` so a missing *cosmetic* token leaves a visible ``$token``
+    in the report rather than discarding a completed crawl. Parent directories
+    are created; values are stringified.
+
+    Returns the ``output_path`` as a ``Path``.
+    """
+    tpl_path, out_path = Path(template_path), Path(output_path)
+    template_text = tpl_path.read_text(encoding="utf-8")
+    rendered = Template(template_text).safe_substitute(
+        {k: str(v) for k, v in variables.items()}
+    )
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(rendered, encoding="utf-8")
+    return out_path
+
+
 def main(argv: list[str]) -> int:
     if len(argv) != 3:
         _die("usage: render_template.py <template.md> <data.json>")
