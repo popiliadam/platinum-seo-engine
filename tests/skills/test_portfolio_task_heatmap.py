@@ -89,7 +89,7 @@ def _synthetic_config(active_count: int = 2) -> dict:
             "display_name": f"Alpha Test {i+1}",
             "workspace_path": f"./workspace-{i+1}",
             "profile": ["e-commerce"],
-            "priority": i + 1,
+            "priority": min(i + 1, 10),  # schema caps priority at 10
         })
     return {
         "schema_version": "1.1",
@@ -366,6 +366,20 @@ def test_heatmap_density_with_open_and_closed_tasks(
     assert "alpha-test-1" in report
     assert "Performance" in report
     assert "SEO" in report
+    # Every $placeholder must be substituted EXCEPT $run_id — the K-06
+    # audit-trail placeholder a render-time hook injects later
+    # (test_run_id_coverage.py enforces $run_id in every report template;
+    # monthly_report.py's setdefault("run_id","$run_id") is the canonical
+    # idiom). Read identifiers from the RAW template (stripping $$ escapes
+    # — a $$var doc-literal is NOT a placeholder) and assert none but
+    # run_id survive into the render.
+    template_ids = set(re.findall(
+        r"\$\{?([A-Za-z_]\w*)\}?", template_text.replace("$$", ""))) - {"run_id"}
+    leaked = sorted(
+        i for i in template_ids
+        if re.search(r"\$\{?" + re.escape(i) + r"\}?", report)
+    )
+    assert not leaked, f"unsubstituted template placeholders: {leaked}"
 
     # Idempotency: same inputs + generated_at -> byte-stable snapshot.
     batch2 = pth.aggregate(
@@ -424,9 +438,12 @@ def test_status_check_drift_advisory_non_durur(
         ("T-2", "SEO",         "HIGH",     "ONGOING"),
     ])
     # Plant a consistency-report with verdict=AMBER -> drift advisory.
+    # Filename matches the drift-check producer's canonical artifact
+    # `consistency-report-{slug}.json` (B1-13), NOT a no-slug variant.
     state_dir = workspace / "projects" / "alpha-test-1" / "_state"
     state_dir.mkdir(parents=True, exist_ok=True)
-    (state_dir / "consistency-report.json").write_text(json.dumps({
+    report_name = "consistency-report-alpha-test-1.json"
+    (state_dir / report_name).write_text(json.dumps({
         "schema_version": "1.0",
         "report_id": 1,
         "generated_at": "2026-05-01T10:00:00Z",
@@ -460,7 +477,7 @@ def test_status_check_drift_advisory_non_durur(
     assert "AMBER" in report
 
     # Counter-case: GREEN verdict -> NO drift.
-    (state_dir / "consistency-report.json").write_text(json.dumps({
+    (state_dir / report_name).write_text(json.dumps({
         "schema_version": "1.0",
         "report_id": 2,
         "generated_at": "2026-05-01T11:00:00Z",
@@ -655,3 +672,28 @@ def test_path_convention_compliance(monkeypatch) -> None:
                 pth._resolve_portfolio_root(None)
         finally:
             os.chdir(cwd_before)
+
+
+# ---------------------------------------------------------------------------
+# Test — active_projects ceiling 12-ok / 13-fail (B1-09; soft cap 8→12)
+# ---------------------------------------------------------------------------
+
+def test_active_projects_ceiling_12_ok_13_fail(
+    portfolio_config_schema: dict,
+) -> None:
+    """The active_projects soft cap was raised 8→12 when the live
+    portfolio reached ~10 (schema maxItems=12). A 12-project config must
+    VALIDATE; a 13-project config must raise the ceiling DURUR. Guards
+    against regression of the stale-8 runtime break (a real ~10-project
+    portfolio previously tripped ActiveProjectsCeilingError)."""
+    # Positive: exactly 12 active_projects validates (no DURUR).
+    pth.validate_portfolio_config(
+        _synthetic_config(active_count=12), portfolio_config_schema)
+
+    # Negative: 13 active_projects → ceiling DURUR (Draft7 maxItems OR the
+    # transform's own ActiveProjectsCeilingError, whichever fires first).
+    with pytest.raises(
+        (pth.ActiveProjectsCeilingError, pth.PortfolioConfigInvalidError),
+    ):
+        pth.validate_portfolio_config(
+            _synthetic_config(active_count=13), portfolio_config_schema)

@@ -695,3 +695,44 @@ def test_skill_md_documents_sf_mcp_live_pattern() -> None:
         "SKILL.md must NOT read a non-existent `rows` key — the real result "
         "is the MCP content envelope, parsed from the written export instead"
     )
+
+
+# ---------------------------------------------------------------------------
+# Test — default_status wiring (B6-07). The declared `default_status` input
+# (frontmatter default "TODO") was inert: the type-only (presence, no JSON-LD
+# blob) branch hardcoded its status. Wired, that branch now seeds from
+# default_status, and the operator can override it.
+# ---------------------------------------------------------------------------
+
+def _type_only_payload() -> dict:
+    """A Type-only SF row: schema_types set, NO JSON-LD blob → Path B → empty
+    props → the 'SF reported type only, no blob' status branch."""
+    return {"rows": [_sf_row("https://example.com/p", types_field="Product")]}
+
+
+def test_default_status_seeds_type_only_rows() -> None:
+    default_result = sat.transform(_type_only_payload())
+    assert default_result["schema"], "type-only row should yield a schema row"
+    assert default_result["schema"][0]["status"] == "TODO"  # frontmatter default
+
+    overridden = sat.transform(_type_only_payload(), default_status="EXISTS")
+    assert overridden["schema"][0]["status"] == "EXISTS"
+
+
+def test_default_status_rejects_non_enum_value() -> None:
+    with pytest.raises(sat.SchemaAuditError):
+        sat.transform(_type_only_payload(), default_status="NONSENSE")
+
+
+def test_cli_default_status_flag_threads_through(tmp_path: Path) -> None:
+    sf = tmp_path / "sf.json"
+    sf.write_text(json.dumps(_type_only_payload()), encoding="utf-8")
+    out = tmp_path / "out"
+    rc = sat.main([
+        "--raw-sf", str(sf),
+        "--default-status", "DEFERRED",
+        "--output-dir", str(out),
+    ])
+    assert rc == 0
+    rows = json.loads((out / "schema_audit.json").read_text("utf-8"))
+    assert rows and rows[0]["status"] == "DEFERRED"

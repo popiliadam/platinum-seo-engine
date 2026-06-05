@@ -15,6 +15,7 @@ Schema authority note:
 """
 from __future__ import annotations
 
+import json
 import re
 import shlex
 from pathlib import Path
@@ -157,11 +158,29 @@ def test_change_summary_format():
     )
 
 
-# --- Test 9: events.jsonl event_type=content_revise (F-8 enum) ---
+# --- Test 9: events.jsonl content_revise + schema-valid event_kind=work ---
 def test_events_event_type_content_revise():
     text = _read_skill_text()
-    assert "content_revise" in text, "content_revise event_type missing (F-8)"
+    assert "content_revise" in text, "content_revise event_type missing (events.schema)"
     assert "event_type" in text, "event_type field missing in routing"
+    # B5-03: event_kind MUST be the schema-valid `work` — `production` is NOT
+    # a member of the events.schema event_kind enum, and content_revise is a
+    # WORK event (events.schema allOf content_revise coupling); mirror
+    # new-blog SKILL.md.
+    assert not re.search(r"event_kind`?\s*=\s*`?production", text), (
+        "revise-content documents an invalid event_kind=production; "
+        "content_revise must be event_kind=work (events.schema enum)"
+    )
+    assert re.search(r"event_kind`?\s*=\s*`?work\b", text), (
+        "revise-content must document event_kind=work for content_revise"
+    )
+    # Schema-valid cross-check: work is in the events.schema event_kind enum.
+    schema = json.loads(
+        (REPO_ROOT / "schemas" / "events.schema.json").read_text("utf-8")
+    )
+    assert "work" in schema["properties"]["event_kind"]["enum"], (
+        "events.schema event_kind enum drifted: 'work' missing"
+    )
     fm = _parse_frontmatter(text)
     outputs_str = " ".join(fm.get("outputs", []))
     assert "events.jsonl" in outputs_str, (

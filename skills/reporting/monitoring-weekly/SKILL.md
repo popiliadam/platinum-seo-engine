@@ -7,10 +7,15 @@ description: |
   çağırır; week range filter events.jsonl + drift-check output reuse +
   GSC week-over-week delta + budget burn rate aggregation →
   outputs/reports/{date}-monitoring-weekly.md.
+  Wave-3 inline scope (truth-in-advertising): drift + portfolio health
+  snapshot ACTIVE; GSC 5σ anomaly alarm + budget-burn (cost.credits)
+  aggregation are PLACEHOLDERS deferred to Phase 14+ — the inline
+  runtime emits a deferral string, not a computed alarm.
   Also use when: cron scheduled weekly run her Pazartesi 09:00 UTC
   report-only mode; reporting suite extension Phase 9 8 reporting skill
   no-write paterni reuse; Foundational Principle 1 truth-verifiable
-  enforcement audit-only (events.jsonl + master.xlsx kaynaklı,
+  enforcement audit-only (Wave-3 inline: consistency-report.json +
+  portfolio.json kaynaklı; events.jsonl + master.xlsx Phase 14+ scope;
   fabrikasyon yok); manager portfolio-overview öncesi tek-proje haftalık
   sağlık özeti istediğinde.
   Do not use when: ad-hoc daily check (out of scope, daily skill ayrı —
@@ -18,8 +23,9 @@ description: |
   range (DURUR #1 SKIP, no report write); GSC api auth fail (out of
   scope, gsc-bootstrap skill önce çalışmalı); template path missing →
   inline fallback (DURUR #4 AMBER, manuel inceleme); 5σ anomaly
-  threshold hit ise CRITICAL escalation severity=alert (DURUR #5,
-  manager onayı Phase 14+ governance); master.xlsx WRITE talep edilirse
+  threshold hit ise CRITICAL escalation severity=alert (DURUR #5 —
+  PLACEHOLDER, Phase 14+ deferred; not computed in Wave-3 inline);
+  master.xlsx WRITE talep edilirse
   YASAK (Phase 9 reporting paterni: 8 skill no-write invariant).
 version: "1.0"
 status: active
@@ -38,9 +44,8 @@ outputs:
   - "_state/events.jsonl"
   - "outputs/reports/{date}-monitoring-weekly.md"
 consumes:
-  - "init-project:project-config[budget_credits_per_day]"
-  - "drift-check:_state/events.jsonl"
-  - "init-project:master.xlsx[gsc_performance]"
+  - "drift-check:_state/cache/consistency-report.json"
+  - "init-project:shared/portfolio.json"
   - "templates/reports/monitoring-weekly.template.md"
 produces: []
 triggers:
@@ -67,15 +72,23 @@ autonomy:
 
 # monitoring-weekly — reporting skill (Phase 12 Wave 2, W-G6)
 
-Weekly health check aggregator. Reads `_state/events.jsonl` filtered to
-the `week_start..week_end` window, reuses `governance/drift-check`
-output (events filter on `event_kind=audit AND audit_action=accessed
-AND audit_target=invariants:*`), pulls week-over-week GSC delta from
-`master.xlsx[gsc_performance]` via `openpyxl read_only=True`, computes
-budget burn rate (events.jsonl `cost.credits` aggregation per day vs
-`project-config.budget_credits_per_day` baseline), then renders
+Weekly health check aggregator. **Wave-3 inline scope** (what the
+runtime actually reads): drift-check output
+(`_state/cache/consistency-report.json`) + project health
+(`shared/portfolio.json`), then renders
 `outputs/reports/{date}-monitoring-weekly.md`. **No MCP**, **no DFS**,
 **no budget pre-flight**, **no master.xlsx WRITE** — strict read-only.
+
+*Deferred to Phase 14+ (PLACEHOLDER strings today, NOT active reads):*
+drift reuse via the `governance/drift-check` `_state/events.jsonl`
+audit filter (`event_kind=audit AND audit_action=accessed AND
+audit_target=invariants:*`), week-over-week GSC delta from
+`master.xlsx[gsc_performance]` via `openpyxl read_only=True`, and
+budget burn rate (events.jsonl `cost.credits` aggregation per day vs
+`project-config.budget_credits_per_day` baseline). The inline runtime
+does **not** open `master.xlsx` or `project-config`, and does not
+filter `events.jsonl` — it reads the consistency-report + portfolio
+snapshots above.
 
 This skill follows the Phase 9 reporting **convention authority**
 established by `skills/reporting/weekly-summary/SKILL.md` (W-E2 — local
@@ -161,9 +174,11 @@ swallow.
 
 2. **DURUR #2 — `budget_credits_per_day` absent in project-config**
    → AMBER + default 500 credits/day fallback.
-   The report's `budget_burn_section` carries the AMBER badge and a
-   note that the baseline came from the hard-coded fallback. The audit
-   event records this in the report (severity=amber).
+   **Wave-3 inline scope: PLACEHOLDER (deferred Phase 14+).** The inline
+   runtime does not read `project-config` today, so this fallback is not
+   yet wired. *When implemented:* the report's `budget_burn_section`
+   carries the AMBER badge and a note that the baseline came from the
+   hard-coded fallback.
 
 3. **DURUR #3 — drift-check output unavailable** (events filter on
    `event_kind=audit AND audit_target ~ invariants:*` returns empty
@@ -180,31 +195,45 @@ swallow.
    the fallback path was used.
 
 5. **DURUR #5 — 5σ GSC anomaly threshold hit** → CRITICAL escalation.
-   When week-over-week delta on any of `clicks`, `impressions`,
-   `ctr`, `position` exceeds 5 standard deviations from the trailing
-   8-week mean (computed locally from `master.xlsx[gsc_performance]`
-   rows ordered by date_iso), the report's `escalations` section
-   carries severity=alert and a separate audit event row is appended
-   with `note` flagging the metric, magnitude, and direction. The
-   manager is expected to act on this in Phase 14+ governance.
+   **Wave-3 inline scope: PLACEHOLDER — NOT active.** The 5σ alarm +
+   `cost.credits` aggregation are **deferred to Phase 14+**; the inline
+   runtime (Block 3) emits a deferral string for `gsc_anomaly_section`
+   and `escalations`, never a computed alarm. No second audit-event row
+   is appended today.
+
+   *When implemented (Phase 14+):* week-over-week delta on any of
+   `clicks`, `impressions`, `ctr`, `position` exceeding 5 standard
+   deviations from the trailing 8-week mean (computed locally from
+   `master.xlsx[gsc_performance]` rows ordered by date_iso) will make the
+   report's `escalations` section carry severity=alert and append a
+   separate audit event row flagging the metric, magnitude, and
+   direction. The manager would act on this in Phase 14+ governance.
 
 ## Workflow (8 step)
 
 1. **Read project-config** for `budget_credits_per_day` baseline + GSC
-   `siteUrl`. Missing key → DURUR #2 (default 500).
+   `siteUrl`. Missing key → DURUR #2 (default 500). **Wave-3 inline
+   scope: PLACEHOLDER (deferred Phase 14+)** — the inline runtime does
+   not open `project-config`; this step lands with the budget-burn
+   capability.
 2. **Read events.jsonl** with week range filter
    (`week_start..week_end` inclusive). 0 rows → DURUR #1 SKIP.
 3. **drift-check output reuse** — filter events on
    `event_kind=audit AND audit_target startswith "invariants:"`.
    0 rows in window → DURUR #3 AMBER.
-4. **GSC anomaly detect** — read `master.xlsx[gsc_performance]` via
-   `openpyxl.load_workbook(read_only=True, data_only=True)`. Compute
-   week-over-week delta against the previous 7-day window; if any
-   metric delta exceeds 5σ of the trailing 8-week mean, fire DURUR
-   #5 escalation.
-5. **Budget burn rate** — sum `cost.credits` from events.jsonl in
-   window per day; compute `daily_mean / budget_credits_per_day`
-   ratio. Ratio > 1.0 emits AMBER badge; ratio > 2.0 emits RED badge.
+4. **GSC anomaly detect** — **Wave-3 inline scope: PLACEHOLDER (deferred
+   Phase 14+).** The current inline runtime (Block 3) emits a deferral
+   string for `gsc_anomaly_section`, not a computed delta. *When
+   implemented:* read `master.xlsx[gsc_performance]` via
+   `openpyxl.load_workbook(read_only=True, data_only=True)`, compute the
+   week-over-week delta against the previous 7-day window, and if any
+   metric delta exceeds 5σ of the trailing 8-week mean, fire DURUR #5.
+5. **Budget burn rate** — **Wave-3 inline scope: PLACEHOLDER (deferred
+   Phase 14+).** The current inline runtime reports a recent-events count
+   from `portfolio.json`, not a computed burn rate. *When implemented:*
+   sum `cost.credits` from events.jsonl in window per day and compute the
+   `daily_mean / budget_credits_per_day` ratio (ratio > 1.0 → AMBER
+   badge; > 2.0 → RED badge).
 6. **Report render** — `templates/reports/monitoring-weekly.template.md`
    via `string.Template` `$var` substitution (Phase 1 mirası
    `scripts/reporting/render_template.py` paterni reuse). Missing
@@ -426,21 +455,26 @@ overrides them.
 
 ### Principle 1 — Truth-Verifiable Health Report
 
-Every datum in the report is sourced from a tangible artifact:
-- `drift_section` ← events.jsonl rows with
-  `event_kind=audit AND audit_target=invariants:*` (Phase 5
-  `drift-check` audit appends).
-- `gsc_anomaly_section` ← `master.xlsx[gsc_performance]` rows
-  (Phase 6 GSC ingestion writer authority).
-- `budget_burn_section` ← events.jsonl `cost.credits` aggregation
-  (Phase 7+8 work events).
-- `exec_summary` ← computed roll-up of the above three; no
-  free-form fabrication.
+Every datum in the report is sourced from a tangible artifact. **Wave-3
+inline scope** — what the runtime actually reads today:
+- `drift_section` ← `_state/cache/consistency-report.json`
+  (drift-check output: red/amber/green counts + verdict).
+- `exec_summary` ← computed roll-up of the drift counts +
+  `shared/portfolio.json` health fields (completion %, active OQ
+  count, recent-events count); no free-form fabrication.
 
-The skill never invents GSC delta values; if `gsc_performance` is
-empty for the window, the section flags "GSC veri yok" and the
-report severity escalates to AMBER. AI suistimal yasağı: hayali
-delta fabrikasyonu YASAK — hep `master.xlsx[gsc_performance]` read.
+**Deferred to Phase 14+ (PLACEHOLDER strings in the current runtime):**
+- `gsc_anomaly_section` ← *will* read `master.xlsx[gsc_performance]`
+  rows (Phase 6 GSC ingestion writer authority) for the 5σ delta.
+  Today it emits a deferral string.
+- `budget_burn_section` ← *will* aggregate events.jsonl `cost.credits`
+  (Phase 7+8 work events). Today it reports a recent-events count from
+  `portfolio.json`.
+
+The skill never invents values; the placeholder sections honestly
+announce the deferral rather than fabricating a delta. AI suistimal
+yasağı: hayali delta fabrikasyonu YASAK — when the GSC path lands
+(Phase 14+) it will read `master.xlsx[gsc_performance]`, never guess.
 
 ### Principle 2 — Profile-Aware Severity
 
@@ -453,12 +487,13 @@ The severity thresholds adapt to `project-config.profile`:
 - `b2b-saas`: GSC impressions delta < -30% AND signup_velocity
   proxy (events.jsonl `event_type=content_new` count) drop → AMBER
   (top-of-funnel signal).
-- `local-business` / `personal-brand`: drift-check FAIL only →
+- `local-service` / `portfolio`: drift-check FAIL only →
   AMBER (lower volume, lower stakes).
 
 The 5-value `profile` enum lives in
 `schemas/project-config.schema.json` (Phase 11 W-A1 v1.2 cascade
-authority).
+authority): `e-commerce`, `ymyl`, `local-service`, `b2b-saas`,
+`portfolio`.
 
 ### Principle 3 — Anti-Cheap-Content (no fabrication)
 

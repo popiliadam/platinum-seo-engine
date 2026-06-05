@@ -49,7 +49,7 @@ MASTER_TASK_DATA_START_ROW: int = 4
 MASTER_TASK_CATEGORY_COL_INDEX: int = 6   # F
 MASTER_TASK_PRIORITY_COL_INDEX: int = 7   # G
 MASTER_TASK_STATUS_COL_INDEX: int = 10    # J
-ACTIVE_PROJECTS_MAX: int = 8
+ACTIVE_PROJECTS_MAX: int = 12
 PORTFOLIO_DIR_NAME: str = "_portfolio"
 OUTPUTS_REPORTS_REL: str = "projects/_portfolio/outputs/reports"
 INBOX_LOCAL_REL: str = "projects/_portfolio/inbox/local"
@@ -178,9 +178,13 @@ def resolve_master_xlsx_path(
 def resolve_consistency_report_path(
     *, portfolio_root: Path, project_entry: Mapping[str, Any],
 ) -> Path:
+    """Per-project drift-check artifact. drift-check emits the canonical
+    `_state/consistency-report-{slug}.json` (NOT a no-slug variant); read
+    that exact name so the OPTIONAL drift advisory resolves (B1-13)."""
+    slug = _safe_str(project_entry.get("slug"))
     return (
         _project_root(portfolio_root, project_entry) / "_state"
-        / "consistency-report.json"
+        / f"consistency-report-{slug}.json"
     )
 
 

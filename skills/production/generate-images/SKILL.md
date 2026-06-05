@@ -109,9 +109,9 @@ The skill is **READ-ONLY** with respect to `master.xlsx`
 (`new_content_plan` allowed_writers is `null` — F-1 schema authority).
 It never calls `transaction.append`, `transaction.update`, or
 `transaction.delete` against the workbook. The only state mutation is
-the audit append to `_state/events.jsonl` (event_kind=`work` per F-9
-ADR-020; event_type=`content_new` on success or `manual` on DURUR #5
-fallback per F-14 enum).
+the audit append to `_state/events.jsonl` (event_kind=`work` per
+ADR-020 + events.schema event_kind discriminator; event_type=`manual`
+per events.schema enum).
 
 ## 🔴 KRİTİK — Plugin Agnostik MCP Boundary (F-16, Süleyman Seçenek D)
 
@@ -177,8 +177,8 @@ photo değil).
 ### Principle 2 — Profile-Aware Enforcement
 
 **Statement.** Skill behavior `project.config.json[profile]` enum'una
-göre değişir; image_style boyutu profile-driven (F-13 schema enum
-5-value).
+göre değişir; image_style boyutu profile-driven (project-config
+schema image_style enum, 5-value).
 
 **Enum 5-value switch (Step 2 + Step 3):**
 
@@ -238,9 +238,9 @@ etmeli.
   (default `nano-banana`, override edilebilir). Schema:
   `{type: string, default: "nano-banana", description: "R-72.
   Plugin agnostik (Higgsfield veya equivalent), per-project override."}`
-- `brand_identity.image_style` — F-13 5-enum profile-aware
-  (`clean-illustration` / `product-photo` / `diagram-screenshot` /
-  `location-photo` / `esnek`).
+- `brand_identity.image_style` — project-config schema 5-enum
+  profile-aware (`clean-illustration` / `product-photo` /
+  `diagram-screenshot` / `location-photo` / `esnek`).
 - `brand_identity.default_hero_url` — DURUR #5 fallback URL
   (R-77 image alt_text fallback).
 - `profile` (singular, schema v1.2 W-F1) — Principle 2 switch driver.
@@ -259,8 +259,8 @@ When `brand_identity.image_style` is set explicitly, the explicit value
 wins (override-friendly); profile-mapped value is the default when the
 field is null.
 
-**DURUR #3.** `image_style` enum 5-value dışı (F-13 schema violation)
-→ REJECT.
+**DURUR #3.** `image_style` enum 5-value dışı (project-config
+`brand_identity.image_style` enum violation) → REJECT.
 
 ### Step 3 — `r71_prompt_enrichment` (8K Ultra Realistic)
 
@@ -307,8 +307,8 @@ eksik veya `HIGGSFIELD_API_KEY` env yok):
 - AMBER warning emit: image generation skip.
 - upload-instructions.md Section B "manual upload required, fallback
   hero used" mark.
-- events.jsonl `event_type=manual` (F-14 enum), `event_kind=work`
-  (F-9 ADR-020).
+- events.jsonl `event_type=manual` (events.schema enum), `event_kind=work`
+  (ADR-020 event_kind discriminator).
 
 **DURUR #2.** Higgsfield budget aşımı (`estimated_credits` 5 cap) →
 `scripts/budget/check_budget.py` blocked.
@@ -400,7 +400,7 @@ revise-content Section C intact when applicable):
 ## Section B — Hero Image Upload (R-74)
 
 **Generated:** {ISO 8601 UTC timestamp}
-**Image Style:** {image_style}        # F-13 profile-aware
+**Image Style:** {image_style}        # project-config image_style enum
 **Image Model:** {image_model}        # R-72 default nano-banana
 **Files:**
 - WebP: outputs/images/{slug}-hero.webp ({size_kb} KB)
@@ -419,21 +419,21 @@ revise-content Section C intact when applicable):
    (R-65 + R-62 alignment)
 ```
 
-`_state/events.jsonl` append (audit, F-9 + F-14 compliance):
+`_state/events.jsonl` append (audit, events.schema + ADR-020 compliance):
 
 | Field            | Value                                                                          |
 |------------------|--------------------------------------------------------------------------------|
-| `schema_version` | `"1.0"` (events.schema F-14 const)                                              |
-| `event_kind`     | `"work"` (F-9 ADR-020 production output enum)                                   |
-| `event_type`     | `"content_new"` (success) or `"manual"` (DURUR #5 fallback) — F-14 10-enum     |
+| `schema_version` | `"1.0"` (events.schema const)                                              |
+| `event_kind`     | `"work"` (ADR-020 event_kind discriminator)                                     |
+| `event_type`     | `"manual"` (success AND DURUR #5 fallback) — events.schema 12-enum                       |
 | `event_id`       | UUID v4                                                                         |
 | `timestamp`      | UTC ISO 8601                                                                    |
-| `project_id`     | `{input.project_slug}` (F-14 pattern `^[a-z][a-z0-9-]*$`)                       |
-| `target`         | `master.xlsx[new_content_plan]#{new_content_plan_id}`                          |
-| `actor`          | `skill:generate-images`                                                         |
+| `project_id`     | `{input.project_slug}` (events.schema pattern `^[a-z][a-z0-9-]*$`)                       |
+| `note`           | `image_generated: kind={image_kind} model={image_model} plan_id={new_content_plan_id}` (note-encoded provenance) |
+| `actor`          | `agent:generate-images` (canonical code block)                                 |
 | `image_kind`     | `{input.image_kind}` (default `hero`)                                          |
 | `image_model`    | `{content_settings.image_model}` (R-72 plugin agnostik)                         |
-| `image_style`    | `{brand_identity.image_style}` (F-13 profile-aware)                             |
+| `image_style`    | `{brand_identity.image_style}` (project-config image_style enum, profile-aware) |
 
 Canonical events_writer invocation (schema-first override 16'ıncı uygulama —
 `event_type=manual` + `note=image_generated` paterni; `content_new` schema'da
@@ -487,7 +487,7 @@ schema authority + intent preservation = doğru fit.
 |----|----------------------------------------------------------------------------|--------------------------------------------------------------------|
 | 1  | `master.xlsx[new_content_plan].image_prompt` empty (R-71 prompt eksik)      | REJECT — new-blog / init-project row populate etmeli                |
 | 2  | Higgsfield budget aşımı (`estimated_credits` 5 cap)                         | `scripts/budget/check_budget.py` blocked                            |
-| 3  | `image_style` F-13 5-enum dışı                                              | REJECT — schema authority cascade fix verify                        |
+| 3  | `image_style` project-config 5-enum dışı                                    | REJECT — schema authority cascade fix verify                        |
 | 4  | Higgsfield response size != 1200x675 (R-73 hero size violation)             | REJECT — model param mismatch, retry with explicit size param       |
 | 5  | Higgsfield MCP unavailable (Claude tool registry'de YOK; F-16 plugin agnostik) | Fallback `brand_identity.default_hero_url` + AMBER + `event_type=manual` |
 | 6  | P1 truth-verifiable: alt_text uydurma claim detect                          | RED — image discard, alt_text source verify                         |
@@ -503,7 +503,7 @@ schema authority + intent preservation = doğru fit.
 - `image_model` resolves at runtime from `content_settings.image_model`
   (R-72 serbest string, override edilebilir; default `nano-banana`).
 - `image_style` resolves at runtime from `brand_identity.image_style`
-  (F-13 5-enum) or profile-mapped default.
+  (project-config image_style 5-enum) or profile-mapped default.
 - `default_hero_url` resolves at runtime from
   `brand_identity.default_hero_url` (R-77 fallback hero, DURUR #5).
 - Per-call / per-url credit shape names (Phase 7 lesson, ADR-028
@@ -546,14 +546,14 @@ schema authority + intent preservation = doğru fit.
   R-62 CLS preempt).
 - `rules/content-eeat-discipline.md` (R-44 source verify; image
   authority signal).
-- `schemas/project-config.schema.json` v1.2 (F-13
-  `content_settings.image_model` serbest string default `nano-banana`;
+- `schemas/project-config.schema.json` v1.2
+  (`content_settings.image_model` serbest string default `nano-banana`;
   `brand_identity.image_style` 5-enum; `brand_identity.default_hero_url`
   format=uri).
 - `schemas/master-excel.schema.json` (`new_content_plan` 14 col Phase
   10 +3 col additive: `image_prompt`, `alt_text`, `content_type`).
-- `schemas/events.schema.json` (event_kind=`work` F-9 ADR-020;
-  event_type 10-enum F-14: `content_new` success, `manual` fallback).
+- `schemas/events.schema.json` (event_kind=`work` ADR-020 discriminator;
+  event_type 12-enum events.schema: `manual` for success AND DURUR #5 fallback).
 - `schemas/skill-frontmatter.schema.json` (8 required fields, category
   enum 8 values, status enum 3 values, `mcp_tools.required` advisory).
 - `.mcp.json` (4 servers: `gsc`, `dataforseo`, `ScraplingServer`, `sf`;

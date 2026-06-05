@@ -80,11 +80,16 @@ schema-compliant `event_type` per branch matrix).
 
 This skill is the **only Wave 2 master.xlsx WRITE skill** (W-G4
 verify-indexing READ-ONLY, W-G6 monitoring-weekly READ-ONLY). Schema
-authority: master_task.allowed_writers gate enforced at the write
-boundary; `master_task.protected_columns` 7 col `[task, category,
-priority, impact, duration_est_min, assignee, note]` are NEVER touched
-(DURUR #5 defensive contract — `transaction.py` already guards but
-skill body explicit "ben bunu yapmayacağım" sentinel for static grep).
+authority: master_task.allowed_writers **identity** gate IS enforced at
+the write boundary by `transaction.py` (`WriterScopeError` when the
+writer_id is not in `allowed_writers`). `master_task.protected_columns`
+7 col `[task, category, priority, impact, duration_est_min, assignee,
+note]` are NEVER touched (DURUR #5). **Note:** that column-scope
+protection is **advisory + skill-discipline only** — `transaction.py`
+gates writer *identity*, NOT *column scope*; it does not inspect which
+columns a write touches. The "ben bunu yapmayacağım" sentinel + static
+grep are the actual guard. (Future: a real column-scope guard in
+`transaction.py` would make this a hard backstop — manager item.)
 
 ## Inputs (frontmatter contract)
 
@@ -105,11 +110,12 @@ human readers; `Draft7Validator` validates only the 4-field whitelist.
 - `_state/events.jsonl` — audit append. **Schema-first override**
   (lesson 7+23+31 worker authority): the brief sketched
   `event_type=task_completed` but `events.schema.json` declares
-  `event_type` as a closed 10-value enum (F-8 WORK-only):
+  `event_type` as a closed 12-value enum (F-08 WORK-only):
   `content_new, content_revise, content_remove, tech_fix,
   quickwin_applied, pillar_launch, schema_fix, redirect_deployed,
-  backlink_outreach, manual`. `task_completed` is NOT in the enum;
-  emitting it would fail `Draft7Validator` and break the F-8
+  backlink_outreach, manual, skill_content_remediation,
+  skill_whats_next`. `task_completed` is NOT in the enum;
+  emitting it would fail `Draft7Validator` and break the F-08
   invariant. Branch matrix:
   - `master_task.primary_source == "quickwin"` AND
     `completion_evidence` contains `cluster + before + after` triplet
@@ -262,15 +268,19 @@ Allowed columns (writer_scope `done_protocol`): J (status), L
 
 **protected_columns 7-col YASAK touch (DURUR #5 defensive):**
 `task` (B), `category` (F), `priority` (G), `impact` (H),
-`duration_est_min` (I), `assignee` (M), `note` (N). transaction.py
-guards via `WriterScopeError`; the skill body adds an explicit
-"ben bunu yapmayacağım" contract — static grep over the skill body
-finds the 7 column names ONLY in the YASAK enumeration block, never
-in a write call site.
+`duration_est_min` (I), `assignee` (M), `note` (N). This column-scope
+restriction is **advisory + skill-discipline**, NOT a `transaction.py`
+hard guard — `transaction.py` enforces only writer *identity*
+(allowed_writers, `WriterScopeError`); it does NOT check which columns a
+payload writes. The actual protection is the skill body's explicit
+"ben bunu yapmayacağım" contract: static grep over the skill body finds
+the 7 column names ONLY in the YASAK enumeration block, never in a write
+call site. (The analogous build-time `ProtectedColumnsWriteAttempt`
+guard exists only in `master_task_sync.py`, for a different writer.)
 
 ### Step 6: events.jsonl Append (event_kind=work, Schema-First Override)
 
-Append a single events.jsonl row with required F-9 fields
+Append a single events.jsonl row with required F-09 fields
 (`schema_version`, `event_kind`, `event_id`, `timestamp`,
 `project_id`, `event_type`, `task_id`).
 
@@ -283,7 +293,7 @@ Append a single events.jsonl row with required F-9 fields
   - Default fallback (W-G1 indexing-ping paterni reuse) →
     `event_type="manual"` (free-form work record, schema requires
     `note`, populated with task_id + completion_evidence summary).
-- `task_id` = `{input.task_id}` (F-9 work events require task_id).
+- `task_id` = `{input.task_id}` (F-09 work events require task_id).
 - `event_id` = `mark_done_{task_id}_{timestamp_compact}` (per
   events.schema event_id pattern).
 - `timestamp` = UTC ISO 8601 RFC3339 (`Z` suffix).
@@ -312,7 +322,7 @@ Write `outputs/mark-done/{YYYY-MM-DD}-mark-report.json` with the
 following per-run fields: `task_id, prior_status, new_status,
 evidence_hash, event_id, completed_work_row_id,
 allowed_writers_check (pass), idempotency_check (pass),
-duration_ms, profile_placeholder`. JSON pretty-print, UTF-8, no
+duration_ms, profile_placeholder`. JSON pretty-print, UTF-08, no
 trailing newline drift.
 
 ## DURUR Conditions (5 koşul)
@@ -342,11 +352,15 @@ trailing newline drift.
    `completion_evidence.manual_note` before retry.
 5. **DURUR #5 — protected_columns Write Attempt.** Skill code MUST
    NOT touch master_task protected_columns 7-col `[task, category,
-   priority, impact, duration_est_min, assignee, note]`. transaction.py
-   already guards via `WriterScopeError`, but the skill body adds a
-   defensive contract: "ben bunu yapmayacağım — protected_columns 7
-   YASAK touch". Static grep sentinel: column names appear ONLY in
-   the YASAK enumeration block, never in a write payload.
+   priority, impact, duration_est_min, assignee, note]`. This is enforced
+   by **skill discipline, not by `transaction.py`** — `transaction.py`'s
+   `WriterScopeError` gates writer *identity* (allowed_writers
+   membership), NOT column scope; it never inspects which columns a write
+   touches. The actual guard is the skill body's defensive contract
+   ("ben bunu yapmayacağım — protected_columns 7 YASAK touch") + the
+   static-grep sentinel: column names appear ONLY in the YASAK enumeration
+   block, never in a write payload. (Future: a real column-scope guard in
+   `transaction.py` would make this a hard backstop — manager item.)
 
 ## WRITE Contract (master.xlsx Skill-Level Enforcement)
 
@@ -365,13 +379,13 @@ READ-ONLY consume (write yapılmaz):
   + protected_columns enumeration).
 - `schemas/cross-sheet-invariants.json` (F-02 + F-05 done_protocol
   rules).
-- `schemas/events.schema.json` (F-8 event_type 10-value enum
+- `schemas/events.schema.json` (F-08 event_type 12-value enum
   compliance).
 - `_state/events.jsonl` (idempotency hash pre-flight scan).
 
 Output artifacts:
 
-- `_state/events.jsonl` (append, F-9 + F-8 enum).
+- `_state/events.jsonl` (append, F-09 + F-08 enum).
 - `outputs/mark-done/{date}-mark-report.json`.
 
 ## Schema-First Override Decisions Made (Lesson 7+23+31)
@@ -380,10 +394,11 @@ The brief included `event_type=task_completed` as the suggested
 events.jsonl payload value. Worker authority (lesson 7+23+31) applies:
 
 1. **Override 1 — `event_type` enum compliance.** `events.schema.json`
-   declares `event_type` as a closed 10-value enum (F-8 WORK-only):
+   declares `event_type` as a closed 12-value enum (F-08 WORK-only):
    `[content_new, content_revise, content_remove, tech_fix,
    quickwin_applied, pillar_launch, schema_fix, redirect_deployed,
-   backlink_outreach, manual]`. `task_completed` is NOT in the enum.
+   backlink_outreach, manual, skill_content_remediation,
+   skill_whats_next]`. `task_completed` is NOT in the enum.
    Branch matrix applied:
    - quickwin path → `event_type=quickwin_applied` (events.schema
      requires `cluster, before, after`).
@@ -441,11 +456,13 @@ exists precisely for this skill's role — schema authority binds the
 - `schemas/master-excel.schema.json` (master_task allowed_writers +
   protected_columns + completed_work required_columns).
 - `schemas/events.schema.json` (event_kind enum 4 values, event_type
-  enum 10 values, allOf branch requirements).
+  enum 12 values, allOf branch requirements).
 - `schemas/cross-sheet-invariants.json` (F-02 + F-05 done_protocol).
 - `schemas/skill-frontmatter.schema.json` (Draft7 8-field required).
-- `scripts/excel/transaction.py` (atomic + allowed_writers gate +
-  protected_columns guard + provenance event_writer one-way import).
+- `scripts/excel/transaction.py` (atomic + allowed_writers **identity**
+  gate via `WriterScopeError`; column-scope/protected_columns is NOT
+  hard-guarded here — advisory skill-discipline only; + provenance
+  event_writer one-way import).
 - ADR-009 (master.xlsx schema-generated, never hand-edited).
 - ADR-018 (statusEnum 7-value hibrit).
 - ADR-020 (event_kind=work vs workflow routing).

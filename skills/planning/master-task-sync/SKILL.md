@@ -96,14 +96,14 @@ full-row write) change. Deviate only with an ADR.
 
 Unlike Phase 7 / Wave 1 skills that *produce* their own master writer
 sheets, master-task-sync *aggregates* them into the master_task SSoT.
-Per master-excel.schema.json#master_task `allowed_writers` (line 293)
-the writer name `master_task_sync` is whitelisted; per `writer_scope`
-(line 298) this writer is restricted verbatim to:
+Per `master-excel.schema.json#/sheets/master_task/allowed_writers`
+the writer name `master_task_sync` is whitelisted; per
+`#/sheets/master_task/writer_scope` this writer is restricted verbatim to:
 
 > "append new auto-generated rows AND merge related_sources (D);
 >  forbidden to touch protected_columns"
 
-`protected_columns` (schema line 300) are 7 columns
+`protected_columns` (`#/sheets/master_task/protected_columns`) are 7 columns
 [B, F, G, H, I, M, N] = [task, category, priority, impact,
 duration_est_min, assignee, note]. The transform raises
 `ProtectedColumnsWriteAttempt` if a payload ever tries to populate any
@@ -131,7 +131,7 @@ test override (mirrors workflow_runner / events_writer).
   human-readable summary (total tasks, append/merge stats, per-source
   breakdown, primary_source distribution).
 - `projects/{slug}/_state/events.jsonl` — `event_kind=provenance`
-  entries (`source.kind=local_aggregation`,
+  entries (`source.kind=tool_computed`,
   `target_excel_sheet=master_task`).
 - `projects/{slug}/inbox/local/{date}-master_task_sync-{slug}.json` —
   drift-recovery snapshot of the full aggregation result.
@@ -319,9 +319,13 @@ primary_source distribution.
 from scripts.state import events_writer
 events_writer.append_provenance(
     project_id=project_slug,
-    source={"kind": "local_aggregation",
-            "module": "scripts.planning.master_task_sync",
-            "sheets_aggregated": len(SOURCE_DEFS)},
+    # source.kind MUST be a valid events.schema source.kind enum value.
+    # Local aggregation is an in-process, non-external-ingest action →
+    # "tool_computed" (the same kind init-project uses for bootstrap).
+    # The events.schema `source` object is additionalProperties:false,
+    # so `module` / `sheets_aggregated` are NOT valid keys and are
+    # dropped (aggregation detail belongs in `notes`, not `source`).
+    source={"kind": "tool_computed"},
     operation="project_excel",
     target_excel_sheet="master_task",
     rows_written=len(batch.appends) + len(batch.merges),
@@ -417,7 +421,7 @@ Mechanically:
 helper that wraps this assertion (used by the test + can be invoked
 defensively by the skill body).
 
-## protected_columns guard (schema line 300)
+## protected_columns guard (`#/sheets/master_task/protected_columns`)
 
 The 7 protected columns are owned by the human + done_protocol writers:
 
@@ -438,7 +442,7 @@ one of these columns with a non-blank value. Empty-string seeds (used
 to pad a new row to its full 19-col shape) are tolerated — the Excel
 write layer treats blank seeds as no-ops at the cell level.
 
-## writer_scope semantic (schema line 298 — verbatim)
+## writer_scope semantic (`#/sheets/master_task/writer_scope` — verbatim)
 
 > "append new auto-generated rows AND merge related_sources (D);
 >  forbidden to touch protected_columns"
@@ -468,7 +472,8 @@ Stop and flag the manager — do not patch, do not fall back.
    `primary_source` value not in the closed schema enum. STOP.
 6. **ProtectedColumnsWriteAttempt** — payload row tries to populate a
    protected_columns field (B/F/G/H/I/M/N). STOP, schema-first violation
-   per writer_scope (line 298 + line 300).
+   per writer_scope + protected_columns
+   (`#/sheets/master_task/writer_scope` + `#/sheets/master_task/protected_columns`).
 7. **WriterScopeViolation** — merge attempted on a column other than
    `related_sources` (D). STOP, only D is mergeable for
    master_task_sync.
@@ -480,11 +485,13 @@ Stop and flag the manager — do not patch, do not fall back.
 
 ## Cross-references
 
-- Schemas: `schemas/master-excel.schema.json#master_task` (lines
-  269-303 — `required_columns` 19 cols + `allowed_writers` line 293 +
-  `writer_scope` line 298 + `protected_columns` line 300 +
+- Schemas: `schemas/master-excel.schema.json#/sheets/master_task`
+  (`required_columns` 19 cols +
+  `#/sheets/master_task/allowed_writers` +
+  `#/sheets/master_task/writer_scope` +
+  `#/sheets/master_task/protected_columns` +
   `#/definitions/statusEnum` + `#/definitions/severityEnum`),
-  `schemas/events.schema.json` (`source.kind=local_aggregation`,
+  `schemas/events.schema.json` (`source.kind=tool_computed`,
   `target_excel_sheet=master_task`), `schemas/skill-frontmatter.schema.json`
   (this frontmatter), `schemas/cross-sheet-invariants.json` (D-01 is
   topical_map.pillar — *not* a master_task invariant; master_task

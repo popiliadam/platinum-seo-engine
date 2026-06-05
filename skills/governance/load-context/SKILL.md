@@ -37,7 +37,6 @@ consumes:
   - "init-project:docs/DECISIONS.md"
   - "init-project:docs/REFERENCE_INDEX.md"
   - "init-project:docs/SESSION_PROTOCOL.md"
-  - "init-project:docs/CONTEXT_LEDGER.md"
 produces: []
 triggers:
   manual: []

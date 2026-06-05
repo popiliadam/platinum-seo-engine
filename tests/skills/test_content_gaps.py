@@ -183,7 +183,8 @@ def test_frontmatter_validates(
 ) -> None:
     """SKILL.md frontmatter must:
       (a) parse as YAML,
-      (b) carry name=content-gaps, status=wip, version="1.0",
+      (b) carry name=content-gaps, status=active (asserted as a member of
+          the valid lifecycle set {active, deprecated, wip}), version="1.0",
           category=discovery,
       (c) declare project_slug + seed_keyword as required string inputs,
       (d) list keyword_ideas + related_keywords in required tools,

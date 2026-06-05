@@ -857,6 +857,21 @@ def test_smoke_e2e_idempotent_pipeline(
     assert "| gamma-test |" in rendered
     # EditorialOverrides notes section renders override_rationale.
     assert "Q2 launch campaign" in rendered
+    # Every $placeholder must be substituted EXCEPT $run_id — the K-06
+    # audit-trail placeholder a render-time hook injects later
+    # (test_run_id_coverage.py enforces $run_id in every report template;
+    # monthly_report.py's setdefault("run_id","$run_id") is the canonical
+    # idiom). Read identifiers from the RAW template (stripping $$ escapes
+    # — a $$var doc-literal is NOT a placeholder) and assert none but
+    # run_id survive into the render.
+    template_text = TEMPLATE_PATH.read_text(encoding="utf-8")
+    template_ids = set(re.findall(
+        r"\$\{?([A-Za-z_]\w*)\}?", template_text.replace("$$", ""))) - {"run_id"}
+    leaked = sorted(
+        i for i in template_ids
+        if re.search(r"\$\{?" + re.escape(i) + r"\}?", rendered)
+    )
+    assert not leaked, f"unsubstituted template placeholders: {leaked}"
 
     # Idempotency: re-run with identical inputs → byte-identical
     # snapshot AND report.
@@ -877,3 +892,58 @@ def test_smoke_e2e_idempotent_pipeline(
     assert rendered == rendered2, (
         "report markdown must be byte-identical on re-run"
     )
+
+
+# ---------------------------------------------------------------------------
+# Test — active_projects ceiling 12-ok / 13-fail (B1-05; soft cap 8→12)
+# ---------------------------------------------------------------------------
+
+def test_active_projects_ceiling_12_ok_13_fail(
+    tmp_path: Path,
+    synthetic_portfolio_config: dict,
+    portfolio_config_schema: dict,
+    fixed_now: datetime,
+) -> None:
+    """The active_projects soft cap was raised 8→12 when the live
+    portfolio reached ~10 (schema maxItems=12). A 12-project portfolio
+    must VALIDATE and BUILD; a 13-project portfolio must raise the ceiling
+    DURUR. Guards against regression of the stale-8 runtime break."""
+    ws = tmp_path / "workspace"
+    ws.mkdir()
+
+    def _config_with(n: int) -> dict:
+        cfg = dict(synthetic_portfolio_config)
+        cfg["active_projects"] = [
+            {
+                "slug": f"proj-{i}",
+                "workspace_path": f"proj-{i}",
+                "profile": ["b2b-saas"],
+                "priority": min(i, 10),  # schema caps priority at 10
+            }
+            for i in range(1, n + 1)
+        ]
+        return cfg
+
+    # Positive: exactly 12 active_projects validates + builds (no DURUR).
+    cfg12 = _config_with(12)
+    pmr.validate_portfolio_config_for_roundup(cfg12, portfolio_config_schema)
+    roundup = pmr.build_portfolio_roundup(
+        portfolio_config=cfg12, workspace_root=ws,
+        now=fixed_now, period_end="2026-05-01",
+    )
+    assert len(roundup.projects) == 12
+
+    # Negative: 13 active_projects → ceiling DURUR (Draft7 maxItems OR the
+    # transform's own ActiveProjectsCeilingError, whichever fires first).
+    cfg13 = _config_with(13)
+    with pytest.raises(
+        (pmr.ActiveProjectsCeilingError, pmr.PortfolioConfigInvalidError),
+    ):
+        pmr.validate_portfolio_config_for_roundup(
+            cfg13, portfolio_config_schema)
+    # build_portfolio_roundup re-checks independently of jsonschema.
+    with pytest.raises(pmr.ActiveProjectsCeilingError):
+        pmr.build_portfolio_roundup(
+            portfolio_config=cfg13, workspace_root=ws,
+            now=fixed_now, period_end="2026-05-01",
+        )

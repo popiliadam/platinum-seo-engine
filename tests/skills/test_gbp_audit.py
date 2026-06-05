@@ -185,3 +185,44 @@ def test_listing_not_found_emits_high_severity_nap(
     assert "listing not found" in nap_rows[0]["gap_description"].lower()
     assert nap_rows[0]["status"] == "TODO"
     assert nap_rows[0]["audit_id"].startswith("gbp-")
+
+
+# ---------------------------------------------------------------------------
+# preflight_budget() — the public budget contract SKILL.md Step 2 documents
+# (B6-05). Mirrors tech-audit's preflight_budget(): keyword-only signature,
+# envelope return with `exceeded`, BudgetExceededError raised on overage so
+# the run routes to awaiting_approval (DURUR #1) instead of a silent downgrade.
+# ---------------------------------------------------------------------------
+
+def _budget_files(tmp_path: Path, cap: int) -> tuple[Path, Path]:
+    cfg = tmp_path / "project.config.json"
+    cfg.write_text(
+        json.dumps({"dataforseo": {"budget_credits_per_day": cap}}), "utf-8"
+    )
+    events = tmp_path / "events.jsonl"
+    events.write_text("", "utf-8")  # no prior spend
+    return cfg, events
+
+
+def test_preflight_budget_envelope_under_cap(tmp_path: Path) -> None:
+    cfg, events = _budget_files(tmp_path, cap=500)
+    env = gbp_audit_transform.preflight_budget(
+        estimated_credits=3,
+        project_config_path=cfg,
+        events_path=events,
+    )
+    assert env["exceeded"] is False
+    assert env["estimated_credits"] == 3
+    # Codebase-standard envelope keys (mirrors tech_audit / the sibling transforms).
+    assert env["projected_used"] == 3
+    assert env["remaining_after"] == 497
+
+
+def test_preflight_budget_raises_when_projected_exceeds_cap(tmp_path: Path) -> None:
+    cfg, events = _budget_files(tmp_path, cap=2)
+    with pytest.raises(gbp_audit_transform.BudgetExceededError):
+        gbp_audit_transform.preflight_budget(
+            estimated_credits=3,  # 0 used + 3 > 2 cap
+            project_config_path=cfg,
+            events_path=events,
+        )

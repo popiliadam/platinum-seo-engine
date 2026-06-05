@@ -131,7 +131,7 @@ branches against the canonical Draft 7 schema.
 ## Transform contract
 
 `scripts/reporting/portfolio_weekly_brief.py` (pure function, < 600
-lines per ADR-027):
+lines — transform size gate; ADR-027 sets the < 1500L policy):
 
 - `build_portfolio_brief(portfolio_config, workspace_root, now,
   week_end=None) -> PortfolioBrief` — top-level idempotent aggregator.

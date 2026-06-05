@@ -48,10 +48,15 @@ autonomy:
 settings + profile hint from Süleyman, validates against
 `schemas/project-config.schema.json` v1.5, and emits a
 **staging-only** config artifact under `outputs/onboarding/`. The
-canonical `projects/{slug}/project.config.json` write is
-deferred to Phase 14 (workspace bring-up); pre-Phase-14 invocations
-remain non-destructive — STAGING-ONLY mode (DURUR #5 surfaces an
-AMBER warning but does NOT block the wizard). Süleyman'ın manuel
+**wizard core (Steps 1-10)** is non-destructive: it NEVER writes the
+canonical `projects/{slug}/project.config.json` — that full-config
+write is deferred to Phase 14 (workspace bring-up). The ONE sanctioned
+exception is **Stage C** of the Bank Seed Pipeline below: once a
+workspace exists, Stage C appends approved bank entries into the
+existing `projects/{slug}/project.config.json` (Step 6 + DURUR #5
+carve-out). Pre-Phase-14 wizard-core invocations remain STAGING-ONLY
+(DURUR #5 surfaces an AMBER warning but does NOT block the wizard).
+Süleyman'ın manuel
 onayı (`approval_received=true`) zorunlu (DURUR #1) — onay yoksa
 events.jsonl'a yazma yapılmaz, hiçbir staging dosyası kalıcı
 kabul edilmez.
@@ -173,11 +178,20 @@ Aynı disiplin (default yok, skip = AMBER iterate). 14 alan:
 13. `disclaimer_templates` — object<string,string>
 14. `image_model` — string (default-aware: `nano-banana`)
 
-### Step 6 — `projects/{slug}/project.config.json` YAZILMAZ
+### Step 6 — Wizard core: `projects/{slug}/project.config.json` YAZILMAZ
 
 Phase 14 öncesi workspace yok ya da skill scope dışında. Bu adım
-explicit no-op: skill **asla** `projects/{slug}/project.config.json` dosyasına
-yazmaz. STAGING-ONLY (DURUR #5).
+explicit no-op: **wizard core (Steps 1-10)** `projects/{slug}/project.config.json`
+dosyasını ASLA oluşturmaz / full-config yazmaz — staging output (Step 7)
+otoritedir. STAGING-ONLY (DURUR #5).
+
+> **Stage C carve-out:** Bu mutlak SADECE wizard core (Steps 1-10) içindir.
+> Aşağıdaki Bank Seed Pipeline'ın **Stage C**'si, bir workspace ZATEN varsa
+> mevcut `projects/{slug}/project.config.json`'a onaylı bank entry'leri
+> **append eder** (sanctioned bank-write — `scripts/meta/brand_onboarding_write.
+> write_bank_entries`, R-44 enforced). Wizard core full-config yazmaz; Stage C
+> yalnızca `content_settings` bank array'lerine ekleme yapar, başka alana
+> dokunmaz.
 
 ### Step 7 — Emit staging output package
 
@@ -217,7 +231,7 @@ Onay komutu: Süleyman explicit "evet/onaylıyorum/y" yazar →
 ```
 
 > **Schema-first override (Lesson 7+23):** Brief `event_type=brand_onboarded`
-> öneriyor; ancak `events.schema.json` `event_type` enum'u 10-value
+> öneriyor; ancak `events.schema.json` `event_type` enum'u 12-value
 > WORK-only kapalı liste (`content_new`, `content_revise`, ...).
 > `event_kind=workflow` için doğru alanlar `workflow_action` (8-value
 > lifecycle) + `workflow_run_id`. Semantic marker olarak `brand_onboarded`
@@ -312,7 +326,10 @@ Stop and flag the manager — do not patch, do not fall back silently.
    REJECT. Type-safe assert; 6. değer kabul edilmez.
 5. **DURUR #5 — Workspace yok (Phase 14 öncesi).** `projects/`
    dizini engine repo'sunda yok → STAGING-ONLY mode (warning, devam).
-   `projects/{slug}/project.config.json` ASLA yazılmaz.
+   Wizard core (Steps 1-10) `projects/{slug}/project.config.json`'ı ASLA
+   yazmaz. (Workspace VARSA, Stage C bu dosyanın `content_settings` bank
+   array'lerine append edebilir — Step 6 Stage C carve-out; bu DURUR
+   yalnızca workspace YOKKEN wizard core'u staging'e kilitler.)
 6. **DURUR #6 — Domain DNS resolve fail.** `socket.gethostbyname`
    exception fırlatır → AMBER prompt; Süleyman manual confirm
    verirse devam, "no" derse ABORT.

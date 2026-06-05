@@ -109,7 +109,16 @@ def _project_config(workspace: Path, slug: str = "test-proj") -> dict:
 # ---------------------------------------------------------------------------
 
 class MockSfMcp:
-    """Holds the per-test mock callbacks for the 5 SF MCP tools."""
+    """Holds the per-test mock callbacks for the SF MCP tools.
+
+    The 24-report export fans out across the THREE real SF export tools
+    (``sf_generate_report`` / ``sf_generate_bulk_export`` /
+    ``sf_export_seo_element_urls``) per ``build_export_plan`` — there is no
+    single ``generate_report(crawl_id, report_name)`` tool. All three default
+    to a shared ``export`` callback (keyed on ``file_path=f"{canonical}.csv"``),
+    so a test that only cares about success/failure sets ``export=`` once; a
+    test that needs per-canonical behaviour inspects ``kw["file_path"]``.
+    """
 
     def __init__(
         self,
@@ -118,13 +127,21 @@ class MockSfMcp:
         list_crawls: Callable[..., Any] = None,
         crawl: Callable[..., Any] = None,
         crawl_progress: Callable[..., Any] = None,
+        export: Callable[..., Any] = None,
         generate_report: Callable[..., Any] = None,
+        generate_bulk_export: Callable[..., Any] = None,
+        export_seo_element_urls: Callable[..., Any] = None,
     ) -> None:
         self.allowed_dir = allowed_dir
         self.list_crawls = list_crawls
         self.crawl = crawl
         self.crawl_progress = crawl_progress
-        self.generate_report = generate_report
+        # Default: a tool-agnostic success keyed on file_path. The 3 real SF
+        # export tools route to it unless a test overrides a specific one.
+        default_export = export or (lambda **kw: {"saved_path": kw.get("file_path")})
+        self.generate_report = generate_report or default_export
+        self.generate_bulk_export = generate_bulk_export or default_export
+        self.export_seo_element_urls = export_seo_element_urls or default_export
 
 
 # ---------------------------------------------------------------------------
@@ -149,7 +166,11 @@ def _run_orchestrator(
 
     NOTE: this simulator INTENTIONALLY does not invoke the real subprocess
     call to sf_import — the handoff test patches subprocess.run separately.
-    For everything else it mirrors SKILL.md body Steps 1-9 line for line.
+    Step 5 drives the REAL export contract: build_export_plan() + the 3-tool
+    dispatch (sf_generate_report / sf_generate_bulk_export /
+    sf_export_seo_element_urls) with NDJSON→CSV conversion, no crawl_id/
+    report_name kwargs. It approximates the body's control flow rather than
+    reproducing every line verbatim.
     """
     import time as _time
 
@@ -265,12 +286,17 @@ def _run_orchestrator(
                                 workspace_root=workspace_root,
                                 output_ref=f"urls_crawled={final_state.urls_crawled}")
 
-    # Step 5 — export_24_reports (orch-8 Tier 1 fail → rollback).
+    # Step 5 — export_24_reports: drive from build_export_plan() and dispatch
+    # each spec to one of the THREE real SF export tools (no crawl_id /
+    # report_name kwargs — that single-tool form does not exist). seo-element
+    # exports arrive as NDJSON and are converted to CSV in place before the
+    # atomic move, so sf_import sees a uniform CSV raw/ set. orch-8: a Tier 1
+    # export failure rolls back the temp staging.
     import shutil
     workflow_runner.start_step(handle.run_id, 3,
                                project_slug=project_slug,
                                workspace_root=workspace_root)
-    report_names = sf_crawl_orchestrator.enumerate_reports(include_tier3=include_tier3)
+    export_plan = sf_crawl_orchestrator.build_export_plan(include_tier3=include_tier3)
     temp_staging = (
         workspace_root / "projects" / project_slug / "_state" / "staging"
         / f"sf-crawl-{handle.run_id}"
@@ -280,27 +306,48 @@ def _run_orchestrator(
     amber_warnings: list[str] = []
     exported: list[str] = []
     sf_scratch = Path(mcp_allowed)
+    # spec.tool → the mock's wrapper (mirrors the body's SF_EXPORT_TOOLS map).
+    tool_fns = {
+        "sf_generate_report": mcp.generate_report,
+        "sf_generate_bulk_export": mcp.generate_bulk_export,
+        "sf_export_seo_element_urls": mcp.export_seo_element_urls,
+    }
 
-    for report_name in report_names:
+    for spec in export_plan:
+        rel_path = f"{spec.canonical}.csv"
         try:
-            mcp.generate_report(crawl_id=crawl_id, report_name=report_name)
+            tool_fn = tool_fns[spec.tool]
+            tool_fn(file_path=rel_path, **spec.call_kwargs)  # NO crawl_id/report_name
             if create_real_csvs:
-                src = sf_scratch / f"{report_name}.csv"
-                src.write_text(f"# fake CSV for {report_name}\n", "utf-8")
-                dst = temp_staging / f"{report_name}.csv"
+                src = sf_scratch / rel_path
+                if sf_crawl_orchestrator.export_returns_ndjson(spec):
+                    # seo-element tool writes NDJSON even to a .csv path;
+                    # convert in place so raw/ is uniform CSV (body Step 5).
+                    src.write_text(
+                        f'{{"address": "https://example.com/{spec.canonical}", '
+                        f'"status_code": 200}}\n',
+                        encoding="utf-8",
+                    )
+                    src.write_text(
+                        sf_crawl_orchestrator.ndjson_to_csv(src.read_text("utf-8")),
+                        encoding="utf-8",
+                    )
+                else:
+                    src.write_text(f"col_a,col_b\n{spec.canonical},ok\n", "utf-8")
+                dst = temp_staging / rel_path
                 sf_crawl_orchestrator.move_with_rollback(src, dst)
-            exported.append(report_name)
+            exported.append(spec.canonical)
         except Exception as exc:
-            if report_name in TIER1_REQUIRED:
+            if spec.tier == "tier1":
                 shutil.rmtree(temp_staging, ignore_errors=True)
                 workflow_runner.fail(
                     handle.run_id, project_slug=project_slug,
                     code="mcp_error",
-                    message=f"DURUR-orch-8 Tier 1 {report_name!r} failed: {exc}",
+                    message=f"DURUR-orch-8 Tier 1 {spec.canonical!r} failed: {exc}",
                     step_index=3, workspace_root=workspace_root,
                 )
                 raise SystemExit(2)  # D-SF-16 atomic rollback
-            amber_warnings.append(f"Tier 2 {report_name!r}: {exc}")
+            amber_warnings.append(f"Tier 2 {spec.canonical!r}: {exc}")
 
     workflow_runner.finish_step(handle.run_id, 3,
                                 project_slug=project_slug,
@@ -430,7 +477,7 @@ def test_happy_path_24_reports(workspace: Path) -> None:
         list_crawls=lambda: {"crawls": []},
         crawl=lambda **kw: {"crawl_id": "happy-001"},
         crawl_progress=lambda **kw: {"progress": {"status": "DONE", "urls_crawled": 250}},
-        generate_report=lambda **kw: {"saved_path": f"/sf/{kw['report_name']}.csv"},
+        # The 3 SF export tools default to success (keyed on file_path).
     )
     with patch("subprocess.run") as mock_sub:
         mock_sub.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
@@ -449,6 +496,19 @@ def test_happy_path_24_reports(workspace: Path) -> None:
     csvs = sorted(p.stem for p in result["target_raw"].iterdir() if p.suffix == ".csv")
     assert set(csvs) >= TIER1_REQUIRED
     assert set(csvs) >= TIER2_RECOMMENDED
+    # raw/ must be UNIFORM CSV: the 16 seo-element reports SF emits as NDJSON
+    # were converted (ndjson_to_csv) before the atomic move. A skipped
+    # conversion would leave a bare JSON object line — assert none survive.
+    import csv as _csv
+    for p in result["target_raw"].iterdir():
+        if p.suffix != ".csv":
+            continue
+        text = p.read_text("utf-8")
+        assert not text.lstrip().startswith("{"), (
+            f"{p.name} is raw NDJSON — ndjson_to_csv conversion was skipped"
+        )
+        parsed = list(_csv.reader(text.splitlines()))
+        assert parsed and parsed[0], f"{p.name} has no CSV header row"
     # Final workflow status = done.
     state = _latest_workflow(workspace)
     assert state["status"] == "done"
@@ -583,7 +643,7 @@ def test_durur_orch_5_target_dir_conflict(workspace: Path) -> None:
         list_crawls=lambda: {"crawls": []},
         crawl=lambda **kw: {"crawl_id": "conflict-001"},
         crawl_progress=lambda **kw: {"progress": {"status": "DONE", "urls_crawled": 100}},
-        generate_report=lambda **kw: {"saved_path": f"/sf/{kw['report_name']}.csv"},
+        # The 3 SF export tools default to success (keyed on file_path).
     )
 
     with pytest.raises(SystemExit):
@@ -611,7 +671,7 @@ def test_durur_orch_6_file_move_fail(workspace: Path) -> None:
         list_crawls=lambda: {"crawls": []},
         crawl=lambda **kw: {"crawl_id": "movefail-001"},
         crawl_progress=lambda **kw: {"progress": {"status": "DONE", "urls_crawled": 100}},
-        generate_report=lambda **kw: {"saved_path": f"/sf/{kw['report_name']}.csv"},
+        # The 3 SF export tools default to success (keyed on file_path).
     )
 
     # We need the move from temp_staging → target_raw (Step 6) to fail, NOT
@@ -676,19 +736,23 @@ def test_durur_orch_7_concurrent_crawl(workspace: Path) -> None:
 def test_durur_orch_8_tier1_export_fail_rollback(workspace: Path) -> None:
     cfg = _project_config(workspace)
 
-    fail_target = next(iter(TIER1_REQUIRED))  # pick any Tier 1 report
+    # Pick a deterministic Tier 1 canonical to fail. The 3-tool dispatch passes
+    # file_path=f"{canonical}.csv" + call_kwargs — there is NO report_name arg,
+    # so the mock keys the failure on file_path.
+    fail_target = sorted(TIER1_REQUIRED)[0]
+    fail_rel = f"{fail_target}.csv"
 
-    def gen_report(**kw: Any) -> dict:
-        if kw["report_name"] == fail_target:
+    def failing_export(**kw: Any) -> dict:
+        if kw.get("file_path") == fail_rel:
             raise RuntimeError(f"SF MCP rejected {fail_target}")
-        return {"saved_path": f"/sf/{kw['report_name']}.csv"}
+        return {"saved_path": kw.get("file_path")}
 
     mcp = MockSfMcp(
         allowed_dir=lambda: {"allowed_directory": cfg["sf"]["mcp"]["allowed_directory"]},
         list_crawls=lambda: {"crawls": []},
         crawl=lambda **kw: {"crawl_id": "rollback-001"},
         crawl_progress=lambda **kw: {"progress": {"status": "DONE", "urls_crawled": 100}},
-        generate_report=gen_report,
+        export=failing_export,
     )
 
     with pytest.raises(SystemExit):
@@ -723,7 +787,7 @@ def test_sf_import_handoff_success(workspace: Path) -> None:
         list_crawls=lambda: {"crawls": []},
         crawl=lambda **kw: {"crawl_id": "handoff-001"},
         crawl_progress=lambda **kw: {"progress": {"status": "DONE", "urls_crawled": 100}},
-        generate_report=lambda **kw: {"saved_path": f"/sf/{kw['report_name']}.csv"},
+        # The 3 SF export tools default to success (keyed on file_path).
     )
 
     with patch("subprocess.run") as mock_sub:

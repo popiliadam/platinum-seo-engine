@@ -463,8 +463,23 @@ def main(argv: list[str]) -> int:
             print(f"--week-end invalid: {exc}", file=sys.stderr)
             return 2
 
-    workspace_root = Path(args.workspace_root)
+    # DURUR #2: workspace_root must resolve to an existing projects/{slug}/.
+    # An empty arg or a missing project dir is a WorkspaceRootUnsetError —
+    # distinct from WorkbookMissingError (project exists, workbook absent).
+    workspace_root_arg = (args.workspace_root or "").strip()
+    if not workspace_root_arg:
+        raise WorkspaceRootUnsetError(
+            "workspace_root unresolvable: --workspace-root is empty "
+            "(pass --workspace-root or set PSEO_WORKSPACE_ROOT)"
+        )
+    workspace_root = Path(workspace_root_arg)
     project_root = workspace_root / "projects" / args.project_slug
+    if not project_root.is_dir():
+        raise WorkspaceRootUnsetError(
+            f"workspace_root cannot be resolved to a project: {project_root} "
+            f"does not exist (check --workspace-root / PSEO_WORKSPACE_ROOT and "
+            f"that init-project has scaffolded projects/{args.project_slug}/)"
+        )
     workbook_path = project_root / "master.xlsx"
     if not workbook_path.is_file():
         raise WorkbookMissingError(

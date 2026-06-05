@@ -192,7 +192,7 @@ for skill_md in (REPO_ROOT / "skills").rglob("SKILL.md"):
     m = re.match(r"^---\n.*?\n---\n", text, re.DOTALL)
     body = text[m.end():] if m else text
     # Extract Title Case 2+ capitalized tokens (heuristic)
-    candidates = re.findall(r"\b([A-Z][A-Za-z]{1,}(?:\s+[A-Z][A-Za-z]{1,})*)\b", body)
+    candidates = re.findall(r"\b([A-Z][A-Za-z]{1,}(?:\s+[A-Z][A-Za-z]{1,})+)\b", body)
     for c in candidates:
         skill_terms_used.setdefault(c, []).append(skill_md)
 ```
@@ -233,9 +233,17 @@ missing_terms = sorted(
 ```
 
 Defensive whitelist guards against false positives from common
-acronyms and rule IDs (R-XX, F-XX, D-XX, M-XX). Without the whitelist
-every skill body would report dozens of false positives. The
-whitelist is conservative; new acronyms must be added explicitly.
+acronyms and rule IDs (R-XX, F-XX, D-XX, M-XX), but it does NOT make
+this a precise detector. The Title-Case heuristic flags every 2+ token
+capitalized span absent from GLOSSARY — skill names, step labels, proper
+nouns, prose emphasis — so the missing-term list runs to the **hundreds**
+even after the 2+ token requirement and the whitelist (≈360 over the
+current `skills/` tree; the pre-fix single-token regex flagged ≈1,400).
+It is therefore an **AMBER advisory candidate list for manager triage**,
+not an authoritative "these terms are undefined" set: the operator skims
+it for genuinely missing glossary entries and ignores the expected
+false-positive bulk. The whitelist is conservative; new acronyms must be
+added explicitly.
 
 ### Step 7 — `render_report`
 

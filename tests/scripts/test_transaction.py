@@ -414,6 +414,11 @@ def test_writer_registry_known_convention_mappings() -> None:
     # both produced by the quick-wins skill.
     assert transaction.WRITER_REGISTRY["opportunity"] == frozenset({"quick-wins"})
     assert transaction.WRITER_REGISTRY["quick_wins"] == frozenset({"quick-wins"})
+    # B5-07: content_improve is PRODUCED by content-decay (its produces[] lists
+    # "content-improve"; monthly-report's producer table agrees). The
+    # content-remediation + faq-optimization skills declare content_improve
+    # READ-ONLY (F-15 allowed_writers=null), so neither writes it.
+    assert transaction.WRITER_REGISTRY["content_improve"] == frozenset({"content-decay"})
 
 
 def test_writer_registry_status_ok_for_registered_writer() -> None:

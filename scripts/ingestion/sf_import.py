@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
-"""sf_import.py — Implementation of sf-import skill 8-step protocol.
+"""sf_import.py — Implementation of the sf-import skill CLI protocol.
 
-Executes the protocol described in skills/ingestion/sf-import/SKILL.md:
-1. validate_export_path — raw/ subfolder discovery
-2. validate_tier1 — 14/14 required reports + filename normalization
-3. envelope_inbox — sha256 + tier mapping → inbox/sf/{date}-{slug}.json
-4. sitemap_xcheck — mcp__gsc__list_sitemaps cross-check (caller-provided)
-5. write_excel — 6-sheet projection via transaction.append
-6. provenance — events_writer.append_provenance(source.kind=sf_csv)
-7. complete — workflow_runner.complete with string-typed outputs
+A deterministic CLI (NOT a workflow_runner run shell). Stages of main(argv),
+as described in skills/ingestion/sf-import/SKILL.md:
+A. workspace/path resolution — DURUR #5 (exit 5)
+B. validate_export_path — raw/ subfolder discovery — DURUR #1 (exit 1)
+C. validate_tier1 — 14/14 required reports + filename normalization
+   (match_tiers, defined here) — DURUR #2 (exit 2)
+D. envelope_inbox — sha256 + tier mapping → inbox/sf/{date}-{slug}.json
+   (master.xlsx existence check → DURUR #6, exit 6)
+E. sitemap_xcheck — Phase-X DEFERRED (not wired; no mcp__gsc__list_sitemaps
+   call, no sf_sitemap_xcheck module)
+F. write_excel + provenance — 6-sheet projection via transaction.replace
+   (idempotent refresh) + events_writer.append_provenance(source.kind=sf_csv)
+G. complete — stdout summary + return 0 (no workflow_runner, no outputs dict)
 
 Plugin-agnostic: project_slug + sf_export_path required, no slug literals.
 

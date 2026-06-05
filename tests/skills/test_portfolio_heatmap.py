@@ -9,7 +9,7 @@ Mirrors tests/skills/test_portfolio_overview.py + test_portfolio_weekly_brief.py
   - missing-sheet schema-valid empty shape (W-E1 paterni reuse)
   - multi-project merge (3 projects with varied sheet density)
   - density normalization (per-cell count → density score)
-  - primary_source 10-enum coverage (each enum gets a bucket)
+  - primary_source 11-enum coverage (each enum gets a bucket)
   - forbidden tokens guard (4 tokens + 8 base64-obfuscated slug list)
   - assert_read_only_module() helper (W-E3 paterni)
   - path convention compliance (projects/_portfolio/{outputs,inbox}/local/
@@ -84,13 +84,15 @@ def _synthetic_config(active_count: int = 3) -> dict:
     )
     active = []
     for i in range(active_count):
-        slug = template_slugs[i]
+        # Use the named fixture slugs for the first 8; generate scalable
+        # overflow slugs beyond that so ceiling tests (12/13) can build.
+        slug = template_slugs[i] if i < len(template_slugs) else f"proj-test-{i+1}"
         active.append({
             "slug": slug,
             "display_name": f"Project {slug}",
             "workspace_path": slug,
             "profile": ["b2b-saas"],
-            "priority": i + 1,
+            "priority": min(i + 1, 10),  # schema caps priority at 10
         })
     return {
         "schema_version": "1.1",
@@ -437,19 +439,36 @@ def test_multi_project_merge_and_density_normalization(
     assert "cannibalization" in rendered
     # Density bars use the sparkline glyph set.
     assert "▇" in rendered or "▆" in rendered or "▅" in rendered
+    # Every $placeholder must be substituted EXCEPT $run_id — the K-06
+    # audit-trail placeholder a render-time hook injects later
+    # (test_run_id_coverage.py enforces $run_id in every report template;
+    # monthly_report.py's setdefault("run_id","$run_id") is the canonical
+    # idiom). safe_substitute leaves any unmapped $token as a literal, so
+    # read identifiers from the RAW template (stripping $$ escapes — a
+    # $$var doc-literal is NOT a placeholder) and assert none but run_id
+    # survive the render.
+    template_ids = set(re.findall(
+        r"\$\{?([A-Za-z_]\w*)\}?", template_text.replace("$$", ""))) - {"run_id"}
+    leaked = sorted(
+        i for i in template_ids
+        if re.search(r"\$\{?" + re.escape(i) + r"\}?", rendered)
+    )
+    assert not leaked, f"unsubstituted template placeholders: {leaked}"
 
 
 # ---------------------------------------------------------------------------
-# Test 5 — primary_source 10-enum coverage (each enum value gets a bucket)
+# Test 5 — primary_source 11-enum coverage (each enum value gets a bucket)
 # ---------------------------------------------------------------------------
 
-def test_primary_source_10_enum_coverage(
+def test_primary_source_11_enum_coverage(
     tmp_path: Path,
     portfolio_config_schema: dict,
 ) -> None:
     """Worker brief acceptance gate: aggregate_dimension="primary_source"
-    must surface a bucket for EVERY one of the 10 enum values, even
-    when count is zero. Strict coverage mode."""
+    must surface a bucket for EVERY one of the 11 schema enum values,
+    even when count is zero. Strict coverage mode — the enum must stay
+    in lockstep with master-excel.schema.json#master_task col C
+    (11 values incl. new_content_plan; Q-V1.2-MASTER-TASK-PRIMARY-SOURCE-01)."""
     portfolio_root = tmp_path / "portfolio_ws"
     portfolio_root.mkdir()
     (portfolio_root / "projects" / "_portfolio").mkdir(parents=True)
@@ -457,7 +476,7 @@ def test_primary_source_10_enum_coverage(
     config = _synthetic_config(active_count=1)
     ph.validate_portfolio_config(config, portfolio_config_schema)
 
-    # Single project with master_task rows covering only 3 of the 10
+    # Single project with master_task rows covering only 3 of the 11
     # primary_source enum values.
     xlsx = (
         portfolio_root / "alpha-test" / "projects" / "alpha-test"
@@ -487,9 +506,13 @@ def test_primary_source_10_enum_coverage(
         generated_at="2026-05-01T00:00:00Z",
     )
 
-    # Every one of the 10 schema enum values surfaces as a bucket.
+    # Every one of the 11 schema enum values surfaces as a bucket.
     assert heatmap.dimension_keys == ph.PRIMARY_SOURCE_ENUM
-    assert len(heatmap.dimension_keys) == 10
+    assert len(heatmap.dimension_keys) == 11
+    assert "new_content_plan" in ph.PRIMARY_SOURCE_ENUM, (
+        "PRIMARY_SOURCE_ENUM must include new_content_plan to stay in "
+        "lockstep with master-excel.schema.json#master_task col C"
+    )
     p1 = heatmap.projects[0]
     for enum_val in ph.PRIMARY_SOURCE_ENUM:
         assert enum_val in p1.dimension_buckets, (
@@ -499,10 +522,11 @@ def test_primary_source_10_enum_coverage(
     assert p1.dimension_buckets["content_decay"] == 1
     assert p1.dimension_buckets["tech_fix"] == 1
     assert p1.dimension_buckets["internal_links"] == 1  # Q-IL-1 closure
-    # Zero buckets stay at 0 (not absent).
+    # Zero buckets stay at 0 (not absent) — incl. the 11th enum value.
     assert p1.dimension_buckets["pillar"] == 0
     assert p1.dimension_buckets["sxo"] == 0
     assert p1.dimension_buckets["redirect_404"] == 0
+    assert p1.dimension_buckets["new_content_plan"] == 0
 
 
 # ---------------------------------------------------------------------------
@@ -654,3 +678,28 @@ def test_path_convention_compliance(
     explicit.mkdir()
     resolved2 = ph._resolve_portfolio_root(str(explicit))
     assert resolved2 == explicit.resolve()
+
+
+# ---------------------------------------------------------------------------
+# Test 9 — active_projects ceiling 12-ok / 13-fail (B1-03; soft cap 8→12)
+# ---------------------------------------------------------------------------
+
+def test_active_projects_ceiling_12_ok_13_fail(
+    portfolio_config_schema: dict,
+) -> None:
+    """The active_projects soft cap was raised 8→12 when the live
+    portfolio reached ~10 (schema maxItems=12). A 12-project config must
+    VALIDATE; a 13-project config must raise the ceiling DURUR. Guards
+    against regression of the stale-8 runtime break that ActiveProjects
+    MAX previously enforced."""
+    # Positive: exactly 12 active_projects validates (no DURUR).
+    ph.validate_portfolio_config(
+        _synthetic_config(active_count=12), portfolio_config_schema)
+
+    # Negative: 13 active_projects → ceiling DURUR (Draft7 maxItems OR the
+    # transform's own ActiveProjectsCeilingError, whichever fires first).
+    with pytest.raises(
+        (ph.ActiveProjectsCeilingError, ph.PortfolioConfigInvalidError),
+    ):
+        ph.validate_portfolio_config(
+            _synthetic_config(active_count=13), portfolio_config_schema)

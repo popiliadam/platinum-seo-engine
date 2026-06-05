@@ -4,12 +4,10 @@ description: |
   Use when: kullanıcı "schema validate", "schema doğrula", "frontmatter
   kontrol", "draft7 audit", "/pseo-driftcheck" der ya da phase gateway
   öncesi quality gate fired. JSON Schema Draft7 validation across all
-  schemas under schemas/, cross-sheet-invariants ≥20 rules
-  (F-01..F-15 + D-01..D-03 + M-01..M-02 baseline; F-16..F-22 additive
-  K-02 v1.5-Phase-2 = 27), and SKILL.md frontmatter compliance under
-  skills/**/.
-  cross-sheet-invariants ≥21 rules baseline post v1.8 Phase 4
-  (F-23 SF MCP additive K-02 paterni reuse #N+1).
+  schemas under schemas/, cross-sheet-invariants 31 rules
+  (F-01..F-15 + D-01..D-03 + M-01..M-02 baseline = 20; F-16..F-22 additive
+  K-02 v1.5-Phase-2 = 27; F-23..F-26 SF MCP additive v1.8 Phase 4 = 31,
+  terminal F-26), and SKILL.md frontmatter compliance under skills/**/.
   Also use when: yeni schema eklendi (additive bump), frontmatter
   drift şüphesi, CI quality gate, drift-check öncesi pre-flight,
   Phase 4 sf-mcp-tool-mapping.schema.json + templates/sf-mcp/
@@ -198,10 +196,10 @@ for entry in rules:
     assert not missing, f"rule {entry.get('id', '?')} missing keys: {missing}"
 ```
 
-The cross-sheet-invariants instance document carries ≥21 rules
+The cross-sheet-invariants instance document carries 31 rules
 (F-01..F-15 + D-01..D-03 + M-01..M-02 baseline = 20; F-16..F-22 additive
-K-02 v1.5-Phase-2 = 27; F-23 additive v1.8 Phase 4 SF MCP cross-sheet
-= 28) per spec §7. Per-rule F-NN ↔ `validate_invariants.py` parity is
+K-02 v1.5-Phase-2 = 27; F-23..F-26 SF MCP cross-sheet additive v1.8
+Phase 4 = 31, terminal F-26) per spec §7. Per-rule F-NN ↔ `validate_invariants.py` parity is
 enforced separately by `tests/schemas/test_cross_sheet_invariants_sync.py`
 (bidirectional + `KNOWN_SCHEMA_ONLY` known-deferred for F-06/F-07). The
 top-level key is `rules` per S3.5 pivot — NOT `invariants`. This skill

@@ -16,7 +16,7 @@ description: |
   kapsamı YOK); status_check_drift varsa WARNING surface (DURUR değil,
   transform devam eder).
   Do not use when: portfolio.config.json yokken (init-portfolio önce
-  çalışmalı, DURUR PortfolioConfigMissingError); active_projects 8'i
+  çalışmalı, DURUR PortfolioConfigMissingError); active_projects 12'yi
   aşıyor (schema maxItems sentinel, DURUR ActiveProjectsCeilingError —
   fazla entry'leri pending_onboard'a taşı); cross_query.read_only !=
   true (schema const, DURUR ReadOnlyContractViolation); tek proje task
@@ -43,7 +43,7 @@ outputs:
 consumes:
   - "init-portfolio:projects/_portfolio/portfolio.config.json"
   - "per-project:master.xlsx#master_task"
-  - "per-project:master.xlsx#consistency-report"
+  - "per-project:_state/consistency-report-{slug}.json"
 produces:
   - "portfolio-overview"
   - "portfolio-weekly-brief"
@@ -128,11 +128,11 @@ provenance governance refinement is deferred to Q-RP-01 (closeout).
 
 | # | Source                                    | Discipline                                |
 |---|-------------------------------------------|-------------------------------------------|
-| 1 | `portfolio.config.json` v1.1              | active_projects iterate (maxItems=8)      |
+| 1 | `portfolio.config.json` v1.1              | active_projects iterate (maxItems=12)     |
 | 2 | per-project `master.xlsx#master_task` col F | category (free-form string)             |
 | 3 | per-project `master.xlsx#master_task` col G | priority (`severityEnum` 4 values)      |
 | 4 | per-project `master.xlsx#master_task` col J | status (`statusEnum` 7 values, OPEN filter) |
-| 5 | per-project consistency-report (OPTIONAL) | verdict GREEN/AMBER/RED → `status_check_drift` advisory |
+| 5 | per-project `_state/consistency-report-{slug}.json` (OPTIONAL) | verdict GREEN/AMBER/RED → `status_check_drift` advisory |
 
 ## Schema authority
 
@@ -151,7 +151,7 @@ provenance governance refinement is deferred to Q-RP-01 (closeout).
 `schemas/portfolio-config.schema.json` v1.1:
 
 - `active_projects[].slug` + `workspace_path` + `priority` drive
-  iteration; `maxItems = 8` enforced (DURUR
+  iteration; `maxItems = 12` enforced (DURUR
   `ActiveProjectsCeilingError`).
 - `cross_query.read_only` = `true` const (DURUR
   `ReadOnlyContractViolation`).
@@ -166,7 +166,7 @@ provenance governance refinement is deferred to Q-RP-01 (closeout).
 ## Transform contract
 
 `scripts/reporting/portfolio_task_heatmap.py` (pure function, < 600
-lines per ADR-027):
+lines — transform size gate; ADR-027 sets the < 1500L policy):
 
 - `aggregate(portfolio_root, config, run_date) -> HeatmapBatch` —
   top-level idempotent aggregator.
@@ -215,7 +215,7 @@ Stop and flag the manager — do not patch, do not fall back.
 2. **PortfolioConfigInvalidError** — payload failed Draft 7
    validation against `schemas/portfolio-config.schema.json`.
    Schema-first violation.
-3. **ActiveProjectsCeilingError** — `active_projects` > 8 (schema
+3. **ActiveProjectsCeilingError** — `active_projects` > 12 (schema
    `maxItems` sentinel). Move surplus to `pending_onboard`.
 4. **ReadOnlyContractViolation** — `cross_query.read_only != true`
    (schema `const: true`). The aggregator cannot run with
