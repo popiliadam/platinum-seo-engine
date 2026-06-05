@@ -42,10 +42,13 @@ def test_every_schema_declares_draft07(schema_path: Path) -> None:
         assert wrong not in declared, f"{schema_path.name} declares a non-Draft-7 $schema: {declared!r}"
 
 
-def test_schemas_count_is_twenty_one() -> None:
-    """Sanity: the parametrized lock actually covers the full schema set (21 files)."""
+def test_schemas_count_is_twenty_two() -> None:
+    """Sanity: the parametrized lock actually covers the full schema set (22 files).
+
+    Bumped 21 -> 22 by AMO batch 1a, which adds schemas/coverage.schema.json
+    (D10 count-guard)."""
     count = len(list(SCHEMAS_DIR.glob("*.schema.json")))
-    assert count == 21, f"expected 21 *.schema.json files, found {count}"
+    assert count == 22, f"expected 22 *.schema.json files, found {count}"
 
 
 def test_validator_pins_draft7() -> None:

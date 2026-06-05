@@ -167,6 +167,10 @@
           "type": "integer",
           "minimum": 0,
           "description": "Index into steps[] of the step that triggered the failure."
+        },
+        "external": {
+          "type": "boolean",
+          "description": "Additive discriminator (spec D4): true iff this failure was caused by an EXTERNAL dependency (GSC/DFS outage, quota, network) rather than an internal logic bug. The denetçi (batch 2c) maps an external failure onto the existing `paused` state + a RED report and ALLOWS turn-end, instead of blocking to force completion. Absent => false (internal). Reuses `paused` — NO new `blocked` state, NO new failure codes."
         }
       }
     },
@@ -218,7 +222,8 @@
                 "enum": ["validation_error", "mcp_error", "budget_exhausted", "user_rejected", "timeout", "internal_error"]
               },
               "message": { "type": "string", "minLength": 1 },
-              "step_index": { "type": "integer", "minimum": 0 }
+              "step_index": { "type": "integer", "minimum": 0 },
+              "external": { "type": "boolean" }
             }
           }
         }

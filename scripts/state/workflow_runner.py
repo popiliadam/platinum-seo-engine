@@ -601,12 +601,21 @@ def resume(run_id: str, *, project_slug: str,
 
 def fail(run_id: str, *, project_slug: str, code: str, message: str,
          step_index: int | None = None, error_details: str | None = None,
+         external: bool = False,
          workspace_root: Path | None = None,
          schema_path: Path | None = None) -> RunHandle:
-    """Move a running run → failed; record failure_reason."""
+    """Move a running run → failed; record failure_reason.
+
+    external (AMO 1a, spec D4): when True, set failure_reason.external=true to
+    flag an EXTERNAL dependency failure (GSC/DFS outage, quota, network) the
+    denetçi maps onto the existing `paused` state. Default False leaves the key
+    absent, so the persisted JSON of every existing fail() call is unchanged.
+    """
     failure: dict[str, Any] = {"code": code, "message": message}
     if step_index is not None:
         failure["step_index"] = step_index
+    if external:
+        failure["external"] = True
     handle = transition(run_id, "failed", project_slug=project_slug,
                         workspace_root=workspace_root, schema_path=schema_path,
                         failure_reason=failure)
