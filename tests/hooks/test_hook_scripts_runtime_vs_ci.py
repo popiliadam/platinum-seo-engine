@@ -28,6 +28,11 @@ RUNTIME_HOOK_SCRIPTS = {
     "stop_validation.py",
     "subagent_output_validate.py",
     "validate_content_write.py",
+    # AMO batch-0d session-aware audit emitter — wired into hooks/post-tool-use.json
+    # (replaces the legacy inline `python3 -c` audit command). Attributes each
+    # Edit/Write/Bash audit event to THIS session's bound project (session marker
+    # → shared/active.json fallback). See scripts/hooks/README.md §1.
+    "audit_post_tool_use.py",
     # AMO batch-0a TEMPORARY diagnostic probe — wired (as an appended command
     # entry) into all five lifecycle events. Remove when the AMO session-binding
     # mechanism is confirmed. See scripts/hooks/README.md §3.
