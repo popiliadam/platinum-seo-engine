@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "http://platinum-seo-engine/schemas/session-marker",
+  "title": "Session Marker v1.0",
+  "description": "Shape of {workspace_root}/shared/sessions/{session_id}.json — the AMO per-session binding marker that pins ONE Claude session (keyed by its session UUID) to ONE SEO project slug, so a user can run 3-5 projects in parallel (one per session) without cross-contamination. Written by /pseo-bind keyed by $CLAUDE_CODE_SESSION_ID (command context); read by a SessionStart hook keyed by the stdin session_id (hook context) in AMO batch 0c — the two ids are the SAME UUID for a session (batch 0a probe). Resolution falls back to shared/active.json when a session is unbound. Lives workspace-GLOBAL under shared/ alongside active.json, NOT per-project _state/.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["active_project", "bound_at", "session_id"],
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "description": "Marker schema version (ADR-018 const discipline). Optional — the ephemeral per-session marker is rewritten on every /pseo-bind, so it is not in required[]; declared here so a future bump can discriminate older markers."
+    },
+    "active_project": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Project slug this session is bound to (matches projects/<slug>/project.config.json; same slug grammar as project-config.schema.json)."
+    },
+    "bound_at": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Local ISO 8601 timestamp when the binding was written (datetime.now().isoformat())."
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Claude session UUID — identical to the hook stdin session_id and the $CLAUDE_CODE_SESSION_ID env var for this session (AMO batch 0a cross-env probe)."
+    }
+  }
+}
