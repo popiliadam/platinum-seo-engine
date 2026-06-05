@@ -25,10 +25,11 @@ Promote to a general engine ONLY if a 4th workflow proves the abstraction earns 
 
 | Batch | Scope | Status | Prereq |
 |---|---|---|---|
-| **0a** | Cross-environment hook probe (empirically resolve session_id availability across VSCode/Mac-app/CLI) — **gates all binding code** | ✅ **BUILT + GREEN** (manager-verified: 1723 pass / 0 fail, +15 tests; additive-only hooks; no leak) — **awaiting operator cross-env data** | — |
-| 0b | Binding substrate: `resolve_session_project` helper (strict/advisory) + `/pseo-bind` (session-id marker file) + 4 consumer wirings (dump_workspace, content-gate, audit hook, banners) + engine-root via CLAUDE_PLUGIN_ROOT | blocked on **0a operator data** (need confirmed session_id field) | 0a |
-| 0c | Shared-resource safety: `portfolio.json` lock + backup-rotation glob fix + two-session-same-project guard | pending | 0b |
-| 0d | Blocking `master.xlsx` lock (bounded timeout → `paused`); precedes ANY parallel writer | pending | 0c |
+| **0a** | Cross-environment hook probe | ✅ **DONE + GREEN** (`e4c22c0`). **Operator data confirmed (VSCode):** `session_id` present+stable 5/5 events incl Stop; **hook `session_id` == command `$CLAUDE_CODE_SESSION_ID`** (proven via transcript namespace); `CLAUDE_PLUGIN_ROOT` reliable; `CLAUDE_ENV_FILE`/`PSEO_WORKSPACE_ROOT` unreliable. Mac-app/CLI re-check deferred to install-time. | — |
+| **0b** | Binding **PRIMITIVE**: `scripts/state/session_binding.py` (resolve_session_project strict/advisory + marker R/W + `~/.config/pseo/config.json` persistence + `session_ids_consistent`) + `/pseo-bind` + `session-marker.schema.json` + tests. Marker at `shared/sessions/<uuid>.json`. | **PROMPT READY** → dispatch | 0a |
+| 0c | Wire 4 consumers to the primitive: `dump_workspace._resolve_slug`, `validate_content_write._resolve_profile`, post-tool-use audit hook, SessionStart/UserPromptSubmit banners + SessionStart `session_ids_consistent` self-check + tests | pending | 0b |
+| 0d | Shared-resource safety: `portfolio.json` lock + backup-rotation glob fix + two-session-same-project guard | pending | 0c |
+| 0e | Blocking `master.xlsx` lock (bounded timeout → `paused`); precedes ANY parallel writer | pending | 0d |
 | 1a | Schema migrations: `_state/coverage/<run_id>.json` shape + `failure_reason.external` bool + confirm `paused` reuse | pending | 0 |
 | 1b | Ordered-sequence runner (`run_step.py`) + committer relocation + identity+content verify (idempotent `replace`) | pending | 1a |
 | 1c | Intent router (one-voice UserPromptSubmit; marker lifecycle session_id/turn_id/intent_id) | pending | 1a |
@@ -48,6 +49,7 @@ Promote to a general engine ONLY if a 4th workflow proves the abstraction earns 
 - **D6** Verification = identity+content (provenance-stamped raw drops, hard-fail on mismatch), NOT exists+non-empty.
 - **D7** Probe-first: batch 0a is a diagnostic probe, dispatched before any binding code, to resolve O1 empirically.
 - **D8** Batch-0a guard-relaxation (Option A, authorized + manager-verified): wiring the probe into Stop and adding a manual companion script collided with 2 guard tests. Relaxed minimally — `test_stop_validation` count `== 1`→`>= 1` (still locks `stop_validation.py` as the FIRST Stop command); added a third `DIAGNOSTIC_HOOK_SCRIPTS` class so every hook script stays classified. Protective contracts preserved, not weakened.
+- **D9** Binding mechanism CONFIRMED (batch-0a probe + manager log analysis 2026-06-05): key = the Claude **session UUID**, sourced identically from hook-stdin `session_id` (hooks) and `$CLAUDE_CODE_SESSION_ID` (commands) — proven equal via the transcript-filename namespace. Engine root = `$CLAUDE_PLUGIN_ROOT`. Workspace root persisted to `~/.config/pseo/config.json` (env unreliable). Marker = `<workspace>/shared/sessions/<uuid>.json` (workspace-global, alongside active.json — corrects the spec's `_state/sessions` path).
 
 ## Provenance
 - Design hardened by 9-agent adversarial review: workflow run `wf_527271b3-931` (51 findings, conditional GO).
