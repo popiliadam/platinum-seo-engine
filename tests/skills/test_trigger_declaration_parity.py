@@ -28,14 +28,47 @@ def _triggers(skill_rel: str) -> dict:
     return fm.get("triggers", {}) or {}
 
 
+_PY_REF_RE = re.compile(r"[\w./${}-]+\.py")
+
+
+def _referenced_scripts(command: str) -> list[Path]:
+    """Resolve the .py scripts a hook command runs (handles ${CLAUDE_PLUGIN_ROOT})."""
+    out: list[Path] = []
+    for raw_ref in _PY_REF_RE.findall(command):
+        rel = raw_ref.replace("${CLAUDE_PLUGIN_ROOT}", "").lstrip("/")
+        out.append(ROOT / rel)
+    return out
+
+
+def _command_strings(data: dict) -> list[str]:
+    return [
+        h["command"]
+        for handlers in (data.get("hooks", {}) or {}).values()
+        for handler in handlers
+        for h in handler.get("hooks", [])
+        if h.get("type") == "command"
+    ]
+
+
 def _a_hook_binds_event_and_names(event: str, needle: str) -> bool:
-    """True iff some hooks/*.json binds `event` (key under top-level "hooks")
-    AND that file's command text mentions `needle`."""
+    """True iff some hooks/*.json binds `event` AND `needle` appears either in that
+    file's command text OR in the source of a .py script the command runs (follow
+    command → referenced script → grep its source). The advisory pointer may live
+    inline in the hook JSON (legacy) or inside the wired script (batch 1c moved the
+    whats-next pointer into scripts/hooks/intent_router.py) — either keeps the
+    declaration truthful. Still returns False (test fails) if the pointer is
+    removed from BOTH places."""
     for hj in HOOKS.glob("*.json"):
         raw = hj.read_text(encoding="utf-8")
         data = json.loads(raw)
-        if event in (data.get("hooks", {}) or {}) and needle in raw:
+        if event not in (data.get("hooks", {}) or {}):
+            continue
+        if needle in raw:
             return True
+        for cmd in _command_strings(data):
+            for script in _referenced_scripts(cmd):
+                if script.is_file() and needle in script.read_text(encoding="utf-8"):
+                    return True
     return False
 
 
