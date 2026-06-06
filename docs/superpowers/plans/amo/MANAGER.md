@@ -49,8 +49,13 @@ Promote to a general engine ONLY if a 4th workflow proves the abstraction earns 
 > which requires `--recent`+`--previous` (`content_decay.py:397,401`). Fix = driver `output_path` keys by SHEET
 > + an INTEGRATION test that runs each REAL CLI and asserts it writes where the loader reads + recipe step-3
 > rewritten per-step. Then **live-acceptance** (`/pseo-run monthly <slug>` on a real GSC project) before Faz 2.
-> **NEXT = 1d.1 fix → live-test → Faz 2 (safety + enforcement): 2a consent ledger → 2b PreToolUse gates → 2c
-> denetçi Stop-hook + correctness oracle.** Deferred/cross-cutting (carry into Faz 2+): self-upgrade versioning full consolidation,
+> **1d.1 ✅ DONE+GREEN (`1fa70d3`, 1891/0):** driver `output_path` keyed by SHEET (gsc_pull→gsc_performance.json)
+> + an INTEGRATION test that runs the 3 REAL CLIs + drives `build_steps`'s actual loader closure (would've gone
+> RED on the original bug) + recipe Section-3 rewritten per-step (content_decay `--recent`+`--previous`). Spine
+> unchanged. **Faz 1 is now LIVE-READY.** **NEXT = LIVE-ACCEPTANCE (Süleyman: `/pseo-run monthly <slug>` on a
+> real GSC-verified project — spec §8 gate) → then Faz 2 (2a consent ledger → 2b PreToolUse gates → 2c denetçi
+> Stop-hook + correctness oracle).** Do NOT arm autonomy / start Faz 2's enforcement until the live loop is
+> demonstrated once. Deferred/cross-cutting (carry into Faz 2+): self-upgrade versioning full consolidation,
 > ACTIVE_PROJECTS_MAX 1-module consolidation, 0d.1 banners (cosmetic), live-acceptance run per environment.
 > Codex audit (72/100) still chipped for separate triage. **Two `check_secrets` regressions (mine, via
 > audit-doc + MANAGER.md quoting watched tokens) caught by worker baselines + fixed (`24b4c15`, `9b38a1f`).**
