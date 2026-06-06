@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -82,9 +84,10 @@ def _write_drop(workspace, entry, rows, *, declared_count=None, mtime=NOW - 60):
     return path
 
 
-def _write_output(workspace, step_name, rows, *, as_dict=False):
-    """Model-produced transform OUTPUT (master.xlsx-shaped rows)."""
-    path = output_path(workspace, RUN_ID, SLUG, step_name)
+def _write_output(workspace, sheet, rows, *, as_dict=False):
+    """Model-produced transform OUTPUT (master.xlsx-shaped rows), written at the
+    SHEET-named path the driver's loader reads (the real CLIs write {sheet}.json)."""
+    path = output_path(workspace, RUN_ID, SLUG, sheet)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({"rows": rows} if as_dict else rows), encoding="utf-8")
     return path
@@ -134,7 +137,7 @@ def test_output_loader_missing_file_raises(tmp_path: Path) -> None:
 def test_happy_path_all_satisfied_verdict_pass(tmp_path: Path) -> None:
     for entry in STEPS:
         _write_drop(tmp_path, entry, _rows(10))
-        _write_output(tmp_path, entry["name"], _rows(10))
+        _write_output(tmp_path, entry["sheet"], _rows(10))
     record = run(
         RUN_ID, SLUG, tmp_path, tmp_path / "master.xlsx", NOW,
         report_exists=True, commit_fn=_fake_commit,
@@ -166,7 +169,7 @@ def test_missing_structured_step_is_incomplete(tmp_path: Path) -> None:
         if entry["name"] == "quick_wins":
             continue  # no raw drop -> verify_raw_drop returns missing_file
         _write_drop(tmp_path, entry, _rows(10))
-        _write_output(tmp_path, entry["name"], _rows(10))
+        _write_output(tmp_path, entry["sheet"], _rows(10))
     record = run(
         RUN_ID, SLUG, tmp_path, tmp_path / "master.xlsx", NOW,
         report_exists=True, commit_fn=_fake_commit, write=False,
@@ -186,7 +189,7 @@ def test_silent_skip_output_is_failed_not_pass(tmp_path: Path) -> None:
         _write_drop(tmp_path, entry, _rows(10))
         # content_decay's transform output drops >50% of its raw rows (keeps 4).
         out_rows = _rows(4) if entry["name"] == "content_decay" else _rows(10)
-        _write_output(tmp_path, entry["name"], out_rows)
+        _write_output(tmp_path, entry["sheet"], out_rows)
     record = run(
         RUN_ID, SLUG, tmp_path, tmp_path / "master.xlsx", NOW,
         report_exists=True, commit_fn=_fake_commit, write=False,
@@ -201,7 +204,7 @@ def test_silent_skip_output_is_failed_not_pass(tmp_path: Path) -> None:
 def test_missing_report_is_not_pass(tmp_path: Path) -> None:
     for entry in STEPS:
         _write_drop(tmp_path, entry, _rows(10))
-        _write_output(tmp_path, entry["name"], _rows(10))
+        _write_output(tmp_path, entry["sheet"], _rows(10))
     record = run(
         RUN_ID, SLUG, tmp_path, tmp_path / "master.xlsx", NOW,
         report_exists=False, commit_fn=_fake_commit, write=False,
@@ -232,3 +235,97 @@ def test_cli_no_drops_prints_remediation_and_writes_coverage(tmp_path, capsys) -
     )
     assert _schema_errors(written) == []
     assert not (tmp_path / "master.xlsx").exists()
+
+
+# --- REAL transform-CLI boundary (the gap-catcher) -------------------------
+#
+# The stub tests above hand-write canned OUTPUT files; they can't catch a
+# filename mismatch between the EXISTING transform CLIs and the path the
+# driver's loader reads. This test runs the THREE real CLIs as subprocesses
+# on minimal canned raw inputs and then drives the REAL loader wired by
+# build_steps. It proves each CLI writes its output exactly where the driver
+# expects to read it (== {sheet}.json) — the impedance batch 1d.1 resolves.
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+_TRANSFORM_CLI = {
+    "gsc_pull": REPO_ROOT / "scripts" / "ingestion" / "gsc_pull.py",
+    "quick_wins": REPO_ROOT / "scripts" / "discovery" / "quickwins_transform.py",
+    "content_decay": REPO_ROOT / "scripts" / "discovery" / "content_decay_transform.py",
+}
+
+
+def _run_real_cli(args: list[str]) -> None:
+    """Run a transform CLI offline; STOP loudly if it cannot (DURUR: these
+    transforms are pure raw-JSON-in → rows-JSON-out, never network/MCP)."""
+    proc = subprocess.run(
+        [sys.executable, *args],
+        capture_output=True, text=True, cwd=str(REPO_ROOT),
+    )
+    assert proc.returncode == 0, (
+        f"transform CLI did not run offline (rc={proc.returncode}): {args}\n"
+        f"stdout={proc.stdout}\nstderr={proc.stderr}"
+    )
+
+
+def _arrange_and_run_transforms(raw_dir: Path, out_dir: str) -> None:
+    """Write the smallest valid canned raw input for each step and run its REAL
+    transform CLI into out_dir. gsc_pull/quick_wins take --raw; content_decay
+    takes TWO windows (--recent + --previous) and DURURs if both are empty, so
+    each window carries a real signal. quick_wins rows need BOTH position and
+    impressions or they are dropped before scoring."""
+    gsc_raw = raw_dir / "gsc_pull.json"
+    gsc_raw.write_text(json.dumps({"rows": [
+        {"keys": ["https://vento.example/p1"], "clicks": 5,
+         "impressions": 100, "position": 11.0},
+    ]}), encoding="utf-8")
+    _run_real_cli([str(_TRANSFORM_CLI["gsc_pull"]),
+                   "--raw", str(gsc_raw), "--output-dir", out_dir])
+
+    qw_raw = raw_dir / "quick_wins.json"
+    qw_raw.write_text(json.dumps({"quickWins": [
+        {"query": "kombi servisi", "page": "https://vento.example/p1",
+         "currentPosition": 12, "impressions": 500, "currentClicks": 3,
+         "currentCtr": 0.6, "potentialClicks": 40},
+    ]}), encoding="utf-8")
+    _run_real_cli([str(_TRANSFORM_CLI["quick_wins"]),
+                   "--raw", str(qw_raw), "--output-dir", out_dir])
+
+    decay_recent = raw_dir / "content_decay_recent.json"
+    decay_previous = raw_dir / "content_decay_previous.json"
+    decay_recent.write_text(json.dumps({"rows": [
+        {"keys": ["https://vento.example/p1"], "clicks": 5},
+    ]}), encoding="utf-8")
+    decay_previous.write_text(json.dumps({"rows": [
+        {"keys": ["https://vento.example/p1"], "clicks": 20},
+    ]}), encoding="utf-8")
+    _run_real_cli([str(_TRANSFORM_CLI["content_decay"]),
+                   "--recent", str(decay_recent),
+                   "--previous", str(decay_previous), "--output-dir", out_dir])
+
+
+def test_real_transform_cli_outputs_land_where_loader_reads(tmp_path: Path) -> None:
+    """For EACH structured step, the REAL transform CLI (run with --output-dir
+    pointed at the driver's transform dir) must write the file the driver's
+    loader reads. Asserted two ways: (1) {sheet}.json exists, and (2) the loader
+    wired by build_steps actually loads it — catching the step-name vs
+    sheet-name impedance (RED on gsc_pull before the fix)."""
+    # transform dir is keyed only by run_id (not step/sheet) — any 4th arg
+    # resolves the same parent; point every CLI's --output-dir here.
+    transform_dir = output_path(tmp_path, RUN_ID, SLUG, "_probe").parent
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    _arrange_and_run_transforms(raw_dir, str(transform_dir))
+
+    # The driver loader (as wired by build_steps) must find each CLI's output.
+    specs = {s.name: s for s in build_steps(RUN_ID, SLUG, tmp_path)}
+    for entry in STEPS:
+        # (1) the CLI wrote {sheet}.json into the transform dir
+        sheet_file = output_path(tmp_path, RUN_ID, SLUG, entry["sheet"])
+        assert sheet_file.exists(), (
+            f"{entry['name']}: CLI did not write {entry['sheet']}.json "
+            f"(looked at {sheet_file})"
+        )
+        # (2) the REAL loader build_steps wired reads exactly that file
+        # (ignores the raw arg, returns the loaded row list)
+        rows = specs[entry["name"]].transform([{"ignored": "raw"}])
+        assert isinstance(rows, list) and rows, entry["name"]

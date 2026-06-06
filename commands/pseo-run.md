@@ -62,11 +62,16 @@ workflow_runner.resume(run_id, project_slug=PROJECT)
 
 ## 3. Yapısal adımlar (SIRAYLA: gsc_pull → quick_wins → content_decay)
 
-| Adım | MCP aracı | Sheet | Transform CLI |
-|------|-----------|-------|---------------|
-| `gsc_pull` | `mcp__gsc__search_analytics` | `gsc_performance` | `scripts/ingestion/gsc_pull.py` |
-| `quick_wins` | `mcp__gsc__detect_quick_wins` | `quick_wins` | `scripts/discovery/quickwins_transform.py` |
-| `content_decay` | `mcp__gsc__enhanced_search_analytics` | `content_decay` | `scripts/discovery/content_decay_transform.py` |
+Her adım: **gerçek** MCP aracını çağır → provenance-damgalı ham drop yaz → adımın **mevcut**
+transform CLI'ını çalıştır. CLI çıktısı `--output-dir` ile inbox'a değil transform klasörüne,
+**SHEET adıyla** (`{sheet}.json`) düşer; sürücünün `_output_loader`'ı tam bu dosyayı okur. CLI'lar
+adıma göre FARKLI argüman alır (`content_decay` `--raw` DEĞİL, iki pencere `--recent`+`--previous`).
+
+| Adım | MCP aracı (ham drop) | Sheet → çıktı dosyası | Transform CLI |
+|------|----------------------|-----------------------|---------------|
+| `gsc_pull` | `mcp__gsc__search_analytics` (recent) [+ `enhanced_search_analytics` enriched] | `gsc_performance` → **`gsc_performance.json`** | `scripts/ingestion/gsc_pull.py` |
+| `quick_wins` | `mcp__gsc__detect_quick_wins` (30d) [+ `enhanced_search_analytics` enriched] | `quick_wins` → **`quick_wins.json`** (+ `opportunity.json`) | `scripts/discovery/quickwins_transform.py` |
+| `content_decay` | `mcp__gsc__enhanced_search_analytics` **×2 (recent + previous pencere)** | `content_decay` → **`content_decay.json`** | `scripts/discovery/content_decay_transform.py` |
 
 Önce inbox + transform klasörlerini hazırla:
 
@@ -75,38 +80,89 @@ mkdir -p "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/inbox/$RUN_ID" \
          "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/transform/$RUN_ID"
 ```
 
-Her `{step}` için **sırayla** şunları yap:
+**Ortak kurallar (her adım):**
 
-1. **MCP çağrısı** — tablodaki aracı çağır (örn. `gsc_pull` için `mcp__gsc__search_analytics`).
-2. **Provenance-damgalı ham drop** — yanıtı `Write` ile
-   `_state/inbox/$RUN_ID/{step}.json` yoluna şu şekilde yaz (driver `verify_raw_drop` ile
-   doğrular; `declared_count` satır sayısına EŞİT olmalı, yoksa `truncated`):
+- **Ham drop (provenance-damgalı)** — her MCP yanıtını `Write` ile yaz. Sürücü her adımın PRİMER
+  drop'unu `_state/inbox/$RUN_ID/{step}.json` (step ADIYLA) yolunda `verify_raw_drop` ile doğrular
+  → `input_count`; provenance `window` + `tool` adımın beklentisine UYMALI ve `declared_count`
+  satır sayısına EŞİT olmalı (yoksa `truncated`):
 
-   ```json
-   {
-     "provenance": {
-       "run_id": "<run_id>", "slug": "<slug>",
-       "site_url": "<project.config gsc.site_url>",
-       "window": "<recent|30d>", "tool": "<mcp aracı>",
-       "fetched_at": "<UTC ISO-8601>", "declared_count": <satır sayısı>
-     },
-     "rows": [ /* ham MCP satırları */ ]
-   }
-   ```
+  ```json
+  {
+    "provenance": {
+      "run_id": "<run_id>", "slug": "<slug>",
+      "site_url": "<project.config gsc.site_url>",
+      "window": "<recent|30d>", "tool": "<mcp aracı>",
+      "fetched_at": "<UTC ISO-8601>", "declared_count": <satır sayısı>
+    },
+    "rows": [ /* ham MCP satırları */ ]
+  }
+  ```
 
-3. **Mevcut transform CLI** — adımın transform'unu çalıştır; master.xlsx-şeklindeki ÇIKTI
-   satırları `_state/transform/$RUN_ID/{step}.json` yoluna düşmeli (driver'ın
-   `_output_loader`'ı tam bu yolu okur; bare JSON list VEYA `{"rows": [...]}` kabul eder).
-   `gsc_pull` örneği (diğer adımlar kendi CLI'ları ile aynı desende):
+- **Çıktı dosyası** — transform CLI `--output-dir` ile `_state/transform/$RUN_ID/` altına SHEET
+  adıyla `{sheet}.json` düşürür (bare JSON list); sürücünün `_output_loader`'ı tam bu yolu okur
+  (`gsc_pull`→`gsc_performance.json`, `quick_wins`→`quick_wins.json`,
+  `content_decay`→`content_decay.json`). `{"rows": [...]}` sarmalı da kabul edilir.
+- **Commit YAPMA** — sheet'leri sürücü (adım 4) `committer` ile yazar.
 
-   ```bash
-   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/ingestion/gsc_pull.py" \
-     --raw "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/inbox/$RUN_ID/gsc_pull.json" \
-     --output-dir "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/transform/$RUN_ID/"
-   ```
+### 3.a — `gsc_pull` → `gsc_performance.json`
 
-> Bu adımda **commit YAPMA** — sheet'leri sürücü (adım 4) `committer` ile yazar. Model yalnızca
-> ham drop + transform çıktısını üretir; doğrulama + commit + coverage CODE'a aittir.
+1. `mcp__gsc__search_analytics` (**recent** pencere) → PRİMER drop
+   `_state/inbox/$RUN_ID/gsc_pull.json` (provenance `window:"recent"`,
+   `tool:"mcp__gsc__search_analytics"`).
+2. *(opsiyonel)* `mcp__gsc__enhanced_search_analytics` (önceki pencere, delta için) → ikincil drop
+   `_state/inbox/$RUN_ID/gsc_pull_enriched.json`.
+
+Transform (`--enriched` opsiyonel; ikincil drop yoksa o bayrağı düşür) → `gsc_performance.json` yazar:
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/ingestion/gsc_pull.py" \
+  --raw "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/inbox/$RUN_ID/gsc_pull.json" \
+  --enriched "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/inbox/$RUN_ID/gsc_pull_enriched.json" \
+  --output-dir "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/transform/$RUN_ID/"
+```
+
+### 3.b — `quick_wins` → `quick_wins.json` (+ `opportunity.json`)
+
+1. `mcp__gsc__detect_quick_wins` → PRİMER drop `_state/inbox/$RUN_ID/quick_wins.json`
+   (provenance `window:"30d"`, `tool:"mcp__gsc__detect_quick_wins"`).
+2. *(opsiyonel)* `mcp__gsc__enhanced_search_analytics` (sparse satır back-fill) → ikincil drop
+   `_state/inbox/$RUN_ID/quick_wins_enriched.json`.
+
+Transform (`--enriched` opsiyonel) → `quick_wins.json` + `opportunity.json` yazar (sürücü PRİMER
+sheet `quick_wins`'i okur; `opportunity` skill'in kendi ikincil çıktısı):
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/discovery/quickwins_transform.py" \
+  --raw "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/inbox/$RUN_ID/quick_wins.json" \
+  --enriched "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/inbox/$RUN_ID/quick_wins_enriched.json" \
+  --output-dir "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/transform/$RUN_ID/"
+```
+
+### 3.c — `content_decay` → `content_decay.json` (**İKİ pencere ZORUNLU**)
+
+`content_decay` tek MCP çağrısı DEĞİL: `enhanced_search_analytics`'i **iki kez** çağır (eşit
+uzunlukta **recent** + **previous** 90-gün pencereleri) ve İKİ ayrı drop yaz. CLI `--raw` DEĞİL,
+`--recent` + `--previous` (ikisi de zorunlu) alır; her İKİ pencere de boşsa CLI DURUR (sinyal yok =
+veri yok).
+
+1. `mcp__gsc__enhanced_search_analytics` (**recent** pencere) → PRİMER drop
+   `_state/inbox/$RUN_ID/content_decay.json` (provenance `window:"recent"`,
+   `tool:"mcp__gsc__enhanced_search_analytics"` — sürücünün gate'lediği drop).
+2. `mcp__gsc__enhanced_search_analytics` (**previous** pencere) → ikincil drop
+   `_state/inbox/$RUN_ID/content_decay_previous.json` (gate'lenmez; CLI'nin `--previous` girdisi).
+
+Transform → `content_decay.json` yazar:
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/discovery/content_decay_transform.py" \
+  --recent "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/inbox/$RUN_ID/content_decay.json" \
+  --previous "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/inbox/$RUN_ID/content_decay_previous.json" \
+  --output-dir "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/transform/$RUN_ID/"
+```
+
+> Bu bölümde **commit YAPMA** — model yalnızca ham drop(lar) + transform çıktısını üretir;
+> doğrulama + commit + coverage CODE'a (adım 4 sürücü) aittir.
 
 ## 4. Sürücü #1 — doğrula + commit + coverage kaydet
 

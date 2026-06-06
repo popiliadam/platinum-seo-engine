@@ -3,7 +3,7 @@
 Path A (no DAG engine): a hard-coded ORDERED step table + a thin driver. For each
 STRUCTURED step the MODEL makes the MCP call, writes a provenance-stamped raw drop
 to ``_state/inbox/{run_id}/{step}.json`` and runs the EXISTING transform CLI to
-``_state/transform/{run_id}/{step}.json``; then this driver verifies + commits +
+``_state/transform/{run_id}/{sheet}.json``; then this driver verifies + commits +
 records coverage. The monthly-report step is MODEL_ATTESTED — the driver records
 that it RAN (its artifact exists), it does NOT verify report quality (the honest
 <=5% scope split). The denetçi that ENFORCES completion is a later batch (2c).
@@ -57,11 +57,17 @@ def inbox_path(workspace_root: Path | str, run_id: str, slug: str, step: str) ->
     )
 
 
-def output_path(workspace_root: Path | str, run_id: str, slug: str, step: str) -> Path:
-    """``{workspace}/projects/{slug}/_state/transform/{run_id}/{step}.json`` (output)."""
+def output_path(workspace_root: Path | str, run_id: str, slug: str, sheet: str) -> Path:
+    """``{workspace}/projects/{slug}/_state/transform/{run_id}/{sheet}.json`` (output).
+
+    Keyed by the step's SHEET, not its step name: the EXISTING transform CLIs
+    write ``{sheet}.json`` (gsc_pull -> gsc_performance.json, quick_wins ->
+    quick_wins.json, content_decay -> content_decay.json), so the loader reads
+    exactly where the CLI writes. The RAW inbox drop stays keyed by step name.
+    """
     return (
         Path(workspace_root) / "projects" / slug / "_state" / "transform" / run_id
-        / f"{step}.json"
+        / f"{sheet}.json"
     )
 
 
@@ -110,7 +116,9 @@ def build_steps(run_id: str, project_slug: str, workspace_root: Path | str) -> l
             raw_path=inbox_path(workspace_root, run_id, project_slug, entry["name"]),
             sheet=entry["sheet"],
             transform=_output_loader(
-                output_path(workspace_root, run_id, project_slug, entry["name"])
+                # output keyed by SHEET (the CLI writes {sheet}.json); raw drop
+                # above stays keyed by step name.
+                output_path(workspace_root, run_id, project_slug, entry["sheet"])
             ),
             verification_class="code_verified",
             expected_site_url=site_url,
