@@ -222,3 +222,54 @@ def test_cli_approve_unbound_session_nonzero(tmp_path: Path, monkeypatch: pytest
 
     rc = cl.main(["approve", "r1", "git_push", "tgt", "--workspace", str(ws)])
     assert rc != 0
+
+
+# ---------------------------------------------------------------------------
+# has_session_consent (batch 2b) — keys on session_id, not run_id
+# ---------------------------------------------------------------------------
+
+def test_has_session_consent_matches_same_session(tmp_path: Path) -> None:
+    th = cl.target_hash("origin main")
+    _append(tmp_path, target="origin main", run_id="r1", action="git_push",
+            session_id="sess-A")
+    assert cl.has_session_consent(
+        tmp_path, "demo", session_id="sess-A", action="git_push", target_hash=th
+    ) is True
+    # wrong action / wrong target_hash -> False
+    assert cl.has_session_consent(
+        tmp_path, "demo", session_id="sess-A", action="net_post", target_hash=th
+    ) is False
+    assert cl.has_session_consent(
+        tmp_path, "demo", session_id="sess-A", action="git_push", target_hash="0" * 64
+    ) is False
+
+
+def test_has_session_consent_different_session_is_false(tmp_path: Path) -> None:
+    # PER-SESSION: a consent granted under sess-A does NOT authorize sess-B even
+    # for the identical action + target.
+    th = cl.target_hash("origin main")
+    _append(tmp_path, target="origin main", run_id="r1", action="git_push",
+            session_id="sess-A")
+    assert cl.has_session_consent(
+        tmp_path, "demo", session_id="sess-B", action="git_push", target_hash=th
+    ) is False
+
+
+def test_has_session_consent_tampered_chain_is_false(tmp_path: Path) -> None:
+    _append(tmp_path, target="t0", run_id="r0", action="git_push", session_id="s")
+    _append(tmp_path, target="t1", run_id="r1", action="net_post", session_id="s")
+    _append(tmp_path, target="t2", run_id="r2", action="fs_delete", session_id="s")
+    path = cl.consent_path(tmp_path, "demo")
+    lines = path.read_text(encoding="utf-8").splitlines()
+    forged = json.loads(lines[1])
+    forged["target_hash"] = "f" * 64
+    lines[1] = cl.canonical_json(forged)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    th = cl.target_hash("t0")
+    assert cl.has_session_consent(
+        tmp_path, "demo", session_id="s", action="git_push", target_hash=th
+    ) is False
+
+
+def test_has_session_consent_in_all() -> None:
+    assert "has_session_consent" in cl.__all__

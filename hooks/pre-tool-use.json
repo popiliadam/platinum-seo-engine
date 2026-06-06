@@ -29,6 +29,17 @@
             "statusMessage": "AMO batch-0a env probe (temporary diagnostic)..."
           }
         ]
+      },
+      {
+        "matcher": "Bash|mcp__gsc__submit_sitemap",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/outward_action_gate.py\"",
+            "timeout": 15,
+            "statusMessage": "AMO outward-action consent gate..."
+          }
+        ]
       }
     ]
   }

@@ -378,6 +378,37 @@ def has_consent(
     )
 
 
+def has_session_consent(
+    workspace_root: Path | str,
+    project_slug: str,
+    *,
+    session_id: str,
+    action: str,
+    target_hash: str,
+) -> bool:
+    """True iff an INTACT chain holds an entry with this session_id + action + target_hash.
+
+    Per-session consent (the operator-chosen model, batch 2b): a consent only
+    authorizes within the session that granted it. The 2a `/pseo-approve` writer
+    stamps each entry with the granting session_id, so a consent from a DIFFERENT
+    session simply does not match here. A broken chain (tamper) returns False —
+    fail-closed. Mirrors has_consent but keys on session_id instead of run_id;
+    run_id is NOT used (it is audit provenance only). (`target_hash` here is the
+    precomputed hex digest the gate passes in, not the module-level
+    target_hash() function.)
+    """
+    entries = read_entries(workspace_root, project_slug)
+    intact, _ = verify_chain(entries)
+    if not intact:
+        return False
+    return any(
+        e.get("session_id") == session_id
+        and e.get("action") == action
+        and e.get("target_hash") == target_hash
+        for e in entries
+    )
+
+
 # ---------------------------------------------------------------------------
 # CLI — `approve` subcommand (mirrors session_binding's argparse main)
 # ---------------------------------------------------------------------------
@@ -494,6 +525,7 @@ __all__: Iterable[str] = (
     "verify_chain",
     "append_consent",
     "has_consent",
+    "has_session_consent",
     "main",
 )
 
