@@ -41,6 +41,13 @@ RUNTIME_HOOK_SCRIPTS = {
     # supersedes any stale intent. Re-emits the `PSEO context:` line.
     # See scripts/hooks/README.md §1.
     "intent_router.py",
+    # AMO batch-2c Stop denetçi — wired into hooks/stop.json as the 2nd Stop
+    # command (stop_validation.py stays FIRST). At turn end it READS the intent
+    # marker (1c) + the freshest coverage record (1a) and, if a declared workflow
+    # did not run/pass, BLOCKS the turn end with a Turkish `/pseo-run … --resume`
+    # fix (paused/external → allow + flag). READ-ONLY, non-blocking-on-error.
+    # See scripts/hooks/README.md §1.
+    "denetci.py",
     # AMO batch-0a TEMPORARY diagnostic probe — wired (as an appended command
     # entry) into all five lifecycle events. Remove when the AMO session-binding
     # mechanism is confirmed. See scripts/hooks/README.md §3.
