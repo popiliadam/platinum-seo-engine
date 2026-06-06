@@ -48,6 +48,15 @@ RUNTIME_HOOK_SCRIPTS = {
     # fix (paused/external → allow + flag). READ-ONLY, non-blocking-on-error.
     # See scripts/hooks/README.md §1.
     "denetci.py",
+    # AMO batch-2b PreToolUse outward-action consent gate — wired into
+    # hooks/pre-tool-use.json as a SECOND PreToolUse block (matcher
+    # "Bash|mcp__gsc__submit_sitemap"); the existing block is untouched. Before a
+    # gated action (git_push / fs_delete / net_post / mcp_submit / index_update)
+    # runs, it classifies + hashes the concrete target and BLOCKS (exit 2) unless
+    # THIS session's bound project consented (consent_ledger.has_session_consent).
+    # READ-ONLY; fail-closed on the gated path, fail-open on the non-gated path.
+    # See scripts/hooks/README.md §1.
+    "outward_action_gate.py",
     # AMO batch-0a TEMPORARY diagnostic probe — wired (as an appended command
     # entry) into all five lifecycle events. Remove when the AMO session-binding
     # mechanism is confirmed. See scripts/hooks/README.md §3.
