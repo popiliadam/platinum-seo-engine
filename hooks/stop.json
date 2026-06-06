@@ -12,6 +12,12 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/denetci.py\"",
+            "timeout": 15,
+            "statusMessage": "AMO denetçi: intent/coverage audit..."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/env_probe.py\"",
             "timeout": 10,
             "statusMessage": "AMO batch-0a env probe (temporary diagnostic)..."
