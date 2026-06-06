@@ -138,15 +138,50 @@ constraints are absolute: Indexing-API submit needs his explicit consent; "writt
 visible HTML; append-only state; plugin-agnostic (no CMS/site specifics in the engine). See the `feedback_*`
 memory files.
 
-## 9. Remaining work
+## 9. Remaining work — UPDATED 2026-06-06 (Faz 0 + Faz 1 DONE)
 
-- **Faz 0:** 0e (portfolio.json safety) + 0f (transaction.py backup-rotation + blocking lock) — check
-  MANAGER.md; if done, Phase 0 is closed. (0d.1 banners + SessionStart self-check = deferred cosmetic.)
-- **Faz 1-4:** author each batch from **spec §7** + a worker-prompt template. Phase 1 order: 1a schema
-  migrations (coverage shape + `failure_reason.external` + confirm `paused`) → 1b runner + committer-relocation
-  + identity/content verify → 1c intent router (one-voice, marker lifecycle) → 1d reference workflow
-  monthly-maintenance + `/pseo-run` + operator-remediation surface. Then 2a-2c (consent ledger → gates →
-  denetçi+oracle), 3 (replicate + lints), 4 (portfolio + cost ceiling + scheduler-OFF). Cross-cutting: e2e
-  stub harness, self-upgrade versioning, ACTIVE_PROJECTS_MAX consolidation.
+> **A fresh manager taking over for FAZ 2 starts here.** Faz 0 ✅ and Faz 1 ✅ are shipped + pushed; read
+> MANAGER.md's two banners (PHASE 0 / PHASE 1 COMPLETE) for the exact commit trail + lessons. Suite is at
+> **1891 pass / 0 fail** (HEAD ~`5889adc`). Do NOT re-do them.
+
+- **Faz 0 ✅ COMPLETE** (`09674c5`): session-id binding substrate (0a-0c) + audit attribution (0d) + parallel-
+  write safety (0e2/0f). 0d.1 banners = deferred cosmetic.
+- **Faz 1 ✅ COMPLETE** (`3b9d87e` + fix `1fa70d3`): orchestrator end-to-end. 1a schema freeze (coverage
+  record + `failure_reason.external` + `paused` reuse) → 1b spine (`scripts/orchestration/` run_step+committer+
+  verify+coverage) → 1c intent router (`scripts/hooks/intent_router.py` + intent-marker.schema) → 1b2 skill-
+  write relocation (3 skills → `committer.commit`, snapshot dup-bug fix) → 1d monthly-maintenance workflow
+  (`scripts/orchestration/workflows/monthly_maintenance.py`) + `/pseo-run` + `remediation.py` → 1d.1
+  driver/CLI reconciliation (output_path by SHEET + real-CLI integration test).
+- **⏳ GATE before Faz 2: LIVE-ACCEPTANCE (spec §8).** Süleyman runs `/pseo-run monthly <slug>` once on a real
+  GSC-verified project (needs the CURRENT installed plugin — `/pseo-run` only exists in the latest version).
+  If it stumbles in the model's execution of the recipe → a small **1d.2** recipe-hardening batch first. Only
+  after the loop is demonstrated live do we build Faz 2's enforcement on top.
+- **Faz 2 (NEXT — the hard, safety-critical phase; spec §7 Phase 2 + §3 L4/oracle):**
+  - **2a** consent ledger: `_state/consent.jsonl` schema (append-only, **hash-chained** prev-hash per line) +
+    a recorder + paired tests; wire append-only enforcement into a PreToolUse gate. (Hard prereq for 2b/2c.)
+  - **2b** PreToolUse outward-action gates: default-DENY `git push` / `rm` / `curl|wget POST` / concrete MCP
+    submit tools (`mcp__gsc__submit_sitemap`, future indexing URL_UPDATED) / oversized DFS unless a consent
+    entry `(run_id, action, target_hash)` exists. + AI-disclosure PostToolUse content-SURFACE rescan of
+    `outputs/blog/**/*.html` (block-and-revert; catches Bash/heredoc bypass of the Write-only validator).
+    Secret gate scans the literal pending bytes. (Süleyman's hard constraints: Indexing-submit needs explicit
+    consent; "written by AI" must NEVER appear in visible HTML — see `feedback_indexing_api_consent` +
+    `feedback_ai_disclosure_ban`.)
+  - **2c** denetçi Stop-hook (extends `hooks/stop.json` chain; `stop_validation.py` untouched; no-op unless a
+    current-turn `intent_declared` marker exists; respects the 8-block cap) — reads the 1c intent marker +
+    the 1a coverage record: incomplete → `decision:block` + the Turkish `remediation.render(...)` fix command;
+    `failure_reason.external==true` → map to `paused` + RED + ALLOW turn-end. + **correctness oracle**
+    `scripts/reporting/orchestration_metrics.py` (reconcile master.xlsx rows vs raw-provenance per run_id =
+    the trustworthy ≤5% number, independent of self-reported status). D5: gates+oracle built ALONGSIDE, never
+    deferred. Remediation already handles `paused`; the marker + coverage contracts are frozen (1a/1c).
+- **Faz 3-4** (later): replicate to new-project/content-pipeline/audit-suite + the two §4 mastery lints
+  (body⊆declared MCP, observed⊆declared) + `sf_load_crawl` registry fix; then portfolio fan-out + cost ledger
+  + kill-switch + scheduler (default OFF).
+- **Cross-cutting (carry through Faz 2+):** e2e stub harness (pattern set in 1b/1d), self-upgrade versioning
+  full consolidation (coverage already has optional `engine_version`), ACTIVE_PROJECTS_MAX 1-module
+  consolidation. **Open:** Codex ruthless-handoff audit 72/100 (`docs/audits/2026-06-05_...`) — separate
+  triage, spawn_task chipped (P1: .mcp.json `.env` shell-source, non-atomic migration writes, narrow CI
+  secret-gate, `rules/*.md` missing-test cites). **Recurring trap:** never quote a watched secret token
+  (the CI scanner's grep literals) in a non-excluded doc — it re-trips `check_secrets`; run the FULL suite
+  even after a "docs-only" commit.
 
 **You have everything. Confirm your understanding to Süleyman in simple Turkish, then continue the loop.**
