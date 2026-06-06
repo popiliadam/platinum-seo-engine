@@ -42,8 +42,15 @@ Promote to a general engine ONLY if a 4th workflow proves the abstraction earns 
 > (`104952e` skill-write relocation) → 1d ✅ (`3b9d87e` monthly-maintenance workflow + `/pseo-run` +
 > remediation). The plan-and-verify loop RUNS end-to-end: intent → `/pseo-run monthly <slug>` → per-step
 > identity+content gate → idempotent committer → coverage record → Turkish remediation on any non-pass.
-> **NEXT = Faz 2 (safety + enforcement): 2a consent ledger → 2b PreToolUse gates → 2c denetçi Stop-hook +
-> correctness oracle.** Deferred/cross-cutting (carry into Faz 2+): self-upgrade versioning full consolidation,
+> **⚠️ 1d.1 INTEGRATION FIX FIRST (manager found 2026-06-06 by reading the real transform CLIs — the e2e stub
+> used canned `{step}.json` drops so it never caught this):** the driver loader reads
+> `_state/transform/{run_id}/{step}.json` but `gsc_pull.py` writes `gsc_performance.json` (SHEET name, not step
+> — `gsc_pull.py:392`); and the `/pseo-run` recipe's generic single `--raw` doesn't fit `content_decay.py`
+> which requires `--recent`+`--previous` (`content_decay.py:397,401`). Fix = driver `output_path` keys by SHEET
+> + an INTEGRATION test that runs each REAL CLI and asserts it writes where the loader reads + recipe step-3
+> rewritten per-step. Then **live-acceptance** (`/pseo-run monthly <slug>` on a real GSC project) before Faz 2.
+> **NEXT = 1d.1 fix → live-test → Faz 2 (safety + enforcement): 2a consent ledger → 2b PreToolUse gates → 2c
+> denetçi Stop-hook + correctness oracle.** Deferred/cross-cutting (carry into Faz 2+): self-upgrade versioning full consolidation,
 > ACTIVE_PROJECTS_MAX 1-module consolidation, 0d.1 banners (cosmetic), live-acceptance run per environment.
 > Codex audit (72/100) still chipped for separate triage. **Two `check_secrets` regressions (mine, via
 > audit-doc + MANAGER.md quoting watched tokens) caught by worker baselines + fixed (`24b4c15`, `9b38a1f`).**
