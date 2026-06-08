@@ -21,7 +21,7 @@ yourself**, then **commit + push**, then author the next batch. You do NOT write
 **Read in this order before doing anything:**
 1. This file (the full brief below).
 2. `docs/superpowers/specs/2026-06-05-agentic-orchestration-multiproject-design.md` — the full v3 design (§4 the two mastery lints, §5 roadmap, §7 phase sketches, §10 O4, §11 honest scope).
-3. `docs/superpowers/plans/amo/MANAGER.md` — **live** batch table (0a-3d all ✅), decisions **D1-D16**, build model,
+3. `docs/superpowers/plans/amo/MANAGER.md` — **live** batch table (0a-3d + 3-gov-* + 3-O4 + 4a + 4b all ✅), decisions **D1-D17**, build model,
    the phase banners (PHASE 0/1/2 COMPLETE, FAZ-3 STARTED, **🎉 FAZ 3 REPLICATION LINE COMPLETE**), MANAGER
    PROTOCOL & CONTINUATION. **This is the source of truth for current state** — check it + `git log --oneline -25`
    to see exactly what's done.
@@ -59,7 +59,7 @@ are `model_attested` — orchestration guarantees they RAN + produced an artifac
 gate (oracle reconcile / AI-disclosure), NOT that the result is "good." Don't conflate quality with structure.
 
 **This design was adversarially hardened** (9-agent review, workflow `wf_527271b3-931`, 51 findings) — the spec
-incorporates all must-fixes. Don't re-litigate settled decisions; see D1-D16 in MANAGER.md.
+incorporates all must-fixes. Don't re-litigate settled decisions; see D1-D17 in MANAGER.md.
 
 ---
 
@@ -72,8 +72,22 @@ incorporates all must-fixes. Don't re-litigate settled decisions; see D1-D16 in 
    (`PSEO_WORKSPACE_ROOT=/Users/apple/Documents/platinum-seo-workspace python3 -m pytest -q 2>&1 | tail -5`),
    confirm `passed >= baseline` + `0 failed`; `git status --short` (scope = ONLY the batch's files); `git diff`
    the risky bits (security, public contracts, the spine, any out-of-scope migration); READ new
-   security-sensitive code line-by-line; INDEPENDENTLY re-derive the worker's key claims when feasible (e.g. 3a:
-   I ran my own detector, not the worker's, to confirm the gap set). Confirm READ-ONLY claims by grep.
+   security-sensitive code line-by-line; INDEPENDENTLY re-derive the worker's key claims when feasible.
+   Confirm READ-ONLY claims by grep. **This independent re-derivation IS the quality bar — match it. Worked
+   examples from the shipped batches (your standard):**
+   - *3a / lint2 (a lint):* run YOUR OWN detector/gap-logic, not the worker's module, and assert the gap set
+     matches (`{}` on a clean tree) + prove it has teeth on a synthetic violation.
+   - *3-O4 (a refactor of shipped code):* "tests pass" is NOT enough. Do a **git-stash old↔new equivalence
+     proof** — dump the behaviour (e.g. built StepSpecs + key outputs) on the NEW tree, `git stash` to restore
+     the OLD modules, dump again, `git stash pop`, and `diff`: the *computed behaviour* must be byte-identical
+     (only the intentional data change differs). That's how you verify behaviour-preservation a test can't catch.
+   - *4a (money safety):* re-run the atomicity invariant with YOUR OWN concurrency (e.g. a thread race, a
+     different primitive than the worker's subprocesses) → assert exactly K of N reserves fit the ceiling and
+     final ledger usage is exact (no overspend).
+   - *4b (the kill-switch):* drive YOUR OWN sweep scenario and assert the ledger shows no leak (partial
+     reservations released) + no overspend after the kill-switch fires.
+   The pattern is always: **reproduce the worker's central safety/correctness claim with independent code/data,
+   don't just read their green checkmark.**
 4. If a worker added a `commands/*.md` or `schemas/*.json` → **apply the count-guard bumps yourself** (D10).
    If a worker added a drift-check **F-rule** → **apply the invariant-count cascade yourself** (D16, §6).
 5. **Green + clean → commit + push:** `git add <only the batch's files>` → conventional message
@@ -243,6 +257,31 @@ STOP + report) · `REPORT` (what to print). Workers have 1M context → inline f
   (Stop hook); oracle `orchestration_metrics.py` (§7.2). content gate: `scripts/validation/content_validator.py`
   `validate_content(html, *, profile=None) -> ContentReport` (`.verdict`/`.has_red` are `@property`).
 
+### 7.4 Faz-4 primitives (4a + 4b shipped — 4c/4d build on these)
+- **Cost/quota ledger (4a) — `scripts/state/cost_ledger.py` + `schemas/cost-ledger.schema.json`:** a
+  GLOBAL `shared/cost_ledger.jsonl` append-only hash-chained ledger (mirrors `consent_ledger`'s O_APPEND+flock,
+  replicated NOT imported; never os.replace; clock-free). **Atomic reserve-then-confirm under a hard ceiling:**
+  `reserve(ws, *, resource, period, amount, ceiling, run_id, project_id, now_iso)` runs read+verify+replay+
+  ceiling-check+append all under ONE `flock(LOCK_EX)` → raises `CostCeilingExceeded` (writes NOTHING) when
+  `usage+amount > ceiling` (`==` allowed). `confirm(reservation_id, amount≤reserved)` / `release(reservation_id)`;
+  `usage(resource, period)` = Σ effective-per-reservation (replay; fail-closed on a broken chain);
+  `read_ceiling(resource)` from operator `shared/cost-ceilings.json`. Resources: `gsc_calls`/`dfs_credits`/
+  `image_spend`. `period` is an opaque clock-free partition key (daily-pool reset). `reservation_id = f"r{seq}"`
+  (under-lock seq). **D17-adjacent:** unset ceiling → ∞ (no cap; OK for manual, NOT for an armed scheduler).
+- **Portfolio sweep (4b) — `scripts/orchestration/portfolio_runner.py` + `scripts/state/project_lock.py` +
+  `commands/pseo-run-portfolio.md`:** `run_sweep(ws, *, workflow, period, now_iso, run_project_fn,
+  run_id_prefix="portfolio", ceilings=None) -> {ran,skipped,paused,failed,not_run,stopped_by_kill_switch}` —
+  iterates `shared/portfolio.json` IN ORDER; per project: `project_lock.try_acquire` (NON-BLOCKING flock →
+  None=skip-if-busy) → job-level budget preflight (`estimate_cost` from `shared/cost-estimates.json` → `reserve`
+  per resource) → `run_project_fn(slug, workflow)` (INJECTABLE — the `commit_fn` pattern; stub in tests, real
+  `/pseo-run` per-project flow in the recipe) → confirm actual / release → unlock. **KILL-SWITCH:**
+  `CostCeilingExceeded` → release partials (no leak) + record `paused` (D4) + STOP sweep (rest → `not_run`).
+  A single project's run failure releases + CONTINUES (not a kill-switch). PURE/clock-free; Turkish operator
+  messages via `render_summary`. **4b follow-ups (carry):** (a) 4d MUST gate scheduler-arming on ALL ceilings
+  set (O5, fail-closed); (b) the interactive recipe holds the per-project lock only at the per-project BOUNDARY
+  (a flock can't survive across model turns) — continuous hold is the pure/autonomous path; the shared ledger
+  stays atomic so budget can't doubly overspend.
+
 ## 8. How to work with Süleyman (the operator)
 
 Non-coder SEO expert. **Simple Turkish.** Format: ★ Insight blocks, tables, "2-3 options + your recommendation."
@@ -345,6 +384,10 @@ plugin-agnostic (no CMS/site specifics in the engine). See the `feedback_*` memo
   versioning consolidation (coverage has optional `engine_version`); ACTIVE_PROJECTS_MAX 1-module consolidation.
   **Open (separate triage):** Codex ruthless-handoff audit 72/100 (`docs/audits/2026-06-05_...`, chipped).
 
-**You have everything. Confirm your understanding to Süleyman in simple Turkish, then continue the loop. Suggested
-order: 3-gov-secrets (low-risk, self-contained) → 3-gov-lint2 (after he picks A or B) → 3-O4 light-promote
-(optional refactor) → Faz 4. But let Süleyman pick — present the 3 remaining Faz-3 items + your recommendation.**
+**You have everything. Confirm your understanding to Süleyman in simple Turkish, then continue the loop.
+CURRENT pick-up point (2026-06-08): Faz 0-3 ✅ + Faz-4 4a (cost ledger) + 4b (sweep + kill-switch) ✅ — see
+the §9-NEW block above. NEXT = 4c (`/pseo-status --portfolio`) → 4d (scheduler, default OFF — gate arming on
+all-ceilings-set, O5) → 4e (recovery runbook) → the D11 comprehensive live-acceptance closes the build.
+Author 4c first (a small read-only status/triage batch); present it to Süleyman + continue the verify→commit→
+push→closeout loop exactly as the shipped batches did. Match the §2 verification caliber (independent
+re-derivation) — that is the standard.**
