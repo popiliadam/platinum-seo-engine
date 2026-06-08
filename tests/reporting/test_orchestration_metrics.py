@@ -24,6 +24,7 @@ import pytest
 from openpyxl import Workbook
 
 from scripts.orchestration.coverage import coverage_path
+from scripts.orchestration.workflows import audit_suite
 from scripts.orchestration.workflows.monthly_maintenance import inbox_path, output_path
 from scripts.reporting import orchestration_metrics as om
 
@@ -160,6 +161,62 @@ def _setup_step(tmp_path, *, raw_slug=None, declared=None, output_n=4, omit_outp
 
 
 # ---------------------------------------------------------------------------
+# Audit-workflow seeding — same conventions, but the transform output is keyed by
+# each step's EXPLICIT output_file (schema_audit -> schema_audit.json while its
+# sheet is `schema`) and three of the four steps are model_attested.
+# ---------------------------------------------------------------------------
+
+_AUDIT = {s["name"]: s for s in audit_suite.STEPS}
+
+
+def _seed_output_file(ws_root, run_id, slug, output_file, n) -> None:
+    """Seed an audit transform output at its EXPLICIT output_file (the real path
+    audit_suite writes), NOT {sheet}.json."""
+    _write_json(
+        audit_suite.output_path(ws_root, run_id, slug, output_file),
+        [{"i": i} for i in range(n)],
+    )
+
+
+def _seed_audit_run(ws_root, run_id, slug, spec: dict, verdict: str) -> dict:
+    """spec: {audit_step: {"raw","output"?,"scored"}}. Seeds the raw drop +
+    (optional) transform output (keyed by output_file) per step; returns the
+    coverage record (verification_class taken from audit_suite.STEPS)."""
+    cov_steps = []
+    for step, vals in spec.items():
+        entry = _AUDIT[step]
+        _seed_raw(ws_root, run_id, slug, step, _raw_drop(run_id, slug, vals.get("raw", 0)))
+        if "output" in vals:
+            _seed_output_file(ws_root, run_id, slug, entry["output_file"], vals["output"])
+        cov_steps.append(_cov_step(
+            step, scored_count=vals.get("scored", 0),
+            vclass=entry["verification_class"],
+        ))
+    return _cov_record(run_id, slug, cov_steps, verdict)
+
+
+def _audit_workbook(path) -> Path:
+    """A committed workbook with all four audit sheets at the {3,1,5,2} layout the
+    happy audit spec targets (committed counts; tests vary OUTPUT to break R4)."""
+    return _seed_multi_workbook(path, {
+        "tech_seo": 3, "schema": 1, "on_page_audit": 5, "cannibalization": 2,
+    })
+
+
+def _audit_happy_spec(**overrides) -> dict:
+    """The all-reconciling audit spec (committed == output per step). The attested
+    steps legitimately drop >50% of raw (advisory high_silent_skip). Override a
+    step immutably, e.g. _audit_happy_spec(tech_audit={"output": 9})."""
+    spec = {
+        "tech_audit": {"raw": 50, "output": 3, "scored": 3},
+        "schema_audit": {"raw": 20, "output": 1, "scored": 1},
+        "on_page_audit": {"raw": 5, "output": 5, "scored": 5},
+        "cannibalization": {"raw": 40, "output": 2, "scored": 2},
+    }
+    return {k: {**spec[k], **overrides.get(k, {})} for k in spec}
+
+
+# ---------------------------------------------------------------------------
 # 1. committed_row_count
 # ---------------------------------------------------------------------------
 
@@ -222,6 +279,49 @@ def test_data_start_row_for_known_sheets():
 def test_data_start_row_for_unknown_sheet_raises():
     with pytest.raises(KeyError):
         om.data_start_row_for("not_a_real_sheet")
+
+
+# ---------------------------------------------------------------------------
+# Workflow-agnostic resolution: _step_output_file + _resolve_workflow_steps
+# ---------------------------------------------------------------------------
+
+def test_step_output_file_prefers_explicit_then_sheet():
+    # monthly entry (no output_file) -> {sheet}.json
+    assert om._step_output_file(
+        {"name": "gsc_pull", "sheet": "gsc_performance"}
+    ) == "gsc_performance.json"
+    # audit entry (explicit output_file) -> output_file, NOT {sheet}.json
+    assert om._step_output_file(
+        {"name": "schema_audit", "sheet": "schema", "output_file": "schema_audit.json"}
+    ) == "schema_audit.json"
+
+
+def test_resolve_workflow_steps_monthly():
+    rec = _cov_record("r1", "demo", [
+        _cov_step("gsc_pull", scored_count=1),
+        _cov_step("quick_wins", scored_count=1),
+        _cov_step("content_decay", scored_count=1),
+        _cov_step("monthly_report", scored_count=0, vclass="model_attested"),
+    ], verdict="pass")
+    name, steps = om._resolve_workflow_steps(rec)
+    assert name == "monthly"
+    assert {s["name"] for s in steps} == {"gsc_pull", "quick_wins", "content_decay"}
+
+
+def test_resolve_workflow_steps_audit():
+    rec = _cov_record("r1", "demo", [
+        _cov_step(s["name"], scored_count=1, vclass=s["verification_class"])
+        for s in audit_suite.STEPS
+    ], verdict="pass")
+    name, steps = om._resolve_workflow_steps(rec)
+    assert name == "audit"
+    assert {s["name"] for s in steps} == {
+        "tech_audit", "schema_audit", "on_page_audit", "cannibalization"}
+
+
+def test_resolve_workflow_steps_unknown_is_none():
+    rec = _cov_record("r1", "demo", [_cov_step("mystery_step", scored_count=1)], "pass")
+    assert om._resolve_workflow_steps(rec) is None
 
 
 # ---------------------------------------------------------------------------
@@ -377,21 +477,109 @@ def test_reconcile_run_loads_coverage_from_disk(tmp_path):
     assert out["self_reported_verdict"] == "pass"
 
 
-def test_reconcile_run_skips_model_attested_steps(tmp_path):
+def test_reconcile_run_reconciles_attested_steps_in_steps_table(tmp_path):
+    """MIGRATED from test_reconcile_run_skips_model_attested_steps to the NEW
+    contract: a step that IS in the workflow's STEPS is reconciled regardless of
+    verification_class — so audit's THREE model_attested steps ARE reconciled (they
+    each commit a sheet). A coverage step NOT in any STEPS (a synthetic report
+    step) is still skipped."""
     ws_root = tmp_path / "ws"
     slug = "demo"
-    wb = _seed_multi_workbook(tmp_path / "m.xlsx", {"gsc_performance": 3})
-    _seed_raw(ws_root, "r1", slug, "gsc_pull", _raw_drop("r1", slug, 3))
-    _seed_output(ws_root, "r1", slug, "gsc_performance", 3)
-    rec = _cov_record("r1", slug, [
-        _cov_step("gsc_pull", scored_count=3),
-        _cov_step("monthly_report", scored_count=0, vclass="model_attested"),
-    ], verdict="pass")
+    wb = _audit_workbook(tmp_path / "m.xlsx")
+    rec = _seed_audit_run(ws_root, "r1", slug, _audit_happy_spec(), "pass")
+    # a synthetic report step NOT in any workflow's STEPS -> must be skipped
+    rec = {**rec, "steps": [
+        *rec["steps"],
+        _cov_step("audit_report", scored_count=0, vclass="model_attested"),
+    ]}
     out = om.reconcile_run(workspace_root=ws_root, slug=slug, run_id="r1",
                            workbook_path=wb, coverage_record=rec)
-    assert len(out["steps"]) == 1
-    assert out["steps"][0]["step"] == "gsc_pull"
+    reconciled_steps = {s["step"] for s in out["steps"]}
+    # all 4 STEPS reconciled, INCLUDING the 3 model_attested ones (not skipped)
+    assert reconciled_steps == {
+        "tech_audit", "schema_audit", "on_page_audit", "cannibalization"}
+    assert "audit_report" not in reconciled_steps  # synthetic report step skipped
     assert out["independent_verdict"] == "reconciled"
+
+
+def test_reconcile_run_audit_all_reconciled(tmp_path):
+    """A full audit run where every committed sheet == its transform output
+    reconciles; the attested steps appear in the result (not skipped)."""
+    ws_root = tmp_path / "ws"
+    wb = _audit_workbook(tmp_path / "m.xlsx")
+    rec = _seed_audit_run(ws_root, "r1", "demo", _audit_happy_spec(), "pass")
+    out = om.reconcile_run(workspace_root=ws_root, slug="demo", run_id="r1",
+                           workbook_path=wb, coverage_record=rec)
+    assert out["independent_verdict"] == "reconciled"
+    assert out["fake_green"] is False
+    assert {s["step"] for s in out["steps"]} == {
+        "tech_audit", "schema_audit", "on_page_audit", "cannibalization"}
+    # advisory only: an attested step drops >50% of raw yet still reconciles
+    tech = next(s for s in out["steps"] if s["step"] == "tech_audit")
+    assert tech["high_silent_skip"] is True
+    assert tech["independent_ok"] is True
+
+
+def test_reconcile_run_audit_attested_step_fake_green(tmp_path):
+    """The backstop FIRES on an ATTESTED step: tech_audit's committed(3) != its
+    transform output(9) while the coverage verdict CLAIMS pass -> mismatch +
+    fake_green. This is the whole point of generalizing the oracle to attested
+    sheet-writers."""
+    ws_root = tmp_path / "ws"
+    wb = _audit_workbook(tmp_path / "m.xlsx")  # committed tech_seo == 3
+    rec = _seed_audit_run(
+        ws_root, "r1", "demo",
+        _audit_happy_spec(tech_audit={"output": 9}),  # output(9) != committed(3)
+        "pass",
+    )
+    out = om.reconcile_run(workspace_root=ws_root, slug="demo", run_id="r1",
+                           workbook_path=wb, coverage_record=rec)
+    assert out["independent_verdict"] == "mismatch"
+    assert out["fake_green"] is True
+    assert out["self_reported_verdict"] == "pass"
+    tech = next(s for s in out["steps"] if s["step"] == "tech_audit")
+    assert om.WORKBOOK_MISMATCH in tech["failed_checks"]
+
+
+def test_reconcile_run_audit_reads_output_file_not_sheet(tmp_path):
+    """schema_audit's CLI writes schema_audit.json though its sheet is `schema`.
+    The oracle must read the OUTPUT_FILE (schema_audit.json), NOT {sheet}.json
+    (schema.json). A correct schema_audit.json + a DECOY schema.json (that would
+    mismatch if wrongly read) still reconciles."""
+    ws_root = tmp_path / "ws"
+    wb = _audit_workbook(tmp_path / "m.xlsx")  # committed schema == 1
+    rec = _seed_audit_run(ws_root, "r1", "demo", _audit_happy_spec(), "pass")
+    # Decoy at the sheet-keyed path: 3 rows. If the oracle (wrongly) read
+    # schema.json it would see 3 != committed(1) -> mismatch. It must NOT.
+    _write_json(
+        audit_suite.output_path(ws_root, "r1", "demo", "schema.json"),
+        [{"i": i} for i in range(3)],
+    )
+    out = om.reconcile_run(workspace_root=ws_root, slug="demo", run_id="r1",
+                           workbook_path=wb, coverage_record=rec)
+    assert out["independent_verdict"] == "reconciled"
+    schema_step = next(s for s in out["steps"] if s["step"] == "schema_audit")
+    assert schema_step["independent_ok"] is True
+    assert schema_step["output_count"] == 1  # schema_audit.json (1), NOT schema.json (3)
+
+
+def test_reconcile_run_unresolved_workflow(tmp_path):
+    """A record whose steps match NO workflow -> unresolved_workflow: reported,
+    excluded from the error-rate denominator, never silently passed. A PRESENT
+    workbook proves the resolution check fires BEFORE the workbook check (so the
+    verdict is not the unrelated workbook_absent)."""
+    ws_root = tmp_path / "ws"
+    wb = _seed_multi_workbook(tmp_path / "m.xlsx", {"gsc_performance": 1})
+    rec = _cov_record("r1", "demo", [_cov_step("mystery_step", scored_count=1)], "pass")
+    out = om.reconcile_run(workspace_root=ws_root, slug="demo", run_id="r1",
+                           workbook_path=wb, coverage_record=rec)
+    assert out["independent_verdict"] == "unresolved_workflow"
+    assert out["fake_green"] is False  # unresolved is NOT a mismatch
+    assert out["steps"] == []
+    m = om.structured_error_rate([out])
+    assert m["unresolved_workflow"] == 1
+    assert m["reconcilable"] == 0
+    assert m["error_rate"] == 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -495,6 +683,36 @@ def test_oracle_report_no_runs_is_empty(tmp_path):
     assert report["metrics"]["total"] == 0
 
 
+def test_oracle_report_mixed_workflows(tmp_path):
+    """A slug holding BOTH a monthly run and an audit run: each auto-resolves to
+    its OWN workflow (monthly STEPS / audit STEPS) and reconciles correctly under
+    one oracle_report call; the metrics aggregate both."""
+    ws_root = tmp_path / "ws"
+    slug = "demo"
+    wb = _seed_multi_workbook(tmp_path / "master.xlsx", {
+        "gsc_performance": 3, "quick_wins": 2, "content_decay": 1,   # monthly sheets
+        "tech_seo": 3, "schema": 1, "on_page_audit": 5, "cannibalization": 2,  # audit
+    })
+    mrec = _seed_run_artifacts(ws_root, "monthly1", slug, {
+        "gsc_pull": {"raw": 3, "output": 3, "scored": 3},
+        "quick_wins": {"raw": 2, "output": 2, "scored": 2},
+        "content_decay": {"raw": 1, "output": 1, "scored": 1},
+    }, verdict="pass")
+    _write_json(coverage_path(ws_root, slug, "monthly1"), mrec)
+    arec = _seed_audit_run(ws_root, "audit1", slug, _audit_happy_spec(), "pass")
+    _write_json(coverage_path(ws_root, slug, "audit1"), arec)
+
+    report = om.oracle_report(workspace_root=ws_root, slug=slug, workbook_path=wb)
+    verdicts = {r["run_id"]: r["independent_verdict"] for r in report["runs"]}
+    assert verdicts == {"monthly1": "reconciled", "audit1": "reconciled"}
+    m = report["metrics"]
+    assert m["total"] == 2
+    assert m["reconciled"] == 2
+    assert m["reconcilable"] == 2
+    assert m["error_rate"] == 0.0
+    assert m["fake_green_count"] == 0
+
+
 # ---------------------------------------------------------------------------
 # 8. CLI smoke
 # ---------------------------------------------------------------------------
@@ -569,7 +787,13 @@ def test_integration_committer_replace_reconciles(tmp_path):
     rec = _cov_record("r1", slug, [_cov_step("gsc_pull", scored_count=3)], "pass")
 
     assert om.committed_row_count(wb_path, "gsc_performance", 5) == 3
+    # This test's contract is the ROW-COUNTER vs the real committer, not workflow
+    # resolution. The single-step record is a minimal probe, not a real monthly run
+    # (which always carries all 3 STEPS), so it would not strict-subset-resolve to a
+    # workflow. Pass `steps=` explicitly — the back-compat path the oracle preserves
+    # for exactly this — to isolate the row-counter assertion from resolution.
     out = om.reconcile_run(workspace_root=ws_root, slug=slug, run_id="r1",
-                           workbook_path=wb_path, coverage_record=rec)
+                           workbook_path=wb_path, coverage_record=rec,
+                           steps=[{"name": "gsc_pull", "sheet": "gsc_performance"}])
     assert out["independent_verdict"] == "reconciled"
     assert out["steps"][0]["committed_count"] == 3

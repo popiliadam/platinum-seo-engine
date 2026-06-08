@@ -21,6 +21,12 @@ compares committed-vs-output (the transform output is the bridge); the raw->outp
 drop is surfaced separately as an advisory silent-skip signal (reusing
 ``verify.silent_skip_exceeds`` so the threshold cannot drift).
 
+Workflow-AGNOSTIC: a run's workflow (``monthly`` / ``audit`` / …) is resolved from
+its coverage record by which workflow's STEPS-names are a subset of the record's
+step names (the name sets are disjoint), so EVERY workflow's runs are reconciled —
+including audit's model_attested sheet-writing steps, whose only independent ≤5%
+backstop is this oracle. No ``workflow`` field is added to the frozen record.
+
 READ-ONLY: this module opens artifacts + the workbook (openpyxl read_only) and
 writes NO state — it adds no hook, schema, or command and never blocks anything.
 """
@@ -35,14 +41,23 @@ from openpyxl import load_workbook
 
 from scripts.orchestration.coverage import coverage_path
 from scripts.orchestration.verify import silent_skip_exceeds
-from scripts.orchestration.workflows.monthly_maintenance import (
-    STEPS,
-    inbox_path,
-    output_path,
-)
+from scripts.orchestration.workflows import audit_suite, monthly_maintenance
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_SCHEMA_PATH = _REPO_ROOT / "schemas" / "master-excel.schema.json"
+
+# Workflow registry — the oracle is workflow-AGNOSTIC: it reconciles whichever
+# workflow a run belongs to. A run's workflow is resolved from its coverage record
+# by which workflow's STEPS-names are a subset of the record's step names. The two
+# name sets are DISJOINT (monthly={gsc_pull,quick_wins,content_decay};
+# audit={tech_audit,schema_audit,on_page_audit,cannibalization}), so a real run
+# matches exactly one — resolution is unambiguous WITHOUT adding a `workflow` field
+# to the frozen coverage record. A 3rd workflow is a one-line append here; the
+# spine + the coverage schema + the workflow modules stay UNTOUCHED.
+_WORKFLOWS: tuple[tuple[str, Sequence[dict]], ...] = (
+    ("monthly", monthly_maintenance.STEPS),
+    ("audit", audit_suite.STEPS),
+)
 
 # Stable reason codes — a report keys on these strings, so a mismatch is always
 # explainable (which of R1-R5 failed).
@@ -78,6 +93,68 @@ def _output_rows(payload: Any) -> list | None:
         return payload
     if isinstance(payload, dict) and isinstance(payload.get("rows"), list):
         return payload["rows"]
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Workflow resolution + artifact-path derivation
+#
+# The oracle knows INDEPENDENTLY where each workflow's artifacts live — it does
+# NOT import a workflow's ``output_path`` (monthly's is SHEET-keyed, which is wrong
+# for audit's explicit ``output_file``). Knowing the layout itself is correct for
+# an independent auditor.
+# ---------------------------------------------------------------------------
+
+def _inbox_path(workspace_root: Path | str, run_id: str, slug: str, step: str) -> Path:
+    """``projects/{slug}/_state/inbox/{run_id}/{step}.json`` (raw drop, keyed by
+    step NAME). This inbox convention is IDENTICAL across every workflow."""
+    return (
+        Path(workspace_root) / "projects" / slug / "_state" / "inbox" / run_id
+        / f"{step}.json"
+    )
+
+
+def _output_file_path(
+    workspace_root: Path | str, run_id: str, slug: str, output_file: str
+) -> Path:
+    """``projects/{slug}/_state/transform/{run_id}/{output_file}`` (transform
+    output, keyed by the step's OUTPUT FILE). Only the filename differs across
+    workflows — see ``_step_output_file``."""
+    return (
+        Path(workspace_root) / "projects" / slug / "_state" / "transform" / run_id
+        / output_file
+    )
+
+
+def _step_output_file(entry: dict) -> str:
+    """The transform-output FILENAME for a STEPS entry.
+
+    Audit entries carry an EXPLICIT ``output_file`` (schema_audit -> schema_audit.json
+    though its sheet is ``schema``); monthly entries carry none, so the file is
+    ``{sheet}.json``. ``entry.get("output_file") or {sheet}.json`` is correct for
+    BOTH workflow shapes and touches neither workflow module."""
+    return entry.get("output_file") or f"{entry['sheet']}.json"
+
+
+def _resolve_workflow_steps(
+    coverage_record: dict,
+) -> tuple[str, Sequence[dict]] | None:
+    """Resolve which workflow a coverage record belongs to.
+
+    Returns ``(workflow_name, STEPS)`` for the registered workflow whose
+    STEPS-names are ALL present in the record's step names (a subset match), or
+    None if no workflow matches (an unknown/legacy record). The workflow name sets
+    are DISJOINT, so a real run matches at most one workflow — resolution is
+    unambiguous WITHOUT a ``workflow`` field on the frozen coverage record. Pure:
+    reads only ``steps[].name``."""
+    names = {
+        s.get("name")
+        for s in (coverage_record.get("steps") or [])
+        if isinstance(s, dict)
+    }
+    for workflow_name, steps in _WORKFLOWS:
+        if all(entry["name"] in names for entry in steps):
+            return workflow_name, steps
     return None
 
 
@@ -228,14 +305,24 @@ def reconcile_step(
     step_name: str,
     sheet: str,
     coverage_step: dict,
+    output_file: str | None = None,
     workbook_path: Path | str | None = None,
     schema_path: Path | str | None = None,
 ) -> dict:
     """Read this step's artifacts (raw drop, transform output, committed rows) and
-    reconcile them via R1-R5. Returns a NEW result dict."""
-    raw = _read_json(inbox_path(workspace_root, run_id, slug, step_name))
+    reconcile them via R1-R5. Returns a NEW result dict.
+
+    ``output_file`` is the transform-output filename; when None it defaults to
+    ``{sheet}.json`` (monthly's convention), so existing sheet-keyed callers are
+    unchanged. Audit passes the step's EXPLICIT ``output_file`` (e.g.
+    ``schema_audit.json`` for sheet ``schema``). The raw drop is ALWAYS keyed by
+    ``step_name`` (the shared inbox convention)."""
+    resolved_output_file = output_file if output_file is not None else f"{sheet}.json"
+    raw = _read_json(_inbox_path(workspace_root, run_id, slug, step_name))
     output_rows = _output_rows(
-        _read_json(output_path(workspace_root, run_id, slug, sheet))
+        _read_json(
+            _output_file_path(workspace_root, run_id, slug, resolved_output_file)
+        )
     )
     scored_count = (
         coverage_step.get("scored_count") if isinstance(coverage_step, dict) else None
@@ -253,6 +340,21 @@ def reconcile_step(
     )
 
 
+def _run_result(run_id: str, slug: str, verdict: str, self_verdict, steps: list) -> dict:
+    """Assemble a reconcile_run result — ONE shape for every verdict. ``fake_green``
+    (pass claimed but committed data mismatches) is DERIVED, so non-mismatch
+    verdicts (reconciled / workbook_absent / unresolved_workflow) are never
+    fake_green."""
+    return {
+        "run_id": run_id,
+        "slug": slug,
+        "independent_verdict": verdict,
+        "self_reported_verdict": self_verdict,
+        "steps": steps,
+        "fake_green": self_verdict == "pass" and verdict == "mismatch",
+    }
+
+
 def reconcile_run(
     *,
     workspace_root: Path | str,
@@ -260,63 +362,69 @@ def reconcile_run(
     run_id: str,
     workbook_path: Path | str | None = None,
     schema_path: Path | str | None = None,
-    steps: Sequence[dict] = STEPS,
+    steps: Sequence[dict] | None = None,
     coverage_record: dict | None = None,
 ) -> dict:
-    """Reconcile every code_verified step of one run; derive the independent verdict.
+    """Reconcile one run (workflow-AGNOSTIC); derive the independent verdict.
 
-    Loads the coverage record (coverage_path) if not passed. Reconciles each
-    ``steps`` entry whose coverage step is ``verification_class == "code_verified"``.
+    Loads the coverage record (coverage_path) if not passed. The run's workflow is
+    resolved from the record (``_resolve_workflow_steps``) unless ``steps`` is
+    given explicitly (back-compat). Reconciles EVERY resolved STEPS entry that has
+    a matching coverage step — regardless of ``verification_class``, because every
+    STEPS entry commits a sheet (audit's model_attested steps write sheets too, so
+    they get the same committed-vs-output R4/R5 backstop). A coverage step NOT in
+    the STEPS table (e.g. a synthetic ``monthly_report``) is never reconciled.
     The run is:
+      - ``unresolved_workflow`` if ``steps`` is None and the record matches no
+        workflow (reported, EXCLUDED from the error-rate denominator — never a
+        silent pass),
       - ``workbook_absent`` if no readable workbook was given (reported, NOT scored),
-      - else ``reconciled`` if EVERY code_verified step independent_ok, else ``mismatch``.
+      - else ``reconciled`` if EVERY reconciled step independent_ok, else ``mismatch``.
     ``fake_green`` = self-reported verdict == "pass" AND independent verdict ==
     "mismatch" (success claimed while the committed data disagrees).
     """
     if coverage_record is None:
         coverage_record = _read_json(coverage_path(workspace_root, slug, run_id)) or {}
     self_verdict = coverage_record.get("verdict")
+
+    if steps is None:
+        resolved = _resolve_workflow_steps(coverage_record)
+        if resolved is None:
+            # Unknown/legacy record — not about the workbook; reported, not scored.
+            return _run_result(run_id, slug, "unresolved_workflow", self_verdict, [])
+        _, steps = resolved
+
     cov_by_name = {
         s.get("name"): s
         for s in (coverage_record.get("steps") or [])
         if isinstance(s, dict)
     }
-
     wb_present = workbook_path is not None and _workbook_present(workbook_path)
     effective_wb = workbook_path if wb_present else None
 
     results: list[dict] = []
     for entry in steps:
         cov_step = cov_by_name.get(entry["name"])
-        if not (
-            isinstance(cov_step, dict)
-            and cov_step.get("verification_class") == "code_verified"
-        ):
+        if not isinstance(cov_step, dict):
             continue
         results.append(
             reconcile_step(
                 workspace_root=workspace_root, slug=slug, run_id=run_id,
-                step_name=entry["name"], sheet=entry["sheet"], coverage_step=cov_step,
+                step_name=entry["name"], sheet=entry["sheet"],
+                output_file=_step_output_file(entry), coverage_step=cov_step,
                 workbook_path=effective_wb, schema_path=schema_path,
             )
         )
 
     if not wb_present or not results:
-        # No readable workbook (or no code_verified step to score) ⇒ not scored.
+        # No readable workbook (or no STEPS step present) ⇒ not scored.
         independent_verdict = "workbook_absent"
     elif all(r["independent_ok"] for r in results):
         independent_verdict = "reconciled"
     else:
         independent_verdict = "mismatch"
 
-    return {
-        "run_id": run_id,
-        "slug": slug,
-        "independent_verdict": independent_verdict,
-        "self_reported_verdict": self_verdict,
-        "steps": results,
-        "fake_green": self_verdict == "pass" and independent_verdict == "mismatch",
-    }
+    return _run_result(run_id, slug, independent_verdict, self_verdict, results)
 
 
 # ---------------------------------------------------------------------------
@@ -326,16 +434,17 @@ def reconcile_run(
 def structured_error_rate(run_reconciliations: Iterable[dict]) -> dict:
     """Aggregate reconcile_run dicts into the headline structured-error metrics.
 
-    ``reconcilable`` EXCLUDES workbook_absent runs (they were never scored).
-    ``error_rate`` = mismatched / reconcilable (0.0 when reconcilable == 0).
-    ``workbook_absent`` is surfaced as its own count — NEVER silently dropped or
-    treated as a pass.
+    ``reconcilable`` EXCLUDES both ``workbook_absent`` and ``unresolved_workflow``
+    runs (neither was scored). ``error_rate`` = mismatched / reconcilable (0.0 when
+    reconcilable == 0). ``workbook_absent`` and ``unresolved_workflow`` are each
+    surfaced as their own count — NEVER silently dropped or treated as a pass.
     """
     runs = list(run_reconciliations)
     verdicts = [r.get("independent_verdict") for r in runs]
     reconciled = verdicts.count("reconciled")
     mismatched = verdicts.count("mismatch")
     workbook_absent = verdicts.count("workbook_absent")
+    unresolved_workflow = verdicts.count("unresolved_workflow")
     reconcilable = reconciled + mismatched
     return {
         "total": len(runs),
@@ -343,6 +452,7 @@ def structured_error_rate(run_reconciliations: Iterable[dict]) -> dict:
         "reconciled": reconciled,
         "mismatched": mismatched,
         "workbook_absent": workbook_absent,
+        "unresolved_workflow": unresolved_workflow,
         "error_rate": (mismatched / reconcilable) if reconcilable else 0.0,
         "fake_green_count": sum(1 for r in runs if r.get("fake_green")),
         "mismatched_run_ids": [
@@ -391,7 +501,8 @@ def _format_report(report: dict) -> str:
         f"  structured error rate: {m['error_rate'] * 100:.1f}%  "
         f"({m['mismatched']}/{m['reconcilable']} reconcilable runs mismatched)",
         f"  reconciled={m['reconciled']}  mismatched={m['mismatched']}  "
-        f"workbook_absent={m['workbook_absent']}  total={m['total']}",
+        f"workbook_absent={m['workbook_absent']}  "
+        f"unresolved_workflow={m['unresolved_workflow']}  total={m['total']}",
     ]
     if m["fake_green_count"]:
         loud = ", ".join(r["run_id"] for r in report["runs"] if r["fake_green"])
