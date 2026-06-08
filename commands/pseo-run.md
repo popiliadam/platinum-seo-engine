@@ -13,17 +13,19 @@ description: |
   drift kontrolü gerekiyor (`/pseo-driftcheck`). Bu komut bir DİZİ orkestratörüdür,
   tek skill değil.
 argument-hint: "<workflow> [project-slug] [--resume]"
-allowed-tools: Bash(jq:*), Bash(python3:*), Bash(date:*), Bash(mkdir:*), Read, Write, mcp__gsc__search_analytics, mcp__gsc__detect_quick_wins, mcp__gsc__enhanced_search_analytics, mcp__dataforseo__on_page_lighthouse, mcp__dataforseo__on_page_content_parsing
+allowed-tools: Bash(jq:*), Bash(python3:*), Bash(date:*), Bash(mkdir:*), Read, Write, mcp__gsc__search_analytics, mcp__gsc__detect_quick_wins, mcp__gsc__enhanced_search_analytics, mcp__dataforseo__on_page_lighthouse, mcp__dataforseo__on_page_content_parsing, mcp__dataforseo__dataforseo_labs_google_keyword_ideas, mcp__dataforseo__dataforseo_labs_google_related_keywords, mcp__dataforseo__dataforseo_labs_google_keyword_suggestions, mcp__dataforseo__dataforseo_labs_search_intent, mcp__dataforseo__dataforseo_labs_google_keyword_overview
 model: sonnet
 ---
 
-# /pseo-run — Workflow Orkestratörü (Faz-1: `monthly` · Faz-3: `audit`)
+# /pseo-run — Workflow Orkestratörü (Faz-1: `monthly` · Faz-3: `audit` + `setup`)
 
 > **Orkestratör spine:** `scripts/orchestration/run_step.py` (verify → loader-transform →
 > commit → coverage) + sürücüler `scripts/orchestration/workflows/monthly_maintenance.py`
-> (`monthly`) ve `scripts/orchestration/workflows/audit_suite.py` (`audit`).
-> Desteklenen workflow'lar: **`monthly`** (Faz-1, **Bölüm 2-7**) ve **`audit`** (Faz-3
-> teknik-SEO denetim suite, **Bölüm 8**). Her sıra SABİT bir Python dizisidir (Path A, DAG
+> (`monthly`), `scripts/orchestration/workflows/audit_suite.py` (`audit`) ve
+> `scripts/orchestration/workflows/new_project_setup.py` (`setup`).
+> Desteklenen workflow'lar: **`monthly`** (Faz-1, **Bölüm 2-7**), **`audit`** (Faz-3
+> teknik-SEO denetim suite, **Bölüm 8**) ve **`setup`** (Faz-3 yeni-proje içerik-planı
+> pipeline'ı, **Bölüm 9**). Her sıra SABİT bir Python dizisidir (Path A, DAG
 > yok). CODE tool çağrısı YAPAMAZ → MCP çağrısını + transform'u MODEL yapar, CODE doğrular +
 > commit'ler.
 
@@ -36,7 +38,8 @@ model: sonnet
 - `PROJECT` boşsa: kullanıcıdan slug iste veya `/pseo-active <slug>` öner; aşağıdaki adımları atla.
 - `$2` `--resume` ise slug'ı `active.json`'dan çöz ve **2.b**'deki resume yolunu izle.
 - Workflow `monthly` ise: **Bölüm 2-7**'yi izle. Workflow `audit` ise: **Bölüm 8** (audit
-  suite, Faz-3) — DURUR'ma. Başka bir workflow ise: desteklenmiyor — DURUR, manager'a bildir.
+  suite, Faz-3) — DURUR'ma. Workflow `setup` ise: **Bölüm 9** (yeni-proje içerik-planı
+  pipeline'ı, Faz-3) — DURUR'ma. Başka bir workflow ise: desteklenmiyor — DURUR, manager'a bildir.
 
 ## 2. Workflow run'ını aç (ya da resume et)
 
@@ -388,4 +391,185 @@ Sürücünün son satırı zaten `remediation.render(...)` çıktısıdır; tek 
 - MCP: `mcp__dataforseo__on_page_lighthouse`, `mcp__dataforseo__on_page_content_parsing`,
   `mcp__gsc__search_analytics`; `schema_audit` SF export (dosya) veya opt-in SF MCP. DFS HEAVY →
   her DFS adımı kendi SKILL.md'sindeki bütçe pre-flight'ına tabidir.
+- Coverage proof: `schemas/coverage.schema.json` (`_state/coverage/{run_id}.json`).
+
+---
+
+## 9. Workflow `setup` (Faz-3) — yeni-proje içerik-planı pipeline'ı
+
+> **3 yapısal adım, rapor adımı YOK.** Teslimat = **3 commit'li sheet** (`topical_map`,
+> `cluster_keywords`, `new_content_plan`). Sürücü `new_project_setup.py`, `monthly`/`audit` ile
+> AYNI spine'ı kullanır ve `audit_suite`'in D15 dispatch'ini (`_run_one`) IMPORT eder.
+> **Ön-koşul:** proje zaten `/pseo-init` ile scaffold edilmiş olmalı (scaffold bu workflow'un
+> parçası DEĞİL). Her sheet bir SNAPSHOT (tarih/run discriminator kolonu yok; `new_content_plan`'in
+> `created_date`'i içerik-üstverisi, append-anahtarı değil — transform `id`'yi her koşuda 1'den
+> yeniden numaralar) → commit `transaction.replace` (idempotent; re-run satır kopyalamaz).
+> **3 adımın HEPSİ ANALİZ/PLANLAMA eder** (topical_map → pillar/cluster taksonomisi; cluster_map
+> no-cluster anahtarları eler + dedup; new_content_plan gap_score'a göre top-N'e kırpar) → girdisinin
+> <%50'sini commit'ler → **HEPSİ `model_attested`** (kimlik+içerik+tazelik gate'i KOŞAR; silent-skip
+> sayım kontrolü TAVSİYE — gate onları yanlış-FAIL etmez). Per-row ingestion adımı YOK → `code_verified`
+> adım YOK; tamamlanmayı yalnız **tamamlanma geçidi** (her adım `satisfied` değilse `pass` olamaz)
+> zorlar.
+>
+> **⚠️ SIRALI BAĞIMLILIK:** `cluster_map`, `topical_map`'i tüketir; `new_content_plan`,
+> `cluster_keywords`'ü tüketir (`consumes:` frontmatter). Sürücü adımları SIRAYLA koşar → her önceki
+> sheet bağımlı adımdan ÖNCE commit'lenir; bağımlılık **SIRALAMA** ile sağlanır (sürücü değişikliği
+> DEĞİL). CLI'lar master.xlsx'i DOĞRUDAN okumaz — model önceki sheet'in satırlarını çıkarıp bağımlı
+> CLI'ya **argüman** olarak geçer (8.2'deki gibi DFS heavy değil; planlama nokta-bazlı).
+
+### 9.1 — Run aç (ya da resume et)
+
+```python
+from scripts.state import workflow_runner
+handle = workflow_runner.create_run(
+    skill="new-project-setup",
+    project_slug=PROJECT,
+    steps=[{"name": "topical_map"}, {"name": "cluster_map"},
+           {"name": "new_content_plan"}],
+)
+run_id = handle.run_id
+```
+
+`--resume`: `monthly`/`audit` ile aynı — `workflow_runner.resume(run_id, project_slug=PROJECT)`; yalnız
+eksik/başarısız adımlar yeniden koşar (committer whole-block replace, coverage yeniden yazılır).
+
+### 9.2 — Yapısal adımlar (SIRAYLA: topical_map → cluster_map → new_content_plan)
+
+Önce klasörleri hazırla:
+
+```bash
+mkdir -p "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/inbox/$RUN_ID" \
+         "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/transform/$RUN_ID"
+```
+
+**Ortak kurallar (her adım):**
+
+- **Ham PRİMER drop (provenance-damgalı)** — gerçek MCP aracını çağır, yanıtı `Write` ile
+  `_state/inbox/$RUN_ID/{step}.json` yoluna yaz. Sürücü bu drop'u `verify_raw_drop` ile doğrular
+  (→ `input_count`). Provenance: `run_id`, `slug`, `tool` (adımın beklediği araç; `new_content_plan`
+  araç PİNLEMEZ — alanı atla), `window: null` (planlama nokta-bazlı, tarih penceresi DEĞİL),
+  `fetched_at` (UTC ISO-8601), `declared_count == len(rows)` (eşit değilse `truncated`). Hiçbir adım
+  GSC-PRİMER değil (`cluster_map`'in GSC'si ENRICHMENT) → `site_url` PİNLENMEZ:
+
+  ```json
+  {
+    "provenance": {
+      "run_id": "<run_id>", "slug": "<slug>", "window": null,
+      "tool": "<gated MCP aracı | new_content_plan: bu alanı atla>",
+      "fetched_at": "<UTC ISO-8601>", "declared_count": <satır sayısı>
+    },
+    "rows": [ /* ham satırlar — gate input_count'u sayar */ ]
+  }
+  ```
+
+- **DFS adımları (`topical_map`, `cluster_map`)**: transform CLI ham yanıtı `items`/`tasks`
+  anahtarından okur (`rows`'dan DEĞİL — `_normalize_dfs_response`). Bu yüzden PRİMER drop'a **hem**
+  `rows` (gate sayar) **hem** `items` (CLI okur; aynı keyword listesi) koy. **`new_content_plan`**:
+  PRİMER "drop"u Faz-7 content-gaps staging satırlarıdır (`{provenance, rows}`); CLI `--staging` bu
+  dosyanın `rows`'unu okur → tek liste yeter (araç PİNLENMEZ).
+
+- **İkincil/enrichment drop'lar GATE'lenmez** (CLI'nin ek girdileri); ayrı inbox dosyalarına yaz:
+  `topical_map` (`--raw-related-keywords`), `cluster_map` (`--raw-related-keywords`, `--raw-gsc`),
+  `new_content_plan` (ops. `--raw-keyword-overview`, `--raw-search-intent`).
+
+- **Önceki-sheet bağımlılığı (SIRALI)** — bağımlı adımın CLI'ı önceki sheet'in verisini bir
+  **argüman** olarak alır; model önceki adımın çıktısını (`{prior_sheet}.json` — sürücü bunu
+  `master.xlsx#{prior_sheet}`'e commit eder) `Read` ile okuyup girdi JSON'unu `Write` ile üretir:
+  - `cluster_map` ← `topical_map`: `master.xlsx#topical_map` kolon B (`cluster`) boş-olmayan
+    değerleri → `cluster_defs.json` (JSON list) → `--cluster-defs-json` (D-02 source-of-truth).
+  - `new_content_plan` ← `cluster_keywords`: `master.xlsx#cluster_keywords`'ten
+    `read_cluster_keywords_snapshot` ile `{keyword: cluster}` → `cluster_map_snapshot.json` →
+    `--cluster-map`; `assigned_cluster` bundan cross-ref edilir.
+
+- **Çıktı dosyası** — CLI `--output-dir` ile `_state/transform/$RUN_ID/` altına **{output_file}**
+  yazar (bare JSON list; `{"rows": [...]}` da kabul). 3 CLI de `{sheet}.json` yazar (1d.1 tuzağı
+  YOK): `topical_map.json`, `cluster_keywords.json`, `new_content_plan.json`. Sürücünün loader'ı tam
+  bu yolu okur.
+
+- **Commit YAPMA** — sheet'leri sürücü (9.3) `committer.commit` ile yazar.
+
+| Adım | Gated MCP aracı (PRİMER drop) | İkincil/enrichment (gate'siz) | Önceki-sheet girdisi | Sheet → **çıktı dosyası** | Transform CLI argümanları |
+|------|------------------------------|-------------------------------|----------------------|---------------------------|---------------------------|
+| `topical_map` | `mcp__dataforseo__dataforseo_labs_google_keyword_ideas` | `…related_keywords` → `topical_map_related.json` | — | `topical_map` → **`topical_map.json`** | `--raw-keyword-ideas <primer> --raw-related-keywords <ikincil> --seed-keyword "<seed>" --output-dir` |
+| `cluster_map` | `mcp__dataforseo__dataforseo_labs_google_keyword_suggestions` | `…related_keywords` → `cluster_map_related.json`; `mcp__gsc__enhanced_search_analytics` → `cluster_map_gsc.json` | `topical_map.cluster` → `cluster_defs.json` | `cluster_keywords` → **`cluster_keywords.json`** | `--raw-keyword-suggestions <primer> --raw-related-keywords <ikincil> --raw-gsc <gsc> --cluster-defs-json <cluster_defs.json> --seed-keyword "<seed>" --project-slug $PROJECT --output-dir` |
+| `new_content_plan` | *(araç PİNLENMEZ — content-gaps staging dosyası)* | *(ops.)* `…keyword_overview`, `…search_intent` | `cluster_keywords` `{keyword:cluster}` → `cluster_map_snapshot.json` | `new_content_plan` → **`new_content_plan.json`** | `--staging <primer> --cluster-map <cluster_map_snapshot.json> [--raw-keyword-overview …] [--raw-search-intent …] --date <YYYY-MM-DD> --output-dir` |
+
+Transform CLI çağrıları (her adım PRİMER drop + önceki-sheet girdisi hazırlandıktan sonra, SIRAYLA):
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/planning/topical_map_transform.py" \
+  --raw-keyword-ideas    "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/inbox/$RUN_ID/topical_map.json" \
+  --raw-related-keywords "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/inbox/$RUN_ID/topical_map_related.json" \
+  --seed-keyword         "$SEED_KEYWORD" \
+  --output-dir           "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/transform/$RUN_ID/"
+
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/planning/cluster_map_transform.py" \
+  --raw-keyword-suggestions "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/inbox/$RUN_ID/cluster_map.json" \
+  --raw-related-keywords    "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/inbox/$RUN_ID/cluster_map_related.json" \
+  --raw-gsc                 "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/inbox/$RUN_ID/cluster_map_gsc.json" \
+  --cluster-defs-json       "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/inbox/$RUN_ID/cluster_defs.json" \
+  --seed-keyword            "$SEED_KEYWORD" --project-slug "$PROJECT" \
+  --output-dir              "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/transform/$RUN_ID/"
+
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/planning/new_content_plan_transform.py" \
+  --staging     "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/inbox/$RUN_ID/new_content_plan.json" \
+  --cluster-map "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/inbox/$RUN_ID/cluster_map_snapshot.json" \
+  --date        "$(date -u +%Y-%m-%d)" \
+  --output-dir  "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/transform/$RUN_ID/"
+```
+
+> `new_content_plan` araç PİNLEMEZ (`expected_tool=None`) — content-gaps staging dosya-bazlı kaynak;
+> provenance `tool` alanını atla; gate yalnız kimlik (`run_id`/`slug`) + tazelik + `declared_count`'u
+> doğrular (schema_audit Faz-3 precedent'i).
+>
+> Bu bölümde **commit YAPMA** — model yalnız ham drop(lar) + önceki-sheet girdisi + transform çıktısı
+> üretir; doğrulama + commit + coverage CODE'a (9.3 sürücü) aittir.
+
+### 9.3 — Sürücü (`new_project_setup`) — doğrula + commit + coverage
+
+3 adımın drop'ları + çıktıları hazırken sürücüyü çalıştır. `--now-epoch` zorunlu (modül saat
+OKUMAZ — sınırda `date` ile geçiyoruz). Rapor adımı YOK → `--report-exists` YOK:
+
+```bash
+PYTHONPATH="${CLAUDE_PLUGIN_ROOT}" python3 -m scripts.orchestration.workflows.new_project_setup \
+  --run-id "$RUN_ID" --slug "$PROJECT" \
+  --workspace-root "$PSEO_WORKSPACE_ROOT" \
+  --workbook "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/master.xlsx" \
+  --now-epoch "$(date +%s)"
+```
+
+Sürücü: her adımı `audit_suite`'ten IMPORT edilen `_run_one` ile geçirir — 3 adım da `model_attested`
+olduğundan kimlik+içerik+tazelik gate'i + `committer.commit` (silent-skip TAVSİYE) yolundan SIRAYLA
+koşar; verdict türetir (3 sheet'in HEPSİ `satisfied` değilse `pass` olamaz — tamamlanma geçidi; bu
+all-attested workflow'da yegâne tamamlanma zorlayıcısı) ve coverage kaydını
+`_state/coverage/$RUN_ID.json` dosyasına yazar (`schemas/coverage.schema.json`).
+
+### 9.4 — Verdict `pass` değilse — Türkçe düzeltme komutu
+
+Sürücünün son satırı zaten `remediation.render(...)` çıktısıdır; tek kopyala-yapıştır aksiyon:
+
+```
+/pseo-run setup <slug> --resume
+```
+
+- `incomplete` → eksik yapısal adım(lar) adlandırılır; `--resume` onları tamamlar.
+- `failed` → gate reddi (kimlik/tazelik/truncated) olan adım(lar); `--resume` yeniden dener.
+- `paused` → harici bağımlılık (DFS/GSC) duraklattı; `--resume` kaldığı yerden devam eder.
+
+### 9.5 — Bağımlılıklar (`setup`)
+
+- Sürücü: `scripts/orchestration/workflows/new_project_setup.py` (+ spine `run_step.py` / `verify.py` /
+  `committer.py` / `coverage.py` — IMPORT-only, değiştirilmez; `audit_suite.py`'den `_run_one` D15
+  dispatch IMPORT'u — değiştirilmez).
+- Remediation: `scripts/orchestration/remediation.py` (`workflow="setup"` → `/pseo-run setup … --resume`).
+- Skill + transform zinciri (SIRALI): `skills/planning/topical-map/SKILL.md` +
+  `scripts/planning/topical_map_transform.py`; `skills/planning/cluster-map/SKILL.md` +
+  `scripts/planning/cluster_map_transform.py`; `skills/planning/new-content-plan/SKILL.md` +
+  `scripts/planning/new_content_plan_transform.py`.
+- Run state: `scripts/state/workflow_runner.py` (`create_run` / `resume`).
+- MCP: `mcp__dataforseo__dataforseo_labs_google_keyword_ideas`,
+  `…dataforseo_labs_google_related_keywords`, `…dataforseo_labs_google_keyword_suggestions`,
+  `…dataforseo_labs_search_intent`, `…dataforseo_labs_google_keyword_overview`,
+  `mcp__gsc__enhanced_search_analytics`. DFS HEAVY → her DFS adımı kendi SKILL.md'sindeki bütçe
+  pre-flight'ına tabidir. `new_content_plan` content-gaps staging'i (Faz-7 producer) tüketir.
 - Coverage proof: `schemas/coverage.schema.json` (`_state/coverage/{run_id}.json`).
