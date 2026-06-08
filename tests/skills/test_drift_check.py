@@ -317,8 +317,8 @@ def test_consistency_report_schema_valid(clean_wb_path: Path, tmp_path: Path,
     Draft7Validator(consistency_schema).validate(report)
     assert report["schema_version"] == "1.0"
     # 20 baseline + F-23 (v1.8 Phase 4) + F-24 (v1.9 Phase 2) +
-    # F-25 (v1.9 Phase 3) + F-26 (v1.9 Phase 4) = 24.
-    assert len(report["checks"]) == 24
+    # F-25 (v1.9 Phase 3) + F-26 (v1.9 Phase 4) + F-27 (AMO Faz-3 drift-F) = 25.
+    assert len(report["checks"]) == 25
     assert report["verdict"] in ("GREEN", "AMBER", "RED")
 
 
@@ -350,7 +350,7 @@ def test_provenance_event_emitted(clean_wb_path: Path, tmp_path: Path,
     events_writer.append_audit(
         project_id=slug,
         audit_action="accessed",
-        audit_target="invariants:24",
+        audit_target="invariants:25",
         actor="drift-check",
         notes="verdict=GREEN fails=0",
         workspace_root=tmp_path,
@@ -363,7 +363,7 @@ def test_provenance_event_emitted(clean_wb_path: Path, tmp_path: Path,
     assert audits, "no event_kind=audit emitted"
     rec = audits[-1]
     assert rec["audit_action"] == "accessed"
-    assert rec["audit_target"] == "invariants:24"
+    assert rec["audit_target"] == "invariants:25"
     # Re-validate with the canonical events schema.
     Draft7Validator(events_schema).validate(rec)
 
