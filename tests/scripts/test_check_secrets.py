@@ -51,3 +51,101 @@ def test_header_states_committed_policy_not_on_disk() -> None:
         "header must document the gitignored-.env WARN allowance so the wording "
         "and the code agree"
     )
+
+
+# ---------------------------------------------------------------------------
+# --scan-stdin mode (literal pending bytes) — AMO Faz-3 governance.
+#   Scans the LITERAL bytes on stdin (gitignore-UNAWARE) so a secret headed for
+#   a gitignored target is caught — EXCEPT a gitignored local .env, a sanctioned
+#   local-secrets store, which only WARNs (exit 0), mirroring section 3.
+#
+# Every secret-shaped fixture below is built by RUNTIME concatenation
+# ("AIza" + "B" * 35), never as a committed literal: on disk the bytes read
+# `AIza"` (the quote breaks the run), so neither the CI wrapper (git grep HEAD)
+# nor the full-mode scanner (filesystem grep, which does NOT exclude this test
+# file) ever sees a contiguous watched token. The secret exists only in memory
+# at runtime. See worker-prompt rule D.
+# ---------------------------------------------------------------------------
+def _run_scan_stdin(
+    payload: str, pseudo_path: str | None = None, cwd: str | None = None
+) -> "subprocess.CompletedProcess[str]":
+    args = ["bash", str(SCRIPT), "--scan-stdin"]
+    if pseudo_path is not None:
+        args.append(pseudo_path)
+    return subprocess.run(
+        args,
+        input=payload,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        cwd=cwd,
+    )
+
+
+def _init_git_repo(path: Path, ignored: list[str]) -> None:
+    subprocess.run(
+        ["git", "init", "-q", str(path)],
+        check=True, capture_output=True, timeout=30,
+    )
+    (path / ".gitignore").write_text("\n".join(ignored) + "\n", encoding="utf-8")
+
+
+def test_scan_stdin_fails_on_google_key_shape_without_pseudo_path() -> None:
+    """T1: a Google-API-key-shaped blob on stdin (no pseudo-path) is a FAIL,
+    and the matched content is REDACTED — only the pattern label is printed."""
+    gkey = "AIza" + "B" * 35  # synthetic Google-API-key shape, not a real token
+    result = _run_scan_stdin(f"config:\n  api_key: {gkey}\n")
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "google_api_key_AIza" in result.stdout
+    assert gkey not in result.stdout, "matched secret must never be echoed"
+    assert gkey not in result.stderr, "matched secret must never be echoed"
+
+
+def test_scan_stdin_green_on_benign_text() -> None:
+    """T2: benign bytes on stdin scan clean (exit 0, GREEN). The banner assertion
+    proves the verdict came from the stdin-scan path, not a positional
+    fall-through (which would also exit GREEN on a non-existent root)."""
+    result = _run_scan_stdin("hello world\nno secrets here\n")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "GREEN" in result.stdout
+    assert "stdin pending bytes" in result.stdout
+
+
+def test_scan_stdin_warns_on_gitignored_dotenv(tmp_path: Path) -> None:
+    """T3: the carve-out — a secret headed for a GITIGNORED local .env is a
+    sanctioned local-secrets store, so WARN (exit 0), never FAIL."""
+    _init_git_repo(tmp_path, [".env", "notes.txt"])
+    gkey = "AIza" + "C" * 35
+    env_path = tmp_path / ".env"
+    result = _run_scan_stdin(
+        f"SECRET={gkey}\n", pseudo_path=str(env_path), cwd=str(tmp_path)
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "WARN" in result.stdout
+    assert gkey not in result.stdout, "matched secret must never be echoed"
+    assert gkey not in result.stderr, "matched secret must never be echoed"
+
+
+def test_scan_stdin_fails_on_gitignored_non_dotenv(tmp_path: Path) -> None:
+    """T4: only .env gets the carve-out. A secret headed for ANY other
+    gitignored target (notes.txt) still FAILs (exit 1)."""
+    _init_git_repo(tmp_path, [".env", "notes.txt"])
+    gkey = "AIza" + "D" * 35
+    notes_path = tmp_path / "notes.txt"
+    result = _run_scan_stdin(
+        f"token: {gkey}\n", pseudo_path=str(notes_path), cwd=str(tmp_path)
+    )
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "google_api_key_AIza" in result.stdout
+    assert gkey not in result.stdout, "matched secret must never be echoed"
+
+
+def test_scan_stdin_fails_on_openai_sk_shape() -> None:
+    """T5: a second, distinct pattern (sk- shape) also fires — proves the full
+    PATTERNS loop runs in the new mode, not just the first entry."""
+    sk = "sk-" + "E" * 24  # synthetic OpenAI/Anthropic key shape
+    result = _run_scan_stdin(f"OPENAI_KEY={sk}\n")
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "openai_or_anthropic_sk_prefix" in result.stdout
+    assert sk not in result.stdout, "matched secret must never be echoed"
+    assert sk not in result.stderr, "matched secret must never be echoed"

@@ -14,7 +14,10 @@
 #            rules/secrets-management.md
 #
 # Usage:
-#   ./scripts/security/check_secrets.sh [root_dir]
+#   ./scripts/security/check_secrets.sh [root_dir]                    # full (default)
+#   ./scripts/security/check_secrets.sh --changed-since [REF] [ROOT]  # incremental
+#   ./scripts/security/check_secrets.sh --scan-stdin [PSEUDO_PATH]    # literal stdin
+#       bytes (gitignore-UNAWARE; a gitignored local .env still only WARNs)
 #   (default root_dir = current working directory)
 #
 # Exit codes:
@@ -27,15 +30,31 @@ set -euo pipefail
 # Argument parsing
 #   ./check_secrets.sh [ROOT]                         # full mode (default)
 #   ./check_secrets.sh --changed-since [REF] [ROOT]   # incremental mode (B2 perf)
+#   ./check_secrets.sh --scan-stdin [PSEUDO_PATH]     # literal pending bytes (stdin)
 #
 # Incremental mode scans ONLY files changed since REF (default HEAD~1) — useful
 # for PreToolUse hook fast-path or CI per-PR scans. Structural checks (cred dirs,
 # .env files, key files, chmod) are SKIPPED in incremental mode by design — those
 # are full-tree checks; pattern scan dominates per-edit latency (B2 finding).
+#
+# --scan-stdin scans the LITERAL bytes piped on stdin (gitignore-UNAWARE), so a
+# secret headed for a gitignored target — invisible to the incremental fast-path,
+# which lists files via git with --exclude-standard — is still caught. The one
+# carve-out: a gitignored local .env (the sanctioned local-secrets store) only
+# WARNs. Optional PSEUDO_PATH is the intended write target (used for that
+# carve-out only). Structural sections 2-6 are skipped (pure pattern scan).
 # ----------------------------------------------------------------------------
 INCREMENTAL=0
 INCREMENTAL_REF=""
-if [ "${1:-}" = "--changed-since" ]; then
+SCAN_STDIN=0
+PSEUDO_PATH=""
+if [ "${1:-}" = "--scan-stdin" ]; then
+  # NEW (AMO Faz-3): parsed BEFORE --changed-since/positional so those two modes
+  # stay byte-for-byte unchanged. Captures an optional intended-target path.
+  SCAN_STDIN=1
+  PSEUDO_PATH="${2:-}"
+  ROOT="."
+elif [ "${1:-}" = "--changed-since" ]; then
   INCREMENTAL=1
   INCREMENTAL_REF="${2:-HEAD~1}"
   ROOT="${3:-.}"
@@ -96,6 +115,100 @@ PATTERN_NAMES=(
   "slack_token_xox"
   "dataforseo_env_hardcoded_literal"
 )
+
+# ----------------------------------------------------------------------------
+# --scan-stdin mode (AMO Faz-3): scan the LITERAL pending bytes from stdin.
+#   The incremental fast-path sources its file list from git (with
+#   --exclude-standard), so a secret headed for a GITIGNORED target is invisible
+#   to it. This mode bypasses git enumeration entirely: it buffers stdin once and
+#   runs the SAME PATTERNS over those literal bytes. It is gitignore-UNAWARE by
+#   design — with ONE carve-out: a gitignored local .env is a sanctioned local
+#   secrets store, so a hit there is WARN (exit 0), never FAIL (mirrors section
+#   3). Every OTHER target (no pseudo-path, a non-gitignored target, or a
+#   gitignored NON-.env target) is a FAIL (exit 1). Structural sections 2-6 are
+#   skipped (pure literal-bytes pattern scan, like incremental).
+#   SECURITY: only the pattern label + match count are ever printed — never the
+#   matched content (same invariant as section 1).
+# ----------------------------------------------------------------------------
+if [ "$SCAN_STDIN" = "1" ]; then
+  echo "============================================================"
+  echo "check_secrets.sh — scanning (stdin pending bytes)..."
+  echo "============================================================"
+
+  # Buffer stdin once into a private temp file (binary-safe; lets us reuse the
+  # per-pattern grep machinery). Always cleaned up via the EXIT trap.
+  tmp="$(mktemp)"
+  trap 'rm -f "$tmp"' EXIT
+  cat > "$tmp"
+
+  # Run the SAME pattern loop over the buffered bytes. Collect matches as
+  # newline-delimited "name|count" entries — never the matched content itself.
+  HIT=0
+  HITS=""
+  for i in "${!PATTERNS[@]}"; do
+    p="${PATTERNS[$i]}"
+    name="${PATTERN_NAMES[$i]:-pattern_$i}"
+    if grep -qE "$p" "$tmp" 2>/dev/null; then
+      HIT=1
+      c=$(grep -cE "$p" "$tmp" 2>/dev/null || echo 0)
+      HITS="${HITS}${name}|${c}"$'\n'
+    fi
+  done
+  HITS="${HITS%$'\n'}"
+
+  # Verdict 1: nothing matched → clean.
+  if [ "$HIT" = "0" ]; then
+    echo ""
+    echo "============================================================"
+    echo "SECURITY GATE GREEN (no secrets in stdin pending bytes)"
+    exit 0
+  fi
+
+  # A secret pattern matched. Apply the gitignored-.env WARN carve-out: a hit is
+  # WARN (exit 0) ONLY when the intended target is a gitignored local .env /
+  # .env.* (but NOT .env.example). Mirrors section 3's git check-ignore logic.
+  IS_ENV_CARVEOUT=0
+  if [ -n "$PSEUDO_PATH" ]; then
+    base="$(basename "$PSEUDO_PATH")"
+    case "$base" in
+      .env.example)
+        : ;;  # committed template — never carve out (a secret here is a FAIL)
+      .env|.env.*)
+        if git check-ignore -q -- "$PSEUDO_PATH" 2>/dev/null; then
+          IS_ENV_CARVEOUT=1
+        fi
+        ;;
+    esac
+  fi
+
+  # Verdict 2: gitignored local .env → WARN, exit stays 0/GREEN.
+  if [ "$IS_ENV_CARVEOUT" = "1" ]; then
+    echo ""
+    echo "WARN: secret pattern in gitignored local .env ($PSEUDO_PATH) — local credentials, no leak"
+    echo "  (content [REDACTED])"
+    echo ""
+    echo "============================================================"
+    echo "SECURITY GATE GREEN (gitignored local .env — WARN only)"
+    exit 0
+  fi
+
+  # Verdict 3: any OTHER target (no pseudo-path, non-gitignored, or gitignored
+  # NON-.env) → FAIL. Report the matching label(s) + count — never the content.
+  echo ""
+  while IFS= read -r entry; do
+    [ -z "$entry" ] && continue
+    n="${entry%%|*}"
+    c="${entry##*|}"
+    echo "FAIL pattern: $n"
+    echo "  stdin pending bytes ($c match(es) — content [REDACTED])"
+  done <<< "$HITS"
+  echo ""
+  echo "============================================================"
+  echo "SECURITY GATE FAIL"
+  echo "   Secret-shaped pattern in pending bytes for: ${PSEUDO_PATH:-<unknown target>}"
+  echo "   Reference: rules/secrets-management.md"
+  exit 1
+fi
 
 echo "============================================================"
 if [ "$INCREMENTAL" = "1" ]; then
