@@ -93,8 +93,8 @@ Promote to a general engine ONLY if a 4th workflow proves the abstraction earns 
 > setup; content stays a separate artifact-driver).
 | 3-oracle | **TRACKED FOLLOW-UP (manager-QA from 3b):** the 2d correctness oracle (`orchestration_metrics.py`) is MONTHLY-specific (reuses `monthly_maintenance.{STEPS,inbox_path,output_path}`). Audit-suite's 3 `model_attested` steps make the silent-skip count ADVISORY → their independent ≤5% backstop is the ORACLE, but it doesn't yet cover `audit`. Generalize the oracle to reconcile any workflow's committed-vs-raw (audit + future 3c/3d) so attested steps are independently verified. NOT a defect — a real coverage gap surfaced by verification, never silently dropped. | ✅ **DONE + GREEN** (`9ee9346`, manager-verified **2127/0** [+9]; READ-ONLY preserved [grep: 0 write primitives]; **R1-R5 reconcile math byte-unchanged**; spine + coverage-schema + both workflow modules UNTOUCHED [step-name resolver, NOT a coverage field — "derive don't store"]; backstop FIRES on an attested fake_green [test-proven]; `_step_output_file` handles schema_audit.json≠schema; new `unresolved_workflow` verdict surfaced+excluded-from-rate; mixed monthly+audit oracle_report; 1 documented test migration [skips→reconciles attested] + 1 accepted non-weakening 2nd-test `steps=` back-compat touch. Known limitation: partial/resumed runs → `unresolved_workflow` [visible, not a backstop gap — a fake_green needs all-steps-satisfied]) | 3b |
 | 3-gov-driftF | **drift-F-rule = F-27** (`csr_mcp`, HIGH): every declared OUTWARD MCP tool ⊆ a 2b gate matcher — FAILs if a skill declares an outward MCP tool the `outward_action_gate` doesn't cover (consent-wall drift). Mirrors F-24 sets-comparison; imports the gate constant (no drift) + reuses 3a `skill_mcp_usage`; curated-outward FAIL-HIGH + outward-verb/read-exclusion AMBER tripwire. (manager SPLIT 3-gov → driftF / secret-bytes / lint#2, distinct subsystems) | ✅ **DONE + GREEN** (`80bc897`, manager-verified **2134/0** [+7 F-27 tests + count cascade]; check_F_27 logic reviewed [engine-governance, gate IMPORTED, zero false-positives PASS-on-real-tree]; 4-way registration sync-green; **worker caught+fixed a REAL regression** [new top-level `from scripts...` imports broke the standalone-loaded `check_excel_writer.py` → RED workbook slipped through → `sys.path` bootstrap fix, gate blocks RED again]; **manager applied the count cascade** [impl 24→25, declared 31→32, HIGH 13→14 across 6 files + drift-check SKILL.md F-27 row/section]) | 3a |
-| 3-gov-secrets | secret-bytes scan: scan the literal pending bytes incl. gitignored targets (enhance `scripts/security/check_secrets.sh`) — sensitive (2 prior regression lessons); careful WARN/FAIL design | pending | — |
-| 3-gov-lint2 | §4 mastery lint #2 (runtime `observed ⊆ declared`) — ⚠️ **needs a correlation design first** (events.jsonl MCP-call rows carry an INTEGER provenance run_id, NOT the STRING workflow_run_id [ADR-020 separate id-spaces] → can't cleanly attribute observed MCP to a workflow run; resolve: A) stamp workflow_run_id on the MCP-call provenance event [recipe/schema] · B) per-project weaker lint) | pending (design) | 3a |
+| 3-gov-secrets | secret-bytes scan: `--scan-stdin` literal-pending-bytes mode for `scripts/security/check_secrets.sh` (gitignore-unaware; gitignored `.env` stays WARN-only) | ✅ **DONE + GREEN** (`089ebfa`, manager-verified **2180/0**; scoped 16/16 + INDEPENDENT re-derivation of all 4 verdicts [FAIL/GREEN/WARN/FAIL] + redaction; default + `--changed-since` byte-unchanged [`--scan-stdin` parsed first]; trap-cleaned mktemp buffer; +5 TDD tests all runtime-constructed [no committed watched token]; structural 2-6 skipped; no D10, no hook) | — |
+| 3-gov-lint2 | §4 mastery lint #2 — **manager REFUTED spec's runtime Option B** (events.jsonl `source.mcp_tool` populated in ~3 of 3000+ events, inconsistently formatted, orchestrator never writes it → runtime `observed⊆declared` is vacuous/false-RED). **Süleyman approved B′ (static):** every workflow `STEPS[].tool` ⊆ owning-skill declared mcp_tools ⊆ registry. Reuses 3a `skill_mcp_usage.declared_tools`; NEW `scripts/validation/workflow_tool_declared.py` + test; glob-discovers workflows (future-proof); GREEN today (8 tool-bearing steps pre-verified). No D10. **Prompt authored + pushed** (`67cb1b6`). | DISPATCHED (B′) | 3a |
 | 3-O4 | promote-to-declarative DECISION GATE (spec O4): define the concrete trigger that flips Path A → declarative engine + auto-graph; default = stay Path A. **⚠️ Signal now STRONG:** 3 workflows (monthly/audit/setup) share the driver pattern — audit+setup already share `_run_one`/`_run_attested_step` via cross-driver IMPORT (3c O4 note). The earned move is a **LIGHT promote**: extract the shared dispatch (`_run_one` + `_run_attested_step` + build_steps/inbox/output/loader + the CLI boilerplate) into a shared `workflow_driver` module that monthly/audit/setup all use — NOT the full declarative engine + auto-graph. **REFINED by 3d (the 4th workflow, content, IS structurally different — an artifact-driver):** the answer is NOT one universal engine but TWO shapes — a shared **data-driver** (monthly/audit/setup; extract `_run_one`/`_run_attested_step`/build_steps/inbox/output/loader/CLI) **+** content's separate **artifact-driver** (shares only `coverage`). So the LIGHT promote = extract the data-driver only; content stays parallel. The full declarative engine + auto-graph stays DEFERRED — Path A vindicated (the divergent shapes prove a single graph would over-abstract). | pending (3d done → ready) | 3b-3d |
 | 4 | Portfolio fan-out + cost/quota ledger + kill-switch + `/pseo-status --portfolio` + recovery runbook; scheduler default OFF | pending | 0-3 |
 
@@ -186,6 +186,25 @@ Promote to a general engine ONLY if a 4th workflow proves the abstraction earns 
 > banner above + the 3-O4 row). **NEXT (Süleyman's call): 3-gov-secrets (secret-bytes) · 3-gov-lint2 (needs
 > correlation design) · 3-O4 light-promote (extract the shared data-driver for monthly/audit/setup).**
 
+> ## 🟢 FAZ-3 REMAINDER STARTED (2026-06-08) — fresh manager took over via FRESH-MANAGER-BOOTSTRAP §9
+> Fresh manager onboarded zero-loss; independently re-verified baseline **2175 pass / 7 skip / 0 fail**
+> (HEAD `05d1a52`, clean, all pushed). **Süleyman locked order (2026-06-08): 3-gov-secrets → 3-gov-lint2
+> (B′) → 3-O4 (before Faz 4) → Faz 4 — "go with your recommendations, best scenario."**
+> **3-gov-secrets ✅ DONE + pushed** (`d0048ba` prompt + `089ebfa` feat, manager-verified **2180/0**): the
+> `--scan-stdin` literal-pending-bytes mode closes the incremental fast-path gitignored-target gap; the
+> gitignored-`.env` WARN carve-out preserved; default/`--changed-since` byte-unchanged; +5 runtime-built
+> TDD fixtures (no committed token). Manager did INDEPENDENT re-derivation of all 4 verdicts + redaction,
+> not just trust the diff. Secrets worker ran in the SHARED working tree (parallel-worktree pattern) →
+> manager committed SCOPE-LOCKED (only the 2 batch files; the lint2 prompt landed separately).
+> **3-gov-lint2 → B′ (manager premise-revision):** verifying the real data BEFORE authoring refuted the
+> spec's runtime Option B — `source.mcp_tool` is in ~3 of 3000+ events, inconsistently formatted, and the
+> orchestrator never writes it (it stamps inbox raw-drops + coverage, not events). So runtime
+> `observed⊆declared` has no data foundation. Presented A / B′ / defer with evidence → Süleyman chose **B′
+> (static `workflow-tool ⊆ skill-declared ⊆ registry`)** — deterministic, self-contained, GREEN today,
+> catches future drift; extends 3a's triangle up to the orchestrator. Prompt authored + pushed (`67cb1b6`),
+> all 8 tool-bearing steps pre-verified green (the `mcp__` 5-char-strip trap noted). **NEXT: verify lint2's
+> report → 3-O4 light-promote → Faz 4.**
+
 ## Decision register
 - **D1** Path A (hard-coded sequences; graph deferred) — Süleyman 2026-06-05.
 - **D2** Binding = session-id marker FILE (not env var); resolution `arg → session-marker(session_id) → active.json`. Reason: env var unsettable in Mac app + `.env` never loaded into hooks (proven `env|grep PSEO` empty).
@@ -237,6 +256,17 @@ Promote to a general engine ONLY if a 4th workflow proves the abstraction earns 
   SKILL.md, GLOSSARY, validate_invariants docstring, the json title). The MANAGER applies this cascade (worker
   scope-locks + surfaces the exact edit set); a worker prompt that adds an F-rule must NOT assume count_consistency
   stays green. Both were manager-author gaps in the F-27 prompt; the worker caught (a) + surfaced (b) cleanly.
+- **D17** Faz-3 lint #2 reframed runtime→static (manager premise-revision + Süleyman, 2026-06-08): the spec's
+  §4 lint #2 (`observed ⊆ declared`, RUNTIME events reconciliation) has NO viable data foundation — verifying
+  the real tree (bootstrap's "verify the API before specifying" rule) showed `events.jsonl source.mcp_tool`
+  is populated in ~3 of 3000+ events, inconsistently formatted (gsc `gsc__tool` vs dfs bare `tool`), and the
+  orchestrator never writes it (it stamps the inbox raw-drop provenance `tool` + the coverage record, NOT an
+  events row). Runtime B → vacuous or false-RED on every project; Option A (stamp it going forward) leans on
+  the model reliably emitting provenance — the very thing AMO de-risks. Süleyman chose **B′ (static):**
+  `workflow STEPS[].tool ⊆ owning-skill declared mcp_tools ⊆ registry` — the honest realization of "the system
+  knows its parts," deterministic, self-contained, GREEN today, drift-catching. Extends 3a's
+  `used⊆declared⊆registry` triangle UP to the orchestrator layer. Runtime reconciliation stays DEFERRED
+  (revisit if Faz-4 live runs make observation-capture worth Option A).
 
 ## Provenance
 - Design hardened by 9-agent adversarial review: workflow run `wf_527271b3-931` (51 findings, conditional GO).
