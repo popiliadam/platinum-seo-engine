@@ -57,6 +57,17 @@ RUNTIME_HOOK_SCRIPTS = {
     # READ-ONLY; fail-closed on the gated path, fail-open on the non-gated path.
     # See scripts/hooks/README.md §1.
     "outward_action_gate.py",
+    # AMO batch-2e PostToolUse AI-disclosure surface rescan — wired into
+    # hooks/post-tool-use.json as the 3rd command (audit_post_tool_use.py +
+    # env_probe.py untouched; matcher "Edit|Write|Bash"). AFTER any Edit/Write/Bash
+    # it re-scans a just-written blog-HTML file's surface via content_validator and,
+    # on a RED AI-disclosure finding, QUARANTINE-renames it off the live .html path
+    # (os.replace → .BLOCKED-ai-disclosure) and emits a {"decision":"block"} stdout
+    # JSON — closing the Bash/heredoc bypass of the PreToolUse Write-gate. REUSES
+    # content_validator + validate_content_write.is_content_html_path (no duplicated
+    # detection); recency-guarded (a read never triggers); non-blocking-on-error.
+    # See scripts/hooks/README.md §1.
+    "ai_disclosure_rescan.py",
     # AMO batch-0a TEMPORARY diagnostic probe — wired (as an appended command
     # entry) into all five lifecycle events. Remove when the AMO session-binding
     # mechanism is confirmed. See scripts/hooks/README.md §3.
