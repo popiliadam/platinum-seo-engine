@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-validate_invariants.py — 24 hand-coded invariant rules for drift-check.
+validate_invariants.py — 25 hand-coded invariant rules for drift-check.
 
 Owned by `skills/governance/drift-check/SKILL.md`. Read-only governance:
 loads `master.xlsx` (data_only=True, read_only=True) plus _state side
-files (events.jsonl, workflows/*.json, backups/) and evaluates the 24
+files (events.jsonl, workflows/*.json, backups/) and evaluates the 25
 invariants enumerated in §17.2 + the F-08 quick-wins URL subset rule.
 
 Single exception to read-only: F-12 records/advances a monotonic high-water
@@ -62,6 +62,7 @@ import functools
 import json
 import os
 import re
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
@@ -69,6 +70,23 @@ from urllib.parse import parse_qsl, quote, unquote, urlencode, urlsplit, urlunsp
 
 from jsonschema import Draft7Validator
 from jsonschema.exceptions import ValidationError as _JSValidationError
+
+# AMO batch 3-gov-driftF (F-27): reuse 3a's declared-tool parser and IMPORT the
+# 2b gate's single gated-MCP constant, so the drift rule can never diverge from
+# the gate it audits — there is no second copy of "what MCP tool is gated".
+# The check_excel_writer hook loads THIS file STANDALONE via
+# spec_from_file_location (repo root NOT on sys.path), so bootstrap the repo
+# root onto sys.path BEFORE these package imports — mirrors
+# outward_action_gate.py's own bootstrap and the hook's file-path loader (the
+# dual-context load pattern; the 0c bare-CLI lesson).
+_BOOTSTRAP_ROOT = str(Path(__file__).resolve().parents[2])
+if _BOOTSTRAP_ROOT not in sys.path:
+    sys.path.insert(0, _BOOTSTRAP_ROOT)
+from scripts.hooks.outward_action_gate import _MCP_SUBMIT_TOOL  # noqa: E402
+from scripts.validation.skill_mcp_usage import (  # noqa: E402
+    declared_tools,
+    split_frontmatter_body,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -459,7 +477,7 @@ def check_F_05(workbook: Any, project_slug: str, **_) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# HIGH (13)
+# HIGH (14)
 # ---------------------------------------------------------------------------
 
 def check_F_08(workbook: Any, project_slug: str, **_) -> dict:
@@ -1672,6 +1690,166 @@ def check_F_26(workbook: Any, project_slug: str, *,
 
 
 # ---------------------------------------------------------------------------
+# F-27 (AMO batch 3-gov-driftF): declared OUTWARD MCP tool ⊆ gate matcher set
+# ---------------------------------------------------------------------------
+
+# The OUTWARD MCP tools the engine KNOWS perform an irreversible/outward
+# submission, in registry-key form (server__tool — what skill_mcp_usage's
+# declared_tools() yields). TODAY exactly one exists: gsc__submit_sitemap, the
+# GSC sitemap-submit the batch-2b gate covers. Adding a NEW outward MCP tool (a
+# future Indexing-API URL_UPDATED submit, a publish tool, …) means adding it
+# BOTH here AND to an outward_action_gate matcher — F-27 FAILs until the gate
+# catches up.
+_OUTWARD_MCP_TOOLS: frozenset[str] = frozenset({"gsc__submit_sitemap"})
+
+# A precise outward-VERB pattern for FUTURE tools the curated set has not caught
+# yet (the AMBER tripwire) — a submit/publish/ping/indexnow/url_updated verb as
+# a whole underscore-delimited segment of the TOOL name.
+_OUTWARD_VERB_RE = re.compile(
+    r"(?:^|_)(?:submit|publish|ping|indexnow|url_updated)(?:_|$)"
+)
+# Read/query verbs that are NEVER outward — an explicit exclusion guaranteeing
+# ZERO false-positives against the real skills (gsc__index_inspect,
+# gsc__list_sitemaps, gsc__get_sitemap, …search/detect/analytics/overview/…).
+_READ_VERB_RE = re.compile(
+    r"(?:^|_)(?:inspect|list|get|search|detect|analytics|overview|suggestions"
+    r"|ideas|keywords|volume|parsing|lighthouse)(?:_|$)"
+)
+
+
+def _strip_mcp_prefix(qualified: str) -> str:
+    """``mcp__gsc__submit_sitemap`` → ``gsc__submit_sitemap`` (registry-key form)
+    so the gate's qualified constant compares against declared_tools() keys."""
+    prefix = "mcp__"
+    return qualified[len(prefix):] if qualified.startswith(prefix) else qualified
+
+
+def _looks_outward(registry_tool: str) -> bool:
+    """True iff a registry-key tool's NAME looks like an outward submission and
+    is not a read/query tool — the tripwire for an UNCLASSIFIED outward tool."""
+    name = registry_tool.split("__", 1)[-1]
+    if _READ_VERB_RE.search(name):
+        return False
+    return bool(_OUTWARD_VERB_RE.search(name))
+
+
+def _scan_declared_outward(
+    skills_root: Path,
+) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
+    """Walk ``skills_root/**/SKILL.md``; partition each skill's DECLARED MCP
+    tools (3a parser) into curated-outward (∈ _OUTWARD_MCP_TOOLS) and
+    unclassified outward-looking, each mapped to the skill paths declaring it.
+    Pure read — never mutates a skill or any input."""
+    curated: dict[str, list[str]] = {}
+    unclassified: dict[str, list[str]] = {}
+    for skill in sorted(skills_root.glob("**/SKILL.md")):
+        try:
+            frontmatter, _ = split_frontmatter_body(
+                skill.read_text(encoding="utf-8")
+            )
+        except OSError:
+            continue
+        rel = skill.relative_to(skills_root).as_posix()
+        for tool in declared_tools(frontmatter):
+            if tool in _OUTWARD_MCP_TOOLS:
+                curated.setdefault(tool, []).append(rel)
+            elif _looks_outward(tool):
+                unclassified.setdefault(tool, []).append(rel)
+    return curated, unclassified
+
+
+def check_F_27(workbook: Any, project_slug: str, *,
+               workspace_root: Path | None = None,
+               skills_root: Path | None = None, **_) -> dict:
+    """Every OUTWARD MCP tool a skill DECLARES ⊆ the outward_action_gate's
+    gated-MCP set (AMO batch 3-gov-driftF; spec §7-2b). The batch-2b gate DENIES
+    an outward MCP submission without per-session consent, but its only gated
+    MCP tool is ``mcp__gsc__submit_sitemap``. If a skill later declares a NEW
+    outward MCP tool (a future Indexing URL_UPDATED submit, a publish tool)
+    WITHOUT a matching gate matcher, that action ships UNGATED — a silent hole
+    in the consent wall (Süleyman's Indexing hard-constraint). Engine-level
+    invariant — IGNORES workbook + workspace_root; reads the skills tree + the
+    IMPORTED gate constant only (no drift; F-16 safe).
+
+    Detection logic (mirrors F-24's sets-comparison shape):
+      1. skills/ missing → SKIP (engine state ambiguous → AMBER).
+      2. gate_matchers = { _MCP_SUBMIT_TOOL stripped to registry-key form }.
+      3. Scan declared MCP tools across skills/**/SKILL.md (3a parser).
+      4. A declared CURATED-outward tool the gate does NOT cover — or a curated
+         outward tool the gate forgot entirely (_OUTWARD_MCP_TOOLS ⊄
+         gate_matchers) → FAIL HIGH (RED): a hole in the consent wall.
+      5. A declared tool that merely LOOKS outward but is unclassified → FAIL
+         MEDIUM (→ AMBER per §17.2): classify it before it ships ungated.
+      6. Else → PASS.
+    """
+    rule = (
+        "every OUTWARD MCP tool a skill declares in mcp_tools "
+        "(required|optional) MUST be covered by an outward_action_gate matcher "
+        "(the gate's gated-MCP set); an ungated declared outward MCP tool is a "
+        "hole in the consent wall"
+    )
+    root = skills_root if skills_root is not None else _REPO_ROOT / "skills"
+    if not root.is_dir():
+        return _make_result(
+            id_="F-27", severity="HIGH", verdict="SKIP",
+            evidence=(
+                f"skills/ missing at {root} — engine state ambiguous, "
+                "surfaces AMBER"
+            ),
+            rule=rule, category="csr_mcp",
+        )
+    gate_matchers = {_strip_mcp_prefix(_MCP_SUBMIT_TOOL)}
+    curated, unclassified = _scan_declared_outward(root)
+    # FAIL (RED): an outward tool the gate does NOT cover — a declared curated
+    # tool that is ungated, OR a curated outward tool the gate forgot wholesale.
+    ungated = sorted(
+        {t for t in curated if t not in gate_matchers}
+        | (set(_OUTWARD_MCP_TOOLS) - gate_matchers)
+    )
+    if ungated:
+        violations = [
+            f"{t}: declared by "
+            f"{curated.get(t, ['(gate hole — no skill declares it)'])}, not gated"
+            for t in ungated
+        ]
+        return _make_result(
+            id_="F-27", severity="HIGH", verdict="FAIL",
+            evidence=(
+                "ungated OUTWARD MCP tool(s) — a hole in the consent wall: "
+                f"{ungated} not in gate matchers {sorted(gate_matchers)}"
+            ),
+            rule=rule, category="csr_mcp",
+            sample_violations=violations, affected_rows=len(violations),
+        )
+    # AMBER (MEDIUM → AMBER per §17.2): an outward-LOOKING tool nobody classified.
+    if unclassified:
+        flagged = sorted(unclassified)
+        violations = [
+            f"{t}: declared by {unclassified[t]}, outward-looking but unclassified"
+            for t in flagged
+        ]
+        return _make_result(
+            id_="F-27", severity="MEDIUM", verdict="FAIL",
+            evidence=(
+                "review: declared MCP tool(s) look OUTWARD but are unclassified "
+                "— if outward, add to _OUTWARD_MCP_TOOLS + an outward_action_gate "
+                f"matcher: {flagged}"
+            ),
+            rule=rule, category="csr_mcp",
+            sample_violations=violations, affected_rows=len(violations),
+        )
+    return _make_result(
+        id_="F-27", severity="HIGH", verdict="PASS",
+        evidence=(
+            "all declared outward MCP tools are gated: declared_outward="
+            f"{sorted(curated)}, gate_matchers={sorted(gate_matchers)}; "
+            "no unclassified outward-looking tool"
+        ),
+        rule=rule, category="csr_mcp",
+    )
+
+
+# ---------------------------------------------------------------------------
 # Rule registry
 # ---------------------------------------------------------------------------
 
@@ -1684,6 +1862,7 @@ _RULE_FUNCTIONS = (
     check_F_23,  # v1.8 Phase 4 SF MCP cross-sheet
     check_F_24,  # v1.9 Phase 2 .mcp.json↔registry key sync
     check_F_25,  # v1.9 Phase 3 sf.mcp.enabled ⇒ schema_version >= 1.5
+    check_F_27,  # AMO 3-gov-driftF declared OUTWARD MCP tool ⊆ gate matchers
     # MEDIUM
     check_F_18, check_F_19, check_F_20, check_F_21, check_F_22,
     check_F_26,  # v1.9 Phase 4 orphan SF crawl detection (MCP-aware AMBER)
@@ -1716,7 +1895,7 @@ def aggregate_verdicts(rule_results: list[dict]) -> dict:
 
     Raises UnknownRuleError if a result.id is outside the registered set
     — that would mean the caller injected a synthetic rule outside the
-    24-rule contract.
+    25-rule contract.
     """
     pass_count = warn_count = fail_count = 0
     overall = "GREEN"
@@ -1730,7 +1909,7 @@ def aggregate_verdicts(rule_results: list[dict]) -> dict:
         rid = r.get("id")
         if rid not in _VALID_RULE_IDS:
             raise UnknownRuleError(
-                f"unknown rule id {rid!r} — outside 24-rule registry"
+                f"unknown rule id {rid!r} — outside 25-rule registry"
             )
         verdict = r.get("verdict")
         severity = r.get("severity", "MEDIUM")
@@ -1911,4 +2090,5 @@ __all__: Iterable[str] = (
     "check_F_24",
     "check_F_25",
     "check_F_26",
+    "check_F_27",
 )

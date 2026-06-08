@@ -153,7 +153,7 @@ Worker schema-first override paterni: schema'da olmayan kind kullanmak YASAK. Ye
 
 | Skill | audit_action | audit_target | Status / Notes |
 |---|---|---|---|
-| drift-check | accessed | `invariants:24` | ✅ Active — Phase 5 audit kind doğum belgesi |
+| drift-check | accessed | `invariants:25` | ✅ Active — Phase 5 audit kind doğum belgesi |
 | schema-validate | accessed | `schemas:bulk-validate` | ✅ Active — Phase 13 governance read-only |
 | glossary-audit | accessed | `glossary:terms` | ✅ Active — Term drift audit |
 | load-context | accessed | `session:wakeup-codify` | ✅ Active — Hook-driven session start |

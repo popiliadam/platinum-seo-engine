@@ -164,7 +164,7 @@ wb = None
 loads cached values, not formula bodies. Write attempts on a read-only
 workbook raise immediately.
 
-### Step 3 — `evaluate_invariants` (24 rules)
+### Step 3 — `evaluate_invariants` (25 rules)
 
 ```python
 from scripts.validation import validate_invariants
@@ -173,12 +173,12 @@ from scripts.validation import validate_invariants
 # (Documented invocation; helper exec leaves results bound from Step 1 init.)
 ```
 
-The 24 rules are partitioned:
+The 25 rules are partitioned:
 
 | Tier      | Count | Verdict on FAIL  |
 |-----------|-------|------------------|
 | CRITICAL  | 5     | RED              |
-| HIGH      | 13    | RED (F-15 AMBER) |
+| HIGH      | 14    | RED (F-15 AMBER) |
 | MEDIUM    | 6     | AMBER            |
 
 ### Step 4 — `aggregate_verdict`
@@ -268,7 +268,7 @@ complete_outputs = {
 (workflow-run.schema.json `outputs.additionalProperties.type` is
 `"string"`). `fail_count` is `str(agg["fail_count"])`, NOT a raw int.
 
-## 24 Invariant Rules
+## 25 Invariant Rules
 
 Source of truth: `scripts/validation/validate_invariants.py`. Each
 rule function signature:
@@ -297,7 +297,7 @@ def check_F_XX(workbook, project_slug) -> dict:
 | F-04  | dashboard formula `=AVERAGEIF(...)` drift check                       |
 | F-05  | schema_version field per-sheet present (every schema-known sheet has a header row matching schema column count; header row resolved via schema authority `sheets[sheet].header_row` with row-1 fallback — Phase 14 W3-W2-C-a) |
 
-### HIGH (13)
+### HIGH (14)
 
 | ID    | Rule                                                                  |
 |-------|-----------------------------------------------------------------------|
@@ -314,6 +314,7 @@ def check_F_XX(workbook, project_slug) -> dict:
 | F-23  | sf-crawl-orchestrator workflow → repo-root mcp-tool-registry.json has 'sf' (v1.8 Phase 4 SF MCP cross-sheet) |
 | F-24  | .mcp.json mcpServers keys == mcp-tool-registry.json servers keys (ScraplingServer↔scrapling case-fold; v1.9 Phase 2 engine transport↔inventory sync) |
 | F-25  | sf.mcp.enabled=true ⇒ project.config.schema_version >= '1.5' (Migration 0005 prerequisite; v1.9 Phase 3 schema-version coupling) |
+| F-27  | every declared OUTWARD MCP tool ⊆ outward_action_gate matcher (skill-declared submit/publish tool must be gated; AMO Faz-3 §7-2b consent-wall drift) |
 
 ### MEDIUM (6)
 
@@ -476,6 +477,41 @@ Category `csr_mcp` (mirrors F-23/F-24/F-25): the `consistency-report.schema.json
 8-category enum has no SF-specific bucket, and spec FE-3's `mcp_runtime` is
 narrative only (not in the closed enum), so `check_F_26` emits `csr_mcp` — see
 Q-V1.9-PHASE-2-WORKER-01 (the same trap that bit F-24).
+
+## F-27 — declared OUTWARD MCP tool ⊆ outward-action gate (AMO Faz-3, consent-wall drift)
+
+The batch-2b `outward_action_gate` DENIES an outward MCP submission without
+per-session consent, but its only gated MCP tool is `mcp__gsc__submit_sitemap`. If a
+skill later **declares** a NEW outward MCP tool (a future Indexing `URL_UPDATED`
+submit, a publish tool) WITHOUT a matching gate matcher, that action would ship
+**ungated** — a silent hole in the consent wall (Süleyman's Indexing hard-constraint).
+F-27 catches that drift in CI.
+
+Detection logic — `check_F_27()` (engine-self-governance, category `csr_mcp`; IGNORES
+the workbook + workspace_root; reads the skills tree + the IMPORTED gate constant only
+— F-16 safe; mirrors F-24's sets-comparison shape):
+1. `skills/` missing → **SKIP** (engine state ambiguous → AMBER).
+2. `gate_matchers = { outward_action_gate._MCP_SUBMIT_TOOL → registry-key form }` =
+   `{gsc__submit_sitemap}` — IMPORTED from the gate so the rule can never drift from
+   what is actually gated.
+3. Scan every `skills/**/SKILL.md` `mcp_tools` (required|optional) via batch-3a's
+   `skill_mcp_usage.declared_tools`.
+4. A declared CURATED-outward tool (`_OUTWARD_MCP_TOOLS`, today `{gsc__submit_sitemap}`)
+   the gate does NOT cover — or a curated outward tool the gate forgot entirely →
+   **FAIL HIGH (RED)**: a hole in the consent wall, with the (tool, skill) pair(s) in
+   `sample_violations`.
+5. A declared tool whose NAME looks outward (`submit|publish|ping|indexnow|url_updated`,
+   excluding read verbs `inspect|list|get|search|detect|…`) but is unclassified →
+   **FAIL MEDIUM (→ AMBER)**: classify it (add to `_OUTWARD_MCP_TOOLS` + a gate matcher)
+   before it ships ungated.
+6. Else → **PASS** (today: the only outward MCP tool `gsc__submit_sitemap` is declared
+   AND gated; every other declared tool is a read/query verb).
+
+Adding a NEW outward MCP tool means updating BOTH `_OUTWARD_MCP_TOOLS` AND a gate
+matcher — F-27 enforces they stay in sync. (Standalone-load note: importing the gate +
+the 3a parser at module top required a `sys.path` repo-root bootstrap so the bare git-hook
+`check_excel_writer.py`, which loads `validate_invariants.py` via `spec_from_file_location`,
+keeps working.)
 
 ## F2 flag — F-08 RED is EXPECTED on the pilot workbook
 

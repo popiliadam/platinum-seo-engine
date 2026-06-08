@@ -125,7 +125,7 @@ Therefore the worker writes:
   (envelope required across all kinds).
 
 This mirrors the Phase 5 `governance/drift-check` pattern
-(`audit_action="accessed"`, `audit_target="invariants:24"`,
+(`audit_action="accessed"`, `audit_target="invariants:25"`,
 `actor="drift-check"`) — drift-check's audit-only convention is the
 authority this skill reuses. Diverges from W-G1 (indexing-ping)
 which used `event_kind=work + event_type=manual + indexing_ping
@@ -534,7 +534,7 @@ constant lives inline alongside the orchestration blocks.)
   reporting skill no-write paterni — strict read-only aggregator).
 - Reference governance skill: `skills/governance/drift-check/SKILL.md`
   (Phase 5 audit event_kind paterni: `audit_action=accessed +
-  audit_target=invariants:24 + actor=drift-check`).
+  audit_target=invariants:25 + actor=drift-check`).
 - Template: `templates/reports/monitoring-weekly.template.md`
   (DURUR #4 fallback to inline string if absent).
 - Tests: `tests/skills/test_monitoring_weekly.py`.

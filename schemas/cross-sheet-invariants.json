@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://platinum-seo-engine/schemas/cross-sheet-invariants.json",
   "additionalProperties": false,
-  "title": "Cross-Sheet Invariants — 31 CSR Registry v1.0",
-  "description": "Populated INSTANCE document (not a meta-schema) carrying the 31 Cross-Sheet Rules per §9.1. Top-level `rules` array is the source of truth consumed by the consistency_check tool. Per S3.5 pivot: instance documents live at `NAME.json`; if a paired meta-schema is ever needed it would go to `NAME.schema.json`. Verdict aggregation (§9.2/§17.2): any RED → RED; else any AMBER/WARN → AMBER; all PASS → GREEN. Severity-to-verdict: CRITICAL/HIGH → RED on FAIL, MEDIUM/LOW → AMBER on FAIL. P0-01 (codex audit Phase 1): the `rule` text + `severity` of every IMPLEMENTED F-ID is bound to scripts/validation/validate_invariants.py (the runtime source of truth) and locked by tests/schemas/test_cross_sheet_invariants_sync.py. Original §17.2 design meanings that the row-level validator does not yet enforce are preserved (not deleted) under the top-level `deferred_design_rules` array.",
+  "title": "Cross-Sheet Invariants — 32 CSR Registry v1.0",
+  "description": "Populated INSTANCE document (not a meta-schema) carrying the 32 Cross-Sheet Rules per §9.1. Top-level `rules` array is the source of truth consumed by the consistency_check tool. Per S3.5 pivot: instance documents live at `NAME.json`; if a paired meta-schema is ever needed it would go to `NAME.schema.json`. Verdict aggregation (§9.2/§17.2): any RED → RED; else any AMBER/WARN → AMBER; all PASS → GREEN. Severity-to-verdict: CRITICAL/HIGH → RED on FAIL, MEDIUM/LOW → AMBER on FAIL. P0-01 (codex audit Phase 1): the `rule` text + `severity` of every IMPLEMENTED F-ID is bound to scripts/validation/validate_invariants.py (the runtime source of truth) and locked by tests/schemas/test_cross_sheet_invariants_sync.py. Original §17.2 design meanings that the row-level validator does not yet enforce are preserved (not deleted) under the top-level `deferred_design_rules` array.",
   "schema_version": "1.0",
   "verdict_aggregation": "any RED → RED; else any AMBER/WARN → AMBER; all PASS → GREEN",
   "severity_to_verdict_map": {
@@ -259,6 +259,14 @@
       "severity": "MEDIUM",
       "category": "csr_mcp",
       "rationale": "v1.9 Phase 4 D-V1.9-11 — operator-level cleanup hint NOT blocking (AMBER not RED per spec v2.2 line 210). Optional MCP-aware check runs only when sf MCP responding within 1s health probe. SKIP if MCP unreachable (avoid blocking drift-check on MCP downtime). FIRST MEDIUM-severity v1.9 invariant (F-24/F-25 are HIGH). Category csr_mcp (mirrors F-23/F-24/F-25): the consistency-report.schema.json 8-category enum has no SF-specific bucket and spec FE-3's 'mcp_runtime' is narrative only (not in the closed enum), so check_F_26 emits csr_mcp.",
+      "computed_by": "validate_invariants"
+    },
+    {
+      "id": "F-27",
+      "rule": "every OUTWARD MCP tool a skill declares in mcp_tools (required|optional) MUST be covered by an outward_action_gate matcher (the gate's gated-MCP set); an ungated declared outward MCP tool is a hole in the consent wall",
+      "severity": "HIGH",
+      "category": "csr_mcp",
+      "rationale": "AMO batch 3-gov-driftF (spec §7-2b) — the batch-2b outward_action_gate DENIES an outward MCP submission without per-session consent, but its only gated MCP tool is mcp__gsc__submit_sitemap (the _MCP_SUBMIT_TOOL constant). If a skill later declares a NEW outward MCP tool (a future Indexing-API URL_UPDATED submit, a publish tool, …) WITHOUT a matching gate matcher, that outward action ships UNGATED — a silent hole in the consent wall (Süleyman's Indexing hard-constraint). Engine-self-governance rule mirroring F-24's sets-comparison shape: it IMPORTS the gate constant (no drift) and reuses batch 3a's declared_tools parser to enumerate every skill's declared MCP tools, then asserts declared-outward ⊆ gate matchers. A declared CURATED-outward tool the gate forgot → FAIL HIGH (RED); a declared tool that merely looks outward but is unclassified (the _OUTWARD_VERB_RE tripwire, read-verb excluded for zero false-positives) → FAIL MEDIUM (AMBER per §17.2). Category csr_mcp (mirrors F-23/F-24/F-25/F-26): the engine-governance MCP bucket.",
       "computed_by": "validate_invariants"
     }
   ],

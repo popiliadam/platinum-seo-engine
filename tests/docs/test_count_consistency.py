@@ -103,7 +103,7 @@ def _implemented_count() -> int:
 
 def test_declared_invariant_count_is_31_and_cited() -> None:
     declared = _declared_count()
-    assert declared == 31
+    assert declared == 32
     schema = json.loads(_read("schemas/cross-sheet-invariants.json"))
     assert f"{declared} CSR Registry" in schema["title"]
     assert f"{declared} Cross-Sheet Rules" in schema["description"]
@@ -111,7 +111,7 @@ def test_declared_invariant_count_is_31_and_cited() -> None:
 
 def test_implemented_invariant_count_is_24_and_cited() -> None:
     implemented = _implemented_count()
-    assert implemented == 24
+    assert implemented == 25
     src = _read("scripts/validation/validate_invariants.py")
     assert f"{implemented} hand-coded invariant rules" in src
     assert f"evaluates the {implemented}" in src
@@ -126,7 +126,7 @@ def test_invariant_tier_counts_sum_to_implemented() -> None:
     src = _read("scripts/validation/validate_invariants.py")
     tiers = {m.group(1): int(m.group(2))
              for m in re.finditer(r"# (CRITICAL|HIGH|MEDIUM) \((\d+)\)", src)}
-    assert tiers == {"CRITICAL": 5, "HIGH": 13, "MEDIUM": 6}
+    assert tiers == {"CRITICAL": 5, "HIGH": 14, "MEDIUM": 6}
     assert sum(tiers.values()) == _implemented_count()
 
 
@@ -137,7 +137,7 @@ def test_drift_check_skill_narrative_counts() -> None:
     assert f"The {implemented} rules are partitioned" in doc
     assert f"## {implemented} Invariant Rules" in doc
     # Tier table mirrors validate_invariants section comments.
-    assert "| HIGH      | 13    |" in doc
+    assert "| HIGH      | 14    |" in doc
     assert "| MEDIUM    | 6     |" in doc
     # Stale narrative gone.
     assert "(20 rules)" not in doc
