@@ -79,7 +79,9 @@ Promote to a general engine ONLY if a 4th workflow proves the abstraction earns 
 | 3b | **Replicate `audit-suite`** (Süleyman's pick 2026-06-08 — FIRST replicate, serial): NEW `scripts/orchestration/workflows/audit_suite.py` (4 steps tech_audit→schema_audit→on_page_audit→cannibalization) reusing the FROZEN 1b spine; **explicit per-step `output_file`** (1d.1 fix: schema_audit CLI writes `schema_audit.json` but sheet is `schema`); relocate 4 skills' SKILL.md `transaction.append`→`committer.commit` (1b2, snapshot→replace, writer preserved); extend `/pseo-run` with the `audit` branch (monthly byte-unchanged); the MODEL makes MCP calls + drops provenance, code gates (Phase-1 seam) | ✅ **DONE + GREEN** (`64fdb7d`, manager-verified **2118/0** [+20: driver e2e + 1d.1 CLI integration]; spine UNTOUCHED [git-confirmed]; **D15 attested-path** for the 3 aggregating steps preserves identity+content+freshness [proven by test_wrong_run_id/stale/truncated_is_failed] + advisory silent-skip; completion-guard pass→incomplete unless all-4-satisfied; monthly recipe byte-unchanged; scope-locked 8 files; no D10) | 3a |
 | 3c/3d | Replicate `new-project-setup` + `content-pipeline` (order TBD; content-pipeline is model_attested/content-quality → hardest, likely last) | pending | 3a |
 | 3-oracle | **TRACKED FOLLOW-UP (manager-QA from 3b):** the 2d correctness oracle (`orchestration_metrics.py`) is MONTHLY-specific (reuses `monthly_maintenance.{STEPS,inbox_path,output_path}`). Audit-suite's 3 `model_attested` steps make the silent-skip count ADVISORY → their independent ≤5% backstop is the ORACLE, but it doesn't yet cover `audit`. Generalize the oracle to reconcile any workflow's committed-vs-raw (audit + future 3c/3d) so attested steps are independently verified. NOT a defect — a real coverage gap surfaced by verification, never silently dropped. | ✅ **DONE + GREEN** (`9ee9346`, manager-verified **2127/0** [+9]; READ-ONLY preserved [grep: 0 write primitives]; **R1-R5 reconcile math byte-unchanged**; spine + coverage-schema + both workflow modules UNTOUCHED [step-name resolver, NOT a coverage field — "derive don't store"]; backstop FIRES on an attested fake_green [test-proven]; `_step_output_file` handles schema_audit.json≠schema; new `unresolved_workflow` verdict surfaced+excluded-from-rate; mixed monthly+audit oracle_report; 1 documented test migration [skips→reconciles attested] + 1 accepted non-weakening 2nd-test `steps=` back-compat touch. Known limitation: partial/resumed runs → `unresolved_workflow` [visible, not a backstop gap — a fake_green needs all-steps-satisfied]) | 3b |
-| 3-gov | **Carried governance batch:** §4 mastery lint #2 (runtime `observed ⊆ declared` — events.jsonl `source.mcp_tool` ⊇ workflow declared-required step tools) + drift-F-rule (every declared OUTWARD MCP tool ⊆ a 2b gate matcher; `csr_mcp` category) + secret-bytes scan (scan literal pending bytes incl. gitignored, enhance `check_secrets.sh`) | pending | 3a |
+| 3-gov-driftF | **drift-F-rule = F-27** (`csr_mcp`, HIGH): every declared OUTWARD MCP tool ⊆ a 2b gate matcher — FAILs if a skill declares an outward MCP tool the `outward_action_gate` doesn't cover (consent-wall drift). Mirrors F-24 sets-comparison; imports the gate constant (no drift) + reuses 3a `skill_mcp_usage`; curated-outward FAIL-HIGH + outward-verb/read-exclusion AMBER tripwire. (manager SPLIT 3-gov → driftF / secret-bytes / lint#2, distinct subsystems) | ✅ **DONE + GREEN** (`80bc897`, manager-verified **2134/0** [+7 F-27 tests + count cascade]; check_F_27 logic reviewed [engine-governance, gate IMPORTED, zero false-positives PASS-on-real-tree]; 4-way registration sync-green; **worker caught+fixed a REAL regression** [new top-level `from scripts...` imports broke the standalone-loaded `check_excel_writer.py` → RED workbook slipped through → `sys.path` bootstrap fix, gate blocks RED again]; **manager applied the count cascade** [impl 24→25, declared 31→32, HIGH 13→14 across 6 files + drift-check SKILL.md F-27 row/section]) | 3a |
+| 3-gov-secrets | secret-bytes scan: scan the literal pending bytes incl. gitignored targets (enhance `scripts/security/check_secrets.sh`) — sensitive (2 prior regression lessons); careful WARN/FAIL design | pending | — |
+| 3-gov-lint2 | §4 mastery lint #2 (runtime `observed ⊆ declared`) — ⚠️ **needs a correlation design first** (events.jsonl MCP-call rows carry an INTEGER provenance run_id, NOT the STRING workflow_run_id [ADR-020 separate id-spaces] → can't cleanly attribute observed MCP to a workflow run; resolve: A) stamp workflow_run_id on the MCP-call provenance event [recipe/schema] · B) per-project weaker lint) | pending (design) | 3a |
 | 3-O4 | promote-to-declarative DECISION GATE (spec O4): define the concrete trigger (≥2 workflows sharing ≥N edges, or operator-authored workflows) that flips Path A → declarative engine + auto-graph; default = stay Path A | pending | 3b-3d |
 | 4 | Portfolio fan-out + cost/quota ledger + kill-switch + `/pseo-status --portfolio` + recovery runbook; scheduler default OFF | pending | 0-3 |
 
@@ -146,8 +148,13 @@ Promote to a general engine ONLY if a 4th workflow proves the abstraction earns 
 > and reconciles attested sheet-writers (dropped the code_verified-only filter) so audit's 3 attested steps now
 > have their independent ≤5% backstop (a fake_green on an attested step is now CAUGHT — test-proven). R1-R5 math
 > byte-unchanged; READ-ONLY preserved; new `unresolved_workflow` verdict (visible, excluded from the rate).
-> **NEXT (Süleyman's call): 3c/3d (new-project-setup + content-pipeline replicate, D15 attested-path reuse) ·
-> 3-gov (lint #2 observed⊆declared + drift-F-rule + secret-bytes).**
+> **3-gov-driftF ✅ DONE + pushed** (`9c40e2e` docs + `80bc897` feat, manager-verified **2134/0**): F-27
+> drift rule (declared outward MCP tool ⊆ 2b gate) shipped — engine-governance, gate-imported (no drift),
+> zero false-positives. **D16: two manager-author lessons** (below). Manager applied the invariant-count
+> cascade (24→25/31→32/HIGH13→14). **Manager SPLIT 3-gov → driftF (✅) / secret-bytes / lint#2** (3 distinct
+> subsystems; lint#2 needs a correlation design — events MCP rows lack the workflow_run_id). **NEXT (Süleyman's
+> call): 3-gov-secrets (secret-bytes scan) · 3-gov-lint2 (needs correlation design) · 3c/3d (new-project-setup +
+> content-pipeline replicate, D15 reuse).**
 
 ## Decision register
 - **D1** Path A (hard-coded sequences; graph deferred) — Süleyman 2026-06-05.
@@ -186,6 +193,20 @@ Promote to a general engine ONLY if a 4th workflow proves the abstraction earns 
   steps satisfied, since `derive_verdict` treats attested as soft). This is the honest ≤5%-scope split
   (spec §11) applied to analysis: structured ingestion = code-verified; analysis-reshaping = attested + the
   oracle is its independent backstop (→ 3-oracle follow-up). 3c/3d will reuse this dispatch.
+- **D16** Two manager-author traps from 3-gov-driftF (F-27) — pre-warn future F-rule / validate_invariants batches:
+  (a) **Standalone-load import trap:** `scripts/validation/validate_invariants.py` is loaded STANDALONE by the
+  hook `scripts/hooks/check_excel_writer.py` via `spec_from_file_location` (repo root NOT on `sys.path`; before
+  F-27 the file had ZERO top-level `from scripts...` imports — F-26's `SfMcpClient` is a LAZY in-function import).
+  Adding a top-level `from scripts...` import raises `ModuleNotFoundError` during the hook's standalone load → the
+  hook fails OPEN → a RED workbook slips through (the excel-writer invariant gate silently disabled). FIX = a
+  `sys.path` repo-root bootstrap BEFORE the package imports (mirror `outward_action_gate.py`). Any batch adding a
+  top-level scripts-import to a standalone-loaded module must do this. (b) **Invariant-count cascade (a 2nd
+  immune system, parallel to D10):** adding an F-rule bumps implemented (`len(_RULE_FUNCTIONS)`), declared
+  (`len(cross-sheet-invariants.rules)`), and tier counts — `tests/docs/test_count_consistency.py` pins all three
+  + cites them across ~8 files (drift-check SKILL.md narrative/tier/rule-table + a `## F-NN` section, sibling
+  SKILL.md, GLOSSARY, validate_invariants docstring, the json title). The MANAGER applies this cascade (worker
+  scope-locks + surfaces the exact edit set); a worker prompt that adds an F-rule must NOT assume count_consistency
+  stays green. Both were manager-author gaps in the F-27 prompt; the worker caught (a) + surfaced (b) cleanly.
 
 ## Provenance
 - Design hardened by 9-agent adversarial review: workflow run `wf_527271b3-931` (51 findings, conditional GO).
