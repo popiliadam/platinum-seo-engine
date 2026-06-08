@@ -201,16 +201,20 @@ workflow_runner.approve(handle.run_id, project_slug=project_slug,
 
 ### Step 6 — `write_excel` (atomic, schema-validated)
 
-Single `transaction.append` call for the cannibalization sheet. Goes
-through the single approved write path with backup, lock, schema
-validation, and post-write provenance event emission.
+Single `committer.commit` call for the cannibalization sheet — the
+orchestrator's idempotent commit path (whole-block `transaction.replace`
+from the schema's `data_start_row`, so re-running never duplicates rows on
+the `cannibalization` snapshot sheet). Goes through the single approved write
+path with backup, lock, schema validation, and post-write provenance event
+emission.
 
 ```python
-from scripts.excel import transaction
-transaction.append(
-    workbook_path=workspace_root/"projects"/project_slug/"master.xlsx",
-    sheet="cannibalization",
-    rows=cannibalization_rows,
+from scripts.orchestration import committer
+committer.commit(
+    workspace_root/"projects"/project_slug/"master.xlsx",
+    "cannibalization",
+    cannibalization_rows,
+    run_id=handle.run_id,
     project_slug=project_slug,
     writer="cannibalization",
 )
