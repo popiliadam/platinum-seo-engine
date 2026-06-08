@@ -414,6 +414,13 @@
           "category": "platform_detection",
           "used_by_mappings": ["internal"],
           "cache_ttl_hours": 24
+        },
+        {
+          "tool_name": "sf__sf_load_crawl",
+          "description": "Load a previously-identified completed SF crawl by crawl_id (instanceDirName) into the SF GUI so element/report exports operate on it. Native SfMcpClient.load_crawl wrapper; used by the D-SF-11 opt-in live-crawl path in schema-audit / on-page-audit / tech-audit / internal-links.",
+          "category": "platform_detection",
+          "used_by_mappings": ["internal"],
+          "cache_ttl_hours": 0
         }
       ]
     }

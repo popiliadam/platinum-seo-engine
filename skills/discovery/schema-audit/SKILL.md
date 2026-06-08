@@ -74,6 +74,9 @@ mcp_tools:
   required: []
   optional:
     - "mcp__dataforseo__on_page_content_parsing"
+    - "mcp__sf__sf_list_crawls"
+    - "mcp__sf__sf_load_crawl"
+    - "mcp__sf__sf_export_seo_element_urls"
 budget:
   uses_paid_mcp: false
   estimated_credits: 0
