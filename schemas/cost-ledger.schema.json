@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "http://platinum-seo-engine/schemas/cost-ledger",
+  "title": "Cost Ledger Entry v1.0",
+  "description": "Shape of ONE line of the GLOBAL (portfolio-wide) shared/cost_ledger.jsonl — the append-only, hash-chained reserve/confirm/release cost & quota ledger Faz-4 uses so 3-5 parallel project runs never blow a real budget (GSC daily call quota, DataForSEO credit pool, image-generation spend). The recorder (scripts/state/cost_ledger.py, AMO batch 4a) RESERVEs an estimate before costly work (refused with CostCeilingExceeded if it would exceed the operator ceiling), then CONFIRMs the actual (<= reserved) or RELEASEs (actual 0) after. USAGE(resource, period) = sum over reservation_ids of each reservation's EFFECTIVE amount (confirmed -> the actual; released -> 0; still-open -> the reserved amount), computed by replaying the INTACT chain. Hash-chained like consent.schema.json: entry_hash = sha256(canonical_json(this entry WITHOUT entry_hash)); prev_hash = the prior line's entry_hash (or 64 zeros for the genesis line) — a forged, rewritten, or reordered entry breaks the chain and verify_chain rejects it, so usage() fails CLOSED over tampered data. This is an append-only LOG (events.jsonl discipline; rules/append-only-state.md), NEVER an os.replace marker. The reservation_id is derived deterministically from the under-lock seq (e.g. 'r' + seq), so no clock/RNG is needed.",
+  "type": "object",
+  "required": ["schema_version", "seq", "op", "resource", "period", "amount", "reservation_id", "run_id", "project_id", "recorded_at", "prev_hash", "entry_hash"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "description": "ADR-018/019 const discipline; lets a future migration discriminate older entries."
+    },
+    "seq": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "0-based monotonic index of this entry within the file. seq 0 is the genesis line (prev_hash = 64 zeros). verify_chain asserts seq increments by exactly 1. The reservation_id of a reserve is derived from this seq."
+    },
+    "op": {
+      "type": "string",
+      "enum": ["reserve", "confirm", "release"],
+      "description": "reserve = hold an estimate against the ceiling (mints reservation_id 'r'+seq); confirm = record the ACTUAL spend (amount <= the reservation's reserved amount) for an open reservation; release = free an open reservation (amount 0). A reservation has at most one reserve then optionally one confirm OR one release (no double-free)."
+    },
+    "resource": {
+      "type": "string",
+      "enum": ["gsc_calls", "dfs_credits", "image_spend"],
+      "description": "The portfolio cost pool this entry charges. gsc_calls=Google Search Console daily call quota; dfs_credits=DataForSEO credit pool; image_spend=image-generation spend. confirm/release carry the SAME resource as the reservation they target so replay needs no back-reference lookup."
+    },
+    "period": {
+      "type": "string",
+      "minLength": 1,
+      "description": "OPAQUE partition key passed in by the caller (clock-free): a daily pool passes the UTC date string ('2026-06-08'), a fixed quota passes a constant ('total'). USAGE filters entries by (resource, period); a new period is a fresh pool (daily-reset semantics). The module NEVER computes the date itself."
+    },
+    "amount": {
+      "type": "number",
+      "minimum": 0,
+      "description": "For reserve: the estimate held against the ceiling. For confirm: the ACTUAL spend (<= the reservation's reserved amount). For release: 0. gsc_calls are integer counts; dfs_credits / image_spend may be fractional, so this is a number (>= 0)."
+    },
+    "reservation_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Identifies the reservation. A reserve MINTS it deterministically from its under-lock seq ('r'+seq) — unique without a clock/RNG. A confirm/release carries the reservation_id it targets, so replay attributes the effective amount to the right reservation."
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The run (or manual token) that wrote this entry — provenance for the audit trail. Usually a workflow run_id {slug}-{YYYY-MM-DD}-{hash4}; PERMISSIVE (minLength 1) to allow a standalone manual entry."
+    },
+    "project_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Slug of the project whose run charged this cost — provenance only (the ledger is portfolio-wide, keyed by resource+period, NOT by project). Matches project-config.schema.json's slug grammar."
+    },
+    "recorded_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC ISO 8601 when this entry was recorded. Passed in by the caller (the module is clock-free)."
+    },
+    "note": {
+      "type": "string",
+      "description": "Optional free-text note (e.g. why a reservation was released)."
+    },
+    "prev_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "entry_hash of the PRIOR line, or 64 zeros ('0'*64) for the genesis line (seq 0). The chain link."
+    },
+    "entry_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "sha256 hex over canonical_json of THIS entry with entry_hash removed (all other fields, incl. prev_hash, present). Tamper-evidence: recomputing must reproduce this value; usage() fails closed if any entry's hash does not reproduce."
+    }
+  }
+}
