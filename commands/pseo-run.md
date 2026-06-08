@@ -13,21 +13,26 @@ description: |
   drift kontrolü gerekiyor (`/pseo-driftcheck`). Bu komut bir DİZİ orkestratörüdür,
   tek skill değil.
 argument-hint: "<workflow> [project-slug] [--resume]"
-allowed-tools: Bash(jq:*), Bash(python3:*), Bash(date:*), Bash(mkdir:*), Read, Write, mcp__gsc__search_analytics, mcp__gsc__detect_quick_wins, mcp__gsc__enhanced_search_analytics, mcp__dataforseo__on_page_lighthouse, mcp__dataforseo__on_page_content_parsing, mcp__dataforseo__dataforseo_labs_google_keyword_ideas, mcp__dataforseo__dataforseo_labs_google_related_keywords, mcp__dataforseo__dataforseo_labs_google_keyword_suggestions, mcp__dataforseo__dataforseo_labs_search_intent, mcp__dataforseo__dataforseo_labs_google_keyword_overview
+allowed-tools: Bash(jq:*), Bash(python3:*), Bash(date:*), Bash(mkdir:*), Read, Write, mcp__gsc__search_analytics, mcp__gsc__detect_quick_wins, mcp__gsc__enhanced_search_analytics, mcp__dataforseo__on_page_lighthouse, mcp__dataforseo__on_page_content_parsing, mcp__dataforseo__dataforseo_labs_google_keyword_ideas, mcp__dataforseo__dataforseo_labs_google_related_keywords, mcp__dataforseo__dataforseo_labs_google_keyword_suggestions, mcp__dataforseo__dataforseo_labs_search_intent, mcp__dataforseo__dataforseo_labs_google_keyword_overview, mcp__dataforseo__serp_organic_live_advanced, mcp__higgsfield__generate_image
 model: sonnet
 ---
 
-# /pseo-run — Workflow Orkestratörü (Faz-1: `monthly` · Faz-3: `audit` + `setup`)
+# /pseo-run — Workflow Orkestratörü (Faz-1: `monthly` · Faz-3: `audit` + `setup` + `content`)
 
 > **Orkestratör spine:** `scripts/orchestration/run_step.py` (verify → loader-transform →
 > commit → coverage) + sürücüler `scripts/orchestration/workflows/monthly_maintenance.py`
-> (`monthly`), `scripts/orchestration/workflows/audit_suite.py` (`audit`) ve
-> `scripts/orchestration/workflows/new_project_setup.py` (`setup`).
+> (`monthly`), `scripts/orchestration/workflows/audit_suite.py` (`audit`),
+> `scripts/orchestration/workflows/new_project_setup.py` (`setup`) ve
+> `scripts/orchestration/workflows/content_pipeline.py` (`content`).
 > Desteklenen workflow'lar: **`monthly`** (Faz-1, **Bölüm 2-7**), **`audit`** (Faz-3
-> teknik-SEO denetim suite, **Bölüm 8**) ve **`setup`** (Faz-3 yeni-proje içerik-planı
-> pipeline'ı, **Bölüm 9**). Her sıra SABİT bir Python dizisidir (Path A, DAG
-> yok). CODE tool çağrısı YAPAMAZ → MCP çağrısını + transform'u MODEL yapar, CODE doğrular +
-> commit'ler.
+> teknik-SEO denetim suite, **Bölüm 8**), **`setup`** (Faz-3 yeni-proje içerik-planı
+> pipeline'ı, **Bölüm 9**) ve **`content`** (Faz-3 blog-içerik üretim pipeline'ı,
+> **Bölüm 10**). İlk üçü VERİ sürücüsüdür (ham drop → transform CLI → verify → commit →
+> sheet satırları). **`content` bir ARTEFAKT sürücüsüdür** — model bir blog HTML artefaktı
+> üretir; `run_step`/`committer` YOK, master.xlsx sheet'i YOK; CODE her adımın artefaktının
+> VAR olduğunu + (HTML ise) AI-disclosure sinyali taşımadığını doğrular. Her sıra SABİT bir
+> Python dizisidir (Path A, DAG yok). CODE tool çağrısı YAPAMAZ → MCP çağrısını +
+> transform/üretimi MODEL yapar, CODE doğrular (veri sürücüleri ayrıca commit'ler).
 
 ## 1. Aktif projeyi + workflow'u çöz
 
@@ -39,6 +44,7 @@ model: sonnet
 - `$2` `--resume` ise slug'ı `active.json`'dan çöz ve **2.b**'deki resume yolunu izle.
 - Workflow `monthly` ise: **Bölüm 2-7**'yi izle. Workflow `audit` ise: **Bölüm 8** (audit
   suite, Faz-3) — DURUR'ma. Workflow `setup` ise: **Bölüm 9** (yeni-proje içerik-planı
+  pipeline'ı, Faz-3) — DURUR'ma. Workflow `content` ise: **Bölüm 10** (blog-içerik üretim
   pipeline'ı, Faz-3) — DURUR'ma. Başka bir workflow ise: desteklenmiyor — DURUR, manager'a bildir.
 
 ## 2. Workflow run'ını aç (ya da resume et)
@@ -572,4 +578,129 @@ Sürücünün son satırı zaten `remediation.render(...)` çıktısıdır; tek 
   `…dataforseo_labs_search_intent`, `…dataforseo_labs_google_keyword_overview`,
   `mcp__gsc__enhanced_search_analytics`. DFS HEAVY → her DFS adımı kendi SKILL.md'sindeki bütçe
   pre-flight'ına tabidir. `new_content_plan` content-gaps staging'i (Faz-7 producer) tüketir.
+- Coverage proof: `schemas/coverage.schema.json` (`_state/coverage/{run_id}.json`).
+
+---
+
+## 10. Workflow `content` (Faz-3) — blog-içerik üretim pipeline'ı
+
+> **3 üretim adımı, rapor adımı YOK.** Teslimat = **üretilmiş blog artefaktı**
+> (`outputs/blog/<post>/article.html` + schema.jsonld + meta-tags.json + hero görseller).
+> Diğer üç workflow'un AKSİNE bu bir **ARTEFAKT sürücüsüdür**: üç üretim skill'i (new-blog,
+> generate-images, faq-optimization) master.xlsx'e YAZMAZ (`transaction.append` YOK — hepsi
+> `allowed_writers=null`, READ-ONLY) → ham drop YOK, transform CLI YOK, commit'lenecek sheet
+> YOK. Sürücü `content_pipeline.py` `run_step`/`committer` KULLANMAZ; yalnız `coverage` +
+> `remediation` + `content_validator` REUSE eder. **3 adımın HEPSİ `model_attested`** (içerik
+> KALİTESİ kodla doğrulanamaz — spec §11); CODE'un sahip olduğu adım-başı doğrulama: beklenen
+> artefakt VAR MI + (HTML ise) `content_validator.validate_content(html).has_red == False`
+> (AI-disclosure sinyali yok — Süleyman sert-kısıt #2; batch 2e `ai_disclosure_rescan` ile AYNI
+> dedektör → write-time hook ile inşaen tutarlı). Per-row `code_verified` adım YOK →
+> tamamlanmayı yalnız **tamamlanma geçidi** (her adım `satisfied` değilse `pass` olamaz) zorlar —
+> bu all-attested workflow'da `setup` ile aynı yegâne tamamlanma zorlayıcısı.
+>
+> **⚠️ DÜRÜST KAPSAM:** Bu workflow "her üretim adımı KOŞTU + artefaktını ÜRETTİ + artefakt
+> AI-disclosure taşımıyor"u GARANTİ eder; içeriğin İYİ olduğunu doğrula(ya)maz — o, ayrıca
+> ölçülen QA döngüsüdür.
+>
+> **⚠️ BAĞIMLILIK:** `new_blog` bir `new_content_plan` satırı tüketir (girdi
+> `new_content_plan_id`); `generate_images` aynı plan satırını / new_blog post'unu tüketir;
+> `faq_optimization`, `new_blog`'un `article.html`'ini ENHANCE eder (mode=enhance). Sürücü
+> adımları SIRAYLA koşar.
+
+### 10.1 — Run aç (ya da resume et)
+
+```python
+from scripts.state import workflow_runner
+handle = workflow_runner.create_run(
+    skill="content-pipeline",
+    project_slug=PROJECT,
+    steps=[{"name": "new_blog"}, {"name": "generate_images"},
+           {"name": "faq_optimization"}],
+)
+run_id = handle.run_id
+```
+
+`--resume`: `monthly`/`audit`/`setup` ile aynı — `workflow_runner.resume(run_id, project_slug=PROJECT)`;
+yalnız eksik/başarısız adımlar yeniden koşar (idempotent: artefakt yeniden üretilir, coverage
+yeniden yazılır).
+
+### 10.2 — Üretim adımları (SIRAYLA: new_blog → generate_images → faq_optimization)
+
+Diğer workflow'ların AKSİNE burada **ham drop / transform CLI YOK**. MODEL üç üretim skill'ini
+SIRAYLA koşar; her biri artefakt(lar)ı `projects/$PROJECT/outputs/...` altına `Write` (ve
+generate-images için ops. `mcp__higgsfield__generate_image`) ile yazar. Her `Write` write-time'da
+MEVCUT iki hook'tan geçer: PreToolUse `content_validator` (RED → write BLOCK) + PostToolUse
+`ai_disclosure_rescan` (RED → karantina). Sürücü (10.3) SONRA her artefaktı BAĞIMSIZ olarak yeniden
+doğrular (VAR MI + `content_validator` temiz mi).
+
+| Adım | Skill | Birincil artefakt (sürücü doğrular) | is_html | Bağımlı |
+|------|-------|--------------------------------------|---------|---------|
+| `new_blog` | `production/new-blog` | `outputs/blog/<post>/article.html` (+ schema.jsonld, meta-tags.json, upload-instructions.md) | ✅ disclosure gate | `new_content_plan` satırı |
+| `generate_images` | `production/generate-images` | `outputs/images/<slug>-hero.{webp,avif,jpg}` (+ Section B upload-instructions.md) | ❌ EXISTS-only | new_blog post'u / plan satırı |
+| `faq_optimization` | `production/faq-optimization` | `outputs/blog/<post>/article.html` (YERİNDE enhance) | ✅ disclosure gate | new_blog `article.html` |
+
+- **new_blog**: bir `master.xlsx[new_content_plan]` satırından (girdi `new_content_plan_id`) tam
+  makale üretir; `<article class="pse-blog-post">` fragmanı (`article.html`) + JSON-LD @graph +
+  meta-tags + Section A upload-instructions yazar. master.xlsx'e YAZMAZ.
+- **generate_images**: hero görsel üretir → `outputs/images/<slug>-hero.{webp,avif,jpg}` (proje-
+  düzeyi, blog dizininin KARDEŞİ). higgsfield HARİCİ kullanıcı-MCP'si (headless'ta sık YOK) →
+  sürücüde EXISTS-only (görsel HTML değil); görsel dizini yoksa normal `missing`, ÇÖKME değil
+  (DURUR #5 fallback).
+- **faq_optimization**: `new_blog`'un `article.html`'ini YERİNDE enhance eder (mode=enhance); FAQ
+  bloğu + FAQPage @graph yeniler. Aynı `article.html`'i hedefler → sürücü onu yine disclosure
+  gate'ten geçirir.
+
+> Bu bölümde **commit YAPMA / transform YAPMA** — model yalnız üretim skill'lerini koşar +
+> artefaktları yazar; VAR-MI + disclosure doğrulaması CODE'a (10.3 sürücü) aittir.
+
+### 10.3 — Sürücü (`content_pipeline`) — artefaktları doğrula + coverage
+
+3 adımın artefaktları üretilince sürücüyü çalıştır. `--blog-output-dir` = THIS run'ın blog dizini
+`projects/$PROJECT/outputs/blog/<post>/` (model hangi post olduğunu bilir → recipe geçer);
+`--now-epoch` zorunlu (CLI simetrisi; artefakt sürücüsünün tazelik geçidi YOK). Rapor adımı YOK →
+`--report-exists` YOK; `--workbook` YOK (commit YOK):
+
+```bash
+PYTHONPATH="${CLAUDE_PLUGIN_ROOT}" python3 -m scripts.orchestration.workflows.content_pipeline \
+  --run-id "$RUN_ID" --slug "$PROJECT" \
+  --workspace-root "$PSEO_WORKSPACE_ROOT" \
+  --blog-output-dir "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/outputs/blog/<post>/" \
+  --now-epoch "$(date +%s)"
+```
+
+Sürücü: her adımın artefaktını `verify_artifact` ile doğrular (VAR yoksa `missing`; HTML +
+disclosure RED ise `failed`; aksi halde `satisfied`), 3 adımı `model_attested` coverage adımı
+olarak ekler, verdict türetir (3 artefaktın HEPSİ `satisfied` değilse `pass` olamaz — tamamlanma
+geçidi) ve coverage kaydını `_state/coverage/$RUN_ID.json` dosyasına yazar
+(`schemas/coverage.schema.json`).
+
+### 10.4 — Verdict `pass` değilse — Türkçe düzeltme komutu
+
+Sürücünün son satırı zaten `remediation.render(...)` çıktısıdır; tek kopyala-yapıştır aksiyon:
+
+```
+/pseo-run content <slug> --resume
+```
+
+- `incomplete` → eksik artefakt(lar) (ör. headless'ta görsel dizini); `--resume` onları tamamlar.
+- `failed` → AI-disclosure RED taşıyan `article.html` (new_blog/faq); `--resume` yeniden üretir —
+  görünür "AI tarafından yazıldı" YASAK (açıklamayı kaldırıp yeniden yaz).
+
+### 10.5 — Bağımlılıklar (`content`)
+
+- Sürücü: `scripts/orchestration/workflows/content_pipeline.py` (+ spine `coverage.py` IMPORT-only;
+  `run_step`/`committer`/`verify` KULLANILMAZ — artefakt sürücüsü, commit YOK).
+- Dedektör REUSE: `scripts/validation/content_validator.py` (`validate_content` +
+  `ContentReport.has_red`) + `scripts/hooks/validate_content_write.py` (`is_content_html_path`) —
+  batch 2e `ai_disclosure_rescan` ile AYNI dedektör (write-time hook ile inşaen tutarlı). Yeni
+  dedektör YOK.
+- Remediation: `scripts/orchestration/remediation.py` (`workflow="content"` → `/pseo-run content … --resume`).
+- Üretim skill zinciri (SIRALI): `skills/production/new-blog/SKILL.md`,
+  `skills/production/generate-images/SKILL.md`, `skills/production/faq-optimization/SKILL.md`.
+- Write-time gate'ler (MEVCUT, değiştirilmez): PreToolUse `content_validator` (RED → block) +
+  PostToolUse `ai_disclosure_rescan` (RED → karantina).
+- Run state: `scripts/state/workflow_runner.py` (`create_run` / `resume`).
+- MCP: `new_blog` → `mcp__gsc__search_analytics` + `mcp__dataforseo__serp_organic_live_advanced`
+  (ops. Scrapling); `generate_images` → `mcp__higgsfield__generate_image` (HARİCİ kullanıcı-MCP,
+  headless'ta sık YOK → DURUR #5 fallback); `faq_optimization` → `mcp__gsc__search_analytics`.
 - Coverage proof: `schemas/coverage.schema.json` (`_state/coverage/{run_id}.json`).
