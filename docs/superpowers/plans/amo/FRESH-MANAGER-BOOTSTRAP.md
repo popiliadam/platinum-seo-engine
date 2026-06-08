@@ -4,8 +4,10 @@
 > AMO build") into a new Claude Code session at `/Users/apple/Documents/platinum-seo-engine`.** It makes you,
 > the new manager, 100% operational with zero information loss. The prior manager hit its context limit;
 > everything it knew is committed to git + saved in memory + this file. You are NOT starting over — you are
-> continuing. **Current handoff point: Faz 0+1+2 ✅ and the Faz-3 REPLICATION LINE ✅ are shipped; you pick up
-> the 3 remaining Faz-3 items, then Faz 4 (see §9).**
+> continuing. **Current handoff point (2026-06-08): Faz 0+1+2+3 ALL ✅ and Faz 4 batches 4a (cost ledger) +
+> 4b (portfolio sweep + kill-switch) ✅ shipped. You pick up at Faz 4 batch 4c (`/pseo-status --portfolio`),
+> then 4d (scheduler, default OFF) + 4e (runbook), then the D11 comprehensive live-acceptance closes the
+> build. Suite 2241 pass / 7 skip / 0 fail. MANAGER.md's batch table + banners are the live truth.**
 
 ---
 
@@ -253,9 +255,11 @@ plugin-agnostic (no CMS/site specifics in the engine). See the `feedback_*` memo
 
 ## 9. Remaining work — UPDATED 2026-06-08 (Faz 0+1+2 ✅ + Faz-3 REPLICATION LINE ✅)
 
-> **A fresh manager taking over starts here.** Read MANAGER.md's banners + the batch table (0a-3d all ✅) +
-> D1-D16. Suite is at **2175 pass / 7 skip / 0 fail** (HEAD `73fc5b9`, working tree clean, all pushed origin/main).
-> The orchestrator drives **4 workflows** (monthly/audit/setup/content). Do NOT re-do anything below the line.
+> **A fresh manager taking over starts here.** Read MANAGER.md's banners + the batch table (0a-3d + 3-gov-secrets
+> + 3-gov-lint2 + 3-O4 + 4a + 4b all ✅) + D1-D17. Suite is at **2241 pass / 7 skip / 0 fail** (HEAD on
+> origin/main, working tree clean, all pushed). The orchestrator drives **4 workflows** (monthly/audit/setup/
+> content) + the portfolio sweep (`/pseo-run-portfolio`). Do NOT re-do anything below the line. **Faz 3 is
+> COMPLETE; Faz 4 has 4a (cost ledger) + 4b (sweep+kill-switch) done — pick up at 4c (see the §9-NEW block).**
 
 - **Faz 0 ✅** (`09674c5`): session-id binding + audit attribution + parallel-write safety.
 - **Faz 1 ✅** (`3b9d87e`+`1fa70d3`): orchestrator spine + `monthly-maintenance` + `/pseo-run` + remediation.
@@ -272,7 +276,35 @@ plugin-agnostic (no CMS/site specifics in the engine). See the `feedback_*` memo
   in all 3 environments). The hard "no autonomy un-proven" rule (Faz-4 scheduler) is met by that end run. Do NOT
   block on a live test now. (Memory `project_amo_live_acceptance_deferred`; recommended project: demo-furniture — GSC confirmed.)
 
-### ───────── YOU PICK UP HERE — 3 remaining Faz-3 items, then Faz 4 ─────────
+### ───────── §9-NEW (2026-06-08): Faz 3 ✅ DONE, Faz 4 4a+4b ✅ DONE — YOU PICK UP AT 4c ─────────
+
+> **Done since this doc was first written (all ✅ pushed, manager-verified, see MANAGER.md rows + memory
+> `project_amo_initiative`):** 3-gov-secrets (`--scan-stdin`) · 3-gov-lint2 **B′** (static workflow-tool ⊆
+> skill-declared ⊆ registry — runtime Option B was REFUTED on real data, D17) · 3-O4 (shared `workflow_driver`
+> extracted, git-stash equivalence proof) · **🎉 Faz 3 COMPLETE** · 4a (`scripts/state/cost_ledger.py` +
+> `cost-ledger.schema.json` — atomic reserve-then-confirm under a hard ceiling, no-overspend proven) · 4b
+> (`scripts/state/project_lock.py` non-blocking lock + `scripts/orchestration/portfolio_runner.py` sweep +
+> `commands/pseo-run-portfolio.md` — sequential sweep [Süleyman Option A] + budget kill-switch, no-leak proven).
+>
+> **YOU PICK UP AT Faz 4 batch 4c**, then 4d, 4e, D11:
+> - **4c — `/pseo-status --portfolio`:** a triage table across the portfolio (run_id, status, missing_steps,
+>   external vs internal) reading each project's coverage record + the 4a ledger `usage`. Mirror the existing
+>   `commands/pseo-status.md` + the reporting scripts. NEW command → D10 command bump (manager applies).
+> - **4d — scheduler (default OFF):** explicit per-cadence consent + projected daily cost shown before arming;
+>   iterates the ACTUAL on-disk project count (not "3-5"). ⚠️ **CARRY from 4b:** the scheduler MUST gate
+>   arming on ALL ceilings being set in `shared/cost-ceilings.json` (O5 — fail-closed for autonomy; 4b's
+>   unset-ceiling→∞ is fine for MANUAL `/pseo-run-portfolio` but NOT for an armed schedule). This is the
+>   autonomy-arming batch — the hard "no autonomy un-proven" rule is met only by the D11 end run.
+> - **4e — recovery runbook** (doc) + cross-cutting consolidation (ACTIVE_PROJECTS_MAX 1-module, self-upgrade
+>   versioning).
+> - **D11 — comprehensive live-acceptance** (Süleyman, deferred to the very end): ONE all-phases live run on a
+>   real GSC-verified project (recommended: demo-furniture) across all 3 environments — observe gate/denetçi/consent +
+>   a portfolio sweep + the kill-switch. This CLOSES the AMO build.
+>
+> The detailed historical items below (3-gov-secrets/lint2/O4 + the Faz-4 bullet) are now DONE/superseded —
+> kept for context (the Faz-4 bullet still describes 4c/4d/4e accurately).
+
+### ───────── (historical — these Faz-3 items are now ✅ DONE) ─────────
 
 - **3-gov-secrets (secret-bytes scan; self-contained, low-risk):** enhance `scripts/security/check_secrets.sh`
   to scan the LITERAL pending bytes incl. gitignored targets, not just git-enumerated files. Current behavior:
