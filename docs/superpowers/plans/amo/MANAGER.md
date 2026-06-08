@@ -75,7 +75,11 @@ Promote to a general engine ONLY if a 4th workflow proves the abstraction earns 
 | 2f | **Outward-gate completeness (Faz-2 FINAL; manager TIGHTENED to the 2 real 2b QA gaps):** (a) gated path fail-CLOSED when `has_session_consent` RAISES (corrupt ledger → deny + alert; main's except no longer fail-opens a gated action) + (b) compound-command segment-split + git-global-flag subcommand detection (`cd x && git push` / `git -C /p push` / `ls && curl POST`); single-command results byte-identical. One file (outward_action_gate.py + test); no wiring/D10. **Deferred:** `dfs_oversized`→**Faz 4** (cost/quota ledger); drift-F-rule [§4 mastery lint] + secret-bytes-scan→**Faz 3**; 2e `os.replace`-fail + shell-var blog-path = accepted (too narrow). | ✅ **DONE + GREEN** (`6760314`, manager-verified **2036/0**; gate tests 35/0 [24 orig + 11 new]; diff reviewed line-by-line = exactly the 2 fixes; (a) consent-check RAISE→deny+alert [main except untouched → gated fully fail-closed, non-gated still fail-open] + (b) segment-split + `_git_push_target` git-flag detection, single-command byte-identical, over-split = false-deny-never-false-allow; scope 2 files; no D10) | 2b ✅, 2e ✅ |
 | 2c | **Denetçi Stop-hook** (manager SPLIT 2c→2c+2d, precedent 1b→1b+1b2): NEW `scripts/hooks/denetci.py` wired into `stop.json` (stop_validation STAYS first) — reads 1c intent marker + 1a coverage; declared+no-fresh-run→block, incomplete/failed→block+`remediation.render`, `paused`(external)→allow+RED flag, pass/none-owed→allow; `stop_hook_active` cap guard; freshness = coverage-mtime ≥ marker-mtime; READ-ONLY + non-crashing. No schema/command → no D10. | ✅ **DONE + GREEN** (`e50d655`, manager-verified **1934/0** [excl 2d mid-flight RED file]; 2c-scoped 33/0; denetci reviewed non-crashing + READ-ONLY [only stderr.write] + stdout-only block + stop_hook_active cap; stop_validation STAYS first; no schema/command → no D10; scope-locked amid 2d contention) | 1 ✅ |
 | 2d | **Correctness oracle** (split from 2c): `scripts/reporting/orchestration_metrics.py` — reconcile master.xlsx rows vs raw-provenance per run_id, INDEPENDENT of the self-reported verdict → the trustworthy ≤5% structured-error number + first-pass/retry/coverage-miss metrics (spec G5). Reconciles committed-rows vs the **transform OUTPUT** (so filtering steps like quick_wins don't false-flag), via openpyxl + master-excel.schema `data_start_row`; reuses `monthly_maintenance.{STEPS,inbox_path,output_path}`; headline = `fake_green` (verdict==pass but workbook mismatch). File-disjoint from 2a+2c. | ✅ **DONE + GREEN** (`7234ccf`, manager-verified **1967/0**; 2d-scoped 33/0; READ-ONLY [grep: zero state-writes]; reconcile-vs-OUTPUT [quick_wins filtering safe, raw→committed drop only advisory] + fake_green [verdict==pass∧independent-mismatch] + workbook_absent-never-silently-passed reviewed; reuses STEPS/inbox/output/coverage/silent_skip; no schema/command→no D10) | 1 ✅ |
-| 3 | Replicate (new-project / content-pipeline / audit-suite) + the 2 mastery lints + registry fix (`sf_load_crawl`); promote-to-declarative decision gate | pending | 1,2 |
+| **3a** | **§4 mastery lint #1 — static `body ⊆ declared` MCP** (manager SCOPED Faz-3 §4 pair → SPLIT static/runtime, D14): NEW `scripts/validation/skill_mcp_usage.py` (invocation-PRECISE detector — qualified `mcp__s__t(` call + native `call_tool("literal")` + `SfMcpClient.load_crawl` wrapper; prose mentions + variable `call_tool(var)` NOT flagged) + per-skill lint `tests/schemas/test_skill_body_mcp_subset_declared.py` (45 cases) + 16 parser unit tests + **registry fix `sf__sf_load_crawl`** (was invoked via `SfMcpClient.load_crawl` but absent from registry — the canonical undeclared-dep bug) + 4 skills declare their SF live-crawl tools (on-page-audit/schema-audit/tech-audit/internal-links, append-only `optional`). Closes the triangle **used ⊆ declared ⊆ registry**. | ✅ **DONE + GREEN** (`c497444`, manager-verified **2098/0** [+61: 16 unit + 45 lint] via INDEPENDENT re-derivation [45-skill gap set clean; both precision traps re-proven: monthly-report backtick-mention + sf-crawl-orchestrator var-dispatch NOT flagged; declared⊆registry still green]; module pure + NO skill-allowlist suppression; scope-locked 8 files append-only [19 ins / 0 del]; no D10; no new RUNTIME_HOOK_SCRIPTS) | 1✅,2✅ |
+| 3b | **Replicate `audit-suite`** (Süleyman's pick 2026-06-08 — FIRST replicate, serial): ordered Python workflow reusing `run_step/committer/verify/coverage` (the proven 1b spine + 1d shape); relocate any SKILL.md-prose master.xlsx writes into the committer (1b2 pattern); keep each audit skill's existing tests green; the MODEL makes the MCP calls + drops provenance-stamped raw artifacts, code gates them (Phase-1 seam) | pending | 3a |
+| 3c/3d | Replicate `new-project-setup` + `content-pipeline` (order TBD; content-pipeline is model_attested/content-quality → hardest, likely last) | pending | 3a |
+| 3-gov | **Carried governance batch:** §4 mastery lint #2 (runtime `observed ⊆ declared` — events.jsonl `source.mcp_tool` ⊇ workflow declared-required step tools) + drift-F-rule (every declared OUTWARD MCP tool ⊆ a 2b gate matcher; `csr_mcp` category) + secret-bytes scan (scan literal pending bytes incl. gitignored, enhance `check_secrets.sh`) | pending | 3a |
+| 3-O4 | promote-to-declarative DECISION GATE (spec O4): define the concrete trigger (≥2 workflows sharing ≥N edges, or operator-authored workflows) that flips Path A → declarative engine + auto-graph; default = stay Path A | pending | 3b-3d |
 | 4 | Portfolio fan-out + cost/quota ledger + kill-switch + `/pseo-status --portfolio` + recovery runbook; scheduler default OFF | pending | 0-3 |
 
 > ## 🚦 FAZ 2 STARTED (2026-06-06) — fresh Faz-2 manager took over via FRESH-MANAGER-BOOTSTRAP §9
@@ -109,6 +113,25 @@ Promote to a general engine ONLY if a 4th workflow proves the abstraction earns 
 > + `sf_load_crawl` registry fix; carries the deferred drift-F-rule + secret-bytes-scan) then Faz 4 (portfolio
 > fan-out + cost/quota ledger [carries `dfs_oversized`] + kill-switch + scheduler-OFF).
 
+> ## 🟢 FAZ 3 STARTED (2026-06-08) — fresh Faz-3 manager took over via FRESH-MANAGER-BOOTSTRAP §9
+> Fresh manager onboarded zero-loss; independently re-verified baseline **2036→2098** path (HEAD was `c5123d8`,
+> suite **2036 pass / 8 skip / 0 fail** on my run; the worker measured 2037/7 — one MCP-availability-gated test
+> flips pass/skip, total 2044 stable, NOT a regression). **Süleyman decisions (2026-06-08): (1) replicate
+> `audit-suite` FIRST; (2) SERIAL cadence (3a → audit-suite, one worker window).** Manager SCOPED Faz 3 into
+> 3a (static lint #1) → 3b audit-suite → 3c/3d (new-project-setup + content-pipeline) → 3-gov (lint #2 +
+> drift-F-rule + secret-bytes) → 3-O4 decision gate. **D14: SPLIT the §4 lint pair** — lint #1 (STATIC SKILL.md
+> text analysis) and lint #2 (RUNTIME events.jsonl reconciliation) are distinct data domains → separate batches
+> for clean reviews; lint #1 alone is a full, grounded, single-concern batch.
+> **3a ✅ DONE + pushed** (`e99b456` docs prompt + `c497444` feat, manager-verified **2098/0**, +61 tests
+> [16 unit + 45 per-skill lint]): the static `body ⊆ declared` MCP lint closes the triangle
+> **used ⊆ declared ⊆ registry**. Detector is invocation-PRECISE (3 matchers: qualified `mcp__s__t(`, native
+> `call_tool("literal")`, `SfMcpClient.load_crawl` wrapper) — prose mentions + variable `call_tool(var)` are NOT
+> flagged (both precision traps re-proven). Grounded RED proof = exactly 4 SF-opt-in skills
+> (on-page-audit/schema-audit/tech-audit/internal-links) each `{sf__sf_list_crawls, sf__sf_load_crawl}`; fix =
+> registry `sf__sf_load_crawl` + 4 skills declare their SF tools (append-only `optional`). Manager QA: INDEPENDENT
+> re-derivation (own detector, not the worker's module) → 45-skill gap set `{}`; scope-locked 8 files; no D10.
+> **NEXT = 3b audit-suite replicate** (Süleyman's pick). Carried to 3-gov: lint #2 + drift-F-rule + secret-bytes.
+
 ## Decision register
 - **D1** Path A (hard-coded sequences; graph deferred) — Süleyman 2026-06-05.
 - **D2** Binding = session-id marker FILE (not env var); resolution `arg → session-marker(session_id) → active.json`. Reason: env var unsettable in Mac app + `.env` never loaded into hooks (proven `env|grep PSEO` empty).
@@ -124,6 +147,16 @@ Promote to a general engine ONLY if a 4th workflow proves the abstraction earns 
 - **D11** Live-acceptance DEFERRED to the end (Süleyman 2026-06-06): build Faz 2+3+4, then ONE comprehensive all-phases live run, instead of the per-phase §8 gate before Faz 2. The hard "no autonomy un-proven" rule (Faz 4) is met by that end run. Memory `project_amo_live_acceptance_deferred`.
 - **D12** Manager SPLIT spec-2c → **2c denetçi Stop-hook** + **2d correctness oracle** (precedent: 1b→1b+1b2). No shared code; smaller batches in the hard phase; enables 2a ∥ 2c ∥ 2d parallel. D5 (gates+oracle in-phase, never deferred) preserved — both ship in Faz 2.
 - **D13** Consent scope = **PER-SESSION** (Süleyman 2026-06-06): a 2b gate allows a gated action iff an intact-chain consent entry matches `session_id` + `action` + `target_hash` (run_id is provenance only). Reason: the session UUID is already in every hook payload AND stamped on each 2a entry → the gate is a pure READ (no run_id mechanism, no single-use consumption log), while still guaranteeing nothing goes out unless approved IN THIS session. Rejected: single-use (gate would have to WRITE), run-scoped (needs a current-run pointer), approve-once (too loose for the Indexing hard-constraint). Manager also SPLIT spec-2b → **2b** outward-action gate (this) + **2e** AI-disclosure surface-rescan + **2f** secret-bytes/dfs_oversized/drift-F-rule (keep the safety phase in small reviewable batches).
+
+- **D14** Faz-3 §4 mastery-lint pair SPLIT static/runtime (manager, 2026-06-08): **lint #1 `body ⊆ declared`**
+  (static SKILL.md text analysis — what a skill INVOKES in prose ⊆ what it DECLARES) and **lint #2
+  `observed ⊆ declared`** (runtime events.jsonl `source.mcp_tool` reconciliation per run) are DISTINCT data
+  domains with different homes + fixtures → separate batches (lint #1 = **3a** ✅; lint #2 → **3-gov** with the
+  carried drift-F-rule + secret-bytes scan). Reason: "split on genuinely distinct concerns" (build model);
+  lint #1 alone is a full, grounded, single-concern batch (closes used⊆declared⊆registry) and was the promised
+  headline "knows its parts" deliverable. The §4 conceptual pairing is not a code dependency. Lint #1 detector is
+  invocation-PRECISE (NOT bare-token) — the whole point is distinguishing a call from a prose mention / a
+  variable-dispatched `call_tool(var)`, so it flags real gaps and stays silent on both precision traps.
 
 ## Provenance
 - Design hardened by 9-agent adversarial review: workflow run `wf_527271b3-931` (51 findings, conditional GO).
