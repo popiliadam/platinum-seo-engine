@@ -361,12 +361,19 @@ workflow_runner.request_approval(
 
 ### Step 9 — `write_excel` (atomic, schema-validated) + provenance
 
+Single `committer.commit` call — the orchestrator's idempotent commit path
+(whole-block `transaction.replace` from the schema's `data_start_row`, so
+re-running never duplicates rows on the `cluster_keywords` snapshot sheet).
+Goes through the single approved write path with backup, lock, schema
+validation, and post-write provenance event emission.
+
 ```python
-from scripts.excel import transaction
-transaction.append(
-    workbook_path=workspace_root/"projects"/project_slug/"master.xlsx",
-    sheet="cluster_keywords",
-    rows=cluster_keywords_rows,
+from scripts.orchestration import committer
+committer.commit(
+    workspace_root/"projects"/project_slug/"master.xlsx",
+    "cluster_keywords",
+    cluster_keywords_rows,
+    run_id=handle.run_id,
     project_slug=project_slug,
     writer="cluster-map",
 )

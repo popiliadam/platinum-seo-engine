@@ -331,16 +331,19 @@ workflow_runner.request_approval(
 
 ### Step 9 — `write_excel` (atomic, schema-validated)
 
-Single `transaction.append` call for the new_content_plan sheet. Goes
-through the single approved write path with backup, lock, schema
-validation, and post-write provenance event emission.
+Single `committer.commit` call for the new_content_plan sheet — the
+orchestrator's idempotent commit path (whole-block `transaction.replace` from
+the schema's `data_start_row`, so re-running never duplicates rows on the
+`new_content_plan` snapshot sheet). Goes through the single approved write path
+with backup, lock, schema validation, and post-write provenance event emission.
 
 ```python
-from scripts.excel import transaction
-transaction.append(
-    workbook_path=workspace_root/"projects"/project_slug/"master.xlsx",
-    sheet="new_content_plan",
-    rows=new_content_plan_rows,
+from scripts.orchestration import committer
+committer.commit(
+    workspace_root/"projects"/project_slug/"master.xlsx",
+    "new_content_plan",
+    new_content_plan_rows,
+    run_id=handle.run_id,
     project_slug=project_slug,
     writer="new-content-plan",
 )

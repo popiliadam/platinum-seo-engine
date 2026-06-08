@@ -378,16 +378,22 @@ workflow_runner.request_approval(
 
 ### Step 8 — Resume (`approve` → `write_excel`)
 
-Single `transaction.append` call through the approved write path
-(backup + lock + schema validation + post-write provenance event).
+Single `committer.commit` call — the orchestrator's idempotent commit path
+(whole-block `transaction.replace` from the schema's `data_start_row`, so
+re-running never duplicates rows on the `topical_map` snapshot sheet). Goes
+through the single approved write path (backup + lock + schema validation +
+post-write provenance event).
 
 ```python
 workflow_runner.approve(handle.run_id, project_slug=project_slug, approver="user")
-from scripts.excel import transaction
-transaction.append(
-    workbook_path=workspace_root/"projects"/project_slug/"master.xlsx",
-    sheet="topical_map", rows=topical_map_rows,
-    project_slug=project_slug, writer="topical-map",
+from scripts.orchestration import committer
+committer.commit(
+    workspace_root/"projects"/project_slug/"master.xlsx",
+    "topical_map",
+    topical_map_rows,
+    run_id=handle.run_id,
+    project_slug=project_slug,
+    writer="topical-map",
 )
 ```
 
