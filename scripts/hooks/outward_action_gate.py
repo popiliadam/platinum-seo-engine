@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shlex
 import sys
 from pathlib import Path
@@ -88,6 +89,18 @@ _POST_DATA_FLAGS = frozenset({
     "--post-data", "--post-file",  # wget
 })
 
+# git GLOBAL options that CONSUME the next token (so a `push` subcommand can sit
+# behind them: `git -C <path> push`). Walking past these to git's real subcommand
+# is what lets the gate see a `git push` that is not at tokens[1].
+_GIT_GLOBAL_ARG_FLAGS = frozenset({
+    "-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path",
+})
+
+# Shell separators that delimit independent commands; classify EACH segment so a
+# gated action that is NOT the leading token (`cd x && git push`) is still caught.
+# `||` MUST precede `|` in the alternation so the two-char operator wins.
+_SEGMENT_SEP_RE = re.compile(r"&&|\|\||;|\n|\|")
+
 
 # ---------------------------------------------------------------------------
 # PURE classification (no IO; the heart, fully unit-tested)
@@ -132,27 +145,65 @@ def _operands(tokens: list[str], start: int) -> list[str]:
     return [tok for tok in tokens[start:] if not tok.startswith("-")]
 
 
-def _classify_bash(command: str) -> tuple[str, str] | None:
-    """Leading-token bash classify -> (action, target) or None (conservative).
+def _split_segments(command: str) -> list[str]:
+    """Split a bash command into segments on shell separators (&& || ; | newline).
+
+    Splits the RAW string then tokenises each segment (NOT shlex over the whole
+    line) — same conservative spirit as the leading-token parse: a quoted / heredoc
+    separator may over-split, but over-splitting only ever yields MORE segments to
+    classify, never fewer, so a gated action is never hidden by it.
+    """
+    return [seg.strip() for seg in _SEGMENT_SEP_RE.split(command) if seg.strip()]
+
+
+def _git_push_target(tokens: list[str]) -> str | None:
+    """The git-push target (operands joined, or "origin") if these tokens are a
+    `git push` — even behind git global flags (`-C <path>`, `-c <kv>`,
+    `--git-dir <p>`, …) — else None.
+
+    Walks past git's global options (those that consume the next token are skipped
+    in PAIRS) to the first non-flag token: it must be `push`, else this is some
+    other git subcommand (`status`, `log`, …) and is NOT gated. tokens[0] is the
+    `git` token and is skipped.
+    """
+    i = 1  # tokens[0] == "git"
+    while i < len(tokens):
+        tok = tokens[i]
+        if tok in _GIT_GLOBAL_ARG_FLAGS:  # global flag that consumes the next token
+            i += 2
+            continue
+        if tok.startswith("-"):           # other global flag (no arg, or --flag=val)
+            i += 1
+            continue
+        if tok != "push":                 # first non-flag token is the subcommand
+            return None
+        operands = [x for x in tokens[i + 1:] if not x.startswith("-")]
+        return " ".join(operands) if operands else "origin"
+    return None
+
+
+def _classify_segment(segment: str) -> tuple[str, str] | None:
+    """Leading-token classify of ONE shell segment -> (action, target) or None.
 
     Target derivation is DETERMINISTIC so the deny message echoes exactly what the
     operator's /pseo-approve must hash:
       * fs_delete  -> the non-flag operands joined (the path(s) being deleted).
-      * git_push   -> the remote+refspec operands joined, or "origin" if bare.
+      * git_push   -> the remote+refspec operands joined, or "origin" if bare
+        (recognised even behind git global flags, e.g. `git -C <path> push`).
       * net_post / index_update -> the request URL.
     """
-    tokens = _tokenize(command)
+    tokens = _tokenize(segment)
     if not tokens:
         return None
     first = tokens[0].rsplit("/", 1)[-1]  # strip any leading path (mirror events_writer)
 
     if first in _DELETE_TOKENS:
         operands = _operands(tokens, 1)
-        return ("fs_delete", " ".join(operands) if operands else command.strip())
+        return ("fs_delete", " ".join(operands) if operands else segment.strip())
 
-    if first == "git" and len(tokens) >= 2 and tokens[1] == "push":
-        operands = _operands(tokens, 2)  # --dry-run is a flag -> ignored here
-        return ("git_push", " ".join(operands) if operands else "origin")
+    if first == "git":  # gated iff it is `git push` (even behind global flags)
+        tgt = _git_push_target(tokens)
+        return ("git_push", tgt) if tgt is not None else None
 
     if first in _HTTP_TOKENS:
         url = _first_url(tokens)
@@ -160,10 +211,28 @@ def _classify_bash(command: str) -> tuple[str, str] | None:
         is_indexing = host == _INDEXING_HOST
         is_indexnow = host.endswith("indexnow.org")
         if _has_post_flag(tokens) or is_indexing or is_indexnow:
-            target = url if url else command.strip()
+            target = url if url else segment.strip()
             return ("index_update", target) if is_indexing else ("net_post", target)
         return None  # a plain GET curl/wget is not gated
 
+    return None
+
+
+def _classify_bash(command: str) -> tuple[str, str] | None:
+    """Split on shell separators and classify EACH segment; the FIRST gated wins.
+
+    Segment-splitting catches a gated action that is NOT the leading token of the
+    whole command — `cd x && git push`, `ls && curl -X POST …`, `mkdir y; rm -rf z`
+    — which the old whole-command leading-token parse waved through. A single
+    command (no separator) is ONE segment, so every single-command result is
+    UNCHANGED. A multi-gated command (e.g. `git push && rm -rf x`) returns its FIRST
+    gated action; the operator approves it, re-runs, and the gate then catches the
+    next — each gated action individually consented (iterative approval).
+    """
+    for segment in _split_segments(command):
+        hit = _classify_segment(segment)
+        if hit is not None:
+            return hit
     return None
 
 
@@ -220,22 +289,35 @@ def evaluate(
     if workspace is not None and session_id:
         slug = slug_fn(workspace, session_id=session_id, strict=False)
     th = target_hash(target)
-    allowed = bool(
-        workspace is not None
-        and slug is not None
-        and session_id
-        and has_consent_fn(
-            workspace, slug, session_id=session_id, action=action, target_hash=th
-        )
-    )
-    if allowed:
+    # Fail-CLOSED consent check: a DETECTED gated action whose consent cannot be
+    # VERIFIED must DENY. has_consent_fn reads the ledger and RAISES (e.g.
+    # ConsentLedgerError on a corrupt consent.jsonl line); that exception must NOT
+    # escape to main()'s fail-OPEN except, which would ALLOW the gated action on an
+    # unreadable ledger. The resolvers above return None (never raise), so wrapping
+    # only the consent lookup is sufficient + precise.
+    consent_error = False
+    consented = False
+    if workspace is not None and slug is not None and session_id:
+        try:
+            consented = has_consent_fn(
+                workspace, slug, session_id=session_id, action=action, target_hash=th
+            )
+        except Exception:  # ledger unreadable/corrupt -> consent UNVERIFIABLE
+            consent_error = True
+    if consented:
         return (0, [])  # consented THIS session -> ALLOW
 
     run_label = "sess-" + (session_id[:8] if session_id else "unknown")
-    return (2, [
+    messages = [
         f"BLOCKED: {action} → {target}  (bu oturumda onay yok)",
         f'İzin vermek için çalıştır:  /pseo-approve {run_label} {action} "{target}"',
-    ])
+    ]
+    if consent_error:
+        messages.append(
+            "⚠️ consent defteri okunamadı/bozuk — onay DOĞRULANAMADI, "
+            "güvenli tarafta REDDEDİLDİ."
+        )
+    return (2, messages)
 
 
 # ---------------------------------------------------------------------------

@@ -144,6 +144,71 @@ def test_classify_other_tools_none() -> None:
 
 
 # ===========================================================================
+# classify() — segment-split (batch 2f): a gated action that is NOT the leading
+# token of the WHOLE command (compound &&/;/|), and `git push` behind git global
+# flags. Every SINGLE-command result above is UNCHANGED (one segment).
+# ===========================================================================
+
+def test_classify_compound_cd_then_git_push() -> None:
+    # leading token is `cd` -> the OLD whole-command parse waved this through;
+    # the segment-split classifies the `git push` part.
+    assert gate.classify(
+        "Bash", {"command": "cd foo && git push origin main"}
+    ) == ("git_push", "origin main")
+
+
+def test_classify_compound_ls_then_curl_post_indexnow() -> None:
+    res = gate.classify(
+        "Bash", {"command": "ls -la && curl -X POST https://api.indexnow.org/x -d @b"}
+    )
+    assert res is not None and res[0] == "net_post"
+    assert "indexnow.org" in res[1]
+
+
+def test_classify_compound_semicolon_then_rm() -> None:
+    res = gate.classify("Bash", {"command": "mkdir y ; rm -rf z"})
+    assert res is not None and res[0] == "fs_delete"
+    assert "z" in res[1]
+
+
+def test_classify_compound_pipe_then_curl_post() -> None:
+    # the `|` separator also splits segments (`||` wins over `|` in the regex).
+    res = gate.classify(
+        "Bash",
+        {"command": "echo body | curl -X POST https://api.indexnow.org/notify -d @-"},
+    )
+    assert res is not None and res[0] == "net_post"
+
+
+def test_classify_git_global_flag_before_push_is_gated() -> None:
+    # `push` is no longer at tokens[1]; walk past git's global flags to find it.
+    assert gate.classify(
+        "Bash", {"command": "git -C /srv/repo push"}
+    ) == ("git_push", "origin")
+    assert gate.classify(
+        "Bash", {"command": "git -c user.name=x push origin main"}
+    ) == ("git_push", "origin main")
+
+
+def test_classify_git_global_flag_non_push_not_gated() -> None:
+    # a flagged NON-push git subcommand stays ungated (only `push` is gated).
+    assert gate.classify("Bash", {"command": "git -C /srv/repo status"}) is None
+
+
+def test_classify_benign_compound_never_gated() -> None:
+    # no gated segment -> None; a benign compound command is never bricked.
+    assert gate.classify("Bash", {"command": "echo hi && ls && cat x"}) is None
+
+
+def test_classify_multi_gated_returns_first_segment() -> None:
+    # first gated segment wins; operator approves it, re-runs, the gate then
+    # catches the next (iterative approval for multi-gated commands).
+    assert gate.classify(
+        "Bash", {"command": "git push && rm -rf x"}
+    ) == ("git_push", "origin")
+
+
+# ===========================================================================
 # evaluate() — per-session consent decision (real resolvers via env + marker)
 # ===========================================================================
 
@@ -237,6 +302,52 @@ def test_evaluate_non_gated_allows_without_any_context(
     monkeypatch.delenv("PSEO_WORKSPACE_ROOT", raising=False)
     code, msgs = gate.evaluate({"tool_name": "Bash", "tool_input": {"command": "ls -la"}})
     assert (code, msgs) == (0, [])
+
+
+# ===========================================================================
+# evaluate() — fail-CLOSED consent check (batch 2f): a DETECTED gated action whose
+# consent cannot be VERIFIED (the ledger read RAISED) must DENY, not slip through
+# main()'s fail-OPEN except. The normal no-entry path still denies WITHOUT the note.
+# ===========================================================================
+
+def test_evaluate_consent_check_raise_denies_fail_closed(bound_ws: Path) -> None:
+    # inject a has_consent_fn that RAISES (mirrors a corrupt ledger): the gated
+    # action must DENY (was ALLOWED — the raise escaped evaluate to main's except).
+    def _boom(*_a: object, **_k: object) -> bool:
+        raise cl.ConsentLedgerError("ledger unreadable")
+
+    code, msgs = gate.evaluate(
+        {"tool_name": "Bash", "tool_input": {"command": "git push origin main"},
+         "session_id": SID},
+        has_consent_fn=_boom,
+    )
+    assert code == 2
+    assert any("REDDEDİLDİ" in m for m in msgs)  # the consent-unverifiable note
+
+
+def test_evaluate_corrupt_consent_ledger_denies_with_note(bound_ws: Path) -> None:
+    # the REAL path: a corrupt (non-JSON) consent.jsonl line makes read_entries
+    # raise -> has_session_consent raises -> evaluate must catch it and DENY.
+    path = cl.consent_path(bound_ws, "demo")
+    path.write_text("{not valid json\n", encoding="utf-8")
+    code, msgs = gate.evaluate(
+        {"tool_name": "Bash", "tool_input": {"command": "git push origin main"},
+         "session_id": SID}
+    )
+    assert code == 2
+    assert any("REDDEDİLDİ" in m for m in msgs)
+
+
+def test_evaluate_no_consent_has_no_corrupt_note(bound_ws: Path) -> None:
+    # regression: the normal "no consent entry" deny (has_session_consent returns
+    # False WITHOUT raising) must NOT carry the corrupt-ledger note.
+    code, msgs = gate.evaluate(
+        {"tool_name": "Bash", "tool_input": {"command": "git push origin main"},
+         "session_id": SID}
+    )
+    assert code == 2
+    assert len(msgs) == 2
+    assert not any("REDDEDİLDİ" in m for m in msgs)
 
 
 # ===========================================================================
