@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "http://platinum-seo-engine/schemas/schedule",
+  "title": "Schedule Marker v1.0",
+  "description": "Shape of the GLOBAL (portfolio-wide) shared/schedule.json — the OPTIONAL recurring-schedule marker AMO batch 4d adds as the final Faz-4 autonomy step. The scheduler is DEFAULT OFF: an ABSENT file is a disarmed schedule (read_schedule returns {schema_version:'1.0', armed:false}); arming CREATES this marker and disarming REWRITES it with armed=false (it is NEVER deleted). It is a MUTABLE POINTER (armed flips true↔false), NOT an append-only log, so the recorder (scripts/state/schedule.py) writes it with the canonical atomic marker writer (tempfile → fsync → os.replace), the SAME one coverage.write_coverage uses — NEVER the append-only/hash-chain discipline of cost_ledger.jsonl or consent.jsonl. This marker FIRES nothing: the actual periodic trigger is EXTERNAL (documented in the 4e recovery runbook), and per D11 the operator only arms after the one comprehensive live-acceptance run. Autonomy that can spend money unattended is dangerous, so arming is gated three ways (spec §7 Phase 4 + §8): (O5 FAIL-CLOSED) every cost ceiling (gsc_calls / dfs_credits / image_spend in shared/cost-ceilings.json) MUST be set — 4b's 'unset ceiling → ∞ no cap' is fine for a human-watched manual /pseo-run-portfolio but UNACCEPTABLE for an armed unattended schedule; (CONSENT) consent_ack MUST be exactly true (the operator confirmed THIS cadence + cost — changing the cadence/workflow is a fresh arm, never a silent re-arm); (TRANSPARENCY) projected_daily_cost records what the operator saw before arming. The if/then below makes an armed marker UNREPRESENTABLE without all four of those — workflow, cadence, consent_ack, projected_daily_cost, armed_at are required iff armed=true.",
+  "type": "object",
+  "required": ["schema_version", "armed"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "description": "ADR-018/019 const discipline; lets a future migration discriminate older markers."
+    },
+    "armed": {
+      "type": "boolean",
+      "description": "Master switch. false (or an ABSENT file) = the scheduler is OFF and fires/arms nothing (default OFF). true = an unattended recurring sweep is armed; the if/then clause then REQUIRES workflow + cadence + consent_ack + projected_daily_cost + armed_at so an armed marker can never omit the cadence it runs, the consent it was armed under, or the cost the operator saw."
+    },
+    "workflow": {
+      "type": "string",
+      "enum": ["monthly", "audit", "setup", "content"],
+      "description": "Which per-project workflow each sweep runs (the same four-workflow set /pseo-run-portfolio accepts). Required iff armed. Changing it = a fresh arm (a new explicit consent)."
+    },
+    "cadence": {
+      "type": "string",
+      "enum": ["daily", "weekly", "monthly"],
+      "description": "How often a sweep is intended to fire. Required iff armed. Drives the projected_daily_cost math: per-sweep cost × sweeps-per-day (daily→1, weekly→1/7, monthly→1/30). The marker only RECORDS the cadence — the actual periodic trigger is EXTERNAL (4e runbook)."
+    },
+    "consent_ack": {
+      "const": true,
+      "description": "Explicit per-cadence consent. Required iff armed and must be exactly true — the operator confirmed THIS cadence + THIS projected cost. There is no override flag and no silent re-arm; an armed marker is unrepresentable without it. (Distinct from the frozen 2a consent ledger's 6 OUTWARD-action enum — a schedule is not one of those actions.)"
+    },
+    "projected_daily_cost": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "What the operator SAW before arming: the projected DAILY cost per resource (per-sweep cost × the cadence's sweeps-per-day), where per-sweep cost = the workflow's per-run estimate × the ACTUAL on-disk project count. Keys are a subset of the three portfolio pools (a resource with no estimate is omitted); an empty object means no estimates were configured. Required iff armed. Mirrors cost-ledger.schema.json's resource set.",
+      "properties": {
+        "gsc_calls": { "type": "number", "minimum": 0, "description": "Projected daily Google Search Console call count." },
+        "dfs_credits": { "type": "number", "minimum": 0, "description": "Projected daily DataForSEO credit spend." },
+        "image_spend": { "type": "number", "minimum": 0, "description": "Projected daily image-generation spend." }
+      }
+    },
+    "armed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC ISO 8601 when the schedule was armed. Passed in by the caller (the module is clock-free — the recipe resolves it at the boundary with date -u). Required iff armed."
+    },
+    "disarmed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC ISO 8601 when the schedule was last disarmed. Optional; set by disarm() (which rewrites the marker armed=false rather than deleting it). Passed in by the caller (clock-free)."
+    }
+  },
+  "allOf": [
+    {
+      "description": "An armed schedule is UNREPRESENTABLE without the cadence it runs, the workflow it sweeps, the explicit consent acknowledgement, the projected daily cost the operator saw, and the arm timestamp. (armed is always required at the top level, so this if matches exactly when armed=true.)",
+      "if": { "properties": { "armed": { "const": true } }, "required": ["armed"] },
+      "then": { "required": ["workflow", "cadence", "consent_ack", "projected_daily_cost", "armed_at"] }
+    }
+  ]
+}
