@@ -64,6 +64,9 @@ mcp_tools:
     - "mcp__dataforseo__on_page_content_parsing"
   optional:
     - "mcp__gsc__search_analytics"
+    - "mcp__sf__sf_list_crawls"
+    - "mcp__sf__sf_load_crawl"
+    - "mcp__sf__sf_export_seo_element_urls"
 budget:
   uses_paid_mcp: true
   estimated_credits: 3
