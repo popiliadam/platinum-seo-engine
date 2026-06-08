@@ -13,16 +13,19 @@ description: |
   drift kontrolü gerekiyor (`/pseo-driftcheck`). Bu komut bir DİZİ orkestratörüdür,
   tek skill değil.
 argument-hint: "<workflow> [project-slug] [--resume]"
-allowed-tools: Bash(jq:*), Bash(python3:*), Bash(date:*), Bash(mkdir:*), Read, Write, mcp__gsc__search_analytics, mcp__gsc__detect_quick_wins, mcp__gsc__enhanced_search_analytics
+allowed-tools: Bash(jq:*), Bash(python3:*), Bash(date:*), Bash(mkdir:*), Read, Write, mcp__gsc__search_analytics, mcp__gsc__detect_quick_wins, mcp__gsc__enhanced_search_analytics, mcp__dataforseo__on_page_lighthouse, mcp__dataforseo__on_page_content_parsing
 model: sonnet
 ---
 
-# /pseo-run — Workflow Orkestratörü (Faz-1: `monthly`)
+# /pseo-run — Workflow Orkestratörü (Faz-1: `monthly` · Faz-3: `audit`)
 
 > **Orkestratör spine:** `scripts/orchestration/run_step.py` (verify → loader-transform →
-> commit → coverage) + sürücü `scripts/orchestration/workflows/monthly_maintenance.py`.
-> Tek Faz-1 workflow'u: **`monthly`**. Sıra SABİT bir Python dizisidir (Path A, DAG yok).
-> CODE tool çağrısı YAPAMAZ → MCP çağrısını + transform'u MODEL yapar, CODE doğrular + commit'ler.
+> commit → coverage) + sürücüler `scripts/orchestration/workflows/monthly_maintenance.py`
+> (`monthly`) ve `scripts/orchestration/workflows/audit_suite.py` (`audit`).
+> Desteklenen workflow'lar: **`monthly`** (Faz-1, **Bölüm 2-7**) ve **`audit`** (Faz-3
+> teknik-SEO denetim suite, **Bölüm 8**). Her sıra SABİT bir Python dizisidir (Path A, DAG
+> yok). CODE tool çağrısı YAPAMAZ → MCP çağrısını + transform'u MODEL yapar, CODE doğrular +
+> commit'ler.
 
 ## 1. Aktif projeyi + workflow'u çöz
 
@@ -32,7 +35,8 @@ model: sonnet
 
 - `PROJECT` boşsa: kullanıcıdan slug iste veya `/pseo-active <slug>` öner; aşağıdaki adımları atla.
 - `$2` `--resume` ise slug'ı `active.json`'dan çöz ve **2.b**'deki resume yolunu izle.
-- Workflow `monthly` değilse: Faz-1'de yalnızca `monthly` desteklenir — DURUR, manager'a bildir.
+- Workflow `monthly` ise: **Bölüm 2-7**'yi izle. Workflow `audit` ise: **Bölüm 8** (audit
+  suite, Faz-3) — DURUR'ma. Başka bir workflow ise: desteklenmiyor — DURUR, manager'a bildir.
 
 ## 2. Workflow run'ını aç (ya da resume et)
 
@@ -229,3 +233,159 @@ Operatör (Mac app) her zaman tek bir sonraki aksiyon görür: yukarıdaki komut
 - Coverage proof: `schemas/coverage.schema.json` (`_state/coverage/{run_id}.json`).
 - Tamamlanmayı ZORUNLU kılan denetçi (Stop-hook) ayrı bir batch'tir (2c) — bu komut workflow'u
   KOŞTURUR + coverage üretir; turn-end engellemesi burada YOKTUR.
+
+---
+
+## 8. Workflow `audit` (Faz-3) — teknik-SEO denetim suite
+
+> **4 yapısal adım, rapor adımı YOK.** Teslimat = **4 commit'li sheet** (`tech_seo`, `schema`,
+> `on_page_audit`, `cannibalization`). Sürücü `audit_suite.py`, `monthly` ile AYNI spine'ı kullanır.
+> Her sheet bir SNAPSHOT (tarih/run kolonu yok) → commit `transaction.replace` (idempotent;
+> re-run satır kopyalamaz). 3 adım ANALİZ eder (aggregate/grupla) → `model_attested`
+> (kimlik+içerik+tazelik gate'i KOŞAR; silent-skip sayım kontrolü TAVSİYE niteliğinde — analiz
+> adımı girdisinin <%50'sini commit'leyebilir, gate onu yanlış-FAIL etmez). `on_page_audit` URL
+> başına bir satır üretir → `code_verified` (silent-skip gate'i ZORUNLU).
+
+### 8.1 — Run aç (ya da resume et)
+
+```python
+from scripts.state import workflow_runner
+handle = workflow_runner.create_run(
+    skill="audit-suite",
+    project_slug=PROJECT,
+    steps=[{"name": "tech_audit"}, {"name": "schema_audit"},
+           {"name": "on_page_audit"}, {"name": "cannibalization"}],
+)
+run_id = handle.run_id
+```
+
+`--resume`: `monthly` ile aynı — `workflow_runner.resume(run_id, project_slug=PROJECT)`; yalnız
+eksik/başarısız adımlar yeniden koşar (committer whole-block replace, coverage yeniden yazılır).
+
+### 8.2 — Yapısal adımlar (SIRAYLA: tech_audit → schema_audit → on_page_audit → cannibalization)
+
+Önce klasörleri hazırla:
+
+```bash
+mkdir -p "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/inbox/$RUN_ID" \
+         "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/transform/$RUN_ID"
+```
+
+**Ortak kurallar (her adım):**
+
+- **Ham PRİMER drop (provenance-damgalı)** — gerçek MCP aracını çağır, yanıtı `Write` ile
+  `_state/inbox/$RUN_ID/{step}.json` yoluna yaz. Sürücü bu drop'u `verify_raw_drop` ile doğrular
+  (→ `input_count`). Provenance: `run_id`, `slug`, `tool` (adımın beklediği araç; `schema_audit`
+  araç PİNLEMEZ — alanı atla), `window: null` (denetim nokta-bazlı, tarih penceresi DEĞİL),
+  `site_url` (yalnız `cannibalization` GSC kaynaklı → project.config `gsc.site_url`), `fetched_at`
+  (UTC ISO-8601), `declared_count == len(rows)` (eşit değilse `truncated`):
+
+  ```json
+  {
+    "provenance": {
+      "run_id": "<run_id>", "slug": "<slug>",
+      "site_url": "<yalnız cannibalization>", "window": null,
+      "tool": "<gated MCP aracı | schema_audit: bu alanı atla>",
+      "fetched_at": "<UTC ISO-8601>", "declared_count": <satır sayısı>
+    },
+    "rows": [ /* ham MCP satırları — gate input_count'u sayar */ ]
+  }
+  ```
+
+- **DFS adımları (`tech_audit`, `on_page_audit`)**: transform CLI ham yanıtı `items`/`tasks`
+  anahtarından okur (`rows`'dan DEĞİL). Bu yüzden PRİMER drop'a **hem** `rows` (gate sayar) **hem**
+  `items` (CLI okur; aynı per-URL liste) koy. **GSC/SF adımları (`cannibalization`,
+  `schema_audit`)**: CLI doğrudan `rows`'u okur → tek anahtar (`rows`) yeter.
+
+- **İKİ girdili CLI'lar** — ikincil drop GATE'lenmez, CLI'nin ek girdisidir; ayrı inbox dosyasına
+  yaz: `tech_audit` (`--content-parsing`), `schema_audit` (`--raw-dfs`, opsiyonel),
+  `on_page_audit` (`--raw-gsc`, opsiyonel).
+
+- **Çıktı dosyası** — CLI `--output-dir` ile `_state/transform/$RUN_ID/` altına **{output_file}**
+  yazar. ⚠️ `{output_file}` her zaman `{sheet}.json` DEĞİL: `schema_audit` CLI'ı
+  **`schema_audit.json`** yazar ama sheet'i **`schema`** (1d.1 tuzağı). Sürücünün loader'ı
+  `{output_file}`'ı okur — `{sheet}.json`'u DEĞİL.
+
+- **Commit YAPMA** — sheet'leri sürücü (8.3) `committer.commit` ile yazar.
+
+| Adım | Gated MCP aracı (PRİMER drop) | İkincil drop (gate'siz) | Sheet → **çıktı dosyası** | Transform CLI argümanları |
+|------|------------------------------|--------------------------|---------------------------|---------------------------|
+| `tech_audit` | `mcp__dataforseo__on_page_lighthouse` | `…on_page_content_parsing` → `tech_audit_content.json` | `tech_seo` → **`tech_seo.json`** | `--lighthouse <primer> --content-parsing <ikincil> [--url-cap N] --output-dir` |
+| `schema_audit` | *(SF veya dosya — araç PİNLENMEZ)* | *(ops.)* `…on_page_content_parsing` → `schema_audit_dfs.json` | `schema` → **`schema_audit.json`** | `--raw-sf <primer> [--raw-dfs <ikincil>] --output-dir` |
+| `on_page_audit` | `mcp__dataforseo__on_page_content_parsing` | *(ops.)* `mcp__gsc__search_analytics` → `on_page_audit_gsc.json` | `on_page_audit` → **`on_page_audit.json`** | `--raw-content-parsing <primer> [--raw-gsc <ikincil>] --output-dir` |
+| `cannibalization` | `mcp__gsc__search_analytics` (query+page) | — | `cannibalization` → **`cannibalization.json`** | `--raw <primer> [--min-impressions N] --output-dir` |
+
+Transform CLI çağrıları (her adım için PRİMER drop yazıldıktan sonra):
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/discovery/tech_audit_transform.py" \
+  --lighthouse      "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/inbox/$RUN_ID/tech_audit.json" \
+  --content-parsing "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/inbox/$RUN_ID/tech_audit_content.json" \
+  --output-dir      "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/transform/$RUN_ID/"
+
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/discovery/schema_audit_transform.py" \
+  --raw-sf     "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/inbox/$RUN_ID/schema_audit.json" \
+  --output-dir "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/transform/$RUN_ID/"
+
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/discovery/on_page_audit_transform.py" \
+  --raw-content-parsing "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/inbox/$RUN_ID/on_page_audit.json" \
+  --output-dir          "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/transform/$RUN_ID/"
+
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/discovery/cannibalization_transform.py" \
+  --raw        "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/inbox/$RUN_ID/cannibalization.json" \
+  --output-dir "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/transform/$RUN_ID/"
+```
+
+> `schema_audit` kaynağı SF: dosya-bazlı `structured_data_all` export (varsayılan) ya da opt-in SF
+> MCP. Bu adım araç PİNLEMEZ (`expected_tool=None`) — provenance `tool` alanını atla; gate yalnız
+> kimlik (`run_id`/`slug`) + tazelik + `declared_count`'u doğrular.
+>
+> Bu bölümde **commit YAPMA** — model yalnız ham drop(lar) + transform çıktısı üretir; doğrulama +
+> commit + coverage CODE'a (8.3 sürücü) aittir.
+
+### 8.3 — Sürücü (`audit_suite`) — doğrula + commit + coverage
+
+4 adımın drop'ları + çıktıları hazırken sürücüyü çalıştır. `--now-epoch` zorunlu (modül saat
+OKUMAZ — sınırda `date` ile geçiyoruz). Rapor adımı YOK → `--report-exists` YOK:
+
+```bash
+PYTHONPATH="${CLAUDE_PLUGIN_ROOT}" python3 -m scripts.orchestration.workflows.audit_suite \
+  --run-id "$RUN_ID" --slug "$PROJECT" \
+  --workspace-root "$PSEO_WORKSPACE_ROOT" \
+  --workbook "$PSEO_WORKSPACE_ROOT/projects/$PROJECT/master.xlsx" \
+  --now-epoch "$(date +%s)"
+```
+
+Sürücü: `code_verified` adımı (`on_page_audit`) `run_step` ile (verify → loader-transform →
+`committer.commit` → silent-skip ZORUNLU); `model_attested` adımları (`tech_audit`, `schema_audit`,
+`cannibalization`) kimlik+içerik+tazelik gate'i + `committer.commit` (silent-skip TAVSİYE) ile
+geçirir; verdict türetir (4 sheet'in HEPSİ `satisfied` değilse `pass` olamaz — tamamlanma geçidi)
+ve coverage kaydını `_state/coverage/$RUN_ID.json` dosyasına yazar (`schemas/coverage.schema.json`).
+
+### 8.4 — Verdict `pass` değilse — Türkçe düzeltme komutu
+
+Sürücünün son satırı zaten `remediation.render(...)` çıktısıdır; tek kopyala-yapıştır aksiyon:
+
+```
+/pseo-run audit <slug> --resume
+```
+
+- `incomplete` → eksik yapısal adım(lar) adlandırılır; `--resume` onları tamamlar.
+- `failed` → gate reddi / `on_page_audit` silent-skip olan adım(lar); `--resume` yeniden dener.
+- `paused` → harici bağımlılık (DFS/GSC) duraklattı; `--resume` kaldığı yerden devam eder.
+
+### 8.5 — Bağımlılıklar (`audit`)
+
+- Sürücü: `scripts/orchestration/workflows/audit_suite.py` (+ spine `run_step.py` / `verify.py` /
+  `committer.py` / `coverage.py` — IMPORT-only, değiştirilmez).
+- Remediation: `scripts/orchestration/remediation.py` (`workflow="audit"` → `/pseo-run audit … --resume`).
+- Skill + transform zinciri: `skills/discovery/tech-audit/SKILL.md` +
+  `scripts/discovery/tech_audit_transform.py`; `skills/discovery/schema-audit/SKILL.md` +
+  `scripts/discovery/schema_audit_transform.py`; `skills/discovery/on-page-audit/SKILL.md` +
+  `scripts/discovery/on_page_audit_transform.py`; `skills/discovery/cannibalization/SKILL.md` +
+  `scripts/discovery/cannibalization_transform.py`.
+- Run state: `scripts/state/workflow_runner.py` (`create_run` / `resume`).
+- MCP: `mcp__dataforseo__on_page_lighthouse`, `mcp__dataforseo__on_page_content_parsing`,
+  `mcp__gsc__search_analytics`; `schema_audit` SF export (dosya) veya opt-in SF MCP. DFS HEAVY →
+  her DFS adımı kendi SKILL.md'sindeki bütçe pre-flight'ına tabidir.
+- Coverage proof: `schemas/coverage.schema.json` (`_state/coverage/{run_id}.json`).

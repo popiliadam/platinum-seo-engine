@@ -291,17 +291,20 @@ workflow_runner.approve(handle.run_id, project_slug=project_slug,
 
 ### Step 8 — `write_excel` (atomic, schema-validated)
 
-One `transaction.append` call. Schema validation (RowSchemaError →
-DURUR #8) happens inside the transaction; the transform also runs a
-defensive `_validate_row` pass before returning, so drift is caught
-twice.
+One `committer.commit` call — the orchestrator's single idempotent commit
+path (whole-block `transaction.replace` from the schema's `data_start_row`,
+so re-running the step never duplicates rows on the `tech_seo` snapshot
+sheet). Schema validation (RowSchemaError → DURUR #8) happens inside the
+transaction; the transform also runs a defensive `_validate_row` pass before
+returning, so drift is caught twice.
 
 ```python
-from scripts.excel import transaction
-transaction.append(
-    workbook_path=workspace_root/"projects"/project_slug/"master.xlsx",
-    sheet="tech_seo",
-    rows=tech_seo_rows,
+from scripts.orchestration import committer
+committer.commit(
+    workspace_root/"projects"/project_slug/"master.xlsx",
+    "tech_seo",
+    tech_seo_rows,
+    run_id=handle.run_id,
     project_slug=project_slug,
     writer="tech-audit",
 )

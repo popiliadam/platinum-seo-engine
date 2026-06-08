@@ -258,16 +258,19 @@ workflow_runner.approve(handle.run_id, project_slug=project_slug,
 
 ### Step 7 — `write_excel` (atomic, schema-validated)
 
-Single `transaction.append` call for the on_page_audit sheet (8 cols).
-Goes through the single approved write path (backup, lock, schema
-validation, post-write provenance event emission).
+Single `committer.commit` call for the on_page_audit sheet (8 cols) — the
+orchestrator's idempotent commit path (whole-block `transaction.replace`
+from the schema's `data_start_row`, so re-running never duplicates rows on
+the `on_page_audit` snapshot sheet). Goes through the single approved write
+path (backup, lock, schema validation, post-write provenance event emission).
 
 ```python
-from scripts.excel import transaction
-transaction.append(
-    workbook_path=workspace_root/"projects"/project_slug/"master.xlsx",
-    sheet="on_page_audit",
-    rows=on_page_audit_rows,
+from scripts.orchestration import committer
+committer.commit(
+    workspace_root/"projects"/project_slug/"master.xlsx",
+    "on_page_audit",
+    on_page_audit_rows,
+    run_id=handle.run_id,
     project_slug=project_slug,
     writer="on-page-audit",
 )
