@@ -53,10 +53,15 @@ def _run(inline: str, payload: dict) -> tuple[int, str]:
 
 
 def test_matcher_includes_bash() -> None:
-    """Tier 1 A2 fix: matcher 'Edit|Write' → 'Edit|Write|Bash'."""
+    """Tier 1 A2 fix: matcher 'Edit|Write' → 'Edit|Write|Bash'. codex-hostile-
+    audit #1 additionally added NotebookEdit so the pending-bytes secret gate
+    fires on notebook writes too. Assert membership (not exact equality) so the
+    matcher can grow as new write-shaped tools are gated."""
     spec = json.loads(HOOK_PATH.read_text(encoding="utf-8"))
     matcher = spec["hooks"]["PreToolUse"][0]["matcher"]
-    assert matcher == "Edit|Write|Bash", f"matcher must include Bash; got {matcher!r}"
+    tools = matcher.split("|")
+    for tool in ("Edit", "Write", "Bash", "NotebookEdit"):
+        assert tool in tools, f"matcher must include {tool}; got {matcher!r}"
 
 
 def test_edit_master_xlsx_with_sidecar_blocks(tmp_path: Path, hook_inline: str) -> None:

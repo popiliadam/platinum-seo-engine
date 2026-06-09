@@ -120,3 +120,73 @@ def test_check_secrets_sh_adr034_four_detection_patterns():
     ]
     for pat in expected_patterns:
         assert pat in body, f"ADR-034 detection pattern missing: {pat}"
+
+
+# ---------------------------------------------------------------------------
+# #2 — CI/runtime scanner parity (hostile-audit finding #2)
+# ============================================================================
+# The CI wrapper used to grep only 4 committed-history literals while the
+# runtime scanner (scripts/security/check_secrets.sh) knows 16 secret CLASSES
+# (PATTERN_NAMES). A class known to runtime could therefore pass GitHub Actions.
+# The wrapper now ALSO invokes the canonical scanner so CI's inventory can never
+# be NARROWER than runtime — a single source of truth by construction.
+import re as _re
+
+CANONICAL = pathlib.Path(__file__).resolve().parents[2] / "scripts/security/check_secrets.sh"
+
+
+def _canonical_pattern_names() -> list[str]:
+    """The canonical inventory labels (the runtime PATTERN_NAMES array)."""
+    m = _re.search(r"PATTERN_NAMES=\((.*?)\)", CANONICAL.read_text(), _re.S)
+    assert m, "PATTERN_NAMES array not found in canonical scanner"
+    return _re.findall(r'"([^"]+)"', m.group(1))
+
+
+def test_ci_wrapper_invokes_canonical_scanner():
+    """#2 fix: the CI wrapper MUST invoke the canonical runtime scanner so its
+    full 16-class inventory covers CI — not just the 4 historical literals."""
+    body = SCRIPT.read_text()
+    assert "scripts/security/check_secrets.sh" in body, (
+        "CI wrapper must invoke scripts/security/check_secrets.sh (the canonical "
+        "16-class inventory); before this fix CI ran only a 4-literal git-grep, "
+        "so a committed Google/Slack/PEM/AWS secret could pass GitHub Actions"
+    )
+
+
+def test_ci_wrapper_coverage_superset_of_runtime_inventory():
+    """Label parity: because the wrapper invokes the canonical scanner, CI's
+    covered class set ⊇ the runtime PATTERN_NAMES by construction. Pin both
+    halves so a future edit can't silently revert to a narrow hand-rolled set."""
+    names = _canonical_pattern_names()
+    assert len(names) >= 16, f"canonical inventory unexpectedly shrank: {names}"
+    assert "scripts/security/check_secrets.sh" in SCRIPT.read_text(), (
+        "wrapper no longer invokes the canonical scanner — CI coverage would "
+        f"fall back below the {len(names)}-class runtime inventory"
+    )
+
+
+def test_ci_wrapper_retains_historical_literal_guard():
+    """Regression: the 4 committed-history specific literals are NOT in the
+    shape-based canonical inventory, so the wrapper must keep its git-grep for
+    them ALONGSIDE the canonical call (assertions avoid the `=`+quote adjacency
+    so they never themselves match the canonical dataforseo pattern)."""
+    body = SCRIPT.read_text()
+    for lit in ("info@demo-agency", "3bf73e0893f69b42", "DATAFORSEO_PASSWORD", "ghp_"):
+        assert lit in body, f"historical-literal guard dropped: {lit}"
+
+
+def test_ci_wrapper_canonical_call_committed_secret_roundtrip(tmp_path: pathlib.Path):
+    """End-to-end: a secret CLASS the OLD 4-literal wrapper missed (Slack) is now
+    caught because the wrapper runs the canonical scanner. Proven directly on the
+    canonical scanner with a dynamically-built token (no literal on disk)."""
+    slack = "xox" + "b-" + "Z" * 24  # synthetic Slack token shape, built at runtime
+    proc = subprocess.run(
+        ["bash", str(CANONICAL), "--scan-stdin", "config.yaml"],
+        input=f"slack_token: {slack}\n",
+        capture_output=True, text=True, timeout=30,
+    )
+    assert proc.returncode == 1, (
+        f"canonical scanner (now invoked by CI) must catch Slack class; "
+        f"stdout={proc.stdout!r}"
+    )
+    assert slack not in proc.stdout, "scanner must never echo matched content"

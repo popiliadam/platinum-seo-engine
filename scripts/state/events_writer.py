@@ -81,13 +81,38 @@ _REDACTED = "***REDACTED***"
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_SCHEMA_PATH = _REPO_ROOT / "schemas" / "events.schema.json"
 
-# Secret VALUE patterns — match common token formats outright.
+# Secret VALUE patterns — a MIRROR of the canonical inventory in
+# scripts/security/check_secrets.sh (its 16 PATTERN_NAMES classes), so an event
+# can never persist a secret class the repo otherwise claims to detect (hostile
+# audit #3). Python redaction can't shell out per event, so the inventory is
+# mirrored here; the drift tripwire is tests/scripts/test_events_writer_secret_
+# redaction.py — its enumeration must equal the scanner's PATTERN_NAMES, so a
+# 17th scanner pattern fails the suite until this tuple grows too. Each regex is
+# written as prefix + char-class (never a contiguous literal token), so the
+# canonical full-scan — which does NOT exclude this module — stays GREEN on it.
 _SECRET_VALUE_PATTERNS: tuple[re.Pattern[str], ...] = (
-    re.compile(r"sk-(?:proj-)?[A-Za-z0-9_\-]{20,}"),       # openai
-    re.compile(r"sk-ant-[A-Za-z0-9_\-]{20,}"),             # anthropic
-    re.compile(r"ghp_[A-Za-z0-9]{36}"),                    # github classic PAT
+    # openai / anthropic            [openai_or_anthropic_sk_prefix]
+    re.compile(r"sk-(?:proj-)?[A-Za-z0-9_\-]{20,}"),
+    re.compile(r"sk-ant-[A-Za-z0-9_\-]{20,}"),
+    # google api key                [google_api_key_AIza]
+    re.compile(r"AIza[0-9A-Za-z_\-]{35}"),
+    # slack token                   [slack_token_xox]
+    re.compile(r"xox[baprs]-[0-9a-zA-Z\-]{10,}"),
+    # github classic + oauth/server/user PAT  [github_pat_classic_ghp + _gho/_ghs/_ghu]
+    re.compile(r"gh[posu]_[A-Za-z0-9]{36}"),
     re.compile(r"github_pat_[A-Za-z0-9_]{82}"),            # github fine-grained
-    re.compile(r"AKIA[0-9A-Z]{16}"),                       # aws access key id
+    # aws  [aws_akia_key_literal + aws_access_key_id_line + aws_secret_access_key_line]
+    re.compile(r"AKIA[0-9A-Z]{16}"),
+    re.compile(r"aws_access_key_id\s*=\s*[A-Z0-9]{20}"),
+    re.compile(r"aws_secret_access_key\s*=\s*[A-Za-z0-9/+=]{40}"),
+    # pem / rsa / openssh private-key header   [pem_/rsa_/openssh_private_key_header]
+    re.compile(r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----"),
+    # gcp service-account email + json private_key field
+    #   [gcp_service_account_client_email + gcp_service_account_json_private_key_field]
+    re.compile(r"[A-Za-z0-9._-]+@[A-Za-z0-9.-]+\.iam\.gserviceaccount\.com"),
+    re.compile(r'"private_key"\s*:\s*"-----BEGIN'),
+    # dataforseo hardcoded creds    [dataforseo_env_hardcoded_literal]
+    re.compile(r"DATAFORSEO_(?:LOGIN|USERNAME|PASSWORD)\s*=\s*[\"'][^\"']+[\"']"),
 )
 
 # Secret FIELD-NAME suffixes — case-insensitive endswith match.

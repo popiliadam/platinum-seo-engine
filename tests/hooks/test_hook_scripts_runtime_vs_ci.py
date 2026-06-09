@@ -28,6 +28,16 @@ RUNTIME_HOOK_SCRIPTS = {
     "stop_validation.py",
     "subagent_output_validate.py",
     "validate_content_write.py",
+    # codex-hostile-audit #1 PreToolUse pending-bytes secret gate — wired into
+    # hooks/pre-tool-use.json (matcher "Edit|Write|NotebookEdit|Bash") as the
+    # command right AFTER the post-hoc check_secrets.sh --changed-since scan
+    # (which it keeps as an ADDITIONAL incremental backstop). It extracts a
+    # Write/Edit/NotebookEdit payload's literal pending content (and a
+    # write-shaped Bash command) and pipes it to check_secrets.sh --scan-stdin
+    # <file_path>, blocking (exit 2) BEFORE a secret-bearing write lands on disk.
+    # Re-implements NO pattern — delegates to the canonical 16-class inventory
+    # (single source of truth). See scripts/hooks/README.md §1.
+    "scan_pending_secret.py",
     # AMO batch-0d session-aware audit emitter — wired into hooks/post-tool-use.json
     # (replaces the legacy inline `python3 -c` audit command). Attributes each
     # Edit/Write/Bash audit event to THIS session's bound project (session marker
