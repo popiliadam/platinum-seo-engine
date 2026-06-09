@@ -527,6 +527,47 @@ def test_emit_failure_is_visible_and_nonblocking(
 
 
 # ---------------------------------------------------------------------------
+# Test 16b — D-B (#9): a failed emit ALSO writes a durable anomaly record so a
+#            workflow transition without an audit event stays reconcilable.
+# ---------------------------------------------------------------------------
+
+def test_emit_failure_records_durable_anomaly(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _setup(tmp_path)
+
+    def _boom(*args: object, **kwargs: object) -> None:
+        raise events_writer.EventWriterError("events.jsonl unwritable")
+
+    monkeypatch.setattr(events_writer, "append_workflow", _boom)
+
+    # create_run emits a 'started' workflow event — now failing. The run state
+    # must still persist (non-blocking, no roll-back) AND a durable anomaly must
+    # be recorded so the missing audit event is reconcilable.
+    handle = workflow_runner.create_run(
+        skill="emit-skill", project_slug="test-proj",
+        steps=[{"name": "go"}], workspace_root=tmp_path,
+    )
+    re_read = workflow_runner.get(handle.run_id, project_slug="test-proj",
+                                  workspace_root=tmp_path)
+    assert re_read.status == "running"
+
+    anomalies = tmp_path / "projects" / "test-proj" / "_state" / "anomalies.jsonl"
+    assert anomalies.exists()
+    recs = [
+        json.loads(line)
+        for line in anomalies.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert len(recs) == 1
+    rec = recs[0]
+    assert rec["kind"] == "workflow_event_emit_failed"
+    assert rec["detail"]["workflow_run_id"] == handle.run_id
+    assert rec["detail"]["workflow_action"] == "started"
+    assert "events.jsonl unwritable" in rec["error"]
+
+
+# ---------------------------------------------------------------------------
 # Test 17 — AMO 1a: fail(external=True) persists failure_reason.external=true
 #           AND the run JSON still validates against the schema (spec D4).
 # ---------------------------------------------------------------------------

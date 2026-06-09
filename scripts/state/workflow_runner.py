@@ -20,7 +20,10 @@ start_step/finish_step are internal-only (no event).
 
 Refs: spec §3 + §10; schemas/workflow-run + events; rules/append-only-
 state, schema-first, time-discipline; ADR-019 / ADR-020 / ADR-021.
-Imports events_writer one-way; never imported by it.
+Imports events_writer + anomaly_recorder one-way; never imported by them. A
+failed workflow-event emit keeps the run state and records a durable anomaly to
+the _state/anomalies.jsonl sidecar (operator decision D-B: no roll-back, no
+hard-block); reconciliation is a follow-up.
 """
 
 from __future__ import annotations
@@ -41,7 +44,7 @@ from typing import Any, Iterable
 from jsonschema import Draft7Validator
 from jsonschema.exceptions import ValidationError as _JSValidationError
 
-from scripts.state import events_writer
+from scripts.state import anomaly_recorder, events_writer
 from scripts.validation.validate_schema import build_validator
 
 # ---------------------------------------------------------------------------
@@ -801,7 +804,14 @@ def _emit_workflow_event(*, project_slug: str, workflow_action: str,
     longer swallowed silently; it surfaces a visible WARNING on stderr. The
     catch is broad (any exception) so an event-writer hiccup can never roll back
     a transition that already committed to disk. `notes` (when given) is mirrored
-    into the event's free-text metadata (pause reason / approve notes)."""
+    into the event's free-text metadata (pause reason / approve notes).
+
+    #9 / operator decision D-B: a failed emit ALSO writes a DURABLE ANOMALY into
+    the _state/anomalies.jsonl sidecar — a SEPARATE path from the events.jsonl
+    whose emit just failed — so a transition that lands a run-state change WITHOUT
+    its audit event stays reconcilable. The run state is kept (no roll-back) and
+    the caller is never hard-blocked. Recording the anomaly is itself best-effort:
+    a fallback failure is downgraded to a WARNING, never re-raised."""
     extra: dict[str, Any] = {}
     if notes:
         extra["notes"] = notes
@@ -816,6 +826,26 @@ def _emit_workflow_event(*, project_slug: str, workflow_action: str,
             f"WARNING: workflow event emit failed (non-blocking) "
             f"({workflow_action} {workflow_run_id}): {exc}"
         )
+        try:
+            # _workflows_dir already validated the slug + resolved the workspace
+            # root when the run JSON was written moments ago; its parent is the
+            # project's _state dir where anomalies.jsonl lives beside events.jsonl.
+            state_dir = _workflows_dir(project_slug, workspace_root).parent
+            anomaly_recorder.record_anomaly(
+                state_dir,
+                kind="workflow_event_emit_failed",
+                detail={
+                    "workflow_run_id": workflow_run_id,
+                    "workflow_action": workflow_action,
+                    "step_index": step_index,
+                },
+                error=f"{type(exc).__name__}: {exc}",
+            )
+        except Exception as rec_exc:  # never re-brick on a fallback failure
+            _log(
+                f"WARNING: anomaly record ALSO failed for workflow "
+                f"{workflow_run_id} ({workflow_action}), unreconcilable: {rec_exc}"
+            )
 
 
 # ---------------------------------------------------------------------------

@@ -27,7 +27,10 @@ Refs: spec §3 + §8.5; schemas/master-excel.schema.json (definitions,
 formula_policy, allowed_writers); rules/excel-discipline, schema-first,
 append-only-state, single-source-of-truth; ADR-009, ADR-012, ADR-018,
 ADR-021.
-Imports events_writer one-way; never imported by it.
+Imports events_writer + anomaly_recorder one-way; never imported by them. On a
+provenance emit failure the write is KEPT and a durable anomaly is recorded to
+the _state/anomalies.jsonl sidecar (operator decision D-B: no roll-back, no
+hard-block); reconciliation is a follow-up.
 """
 
 from __future__ import annotations
@@ -51,7 +54,7 @@ from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
 from openpyxl.workbook import Workbook
 
-from scripts.state import events_writer
+from scripts.state import anomaly_recorder, events_writer
 from scripts.validation.validate_schema import build_validator
 
 # ---------------------------------------------------------------------------
@@ -897,11 +900,14 @@ def update(
     finally:
         _release_lock(fd, lock_path)
 
-    event_id = _emit_provenance(
+    # D-B: a provenance emit failure records a durable anomaly + keeps the
+    # workbook (no roll-back, no hard-block) — never propagates. state_dir is the
+    # project's _state dir (anomalies.jsonl lands beside events.jsonl).
+    event_id = _emit_provenance_or_anomaly(
         project_slug=project_slug,
         sheet=sheet,
         rows_affected=len(affected_rows),
-        state_root=state_dir.parent,  # _state lives at projects/{slug}/_state
+        state_dir=state_dir,
         operation="project_excel",
     )
     return WriteResult(
@@ -997,14 +1003,16 @@ def _write_or_append(
     finally:
         _release_lock(fd, lock_path)
 
-    # 7. Emit provenance event into events.jsonl. Failure to emit does not
-    # roll back the write — Excel is on disk, the lack of an event is its
-    # own anomaly, surfaced via the raised exception.
-    event_id = _emit_provenance(
+    # 7. Emit provenance event into events.jsonl. Failure to emit does NOT roll
+    # back the write (Excel is on disk) and does NOT hard-block the caller —
+    # operator decision D-B. Instead a DURABLE ANOMALY is recorded into the
+    # _state/anomalies.jsonl sidecar (a SEPARATE path from the events.jsonl whose
+    # emit just failed) so the missing provenance event stays reconcilable.
+    event_id = _emit_provenance_or_anomaly(
         project_slug=project_slug,
         sheet=sheet,
         rows_affected=len(rows),
-        state_root=state_dir.parent,
+        state_dir=state_dir,
         operation="project_excel",
     )
 
@@ -1049,6 +1057,59 @@ def _emit_provenance(
         workspace_root=workspace_root,
     )
     return result.event_id
+
+
+def _emit_provenance_or_anomaly(
+    *,
+    project_slug: str,
+    sheet: str,
+    rows_affected: int,
+    state_dir: Path,
+    operation: str,
+) -> str:
+    """Emit provenance; on emit failure record a durable anomaly (operator D-B).
+
+    The workbook is already saved + the lock released by the time this runs. D-B
+    rules that an audit/event emit hiccup must NOT roll back the workbook and must
+    NOT hard-block the caller. So on ANY emit failure we:
+      1. write a DURABLE ANOMALY into _state/anomalies.jsonl — a SEPARATE path
+         from the events.jsonl whose emit just failed (so a schema-load/lock/disk
+         failure on events.jsonl can't take the fallback down with it), and
+      2. return "" (no event_id) instead of raising.
+    A failure of the anomaly write itself is downgraded to a WARNING — a fallback
+    failure must never re-brick an already-committed write. Reconciliation
+    (drift-check surfacing anomalies.jsonl) is a follow-up.
+    """
+    try:
+        return _emit_provenance(
+            project_slug=project_slug,
+            sheet=sheet,
+            rows_affected=rows_affected,
+            state_root=state_dir.parent,  # _state lives at projects/{slug}/_state
+            operation=operation,
+        )
+    except Exception as exc:
+        try:
+            anomaly_recorder.record_anomaly(
+                state_dir,
+                kind="provenance_emit_failed",
+                detail={
+                    "sheet": sheet,
+                    "rows_written": rows_affected,
+                    "operation": operation,
+                },
+                error=f"{type(exc).__name__}: {exc}",
+            )
+        except Exception as rec_exc:  # never re-brick on a fallback failure
+            _log(
+                f"WARNING: anomaly record ALSO failed for sheet {sheet!r} "
+                f"(provenance emit lost, unreconcilable): {rec_exc}"
+            )
+        _log(
+            f"WARNING: provenance emit failed for sheet {sheet!r} — anomaly "
+            f"recorded, workbook kept (D-B: no roll-back, no hard-block): {exc}"
+        )
+        return ""
 
 
 # ---------------------------------------------------------------------------
