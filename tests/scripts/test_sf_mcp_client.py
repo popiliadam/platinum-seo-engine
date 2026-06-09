@@ -29,7 +29,8 @@ Coverage:
     * Connection error → 3-retry exp-backoff; all-fail → SfMcpConnectionError.
     * Response size cap → SfMcpResponseTooLargeError; HTTP 4xx → SfMcpToolError.
     * Session expiry → re-initialize once + retry.
-    * Redirect handling (307 → 200 follow, POST + body + session preserved).
+    * Redirect handling (#20): 3xx is NOT followed (SSRF guard) — it surfaces as
+      SfMcpToolError; health() returns False on a redirect during initialize.
     * Spider-BUSY retry (v1.9.2): transient busy → retry-with-backoff →
       success; busy forever → exhaust budget + return busy as-is (no loop, no
       raise); permanent isError (SecurityException) → NO retry; success → NO
@@ -731,24 +732,26 @@ def test_call_tool_session_error_does_not_loop_forever() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Case 10: Redirect handling (307 → 200 follow, POST + body + headers preserved)
+# Case 10: Redirect handling (#20) — redirects are NOT followed (SSRF guard).
+# The SF MCP base_url is loopback; a server 3xx that points off-host is always
+# suspect, so follow_redirects=False + the 3xx surfaces as a clear error instead
+# of silently chasing an attacker-controlled Location to a different host/port.
 # ---------------------------------------------------------------------------
 
-def test_call_tool_follows_307_redirect_preserving_post_body() -> None:
-    """307 must be followed; method (POST), body, and session header preserved.
+def test_call_tool_does_not_follow_redirect_surfaces_error() -> None:
+    """#20: a 3xx on ``tools/call`` must NOT be followed — it surfaces as a clear
+    SfMcpToolError and the client never POSTs to the redirect target.
 
-    Per RFC 7231 §6.4.7, only 307/308 preserve method+body. An MCP server using
-    redirects MUST use 307, or POST→GET downgrade would drop the envelope.
-    We redirect only the ``tools/call`` (the handshake completes normally).
+    The handler offers a 200 success AT the redirect target; if the client (wrongly)
+    followed the redirect it would reach it and return a result. The fix proves the
+    redirect is refused: exactly ONE tool POST (to base_url) and an error raised.
     """
-    redirect_target = BASE_URL + "/v2"
-    tool_calls: list[tuple[str, str, str | None]] = []  # (url, method, session)
+    redirect_target = "http://169.254.169.254/latest/meta-data"  # SSRF canary host
+    tool_posts: list[str] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
         body = json.loads(request.content) if request.content else {}
         method = body.get("method")
-        headers = {k.lower(): v for k, v in request.headers.items()}
-
         if method == "initialize":
             return httpx.Response(
                 200, json=_jsonrpc_result(body["id"], {"ok": True}),
@@ -756,26 +759,40 @@ def test_call_tool_follows_307_redirect_preserving_post_body() -> None:
             )
         if method == "notifications/initialized":
             return httpx.Response(202)
-
-        # tools/call
+        # tools/call — the server tries to redirect us off-host.
         url = str(request.url)
-        tool_calls.append((url, request.method, headers.get(SESSION_ID_HEADER.lower())))
+        tool_posts.append(url)
         if url == BASE_URL:
             return httpx.Response(307, headers={"location": redirect_target}, text="")
+        # Only reached if the client WRONGLY follows the redirect.
         return httpx.Response(
             200,
-            text=_sse_body(_jsonrpc_result(body["id"], {"final": "yes"})),
+            text=_sse_body(_jsonrpc_result(body["id"], {"final": "followed!"})),
             headers={"content-type": "text/event-stream"},
         )
 
     client = _raw_client(handler)
-    result = client.call_tool("sf_list_crawls")
+    with pytest.raises(SfMcpToolError) as exc_info:
+        client.call_tool("sf_list_crawls")
 
-    assert tool_calls == [
-        (BASE_URL, "POST", DEFAULT_SESSION_ID),
-        (redirect_target, "POST", DEFAULT_SESSION_ID),
-    ], f"307 must preserve POST + session header on redirect; got {tool_calls}"
-    assert result == {"final": "yes"}
+    assert exc_info.value.status_code == 307
+    assert "redirect" in str(exc_info.value).lower()
+    assert tool_posts == [BASE_URL], (
+        f"redirect must NOT be followed; expected exactly one POST to {BASE_URL}, "
+        f"got {tool_posts}"
+    )
+
+
+def test_health_false_on_redirect_during_initialize() -> None:
+    """A 3xx on the initialize handshake makes health() return False (the redirect
+    is surfaced internally as an error; health stays non-raising by contract)."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            302, headers={"location": "http://evil.example/"}, text=""
+        )
+
+    client = _raw_client(handler)
+    assert client.health() is False
 
 
 # ---------------------------------------------------------------------------

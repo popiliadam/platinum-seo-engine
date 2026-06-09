@@ -301,7 +301,7 @@ the events.schema event_type enum, so skill writes:
 | `timestamp`      | UTC ISO 8601                                   |
 | `project_id`     | `project-config[project_id]`                   |
 | `note`           | `host + url_count + submitted + failed summary`|
-| `indexing_ping`  | `{ attempted, call_type=URL_UPDATED, response_code, called_at }` |
+| `indexing_ping`  | `{ attempted, response_code, called_at }` — **sitemap_submission** semantics; `call_type` is OMITTED on the wired `mcp__gsc__submit_sitemap` path (a sitemap-level submission has no per-URL notification type). The `call_type` enum (`URL_UPDATED` / `URL_DELETED`) stays RESERVED for the unbuilt, consent-gated per-URL Google Indexing API. |
 | `primary_source` | `manual`                                       |
 
 Per-URL detail goes into `indexing_ping` sub-object plus the

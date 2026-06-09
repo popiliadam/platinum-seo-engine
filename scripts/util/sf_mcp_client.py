@@ -69,6 +69,10 @@ Reliability:
     * Response size cap: raises :class:`SfMcpResponseTooLargeError` when
       Content-Length OR the actual body bytes exceed ``max_response_bytes``
       (default 100,000 bytes per D-SF-05).
+    * Redirects (#20): NEVER auto-followed. ``follow_redirects=False`` pins the
+      client to its configured (loopback) ``base_url``; a server 3xx is surfaced
+      as an :class:`SfMcpToolError` (carrying the refused ``Location``) rather than
+      silently chasing an attacker-controlled redirect to another host/port.
 
 Logging: every call writes one stderr line in the PSEO ingestion convention
 ``[sf_mcp_client] {method} {tool} → {status}``.
@@ -560,6 +564,7 @@ class SfMcpClient:
         }
         resp = self._post_once(envelope)
         self._enforce_size_cap(resp, "initialize")
+        self._reject_redirect(resp, "initialize")
         if not (200 <= resp.status_code < 300):
             raise SfMcpToolError(
                 f"HTTP {resp.status_code} from MCP initialize: {resp.text[:200]}",
@@ -601,7 +606,12 @@ class SfMcpClient:
             self._client = httpx.Client(
                 timeout=self.timeout_seconds,
                 transport=self._transport,
-                follow_redirects=True,
+                # SSRF guard (#20): NEVER auto-follow redirects. The MCP
+                # Streamable-HTTP transport posts to a fixed (typically loopback)
+                # base_url and never legitimately redirects; following a server
+                # 3xx would let it steer the client to an arbitrary host/port. A
+                # 3xx is instead surfaced as a clear error (see _reject_redirect).
+                follow_redirects=False,
             )
         return self._client
 
@@ -719,9 +729,30 @@ class SfMcpClient:
                 f"max_response_bytes={self.max_response_bytes}"
             )
 
+    def _reject_redirect(self, resp: httpx.Response, label: str) -> None:
+        """Refuse a 3xx response — redirects are NOT followed (SSRF guard, #20).
+
+        ``follow_redirects=False`` keeps the client pinned to its configured
+        (typically loopback) ``base_url``; a server 3xx is surfaced as a clear
+        :class:`SfMcpToolError` instead of silently chasing an attacker-controlled
+        ``Location`` to a different host/port. Same-host redirects are refused too —
+        the MCP Streamable-HTTP transport posts to a fixed path and never
+        legitimately redirects.
+        """
+        if 300 <= resp.status_code < 400:
+            location = resp.headers.get("location", "")
+            self._log("POST", label,
+                      f"redirect {resp.status_code} NOT followed → {location!r}")
+            raise SfMcpToolError(
+                f"redirect ({resp.status_code}) from MCP server for {label!r} not "
+                f"followed (redirects disabled — SSRF guard) → Location={location!r}",
+                status_code=resp.status_code,
+            )
+
     def _handle_tool_response(self, resp: httpx.Response, tool_name: str) -> dict:
         """Validate + parse a ``tools/call`` response into its JSON-RPC ``result``."""
         self._enforce_size_cap(resp, tool_name)
+        self._reject_redirect(resp, tool_name)
 
         # HTTP status (4xx/5xx → SfMcpToolError, no retry here).
         if not (200 <= resp.status_code < 300):

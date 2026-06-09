@@ -55,6 +55,12 @@ MARKETPLACE_DESC_PREFIX_RE = re.compile(
     r"^v\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?\s+—\s+"
 )
 
+# Version-keyed RELEASE_NOTES link, e.g. docs/RELEASE_NOTES_v1.5.0.md (F12). A
+# banner bump alone left these pointing at the previous release.
+RELEASE_NOTES_LINK_RE = re.compile(
+    r"RELEASE_NOTES_v\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?\.md"
+)
+
 
 def _validate_semver(version: str) -> None:
     if not SEMVER_RE.fullmatch(version):
@@ -154,6 +160,98 @@ def _bump_install_banner(
     return (old, new)
 
 
+def _bump_release_notes_links(
+    path: Path, target: str, apply: bool
+) -> List[Tuple[str, str]]:
+    """Bump every version-keyed RELEASE_NOTES link in ``path`` to the target (F12).
+
+    A banner bump alone left links like ``docs/RELEASE_NOTES_v1.4.0.md`` pointing at
+    the previous release. Rewrites every ``RELEASE_NOTES_v<semver>.md`` reference to
+    ``RELEASE_NOTES_v<target>.md``; returns the (old, new) deltas (deduped,
+    order-preserving). No-op (``[]``) on a file with no such link or links already
+    on target.
+    """
+    text = path.read_text(encoding="utf-8")
+    target_ref = f"RELEASE_NOTES_v{target}.md"
+    stale = [
+        m.group(0)
+        for m in RELEASE_NOTES_LINK_RE.finditer(text)
+        if m.group(0) != target_ref
+    ]
+    if not stale:
+        return []
+    if apply:
+        path.write_text(
+            RELEASE_NOTES_LINK_RE.sub(target_ref, text), encoding="utf-8"
+        )
+    return [(old, target_ref) for old in dict.fromkeys(stale)]
+
+
+def check_release_consistency(
+    repo_root: Path = REPO_ROOT_DEFAULT, target_version: str = ""
+) -> List[str]:
+    """READ-ONLY audit (F12): every managed version surface that does NOT agree with
+    ``target_version``. A clean post-apply state returns ``[]``; any entry means a
+    bump LEFT a stale version surface or a stale RELEASE_NOTES link.
+
+    Surfaces: plugin.json version, marketplace metadata.version + plugins[0]
+    description ``v<target> —`` prefix, README + INSTALL ``Status: **v<target>**``
+    banners, and every ``RELEASE_NOTES_v<semver>.md`` link in README + INSTALL. The
+    target RELEASE_NOTES FILE's existence is NOT a consistency error (that stays an
+    authoring WARNING in :func:`bump`).
+    """
+    repo_root = Path(repo_root)
+    problems: List[str] = []
+
+    plugin_json = repo_root / ".claude-plugin" / "plugin.json"
+    if plugin_json.exists():
+        v = json.loads(plugin_json.read_text(encoding="utf-8")).get("version", "")
+        if v != target_version:
+            problems.append(
+                f".claude-plugin/plugin.json version {v!r} != target {target_version!r}"
+            )
+
+    mkt = repo_root / ".claude-plugin" / "marketplace.json"
+    if mkt.exists():
+        data = json.loads(mkt.read_text(encoding="utf-8"))
+        meta_v = data.get("metadata", {}).get("version", "")
+        if meta_v != target_version:
+            problems.append(
+                f".claude-plugin/marketplace.json metadata.version {meta_v!r} != "
+                f"target {target_version!r}"
+            )
+        plugins = data.get("plugins", [])
+        if plugins:
+            desc = plugins[0].get("description", "")
+            if not desc.startswith(f"v{target_version} —"):
+                problems.append(
+                    "marketplace.json plugins[0].description prefix is not "
+                    f"'v{target_version} —': {desc[:32]!r}"
+                )
+
+    for rel, path, banner_re in (
+        ("README.md", repo_root / "README.md", README_BANNER_RE),
+        ("docs/INSTALL.md", repo_root / "docs" / "INSTALL.md", INSTALL_BANNER_RE),
+    ):
+        if not path.exists():
+            continue
+        text = path.read_text(encoding="utf-8")
+        m = banner_re.search(text)
+        if m is not None:
+            found = re.search(r"v(\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?)", m.group(0))
+            if found and found.group(1) != target_version:
+                problems.append(
+                    f"{rel} Status banner v{found.group(1)} != target v{target_version}"
+                )
+        for link in RELEASE_NOTES_LINK_RE.finditer(text):
+            if link.group(0) != f"RELEASE_NOTES_v{target_version}.md":
+                problems.append(
+                    f"{rel} stale release link {link.group(0)} != "
+                    f"RELEASE_NOTES_v{target_version}.md"
+                )
+    return problems
+
+
 def bump(
     target_version: str,
     repo_root: Path = REPO_ROOT_DEFAULT,
@@ -189,6 +287,8 @@ def bump(
         delta = _bump_readme_banner(readme, target_version, apply)
         if delta is not None:
             changes.append(("README.md", delta[0], delta[1]))
+        for old, new in _bump_release_notes_links(readme, target_version, apply):
+            changes.append(("README.md::release_notes_link", old, new))
     else:
         warnings.append(f"README.md not found at {readme}")
 
@@ -197,6 +297,8 @@ def bump(
         delta = _bump_install_banner(install, target_version, apply)
         if delta is not None:
             changes.append(("docs/INSTALL.md", delta[0], delta[1]))
+        for old, new in _bump_release_notes_links(install, target_version, apply):
+            changes.append(("docs/INSTALL.md::release_notes_link", old, new))
     else:
         warnings.append(f"docs/INSTALL.md not found at {install}")
 
@@ -212,6 +314,9 @@ def bump(
         "applied": apply and bool(changes),
         "changes": changes,
         "warnings": warnings,
+        # F12: post-state audit — on --apply this must be empty (no stale surface
+        # left); on dry-run it reflects the current pre-bump drift vs target.
+        "consistency": check_release_consistency(repo_root, target_version),
     }
 
 
@@ -259,6 +364,19 @@ def main(argv: List[str] | None = None) -> int:
             print(f"  ! {w}", file=sys.stderr)
     if not args.apply:
         print(f"[{mode}] no files written (use --apply to commit).")
+        return 0
+
+    # F12: an --apply must not LEAVE a stale version surface / release link.
+    consistency = result.get("consistency", [])
+    if consistency:
+        print(
+            f"[{mode}] FAILED: apply left {len(consistency)} stale version "
+            "surface(s) — fix before release:",
+            file=sys.stderr,
+        )
+        for c in consistency:
+            print(f"  ✗ {c}", file=sys.stderr)
+        return 3
     return 0
 
 

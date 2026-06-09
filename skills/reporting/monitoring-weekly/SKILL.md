@@ -28,7 +28,7 @@ description: |
   master.xlsx WRITE talep edilirse
   YASAK (Phase 9 reporting paterni: 8 skill no-write invariant).
 version: "1.0"
-status: active
+status: wip
 category: reporting
 inputs:
   week_start:
