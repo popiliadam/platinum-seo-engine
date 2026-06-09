@@ -68,7 +68,6 @@ from pathlib import Path
 from typing import Any, Iterable
 from urllib.parse import parse_qsl, quote, unquote, urlencode, urlsplit, urlunsplit
 
-from jsonschema import Draft7Validator
 from jsonschema.exceptions import ValidationError as _JSValidationError
 
 # AMO batch 3-gov-driftF (F-27): reuse 3a's declared-tool parser and IMPORT the
@@ -87,6 +86,10 @@ from scripts.validation.skill_mcp_usage import (  # noqa: E402
     declared_tools,
     split_frontmatter_body,
 )
+# build_validator (not a raw Draft7Validator) so the consistency-report
+# generated_at format:date-time is ENFORCED with the strict UTC '…Z' checker
+# (P1-02 / time-discipline §8.10).
+from scripts.validation.validate_schema import build_validator  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -2060,7 +2063,7 @@ def build_consistency_report(
         report["notes"] = notes
 
     schema = _load_consistency_report_schema()
-    validator = Draft7Validator(schema)
+    validator = build_validator(schema)
     errors = sorted(validator.iter_errors(report), key=lambda e: e.path)
     if errors:
         msgs = []

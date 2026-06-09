@@ -160,6 +160,28 @@ def test_classify_skips_blank_lines(tmp_path, migrate_module) -> None:
     assert fail_records == []
 
 
+def test_classify_rejects_naive_timestamp(tmp_path, migrate_module) -> None:
+    """An event schema-valid EXCEPT a naive (tz-less) timestamp must classify as
+    FAIL → legacy (finding #19): routing _load_schema through the strict
+    build_validator ENFORCES events.schema.json's timestamp format:date-time, so
+    the migration partitions EXACTLY like the events_writer append path (which
+    already refuses a naive timestamp). A plain Draft7Validator skipped `format`
+    and would have admitted the non-UTC row into the strict file."""
+    naive = _strict_provenance_event("ev-naive")
+    naive["timestamp"] = "2026-05-07T12:00:00"  # naive — no 'Z'
+    ws = _seed_events(tmp_path, [
+        _strict_provenance_event("ev-ok"),  # '…Z' → passes
+        naive,                              # naive → legacy
+    ])
+    events_path = ws / "projects" / "test-proj" / "_state" / "events.jsonl"
+    validator = migrate_module._load_schema()
+    pass_lines, fail_records = migrate_module._classify_lines(events_path, validator)
+    assert len(pass_lines) == 1                     # only the canonical '…Z' row
+    assert len(fail_records) == 1
+    assert fail_records[0][0] == 2                  # naive row is line 2
+    assert "date-time" in fail_records[0][2]        # rejected on the timestamp format
+
+
 # ---------------------------------------------------------------------------
 # migrate() end-to-end tests
 # ---------------------------------------------------------------------------

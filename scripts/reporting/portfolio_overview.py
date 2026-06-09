@@ -154,10 +154,12 @@ def validate_portfolio_config(
     domain exceptions.
     """
     try:
-        from jsonschema import Draft7Validator
+        from scripts.validation.validate_schema import build_validator
     except ImportError as exc:  # pragma: no cover
         raise PortfolioConfigInvalidError("jsonschema required") from exc
-    validator = Draft7Validator(dict(schema))
+    # build_validator → strict FormatChecker: portfolio-config domain (format:uri)
+    # is enforced consistently with the rest of the engine (finding #19 / P1-02).
+    validator = build_validator(dict(schema))
     errors = sorted(validator.iter_errors(dict(config)),
                     key=lambda e: list(e.absolute_path))
     if errors:

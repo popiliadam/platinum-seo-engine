@@ -34,8 +34,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_PATH = REPO_ROOT / "schemas" / "schedule.schema.json"
 MODULE_PATH = REPO_ROOT / "scripts" / "state" / "schedule.py"
 
-_NOW = "2026-06-08T12:00:00+00:00"
-_LATER = "2026-06-09T00:00:00+00:00"
+_NOW = "2026-06-08T12:00:00Z"  # canonical UTC '…Z' (strict date-time checker rejects +00:00)
+_LATER = "2026-06-09T00:00:00Z"
 
 # A workspace fixture set where the gate would PASS: all three ceilings set, a
 # 3-project portfolio, and a per-run estimate for the `monthly` workflow.
@@ -211,6 +211,19 @@ def test_arm_rejects_unknown_workflow_writes_nothing(tmp_path: Path) -> None:
     assert not _marker_file(tmp_path).exists()
 
 
+def test_arm_rejects_non_utc_armed_at_writes_nothing(tmp_path: Path) -> None:
+    """armed_at's format:date-time is enforced via the strict build_validator
+    (finding #19): a naive (tz-less) now_iso and an explicit non-UTC/zero offset
+    are rejected, and the marker is NEVER written (fail-closed, like every other
+    arm refusal)."""
+    _fully_armable(tmp_path)
+    for bad in ("2026-06-08T12:00:00", "2026-06-08T12:00:00+03:00", "2026-06-08T12:00:00+00:00"):
+        with pytest.raises(schedule.ScheduleValidationError):
+            schedule.arm(tmp_path, workflow="monthly", cadence="daily",
+                         now_iso=bad, consent_ack=True)
+        assert not _marker_file(tmp_path).exists()
+
+
 # ---------------------------------------------------------------------------
 # arm — success
 # ---------------------------------------------------------------------------
@@ -253,7 +266,7 @@ def test_disarm_after_arm_rewrites_marker_disarmed(tmp_path: Path) -> None:
 def test_disarm_is_idempotent_on_absent_schedule(tmp_path: Path) -> None:
     first = schedule.disarm(tmp_path, now_iso=_LATER)
     assert first["armed"] is False
-    again = schedule.disarm(tmp_path, now_iso="2026-06-10T00:00:00+00:00")
+    again = schedule.disarm(tmp_path, now_iso="2026-06-10T00:00:00Z")
     assert again["armed"] is False
     assert schedule.read_schedule(tmp_path)["armed"] is False
 

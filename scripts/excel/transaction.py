@@ -52,6 +52,7 @@ from openpyxl.utils.exceptions import InvalidFileException
 from openpyxl.workbook import Workbook
 
 from scripts.state import events_writer
+from scripts.validation.validate_schema import build_validator
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -284,7 +285,11 @@ def _build_row_validator(schema: dict, sheet: str, *, allow_extra: bool = False)
         "required": required,
         "properties": properties,
     }
-    return Draft7Validator(row_schema)
+    # build_validator (not a raw Draft7Validator) so the engine's single strict
+    # FormatChecker governs row validation too — today the dynamic row_schema
+    # carries only `type` (no `format`), so this is behavior-preserving, but any
+    # future date-time/uri column would then be enforced consistently (P1-02).
+    return build_validator(row_schema)
 
 
 # ---------------------------------------------------------------------------

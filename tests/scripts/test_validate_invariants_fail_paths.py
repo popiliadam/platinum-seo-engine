@@ -35,8 +35,11 @@ import json
 from pathlib import Path
 
 import openpyxl
+import pytest
 
 from scripts.validation.validate_invariants import (
+    ConsistencyReportInvalidError,
+    build_consistency_report,
     check_F_11,
     check_F_13,
     check_F_14,
@@ -324,3 +327,29 @@ def test_F21_short_cell_passes(tmp_path: Path) -> None:
     finally:
         wb.close()
     assert result["verdict"] == "PASS", result
+
+
+# ---------------------------------------------------------------------------
+# #19 — consistency-report generated_at is strict UTC '…Z'
+# ---------------------------------------------------------------------------
+
+def test_build_consistency_report_rejects_naive_generated_at() -> None:
+    """generated_at carries format:date-time in consistency-report.schema.json.
+    Routing the report validator through the strict build_validator (finding #19)
+    makes build_consistency_report reject a naive (tz-less) generated_at — the UTC
+    '…Z' discipline is ENFORCED, not annotated. The rest of the report is valid,
+    so the failure is unambiguously the timestamp."""
+    results = [{"id": "CI-01", "verdict": "PASS"}]
+    agg = {"overall": "GREEN", "total": 1, "pass_count": 1, "warn_count": 0, "fail_count": 0}
+    # canonical '…Z' builds a valid report (control)…
+    ok = build_consistency_report(
+        rule_results=results, aggregation=agg, project_id="demo", report_id=1,
+        generated_at="2026-06-08T12:00:00Z", run_id=1,
+    )
+    assert ok["generated_at"].endswith("Z")
+    # …a naive stamp is rejected on its date-time format.
+    with pytest.raises(ConsistencyReportInvalidError, match="generated_at"):
+        build_consistency_report(
+            rule_results=results, aggregation=agg, project_id="demo", report_id=1,
+            generated_at="2026-06-08T12:00:00", run_id=1,  # naive — no 'Z'
+        )

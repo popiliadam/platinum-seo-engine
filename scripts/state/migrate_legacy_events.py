@@ -61,12 +61,25 @@ import jsonschema
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+# Allow the bare-script invocation `python3 scripts/state/migrate_legacy_events.py`
+# (this one-shot ADR-031 migration is run directly, not only via `python -m`):
+# ensure the repo root is importable so `scripts.*` resolves the same way it does
+# under `python -m` / pytest.
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from scripts.validation.validate_schema import build_validator  # noqa: E402
+
 SCHEMA_PATH = REPO_ROOT / "schemas" / "events.schema.json"
 
 
 def _load_schema() -> jsonschema.Draft7Validator:
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
-    return jsonschema.Draft7Validator(schema)
+    # build_validator (not a raw Draft7Validator) so events.schema.json's
+    # timestamp format:date-time is ENFORCED with the strict UTC '…Z' checker —
+    # the migration then partitions EXACTLY like the events_writer append path
+    # (P1-02 / time-discipline §8.10), instead of admitting a naive row as strict.
+    return build_validator(schema)
 
 
 def _classify_lines(events_path: Path, validator: jsonschema.Draft7Validator):

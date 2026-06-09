@@ -58,11 +58,10 @@ import json
 from pathlib import Path
 from typing import Iterable
 
-from jsonschema import Draft7Validator
-
 from scripts.orchestration import portfolio_runner
 from scripts.state import cost_ledger
 from scripts.state.session_binding import _atomic_write_json
+from scripts.validation.validate_schema import build_validator
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -167,7 +166,10 @@ def _validate(marker: dict) -> None:
         schema = json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise ScheduleValidationError(f"cannot load schedule schema: {exc}") from exc
-    errors = list(Draft7Validator(schema).iter_errors(marker))
+    # build_validator (not a raw Draft7Validator) so armed_at/disarmed_at's
+    # format:date-time is ENFORCED with the strict UTC '…Z' checker — a naive or
+    # non-UTC stamp is rejected before the marker is written (time-discipline §8.10).
+    errors = list(build_validator(schema).iter_errors(marker))
     if errors:
         msgs = "; ".join(e.message for e in errors)
         raise ScheduleValidationError(f"invalid schedule marker: {msgs}")

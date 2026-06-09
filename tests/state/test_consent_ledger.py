@@ -30,7 +30,7 @@ SCHEMA_PATH = _REPO_ROOT / "schemas" / "consent.schema.json"
 
 def _append(ws: Path, slug: str = "demo", *, run_id: str = "demo-furniture-2026-06-06-ab12",
             action: str = "index_update", target: str = "https://x/sitemap.xml",
-            granted_by: str = "operator", now_iso: str = "2026-06-06T10:00:00",
+            granted_by: str = "operator", now_iso: str = "2026-06-06T10:00:00Z",
             **kw) -> dict:
     return cl.append_consent(
         workspace_root=ws, project_slug=slug, run_id=run_id, action=action,
@@ -273,3 +273,40 @@ def test_has_session_consent_tampered_chain_is_false(tmp_path: Path) -> None:
 
 def test_has_session_consent_in_all() -> None:
     assert "has_session_consent" in cl.__all__
+
+
+# ---------------------------------------------------------------------------
+# #6 / #19 — granted_at is canonical UTC '…Z' AND the validator enforces it
+# ---------------------------------------------------------------------------
+
+def test_cli_approve_granted_at_is_utc_z(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The approve CLI stamps granted_at as canonical UTC ('…Z'), not naive local
+    time (finding #6). datetime.now().isoformat() emitted a tz-less local string;
+    rules/time-discipline.md §8.10 fixes storage to UTC '…Z'. The migrated strict
+    validator (finding #19) would also reject a naive stamp, so this proves the
+    producer emits the canonical form the validator now demands."""
+    from datetime import datetime as _dt
+
+    ws = _isolate(tmp_path, monkeypatch)
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "sess-1")
+    (ws / "projects" / "demo" / "_state").mkdir(parents=True)
+    sb.write_session_binding("sess-1", "demo", ws, "2026-06-06T00:00:00Z")
+
+    rc = cl.main(["approve", "demo-furniture-2026-06-06-ab12", "git_push", "origin main",
+                  "--workspace", str(ws)])
+    assert rc == 0
+    granted_at = cl.read_entries(ws, "demo")[0]["granted_at"]
+    assert granted_at.endswith("Z"), granted_at
+    # canonical + parseable as an instant (Z → +00:00 for fromisoformat)
+    _dt.fromisoformat(granted_at[:-1] + "+00:00")
+
+
+def test_append_rejects_non_utc_granted_at(tmp_path: Path) -> None:
+    """After routing _validate_entry through the strict build_validator (finding
+    #19), granted_at's format:date-time is ENFORCED: a naive (tz-less) value and
+    an explicit non-UTC/zero offset are both rejected BEFORE any write — the
+    append-only ledger never records a non-canonical timestamp."""
+    for bad in ("2026-06-06T10:00:00", "2026-06-06T10:00:00+03:00", "2026-06-06T10:00:00+00:00"):
+        with pytest.raises(cl.ConsentValidationError):
+            _append(tmp_path, now_iso=bad)
+    assert cl.read_entries(tmp_path, "demo") == []  # nothing written on any reject

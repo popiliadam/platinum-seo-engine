@@ -49,7 +49,7 @@ import os
 import re
 import sys
 import tempfile
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Mapping
 
@@ -324,8 +324,11 @@ def _cmd_bind(slug: str, workspace: str | None) -> int:
     if not cfg.exists():
         print(f"error: {cfg} not found — run /pseo-init {slug} first (marker NOT written)", file=sys.stderr)
         return 4
-    # 4. Write the marker + one-line confirmation banner.
-    path = write_session_binding(session_id, slug, ws, datetime.now().isoformat())
+    # 4. Write the marker + one-line confirmation banner. Canonical UTC '…Z'
+    #    (rules/time-discipline.md §8.10; mirrors events_writer._utc_iso_z) —
+    #    datetime.now().isoformat() emitted a naive LOCAL stamp.
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    path = write_session_binding(session_id, slug, ws, now_iso)
     print(f"bound session {session_id[:8]} → {slug}  ({path})")
     return 0
 

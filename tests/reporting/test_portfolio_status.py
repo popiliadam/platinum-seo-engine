@@ -65,11 +65,11 @@ def _seed_usage(ws: Path, resource: str, period: str, amount: float, ceiling: fl
     """
     entry = cost_ledger.reserve(
         ws, resource=resource, period=period, amount=amount, ceiling=ceiling,
-        run_id="seed", project_id="seed", now_iso="2026-06-08T00:00:00+00:00",
+        run_id="seed", project_id="seed", now_iso="2026-06-08T00:00:00Z",
     )
     cost_ledger.confirm(
         ws, reservation_id=entry["reservation_id"], amount=amount,
-        run_id="seed", project_id="seed", now_iso="2026-06-08T00:00:00+00:00",
+        run_id="seed", project_id="seed", now_iso="2026-06-08T00:00:00Z",
     )
 
 

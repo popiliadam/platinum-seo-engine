@@ -38,7 +38,7 @@
     "granted_at": {
       "type": "string",
       "format": "date-time",
-      "description": "UTC ISO 8601 when consent was granted."
+      "description": "Canonical UTC ISO 8601 with a 'Z' suffix (…S.%fZ) when consent was granted. format:date-time is enforced by the strict checker (rules/time-discipline.md §8.10) — naive/non-UTC/+00:00 values are rejected; the recorder stamps datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%fZ')."
     },
     "granted_by": {
       "type": "string",

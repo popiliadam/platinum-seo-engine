@@ -130,11 +130,11 @@ def validate_portfolio_config(
 ) -> None:
     """Draft 7 validate + maxItems + cross_query.read_only domain guards."""
     try:
-        from jsonschema import Draft7Validator
+        from scripts.validation.validate_schema import build_validator
     except ImportError as exc:  # pragma: no cover
         raise PortfolioConfigInvalidError("jsonschema required") from exc
     errors = sorted(
-        Draft7Validator(dict(schema)).iter_errors(dict(config)),
+        build_validator(dict(schema)).iter_errors(dict(config)),
         key=lambda e: list(e.absolute_path),
     )
     if errors:
