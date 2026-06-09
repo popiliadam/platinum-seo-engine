@@ -365,19 +365,19 @@ def test_main_internal_error_is_nonblocking(monkeypatch, capsys):
 
 
 # ---------------------------------------------------------------------------
-# 5. Wiring — 3rd post-tool-use command (other two intact) + registration
+# 5. Wiring — 2nd post-tool-use command (audit command intact) + registration
 # ---------------------------------------------------------------------------
 
-def test_rescan_wired_as_third_post_tool_use_command():
+def test_rescan_wired_as_second_post_tool_use_command():
     spec = json.loads(HOOK_PATH.read_text(encoding="utf-8"))
     handlers = spec["hooks"]["PostToolUse"]
     assert len(handlers) == 1
     block = handlers[0]
     assert block["matcher"] == "Edit|Write|Bash"  # matcher unchanged
     cmds = [h["command"] for h in block["hooks"]]
-    # the two existing commands are intact …
+    # the existing audit command is intact; env_probe was UNWIRED (audit #17) …
     assert any("audit_post_tool_use.py" in c for c in cmds)
-    assert any("env_probe.py" in c for c in cmds)
+    assert not any("env_probe.py" in c for c in cmds)
     # … and ours is added, plugin-agnostic (F-16 CLAUDE_PLUGIN_ROOT discipline).
     rescan = [c for c in cmds if "ai_disclosure_rescan.py" in c]
     assert rescan, "ai_disclosure_rescan.py not wired into post-tool-use.json"

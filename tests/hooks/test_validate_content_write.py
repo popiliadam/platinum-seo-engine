@@ -49,6 +49,13 @@ def _payload(tool: str, file_path: str, **content: str) -> dict:
         ("outputs/reports/2026-06-monthly.html", False),
         ("templates/content/new-blog.template.html", False),
         ("projects/foo/outputs/blog/z/upload-instructions.md", False),
+        # codex-hostile-audit #16 — the suffix check is case-INSENSITIVE, so an
+        # uppercase extension cannot bypass the gate (the whole point of the gate).
+        ("outputs/blog/x/article.HTML", True),
+        ("outputs/blog/x/article.Html", True),
+        # … but the .template.html exclusion must SURVIVE case-folding: a template
+        # with an uppercase extension stays out of scope (not a published surface).
+        ("outputs/blog/x/article.template.HTML", False),
     ],
 )
 def test_is_content_html_path(path: str, expected: bool) -> None:
@@ -64,6 +71,21 @@ def test_write_with_disclosure_blocks() -> None:
         _payload(
             "Write",
             _CONTENT_PATH,
+            content='<article class="pse-blog-post"><p>written by AI</p></article>',
+        )
+    )
+    assert code == 2
+    assert any("AI-disclosure" in m for m in msgs)
+
+
+def test_write_disclosure_to_uppercase_html_blocks() -> None:
+    """codex-hostile-audit #16 — a disclosure write to a .HTML (uppercase ext)
+    path must NOT bypass the gate: case-insensitive suffix → still exit 2."""
+    upper_path = "projects/eykom/outputs/blog/klima-montaji/article.HTML"
+    code, msgs = evaluate(
+        _payload(
+            "Write",
+            upper_path,
             content='<article class="pse-blog-post"><p>written by AI</p></article>',
         )
     )

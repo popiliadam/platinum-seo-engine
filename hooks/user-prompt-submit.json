@@ -9,12 +9,6 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/intent_router.py\"",
             "timeout": 10,
             "statusMessage": "AMO intent router…"
-          },
-          {
-            "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/env_probe.py\"",
-            "timeout": 10,
-            "statusMessage": "AMO batch-0a env probe (temporary diagnostic)..."
           }
         ]
       }

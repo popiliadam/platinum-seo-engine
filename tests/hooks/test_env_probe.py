@@ -13,7 +13,16 @@ Contract under test:
     malformed stdin (records ``_stdin_parse_error``), appends exactly one line.
   * ``env_probe_report.py`` groups by ``session_id`` and emits an N/5 stability
     verdict per session.
-  * The probe is wired ADDITIVELY into all five lifecycle events, plugin-agnostic.
+
+NOTE (codex-hostile-audit #17): the probe has been UNWIRED from all five
+lifecycle events — the AMO batch-0a session-binding question it existed to answer
+is settled. The two wiring assertions (probe-in-all-five / plugin-agnostic-as-
+wired) were therefore removed; the remaining behaviour tests still pass because
+``env_probe.py`` + ``env_probe_report.py`` are still present, now ORPHANED on
+disk. Those two scripts AND this test file are a deletion bundle the manager
+removes with consent at integration — a bare ``rm`` here trips the engine's own
+outward-action fs_delete consent gate (the unwired guarantee is locked by
+``tests/hooks/test_hook_scripts_runtime_vs_ci.py``).
 """
 
 from __future__ import annotations
@@ -29,7 +38,6 @@ from scripts.hooks.env_probe import extract_probe_record
 _REPO = Path(__file__).resolve().parents[2]
 _PROBE = _REPO / "scripts" / "hooks" / "env_probe.py"
 _REPORT = _REPO / "scripts" / "hooks" / "env_probe_report.py"
-_HOOKS_JSON = _REPO / "hooks"
 
 # The five lifecycle events the probe must fire on -> their hooks/*.json file.
 _EVENT_FILES = {
@@ -241,33 +249,3 @@ def test_report_missing_log_is_graceful(tmp_path: Path) -> None:
     )
     assert proc.returncode == 0
     assert "Traceback" not in proc.stderr
-
-
-# --------------------------------------------------------------------------
-# Hook registration — additive, plugin-agnostic, all five events
-# --------------------------------------------------------------------------
-
-def test_probe_wired_into_all_five_events() -> None:
-    for event, fname in _EVENT_FILES.items():
-        data = json.loads((_HOOKS_JSON / fname).read_text(encoding="utf-8"))
-        assert event in data["hooks"], f"{fname} missing {event} block"
-        blob = json.dumps(data["hooks"][event])
-        assert "env_probe.py" in blob, f"env_probe.py not wired into {event}"
-
-
-def test_probe_command_is_plugin_agnostic() -> None:
-    """F-16 discipline: the probe command resolves itself via CLAUDE_PLUGIN_ROOT,
-    never a hardcoded slug/path."""
-    for event, fname in _EVENT_FILES.items():
-        data = json.loads((_HOOKS_JSON / fname).read_text(encoding="utf-8"))
-        probe_cmds = [
-            h["command"]
-            for group in data["hooks"][event]
-            for h in group["hooks"]
-            if "env_probe.py" in h.get("command", "")
-        ]
-        assert probe_cmds, f"no env_probe command found in {fname}"
-        for cmd in probe_cmds:
-            assert "CLAUDE_PLUGIN_ROOT" in cmd, (
-                f"probe command in {fname} is not plugin-agnostic: {cmd!r}"
-            )

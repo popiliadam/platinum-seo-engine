@@ -59,9 +59,17 @@ _FRAGMENT_SAFE_RULES = frozenset({"AI-disclosure", "R-22", "R-43", "R-77"})
 
 
 def is_content_html_path(path: str) -> bool:
-    """True iff ``path`` is a generated blog HTML file (the gate's scope)."""
+    """True iff ``path`` is a generated blog HTML file (the gate's scope).
+
+    The suffix check is case-INSENSITIVE (codex-hostile-audit #16): a write to
+    ``article.HTML`` / ``article.Html`` must not slip past the AI-disclosure gate
+    just because the extension is upper/mixed case. The ``.template.html``
+    exclusion is preserved under the same case-fold (an uppercase template stays
+    out of the published surface).
+    """
     norm = path.replace("\\", "/")
-    if not norm.endswith(".html") or norm.endswith(".template.html"):
+    suffix = norm.lower()
+    if not suffix.endswith(".html") or suffix.endswith(".template.html"):
         return False
     return bool(_CONTENT_PATH_RE.search(norm))
 
