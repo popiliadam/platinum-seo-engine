@@ -35,7 +35,7 @@ Tüm portföyü tek Türkçe blokla triyaj et: her projenin EN SON coverage kayd
 `$1` verilmişse `period` = o; yoksa `period` = bugünün UTC tarihi (`date -u +%Y-%m-%d`).
 Period SINIRDA çözülür ve aşağıdaki python primitive'ine **argüman olarak** geçer.
 
-!`if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş — kullanıcıya workspace path'ini sor"; else PERIOD="${1:-$(date -u +%Y-%m-%d)}"; echo "workspace=$PSEO_WORKSPACE_ROOT period=$PERIOD"; fi`
+!`set -- $ARGUMENTS; if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş — kullanıcıya workspace path'ini sor"; else PERIOD="${1:-$(date -u +%Y-%m-%d)}"; echo "workspace=$PSEO_WORKSPACE_ROOT period=$PERIOD"; fi`
 
 Çıktı `ERROR: ...` ise: kullanıcıdan workspace path'ini iste; aşağıdaki adımı atla.
 
@@ -44,7 +44,7 @@ Period SINIRDA çözülür ve aşağıdaki python primitive'ine **argüman olara
 Engine root'u çöz (`CLAUDE_PLUGIN_ROOT` yoksa fallback) ve `build_triage` + `render_triage`'ı
 inline `python3` ile çağır. Bu adım yalnız OKUR — hiçbir yazma, hiçbir MCP çağrısı yok:
 
-!`if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş"; exit 2; fi; ENGINE_ROOT="${CLAUDE_PLUGIN_ROOT:-${PSEO_ENGINE_ROOT:-$(find /Users/apple/.claude/plugins/cache 2>/dev/null -type d -name 'platinum-seo-engine' | sort | tail -1 | xargs -I{} find {} -maxdepth 1 -type d -name '[0-9]*' 2>/dev/null | sort -V | tail -1)}}"; if [ -z "$ENGINE_ROOT" ]; then echo "ERROR: CLAUDE_PLUGIN_ROOT yok ve fallback bulunamadı — PSEO_ENGINE_ROOT env var set edin"; exit 3; fi; PERIOD="${1:-$(date -u +%Y-%m-%d)}"; PSEO_ENGINE_ROOT="$ENGINE_ROOT" PYTHONPATH="$ENGINE_ROOT" PERIOD="$PERIOD" python3 -c "
+!`set -- $ARGUMENTS; if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş"; exit 2; fi; ENGINE_ROOT="${CLAUDE_PLUGIN_ROOT:-${PSEO_ENGINE_ROOT:-$(find /Users/apple/.claude/plugins/cache 2>/dev/null -type d -name 'platinum-seo-engine' | sort | tail -1 | xargs -I{} find {} -maxdepth 1 -type d -name '[0-9]*' 2>/dev/null | sort -V | tail -1)}}"; if [ -z "$ENGINE_ROOT" ]; then echo "ERROR: CLAUDE_PLUGIN_ROOT yok ve fallback bulunamadı — PSEO_ENGINE_ROOT env var set edin"; exit 3; fi; PERIOD="${1:-$(date -u +%Y-%m-%d)}"; PSEO_ENGINE_ROOT="$ENGINE_ROOT" PYTHONPATH="$ENGINE_ROOT" PERIOD="$PERIOD" python3 -c "
 import os, sys
 from pathlib import Path
 engine = os.environ.get('CLAUDE_PLUGIN_ROOT') or os.environ.get('PSEO_ENGINE_ROOT')

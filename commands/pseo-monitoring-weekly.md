@@ -14,7 +14,7 @@ model: sonnet
 
 ## 1. Aktif projeyi çöz
 
-!`if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş"; else PROJECT="${1:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/active.json" 2>/dev/null)}"; if [ -z "$PROJECT" ]; then echo "NO_ACTIVE_PROJECT — once /pseo-active <slug>"; else WS_END="${3:-$(date -u +%Y-%m-%d)}"; WS_START="${2:-$(date -u -v-7d +%Y-%m-%d 2>/dev/null || date -u --date='7 days ago' +%Y-%m-%d)}"; echo "active=$PROJECT week=$WS_START..$WS_END"; fi; fi`
+!`set -- $ARGUMENTS; if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş"; else PROJECT="${1:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/active.json" 2>/dev/null)}"; if [ -z "$PROJECT" ]; then echo "NO_ACTIVE_PROJECT — once /pseo-active <slug>"; else WS_END="${3:-$(date -u +%Y-%m-%d)}"; WS_START="${2:-$(date -u -v-7d +%Y-%m-%d 2>/dev/null || date -u --date='7 days ago' +%Y-%m-%d)}"; echo "active=$PROJECT week=$WS_START..$WS_END"; fi; fi`
 
 ## 2. Skill chain
 

@@ -37,7 +37,7 @@ model: sonnet
 `$1` = workflow (ZORUNLU). Geçerli set: `monthly` · `audit` · `setup` · `content`. Başka
 bir değer → **DURUR** (manager'a bildir, hiçbir şey rezerve etme):
 
-!`if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş"; else WF="${1:-}"; if [ -z "$WF" ]; then echo "ERROR: workflow ZORUNLU — kullanım: /pseo-run-portfolio <monthly|audit|setup|content>"; elif [ "$WF" = monthly ] || [ "$WF" = audit ] || [ "$WF" = setup ] || [ "$WF" = content ]; then PERIOD="$(date -u +%Y-%m-%d)"; NOW_ISO="$(date -u +%Y-%m-%dT%H:%M:%S+00:00)"; echo "workflow=$WF period=$PERIOD now_iso=$NOW_ISO"; else echo "DURUR: desteklenmeyen workflow — yalnız monthly/audit/setup/content"; fi; fi`
+!`set -- $ARGUMENTS; if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş"; else WF="${1:-}"; if [ -z "$WF" ]; then echo "ERROR: workflow ZORUNLU — kullanım: /pseo-run-portfolio <monthly|audit|setup|content>"; elif [ "$WF" = monthly ] || [ "$WF" = audit ] || [ "$WF" = setup ] || [ "$WF" = content ]; then PERIOD="$(date -u +%Y-%m-%d)"; NOW_ISO="$(date -u +%Y-%m-%dT%H:%M:%S+00:00)"; echo "workflow=$WF period=$PERIOD now_iso=$NOW_ISO"; else echo "DURUR: desteklenmeyen workflow — yalnız monthly/audit/setup/content"; fi; fi`
 
 - `PERIOD` = bugünün UTC tarihi (4a defteri için partition anahtarı); `NOW_ISO` = UTC
   ISO-8601 (rezervasyon/teyit damgası). İkisi de SINIRDA `date` ile çözülür ve aşağıdaki
