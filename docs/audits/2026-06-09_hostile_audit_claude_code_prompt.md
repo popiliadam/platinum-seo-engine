@@ -118,10 +118,12 @@ bash scripts/ci/check_secrets.sh
 
 ```bash
 DATAFORSEO_PASSWORD=[...]
-info@demo-agency
-3bf73e0893f69b42
+info@<redacted-vendor-email>
+<redacted-16hex-token>
 ghp_[...]
 ```
+
+> _(Two literal credentials above were redacted by the manager — they are real historical secrets the canonical scanner greps for; committing them verbatim would re-introduce a tracked secret and trip the very gate this finding hardened. The audit's point is unchanged: the CI scanner watches a narrow literal set.)_
 
 - Runtime scanner knows many more classes: Google API key class, OpenAI/Anthropic `sk-` class, GCP service account fields, PEM private-key headers, GitHub `gho/ghs/ghu`, AWS, Slack, DataForSEO env literals.
 
