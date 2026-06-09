@@ -46,6 +46,13 @@ def _run_hook(workspace: Path, payload: dict) -> subprocess.CompletedProcess[str
     cmd = _hook_command().replace("python3", shlex.quote(sys.executable), 1)
     env = {
         **os.environ,
+        # Isolate HOME so the hook's resolve_workspace_root() cannot read the
+        # operator's real ~/.config/pseo/config.json (which WINS over the env var
+        # by design — D9). Without this, the 4 end-to-end assertions fail on ANY
+        # machine that has bound a workspace (config.json present) — they passed
+        # only on a clean CI home. The tmp workspace has no .config/, so the
+        # resolver correctly falls back to PSEO_WORKSPACE_ROOT below.
+        "HOME": str(workspace),
         "PSEO_WORKSPACE_ROOT": str(workspace),
         "CLAUDE_PLUGIN_ROOT": str(REPO_ROOT),
     }
