@@ -1,10 +1,17 @@
 """The ``monthly`` workflow: gsc_pull -> (quick_wins + content_decay) -> report.
 
 Path A (no DAG engine): a hard-coded ORDERED step table + the shared
-``workflow_driver``. The three STRUCTURED steps are ``code_verified`` (per-row
-ingestion: the silent-skip gate is meaningful); the trailing monthly-report step is
-MODEL_ATTESTED — the driver records that it RAN (its artifact exists), it does NOT
-verify report quality (the honest <=5% scope split).
+``workflow_driver``. Of the three STRUCTURED steps, ``content_decay`` is
+``code_verified`` (one row per union-URL = genuine per-row ingestion, so the
+silent-skip count gate is meaningful and anchors completeness). ``gsc_pull`` and
+``quick_wins`` are ``model_attested``: both are AGGREGATING/scoring transforms
+(gsc_pull groups raw query+page rows -> per-page rows; quick_wins scores + dedups +
+top-N), so a deterministic CLI legitimately commits far fewer rows than it received
+— the silent-skip COUNT check is a category error there and is recorded advisory,
+NOT failed (matches the ``audit`` workflow's aggregating analysis steps). Their
+identity / freshness / truncation gates (``verify_raw_drop``) STILL hard-fail. The
+trailing monthly-report step is MODEL_ATTESTED — the driver records that it RAN (its
+artifact exists), it does NOT verify report quality (the honest <=5% scope split).
 
 Transform impedance (the monthly-specific wrinkle): the EXISTING transform CLIs
 write ``{sheet}.json`` (gsc_pull -> gsc_performance.json, quick_wins ->
@@ -25,8 +32,10 @@ from pathlib import Path
 from scripts.orchestration import committer, workflow_driver
 from scripts.orchestration.remediation import remediation, render
 
-# Module-level ORDERED step table (data-driven). One entry per STRUCTURED
-# (code_verified) step. quick_wins ALSO writes an `opportunity` sheet, but its
+# Module-level ORDERED step table (data-driven). One entry per STRUCTURED step
+# (content_decay code_verified; gsc_pull + quick_wins model_attested — aggregating
+# transforms whose silent-skip count check is advisory). quick_wins ALSO writes an
+# `opportunity` sheet, but its
 # coverage step is keyed on its PRIMARY sheet `quick_wins` (the secondary write is
 # the skill's own concern). ``output_file`` is ``{sheet}.json`` for every step (the
 # CLIs write there); ``window`` is pinned because monthly is window-scoped.
@@ -34,10 +43,10 @@ STEPS: tuple[dict, ...] = (
     {"name": "gsc_pull", "sheet": "gsc_performance",
      "output_file": "gsc_performance.json", "writer": "gsc-pull",
      "site_url": True, "window": "recent", "tool": "mcp__gsc__search_analytics",
-     "verification_class": "code_verified"},
+     "verification_class": "model_attested"},
     {"name": "quick_wins", "sheet": "quick_wins", "output_file": "quick_wins.json",
      "writer": "quick-wins", "site_url": True, "window": "30d",
-     "tool": "mcp__gsc__detect_quick_wins", "verification_class": "code_verified"},
+     "tool": "mcp__gsc__detect_quick_wins", "verification_class": "model_attested"},
     {"name": "content_decay", "sheet": "content_decay",
      "output_file": "content_decay.json", "writer": "content-decay",
      "site_url": True, "window": "recent",

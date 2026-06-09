@@ -21,7 +21,7 @@ Discipline (mirrors scripts/state/events_writer.py's fcntl.flock contract):
   - Idempotent dedup on slug: an absent slug is appended; an already-present
     slug is a no-op (first write wins — created_at is preserved).
   - Exact shape preserved for all readers (e.g. monitoring-weekly):
-    {"schema_version": "1.0", "projects": [{slug, domain, market, created_at}, …]},
+    {"schema_version": "1.0", "active_projects": [{slug, domain, market, created_at}, …]},
     json.dumps(..., ensure_ascii=False, indent=2) + trailing newline.
 
 Public API:
@@ -55,7 +55,7 @@ class PortfolioWriterError(Exception):
 
 def _empty_portfolio() -> dict[str, Any]:
     """The canonical empty registry written on first registration."""
-    return {"schema_version": _SCHEMA_VERSION, "projects": []}
+    return {"schema_version": _SCHEMA_VERSION, "active_projects": []}
 
 
 def _read_all(fd: int) -> bytes:
@@ -81,9 +81,9 @@ def _parse_or_empty(raw: bytes) -> dict[str, Any]:
         data = json.loads(text)
     except json.JSONDecodeError as exc:
         raise PortfolioWriterError(f"portfolio.json is not valid JSON: {exc}") from exc
-    if not isinstance(data, dict) or not isinstance(data.get("projects"), list):
+    if not isinstance(data, dict) or not isinstance(data.get("active_projects"), list):
         raise PortfolioWriterError(
-            "portfolio.json must be an object with a 'projects' array"
+            "portfolio.json must be an object with an 'active_projects' array"
         )
     return data
 
@@ -94,10 +94,10 @@ def _with_project(
     """Return a NEW registry dict with `slug` registered (no mutation of `data`).
     Idempotent: if the slug is already present, returns `data` unchanged so the
     original entry — including its created_at — is preserved (first write wins)."""
-    if slug in {p["slug"] for p in data["projects"]}:
+    if slug in {p["slug"] for p in data["active_projects"]}:
         return data
     entry = {"slug": slug, "domain": domain, "market": market, "created_at": created_at}
-    return {**data, "projects": [*data["projects"], entry]}
+    return {**data, "active_projects": [*data["active_projects"], entry]}
 
 
 def register_project(

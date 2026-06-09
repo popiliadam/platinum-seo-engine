@@ -105,7 +105,9 @@ def test_build_steps_wires_one_spec_per_structured_step(tmp_path: Path) -> None:
     assert [s.name for s in specs] == [e["name"] for e in STEPS]
     for spec, entry in zip(specs, STEPS):
         assert spec.sheet == entry["sheet"]
-        assert spec.verification_class == "code_verified"
+        # gsc_pull + quick_wins aggregate/score -> model_attested (silent-skip
+        # advisory); content_decay is per-union-URL -> code_verified.
+        assert spec.verification_class == entry["verification_class"]
         assert spec.expected_tool == entry["tool"]
         assert spec.expected_window == entry["window"]
         assert spec.observed_mcp == (entry["tool"],)
@@ -148,9 +150,12 @@ def test_happy_path_all_satisfied_verdict_pass(tmp_path: Path) -> None:
 
     code = [s for s in record["steps"] if s["verification_class"] == "code_verified"]
     attested = [s for s in record["steps"] if s["verification_class"] == "model_attested"]
-    assert len(code) == 3 and all(s["status"] == "satisfied" for s in code)
-    assert [s["name"] for s in attested] == ["monthly_report"]
-    assert attested[0]["status"] == "satisfied"
+    # content_decay is the lone code_verified completeness anchor; gsc_pull +
+    # quick_wins + monthly_report are model_attested.
+    assert [s["name"] for s in code] == ["content_decay"]
+    assert all(s["status"] == "satisfied" for s in code)
+    assert [s["name"] for s in attested] == ["gsc_pull", "quick_wins", "monthly_report"]
+    assert all(s["status"] == "satisfied" for s in attested)
 
     # the returned AND the written coverage records validate against the schema.
     assert _schema_errors(record) == []

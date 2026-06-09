@@ -118,14 +118,18 @@ def estimate_cost(workspace_root: Path | str, workflow: str) -> dict[str, float]
 
 
 def list_projects(workspace_root: Path | str) -> list[dict]:
-    """Read shared/portfolio.json's ``projects`` list IN ORDER. Missing → []."""
+    """Read shared/portfolio.json's ``active_projects`` list IN ORDER. Missing → [].
+
+    ``active_projects`` is the canonical key per portfolio-config.schema.json
+    (#/required) and every reporting reader (portfolio_overview, _heatmap, …).
+    """
     data = _read_json_object(Path(workspace_root) / "shared" / "portfolio.json")
     if data is None:
         return []
-    projects = data.get("projects")
+    projects = data.get("active_projects")
     if not isinstance(projects, list):
         raise PortfolioRunnerError(
-            "portfolio.json must have a 'projects' array"
+            "portfolio.json must have an 'active_projects' array"
         )
     return list(projects)
 
