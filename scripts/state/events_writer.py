@@ -67,6 +67,8 @@ from typing import Any, Iterable
 from jsonschema import Draft7Validator
 from jsonschema.exceptions import ValidationError as _JSValidationError
 
+from scripts.validation.validate_schema import build_validator
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -205,11 +207,20 @@ def _log(msg: str) -> None:
 
 @functools.lru_cache(maxsize=4)
 def _get_validator(schema_path: str) -> Draft7Validator:
-    """Cache one Draft7Validator per schema path (lru_cache hashes the str key)."""
+    """Cache one STRICT (format-enforcing) validator per schema path.
+
+    Routes through validate_schema.build_validator so events get the SAME
+    FormatChecker the CLI + drift-check use — `format: date-time` (UTC `…Z`,
+    rules/time-discipline.md §8.10) and `format: uri` are ENFORCED, not treated
+    as bare annotations. A plain Draft7Validator(schema) skips `format`, so a
+    caller-supplied `timestamp:"not-a-date"` (kept by _populate_envelope's
+    setdefault) would persist (hostile-audit finding #4). lru_cache hashes the
+    str path key.
+    """
     p = Path(schema_path)
     with p.open("r", encoding="utf-8") as fh:
         schema = json.load(fh)
-    return Draft7Validator(schema)
+    return build_validator(schema)
 
 
 def _resolve_workspace_root(workspace_root: Path | None) -> Path:

@@ -44,12 +44,18 @@ def test_accepts_good_uri() -> None:
 
 def test_rejects_bad_date_time() -> None:
     assert _errors(DATETIME_SCHEMA, {"d": "nonsense"}), "format:date-time must reject a non-timestamp"
+    # storage timestamps are canonical UTC `…Z` (rules/time-discipline.md §time); non-UTC
+    # offsets and naive (no-tz) forms must be rejected — codex audit finding #5.
+    assert _errors(DATETIME_SCHEMA, {"d": "2026-06-03T12:34:56+03:00"}), "non-UTC offset must be rejected"
+    assert _errors(DATETIME_SCHEMA, {"d": "2026-06-03T12:00:00"}), "naive (no tz) must be rejected"
 
 
 def test_accepts_good_date_time() -> None:
-    # both Z and explicit-offset RFC 3339 forms must pass
+    # only canonical UTC `…Z` passes (rules/time-discipline.md); offsets/naive are
+    # rejected (see test_rejects_bad_date_time). Microsecond `…Z` (events_writer's
+    # emitted form) must pass.
     assert not _errors(DATETIME_SCHEMA, {"d": "2026-06-03T00:00:00Z"})
-    assert not _errors(DATETIME_SCHEMA, {"d": "2026-06-03T12:34:56+03:00"})
+    assert not _errors(DATETIME_SCHEMA, {"d": "2026-06-03T12:34:56.123456Z"})
 
 
 def test_rejects_bad_date() -> None:

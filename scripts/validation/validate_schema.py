@@ -53,9 +53,24 @@ def _is_uri(value: object) -> bool:
 
 @_FORMAT_CHECKER.checks("date-time", raises=ValueError)
 def _is_date_time(value: object) -> bool:
+    """Storage timestamps MUST be canonical UTC with a 'Z' suffix.
+
+    rules/time-discipline.md §8.10 fixes the storage layer to UTC `…Z` only;
+    `format: date-time` is the rule's schema-side enforcement point. So this
+    checker REJECTS naive (tz-less) and non-UTC values — `…T12:00:00`,
+    `…+03:00`, even `…+00:00` — even though they are structurally valid
+    RFC 3339, because they are the exact drift vectors the rule forbids and
+    `…Z` is its canonical form. Microseconds ARE allowed (events_writer emits
+    `…S.%fZ`). Non-strings defer to `type` (format only constrains strings).
+    """
     if not isinstance(value, str):
         return True
-    _datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if not value.endswith("Z"):
+        raise ValueError("timestamp must be UTC with a 'Z' suffix (rules/time-discipline.md §8.10)")
+    # Parse the calendar instant to reject structurally-invalid values. Python
+    # 3.10's fromisoformat rejects a bare 'Z', so swap the verified suffix for
+    # the equivalent explicit zero offset.
+    _datetime.fromisoformat(value[:-1] + "+00:00")
     return True
 
 
