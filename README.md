@@ -173,8 +173,7 @@ v1.8 added Screaming Frog 24's native MCP server as the **fourth MCP** in PSEO (
 
 1. Install Screaming Frog 24+ ([screamingfrog.co.uk](https://www.screamingfrog.co.uk/seo-spider/))
 2. Open SF → Configuration → API Access → MCP Server tab → click **Start**
-3. Verify: `curl http://127.0.0.1:11435/mcp/tools | jq '.tools[].name'` returns ≥5 tools
-4. After plugin install, `claude mcp list` should show `sf` connected
+3. After plugin install, verify with `claude mcp list` — the `sf` entry should show connected. SF 24's MCP is **Streamable-HTTP** with a per-session `Mcp-Session-Id`; it exposes **no** plain tool-listing or health HTTP endpoint that a bare `curl` can hit. The repo's canonical programmatic probe is `SfMcpClient.health()` in [`scripts/util/sf_mcp_client.py`](scripts/util/sf_mcp_client.py), which runs the `initialize` → `notifications/initialized` → `tools/call` handshake.
 
 ### SF Settings (recommended)
 
@@ -182,7 +181,7 @@ v1.8 added Screaming Frog 24's native MCP server as the **fourth MCP** in PSEO (
 |---|---|---|
 | Port | `11435` | Default; matches `.mcp.json` |
 | Max Response Size (Bytes) | `100000` | D-SF-05; orchestrator handles big data via file path |
-| Directory | `/Users/apple/seo_spider_mcp_server` | D-SF-03; F-15 governance: SF scratch isolated from PSEO workspace |
+| Directory | `/Users/apple/seo_spider_mcp_server` (recommended) | D-SF-03; **opt-in** F-15 isolation. The project-config `sf.mcp.allowed_directory` default is **null** (SF GUI default applies; isolation *not* enforced) until you set it to match this path. |
 | Node.js Runtime Environment | ☐ Unchecked | D-SF-04; security (v1.1+ scope) |
 
 ### .mcp.json snippet (v1.8+)
@@ -265,10 +264,12 @@ The plugin is delivered in **15 phases**. Foundation phases (0–4) are complete
 | 8 | Planning Suite | done | 5 |
 | 9 | Reporting Suite | done | 9 |
 | 10 | Content Rules Processing | done | — |
-| 11 | Production Suite | done | 5 |
-| 12 | Publishing + Specialized | done | 2 |
+| 11 | Production Suite | in progress | 5 |
+| 12 | Publishing + Specialized | in progress | 2 |
 | 13 | Governance Final | done | 4 |
 | 14 | Workspace + CI + Pilot E2E | in progress | — |
+
+> Phases 11 (Production) and 12 (Publishing) are **in progress**: their skills are spec- and contract-locked (SKILL.md + paired tests) but the runtime scripts are deferred, so each one's frontmatter is `status: wip`. The docs track that frontmatter rather than over-advertise.
 
 Detailed status: **[docs/PHASE_STATUS.md](docs/PHASE_STATUS.md)** · Open questions: **[docs/OPEN_QUESTIONS.md](docs/OPEN_QUESTIONS.md)** · Latest release: **[docs/RELEASE_NOTES_v2.0.0.md](docs/RELEASE_NOTES_v2.0.0.md)**.
 

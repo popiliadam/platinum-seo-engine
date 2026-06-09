@@ -63,12 +63,12 @@ Her biri `rules/*.md`'de tanımlı; drift-check ve CI otomatik denetler.
 | 8 | Planning Suite | tamamlandı ✅ | 5 |
 | 9 | Reporting Suite | tamamlandı ✅ | 8 |
 | 10 | Content Rules Processing | tamamlandı ✅ | — |
-| 11 | Production Suite | tamamlandı ✅ | 5 |
-| 12 | Publishing + Specialized | tamamlandı ✅ | 6 |
+| 11 | Production Suite | devam ediyor 🚧 | 5 |
+| 12 | Publishing + Specialized | devam ediyor 🚧 | 6 |
 | 13 | Governance Final | tamamlandı ✅ | 3 |
 | 14 | Workspace + CI + Pilot End-to-End | devam ediyor 🚧 | — |
 
-**Toplam ~45 skill** (45 SKILL.md filesystem SoT), 9 batch phase'e yayılmış (v1.7'de +1 gbp-audit; v1.8'de +1 sf-crawl-orchestrator). **Güncel durum (engine v1.9.4): Phase 0–13 tamamlandı; Phase 14 (workspace + CI + pilot E2E) devam ediyor.** Foundation (Phase 0–4) skill phase'lerinden önce tamamlandı; Phase 5 **GO/NO-GO gateway** geçildi.
+**Toplam ~45 skill** (45 SKILL.md filesystem SoT), 9 batch phase'e yayılmış (v1.7'de +1 gbp-audit; v1.8'de +1 sf-crawl-orchestrator). **Güncel durum (engine v2.0.0): foundation (Phase 0–4) + Phase 5–10 + 13 tamamlandı; Phase 11 (production) + Phase 12 (publishing) skill'leri `wip` — SKILL.md + paired test ile kontrat/spec kilitli, runtime ertelendi; Phase 14 (workspace + CI + pilot E2E) devam ediyor.** Foundation (Phase 0–4) skill phase'lerinden önce tamamlandı; Phase 5 **GO/NO-GO gateway** geçildi.
 
 ---
 
@@ -78,14 +78,14 @@ v1 release için TÜM şunlar geçmeli:
 
 1. Plugin Claude Code'da yükleniyor.
 2. ~45 skill çalışıyor (her kategori için en az 1 happy-path test).
-3. 18 command (`/pseo-*`) çalışıyor.
+3. 25 command (`/pseo-*`) çalışıyor.
 4. 6 hook (session-start, pre/post-tool-use, user-prompt-submit, stop, subagent-stop) tetikleniyor.
-5. 21 schema validation PASS (schemas/*.json).
+5. 27 schema validation PASS (schemas/*.json).
 6. Content rules input doc tamamen işlenmiş (Phase 10).
 7. Pilot proje (dentnotion) end-to-end: init → ingest → discovery → planning → reporting → production → publishing zinciri çalışıyor; drift-check GREEN; whats-next priority list doğru.
 8. CI pipeline 7 check PASS.
 9. `events.jsonl`'de tüm aktiviteler logged.
-10. master.xlsx invariant check temiz (31 declared / 24 implemented CSR rule).
+10. master.xlsx invariant check temiz (32 declared / 25 implemented CSR rule).
 11. docs (ARCHITECTURE, GLOSSARY, WORKFLOWS) güncel; phase status doğru.
 12. Workspace repo açılmış, `.env.example` doğru, init-project ile yeni proje eklenebiliyor.
 13. Budget guardrail çalışıyor (DataForSEO çağrısı bütçeyi aşmıyor).
@@ -156,6 +156,6 @@ sf-import projects to 6 sheets (`crawl_sitemap`, `inlinks`, `outlinks`, `redirec
 ### Plugin manifest counts (v1.8+)
 
 - 45 SKILL.md files (was 44 pre-v1.8; +1 sf-crawl-orchestrator)
-- 18 commands/*.md files (was 16 pre-v1.8; +2 pseo-sf-crawl + pseo-sf-status)
+- 25 commands/*.md files (16 pre-v1.8 → 18 with +2 pseo-sf-crawl/pseo-sf-status → 25 at v2.0 with the AMO command suite: pseo-run/-run-portfolio/-status-portfolio/-schedule/-approve/-bind + pseo-coverage)
 - 6 hooks (UNCHANGED; Q-SF-MCP-08 RESOLVED → NO; stop_validation.py perf budget intact)
 - 4 MCP servers (was 3; +sf HTTP)
