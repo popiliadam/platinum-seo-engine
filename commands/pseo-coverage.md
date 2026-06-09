@@ -63,7 +63,32 @@ gelir (`$1` `!`…`` bloklarında BOŞ gelir — `docs/bugs/2026-06-09-slash-com
 - Çıktı `ERROR: ...` ise: mesajı operatöre ilet (engine path sorunu). Slug verilmediyse de
   STATİK rapor yine gelir — runtime katmanı sadece atlanır.
 
-## 3. Bağımlılıklar
+## 3. Ad-hoc-only allow-list (kabul kararı)
+
+Coverage tool'unun verisi DOĞRU; "ad-hoc-only" listesi ölü skill DEĞİL — ama
+hepsi de kalıcı olarak kabul edilebilir değil. Karar yüzeyi: **read-only /
+advisory / operatör-tetikli** skill'ler ad-hoc kalır (KABUL); **state-değiştiren
+veya çekirdek-SEO** skill'ler bir workflow'a/route'a taşınmalıdır (PROMOTION
+ADAYI — gelecek iş; bu komut HİÇBİR ŞEY taşımaz, yalnız kararı belgeler).
+
+**KABUL (intentional ad-hoc — sıralama/denetçi gerektirmez):**
+- Portföy raporlama (READ-ONLY, operatör tetikler): `portfolio-overview`,
+  `portfolio-heatmap`, `portfolio-kpi-trend`, `portfolio-monthly-roundup`,
+  `portfolio-task-heatmap`, `portfolio-weekly-brief`, `weekly-summary`
+- Read-only keşif/analiz/doğrulama (advisory): `aio-competitor-map`,
+  `competitive-analysis`, `geo-analysis`, `glossary-audit`, `schema-validate`
+- Oturum/kurulum yardımcıları (interaktif, operatör-sürücülü): `brand-onboarding`,
+  `load-context`
+
+**PROMOTION ADAYI (kritik state-değiştiren / SEO-etkili — route edilmeli, future work):**
+`content-remediation`, `indexing-ping`, `verify-indexing`, `mark-done`,
+`sf-import`, `revise-content`, `internal-links`, `content-gaps`,
+`master-task-sync` — yukarıdaki "Öneri" tablosu bunları graf-merkeziyetine göre
+sıralar; consent-gate'li dış aksiyonlar (örn. `indexing-ping`) ayrıca önce
+`/pseo-approve` defterinden geçer. **Promotion-into-workflows bu komutun kapsamı
+DIŞI** (ayrı karar; bu allow-list yalnız "hangi ad-hoc KABUL" yüzeyidir).
+
+## 4. Bağımlılıklar
 
 - Saf + READ-ONLY çekirdek: `scripts/reporting/capability_coverage.py`
   (`classify_skills` / `classify_mcp` / `classify_scripts` / `recommendations` /

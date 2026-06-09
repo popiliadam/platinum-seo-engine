@@ -43,7 +43,7 @@ Bu komut şu sırayı tetikler:
 
 - `skills/discovery/quick-wins/SKILL.md` — aktif (Phase 5)
 - `skills/ingestion/gsc-pull/SKILL.md` — aktif (Phase 6)
-- MCP (quick-wins required): `mcp__gsc__detect_quick_wins` + `mcp__gsc__enhanced_search_analytics`
+- MCP **skill-level** (quick-wins / gsc-pull skill'leri çağırır, bu komut DEĞİL; skill frontmatter `mcp_tools`) — quick-wins required: `mcp__gsc__detect_quick_wins` + `mcp__gsc__enhanced_search_analytics`
 - MCP (quick-wins optional): `mcp__gsc__search_analytics` (alternative data source)
 - MCP (gsc-pull required): `mcp__gsc__enhanced_search_analytics` + `mcp__gsc__search_analytics`
 - MCP (gsc-pull optional): `mcp__gsc__index_inspect` (URL inspection enrichment)

@@ -37,7 +37,7 @@ model: sonnet
 ## 4. Bağımlılıklar
 
 - `skills/ingestion/gsc-pull/SKILL.md` — Phase 6 W1
-- MCP required: `mcp__gsc__enhanced_search_analytics` + `mcp__gsc__search_analytics`
+- MCP required (**skill-level** — gsc-pull skill çağırır, bu komut DEĞİL; skill frontmatter `mcp_tools`): `mcp__gsc__enhanced_search_analytics` + `mcp__gsc__search_analytics`
 - MCP optional: `mcp__gsc__index_inspect` (URL inspection enrichment, indexing status check)
 - `.mcp.json` bash wrapper, `.env` auto-source (`GOOGLE_APPLICATION_CREDENTIALS` service account JSON)
 - `project.config.gsc.site_url` — required input

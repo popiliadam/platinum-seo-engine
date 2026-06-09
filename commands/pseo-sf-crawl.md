@@ -4,7 +4,7 @@ description: |
   Also use when: aktif projenin Screaming Frog MCP server'ı (`http://127.0.0.1:11435/mcp`) açık, `project.config.sf.mcp.enabled=true`; 24 raporluk Tier 1 + Tier 2 export döngüsü tetiklenecek; mid-loop crash sonrası `--resume <run_id>` ile devam ettiriliyor.
   Do not use when: SF MCP server kapalı (GUI'den önce başlat), manuel CSV drop (mevcut sf-import file-only path zaten çalışır), GSC ingestion (`/pseo-gsc-pull`), DFS pull (`/pseo-dfs-pull`).
 argument-hint: "<slug> [start_url] [--resume <run_id>]"
-allowed-tools: Bash(jq:*), Bash(curl:*), Bash(head:*), Read
+allowed-tools: Bash(jq:*), Read
 model: sonnet
 ---
 
@@ -21,9 +21,7 @@ model: sonnet
 
 ## 2. SF MCP pre-flight
 
-Pre-flight: SF GUI açık + MCP server start edilmiş olmalı (D-SF-10 + DURUR-orch-1). Bağlantı testi:
-
-!`curl -sf -m 3 http://127.0.0.1:11435/mcp/tools 2>/dev/null | jq -r '.tools[]?.name // empty' | head -5 || echo "SF_MCP_DOWN — SF GUI'de Configuration → API Access → MCP Server Start"`
+Pre-flight: SF GUI açık + MCP server start edilmiş olmalı (D-SF-10 + DURUR-orch-1). Bağlantı testi orchestrator skill'in **skill-level** MCP tool'larıyla yapılır — `mcp__sf__sf_list_allowed_base_directory` (allowed_directory probe) + `mcp__sf__sf_list_crawls` (concurrent-crawl guard R13). SF MCP **stateful Streamable-HTTP** transport konuşur (session handshake'li; `scripts/util/sf_mcp_client.py:8-17`); raw `curl` ile bare tool-list endpoint'i (öyle bir HTTP route yok) ve session'sız bare `tools/call` POST (HTTP 400 `-32600`) **obsolete** — kullanma.
 
 Beklenen tool inventory (minimum 5): `sf_crawl`, `sf_crawl_progress`, `sf_generate_report`, `sf_list_crawls`, `sf_list_allowed_base_directory`.
 
@@ -63,7 +61,7 @@ Frontmatter `requires_approval=true` — skill `awaiting_approval` durumunda dur
 - Skill: `skills/ingestion/sf-crawl-orchestrator/SKILL.md` — v1.8 Phase 3 aktif
 - Script: `scripts/ingestion/sf_crawl_orchestrator.py` (pure-transform helpers)
 - Util: `scripts/util/sf_mcp_client.py` (HTTP MCP client, D-SF-14)
-- MCP required: `mcp__sf__sf_crawl` + `mcp__sf__sf_crawl_progress` + `mcp__sf__sf_generate_report` + `mcp__sf__sf_generate_bulk_export` + `mcp__sf__sf_export_seo_element_urls` + `mcp__sf__sf_list_crawls` + `mcp__sf__sf_list_allowed_base_directory`
+- MCP required (**skill-level** — sf-crawl-orchestrator skill çağırır, bu komut DEĞİL; skill frontmatter `mcp_tools` + body): `mcp__sf__sf_crawl` + `mcp__sf__sf_crawl_progress` + `mcp__sf__sf_generate_report` + `mcp__sf__sf_generate_bulk_export` + `mcp__sf__sf_export_seo_element_urls` + `mcp__sf__sf_list_crawls` + `mcp__sf__sf_list_allowed_base_directory`
 - `project.config.sf.mcp.{enabled,url,allowed_directory,max_wait_minutes,per_report_timeout_seconds}` — Migration 0005 retro-populates (D-SF-12 + D-SF-18)
 - `.mcp.json` `sf` entry (`http://127.0.0.1:11435/mcp`) — v1.8 Phase 2 ADR-039
 - Schema: `schemas/sf-mcp-tool-mapping.schema.json` + `mcp-tool-registry.json` (sf entry, F-23 invariant)
