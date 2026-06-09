@@ -538,3 +538,69 @@ def test_extract_competitor_domains_both_shapes() -> None:
         "rival3.example", "rival1.example",
     ]
     assert ca.extract_competitor_domains(None) == []
+
+
+# ---------------------------------------------------------------------------
+# Tests 17-19 — Batch-B-tail #19: validate_s1_row enforces the S1 schema's
+# 3 `format` keywords (snapshot_date→date-time, url_normalized/url_original→uri)
+# via the strict validate_schema.build_validator. A plain Draft7Validator
+# treats `format` as a bare annotation and would let drifted rows through.
+# ---------------------------------------------------------------------------
+
+def _valid_s1_row() -> dict:
+    """A baseline S1 row that satisfies every constraint INCLUDING the 3
+    format keywords (canonical '…Z' snapshot_date + scheme-ful URLs)."""
+    entry = _entry(url="https://competitor.example/page-1",
+                   fetch_method="get", tier_attempts=1)
+    return ca.build_s1_row(entry, snapshot_date="2026-05-01T00:00:00.000000Z")
+
+
+def test_validate_s1_row_rejects_non_utc_snapshot_date() -> None:
+    """#19 strict-format (snapshot_date / date-time): validate_s1_row routes
+    through the strict UTC checker, so a non-'…Z' snapshot_date is REJECTED —
+    both the prior isoformat '+00:00' output and a naive tz-less stamp
+    (rules/time-discipline.md §8.10). Unenforced under a plain Draft7Validator."""
+    row = _valid_s1_row()
+    ca.validate_s1_row(row)  # conformant baseline passes (no raise)
+
+    # RFC3339-valid but §8.10-forbidden '+00:00' offset → rejected.
+    bad_offset = {**row, "snapshot_date": "2026-05-01T00:00:00.000000+00:00"}
+    with pytest.raises(ca.StagingSchemaError):
+        ca.validate_s1_row(bad_offset)
+
+    # Naive (tz-less) stamp → rejected.
+    bad_naive = {**row, "snapshot_date": "2026-05-01T00:00:00"}
+    with pytest.raises(ca.StagingSchemaError):
+        ca.validate_s1_row(bad_naive)
+
+
+def test_validate_s1_row_rejects_scheme_less_uri() -> None:
+    """#19 strict-format (url_normalized + url_original / uri): a scheme-less
+    URL is REJECTED on BOTH uri-format fields. Unenforced under a plain
+    Draft7Validator (which treats them as bare strings)."""
+    row = _valid_s1_row()
+
+    bad_norm = {**row, "url_normalized": "competitor.example/page-1"}  # no scheme
+    with pytest.raises(ca.StagingSchemaError):
+        ca.validate_s1_row(bad_norm)
+
+    bad_orig = {**row, "url_original": "competitor.example/page-1"}    # no scheme
+    with pytest.raises(ca.StagingSchemaError):
+        ca.validate_s1_row(bad_orig)
+
+
+def test_default_snapshot_date_is_utc_z_and_validates_strict() -> None:
+    """Producer/validator pairing (the #19 blast-radius): the default
+    snapshot_date producer emits canonical '…Z', so transform()'s internal
+    (now strict) validate_s1_row gate accepts default-stamped rows and a
+    valid row still passes end-to-end."""
+    out = ca.transform(
+        [_entry(url="https://competitor.example/page-1",
+                fetch_method="get", tier_attempts=1)],
+        project_slug="test-project",
+    )  # no explicit snapshot_date → uses _utc_iso_microseconds()
+    assert len(out["rows"]) == 1
+    snap = out["rows"][0]["snapshot_date"]
+    assert snap.endswith("Z") and "+00:00" not in snap
+    ca.validate_s1_row(out["rows"][0])           # strict gate accepts it
+    assert out["meta"]["snapshot_date"].endswith("Z")

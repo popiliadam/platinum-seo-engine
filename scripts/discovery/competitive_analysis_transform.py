@@ -24,8 +24,10 @@ tier_escalation override matches the canonical
 raise TierEscalationOrderError — DURUR.
 
 S1 schema validation: every projected row is round-tripped through
-Draft7Validator(S1_SCHEMA) before being committed to the in-memory
-staging payload. Validation failure raises StagingSchemaError — DURUR.
+validate_schema.build_validator(S1_SCHEMA) before being committed to the
+in-memory staging payload — the strict FormatChecker ENFORCES the schema's
+`format` keywords (date-time / uri), not just structure. Validation failure
+raises StagingSchemaError — DURUR.
 
 STAGING-ONLY (D-003 / ADR-025 alignment): no master.xlsx writes from
 this module. No Excel writer import is allowed here. Output is a JSON
@@ -465,13 +467,23 @@ def build_s1_row(
 
 def validate_s1_row(row: Mapping[str, Any]) -> None:
     """Validate `row` against the S1 sub-schema. Raises StagingSchemaError
-    on the FIRST validation error (with absolute path + message)."""
+    on the FIRST validation error (with absolute path + message).
+
+    Routes through :func:`scripts.validation.validate_schema.build_validator`
+    so the S1 schema's 3 `format` keywords — `snapshot_date` (date-time) and
+    `url_normalized` / `url_original` (uri) — are ENFORCED with the strict
+    UTC '…Z' / scheme-ful checkers (P1-02 / rules/time-discipline.md §8.10).
+    A plain `Draft7Validator(schema)` treats `format` as a bare annotation
+    and would let a naive/non-UTC snapshot_date or a scheme-less URL into the
+    staging payload (codex-audit #19, Batch-B-tail)."""
     schema = _load_s1_schema()
     try:
-        from jsonschema import Draft7Validator
+        from scripts.validation.validate_schema import build_validator
     except ImportError as exc:  # pragma: no cover
-        raise StagingSchemaError(f"jsonschema unavailable: {exc}") from exc
-    validator = Draft7Validator(schema)
+        raise StagingSchemaError(
+            f"validate_schema.build_validator unavailable: {exc}"
+        ) from exc
+    validator = build_validator(schema)
     errors = sorted(validator.iter_errors(row), key=lambda e: list(e.absolute_path))
     if errors:
         first = errors[0]
@@ -766,10 +778,14 @@ def write_inbox_raw(
 # ---------------------------------------------------------------------------
 
 def _utc_iso_microseconds() -> str:
-    """UTC ISO 8601 with microsecond precision and explicit '+00:00' offset.
-    Mirrors dfs_pull.py — cluster-map / staging consumers expect offset-aware
-    parsing across the platform."""
-    return datetime.now(timezone.utc).isoformat(timespec="microseconds")
+    """UTC ISO 8601 with microsecond precision and the canonical '…Z' suffix.
+
+    Storage-layer canonical form per rules/time-discipline.md §8.10 (mirrors
+    events_writer._utc_iso_z / scrapling_ops). The S1 sub-schema's
+    `snapshot_date` declares `format: date-time`, now ENFORCED by the strict
+    UTC checker in :func:`validate_s1_row`; a '+00:00' offset (the prior
+    isoformat() output) is rejected there, so the producer emits '…Z'."""
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 # ---------------------------------------------------------------------------
