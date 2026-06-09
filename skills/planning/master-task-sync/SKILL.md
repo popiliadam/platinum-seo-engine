@@ -54,7 +54,6 @@ consumes:
 produces:
   - "drift-check"
   - "monthly-report"
-  - "dashboard-refresh"
 triggers:
   manual: ["/pseo-master-task-sync"]
   natural_language: |
