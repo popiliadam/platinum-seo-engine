@@ -3,7 +3,7 @@ description: |
   Use when: kullanıcı "yeni proje", "init", "proje kur", "yeni domain ekle", "scaffold" gibi ifadeler kullanır ya da `/pseo-init` çağırırsa.
   Also use when: portföye yeni bir SEO projesi alındı, `projects/{slug}/` klasörü ve `project.config.json` dosyasının schemaya uygun ilk hâli üretilecek; brief'te slug + domain + market biliniyor.
   Do not use when: mevcut bir projeye yeni veri yüklemek (`/pseo-status` veya ingestion skill'leri), aylık rapor (`/pseo-monthly`) ya da drift kontrol (`/pseo-driftcheck`) gerekiyorsa — her biri ayrı komut/skill ile çalışır.
-argument-hint: "<slug> [domain] [--market TR] [--locale tr-TR] [--profile local-service] [--schema-version 1.5] [--dry-run]"
+argument-hint: "<slug> [domain] [--market TR] [--locale tr-TR] [--profile local-service] [--dry-run]"
 allowed-tools: Bash(python3:*), Bash(jq:*), Bash(head:*), Read
 model: sonnet
 ---
@@ -38,11 +38,11 @@ Workspace root resolution: `PSEO_WORKSPACE_ROOT` env var → yoksa kullanıcıya
 
 Bu komut yalnızca `project.config.json` scaffold rolünü üstlenir. Tam workspace tree (master.xlsx kopyalama, `inbox/` + `outputs/` + `_state/` klasörler, `shared/portfolio.json` güncelleme, `project_created` event'i, GSC validation, approval gate) `skills/meta/init-project/SKILL.md` (Phase 5, aktif) tarafından sürülür. Brief'te "tam init" ihtiyacı varsa skill'i çağır; sadece config dosyası lazımsa bu komut yeterli.
 
-## 5. Schema version (v1.8 NEW)
+## 5. Schema version (v1.8+)
 
-Default `--schema-version=1.5` (v1.8 Phase 1 — project-config v1.4→v1.5; additive `sf` block). `bootstrap_project.py` post-Phase-1 native olarak 1.5 emit ediyor; Migration 0005 cascade legacy v1.4 workspace'lerde init-project Step 4.5'te otomatik tetiklenir (idempotent on already-1.5 docs). Legacy zorlamak gerekirse `--schema-version=1.4` explicitly geçilir (deprecated path; v1.9'da kaldırılması planlanır).
+`bootstrap_project.py` şema sürümünü `SCHEMA_VERSION` sabitinden **native** emit eder (şu an `1.5` — v1.8 Phase 1; project-config v1.4→v1.5, additive `sf` block). Bu bir CLI flag DEĞİLDİR; operatör seçmez (sürüm bir kontrattır, tercih değil). Legacy v1.4 workspace'ler init-project Step 4.5'te Migration 0005 cascade ile otomatik 1.5'e taşınır (idempotent on already-1.5 docs).
 
-`sf` block default: `{ mcp: { enabled: false, url: "http://127.0.0.1:11435/mcp", allowed_directory: "/Users/apple/seo_spider_mcp_server", max_wait_minutes: 180, per_report_timeout_seconds: 300 } }` (D-SF-12 + D-SF-18 path parameterization; operator project-bazlı override edebilir).
+`sf` block default (kod: `DEFAULT_SF_MCP_BLOCK`): `{ mcp: { enabled: false, url: "http://127.0.0.1:11435/mcp", allowed_directory: null, crawl_config_path: null, max_wait_minutes: 180, per_report_timeout_seconds: 300 } }`. `allowed_directory` default'u `null`'dur; operatör project-bazlı override eder (D-SF-12 + D-SF-18; SF GUI'de önerilen scratch dizini için README § Screaming Frog'a bak).
 
 ## 6. Bağımlılıklar
 
