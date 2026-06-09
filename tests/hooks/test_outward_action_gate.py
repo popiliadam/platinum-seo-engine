@@ -209,6 +209,168 @@ def test_classify_multi_gated_returns_first_segment() -> None:
 
 
 # ===========================================================================
+# classify() — leading command-wrapper unwrap (#10): sudo/command/env/time/... are
+# command WRAPPERS, not commands; a gated action behind one (`sudo rm -rf x`,
+# `sudo git push`) was waved through because the wrapper token sat at tokens[0].
+# Unwrapping exposes the real command. NEVER weaken: a wrapped non-gated command is
+# still None, and every plain (un-wrapped) result above is byte-identical.
+# ===========================================================================
+
+def test_classify_sudo_rm_is_fs_delete() -> None:
+    res = gate.classify("Bash", {"command": "sudo rm -rf foo/bar"})
+    assert res is not None and res[0] == "fs_delete"
+    assert "foo/bar" in res[1]  # target is the wrapped command's path, not "sudo"
+
+
+def test_classify_command_builtin_wrapped_rm_is_fs_delete() -> None:
+    for w in ("command", "builtin", "exec", "nohup"):
+        res = gate.classify("Bash", {"command": f"{w} rm -rf foo/bar"})
+        assert res is not None and res[0] == "fs_delete", w
+        assert "foo/bar" in res[1], w
+
+
+def test_classify_env_wrapped_rm_is_fs_delete() -> None:
+    res = gate.classify("Bash", {"command": "env rm -rf foo/bar"})
+    assert res is not None and res[0] == "fs_delete"
+
+
+def test_classify_env_assignment_then_rm_is_fs_delete() -> None:
+    # `env FOO=bar rm z` — the NAME=VALUE assignment must not hide the wrapped rm.
+    res = gate.classify("Bash", {"command": "env FOO=bar BAZ=1 rm -rf z"})
+    assert res is not None and res[0] == "fs_delete"
+    assert "z" in res[1]
+
+
+def test_classify_sudo_git_push_is_git_push() -> None:
+    assert gate.classify(
+        "Bash", {"command": "sudo git push origin main"}
+    ) == ("git_push", "origin main")
+
+
+def test_classify_sudo_curl_post_is_net_post() -> None:
+    res = gate.classify(
+        "Bash", {"command": "sudo curl -X POST https://example.com/x -d @b"}
+    )
+    assert res is not None and res[0] == "net_post"
+    assert "example.com" in res[1]
+
+
+def test_classify_sudo_argflag_then_rm_still_gated() -> None:
+    # `sudo -u www-data rm …` — an arg-TAKING wrapper flag whose value (www-data)
+    # is NOT the command; the gate must still find the wrapped rm (no under-deny).
+    res = gate.classify("Bash", {"command": "sudo -u www-data rm -rf /srv/data"})
+    assert res is not None and res[0] == "fs_delete"
+
+
+def test_classify_positional_arg_wrapper_then_push_gated() -> None:
+    # a wrapper with a POSITIONAL arg (`timeout 5 …`, `nice -n 10 …`) must not hide
+    # the wrapped gated command.
+    assert gate.classify(
+        "Bash", {"command": "timeout 5 git push origin main"}
+    ) == ("git_push", "origin main")
+    res = gate.classify("Bash", {"command": "nice -n 10 rm -rf /tmp/z"})
+    assert res is not None and res[0] == "fs_delete"
+
+
+def test_classify_nested_wrappers_then_rm_is_fs_delete() -> None:
+    res = gate.classify("Bash", {"command": "sudo nohup rm -rf /tmp/x"})
+    assert res is not None and res[0] == "fs_delete"
+
+
+def test_classify_wrapped_non_gated_command_not_gated() -> None:
+    # unwrap must NOT over-gate a benign wrapped command (no gated token present).
+    assert gate.classify("Bash", {"command": "sudo systemctl restart nginx"}) is None
+    assert gate.classify("Bash", {"command": "sudo ls -la /root"}) is None
+    assert gate.classify("Bash", {"command": "env NODE_ENV=prod node app.js"}) is None
+
+
+def test_classify_wrapper_lookalike_not_unwrapped() -> None:
+    # leading-token, NOT prefix: a token that merely STARTS with a wrapper's letters
+    # ('commander', 'sudoku', 'timeout-foo') is not a wrapper -> classified as-is.
+    assert gate.classify("Bash", {"command": "commander deploy"}) is None
+    assert gate.classify("Bash", {"command": "sudoku --new-game"}) is None
+
+
+def test_classify_compound_then_wrapped_gated() -> None:
+    # wrapper-unwrap composes with segment-split: `cd x && sudo rm -rf y`.
+    res = gate.classify("Bash", {"command": "cd x && sudo rm -rf y"})
+    assert res is not None and res[0] == "fs_delete"
+    assert "y" in res[1]
+
+
+# ===========================================================================
+# classify() — loopback carve-out (#12): a POST to THIS machine never leaves it, so
+# it is NOT an outward action (e.g. the /pseo-status SF-MCP health probe to
+# 127.0.0.1:11435 — commands/pseo-status.md). Public POST + Indexing/IndexNow STAY
+# gated (their hosts are never loopback, so the carve-out can't un-gate them).
+# ===========================================================================
+
+def test_classify_localhost_mcp_post_not_gated() -> None:
+    # the real /pseo-status SF MCP health probe — a local POST, must NOT be gated.
+    cmd = (
+        "curl -sf -m 3 -X POST http://127.0.0.1:11435/mcp "
+        "-H 'Content-Type: application/json' "
+        "-d '{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\"}'"
+    )
+    assert gate.classify("Bash", {"command": cmd}) is None
+
+
+def test_classify_localhost_name_post_not_gated() -> None:
+    assert gate.classify(
+        "Bash", {"command": "curl -X POST http://localhost:8080/x -d @b"}
+    ) is None
+
+
+def test_classify_ipv6_loopback_post_not_gated() -> None:
+    assert gate.classify(
+        "Bash", {"command": "curl -X POST http://[::1]:9000/y -d @b"}
+    ) is None
+
+
+def test_classify_127_subnet_post_not_gated() -> None:
+    # the whole 127.0.0.0/8 block is loopback, not just 127.0.0.1.
+    assert gate.classify(
+        "Bash", {"command": "curl -X POST http://127.0.0.53:5000/z -d @b"}
+    ) is None
+
+
+def test_classify_status_probe_full_pipe_not_gated() -> None:
+    # the FULL status.md probe shape (loopback curl POST | jq) -> no segment gated.
+    cmd = (
+        "curl -sf -X POST http://127.0.0.1:11435/mcp -d '{\"x\":1}' "
+        "2>/dev/null | jq -r '.result'"
+    )
+    assert gate.classify("Bash", {"command": cmd}) is None
+
+
+def test_classify_public_post_still_gated() -> None:
+    res = gate.classify(
+        "Bash", {"command": "curl -X POST https://example.com/api -d @b"}
+    )
+    assert res is not None and res[0] == "net_post"
+
+
+def test_classify_indexing_not_carved_out_still_index_update() -> None:
+    res = gate.classify(
+        "Bash",
+        {"command": "curl -X POST https://indexing.googleapis.com/v3/x -d @b"},
+    )
+    assert res is not None and res[0] == "index_update"
+
+
+def test_classify_indexnow_still_net_post() -> None:
+    res = gate.classify(
+        "Bash", {"command": "curl -X POST https://api.indexnow.org/IndexNow -d @b"}
+    )
+    assert res is not None and res[0] == "net_post"
+
+
+def test_classify_loopback_get_still_not_gated() -> None:
+    # regression: a loopback GET was already non-gated and stays None.
+    assert gate.classify("Bash", {"command": "curl http://127.0.0.1:11435/health"}) is None
+
+
+# ===========================================================================
 # evaluate() — per-session consent decision (real resolvers via env + marker)
 # ===========================================================================
 
