@@ -28,6 +28,7 @@ from typing import Any, Mapping, Sequence
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
+from scripts.state.active_projects import ACTIVE_PROJECTS_MAX  # noqa: E402  (sys.path mutation above; no blank line keeps file < ADR-027 600-line ceiling)
 
 EVENT_TYPE_ENUM: tuple[str, ...] = (
     "content_new", "content_revise", "content_remove", "tech_fix",
@@ -38,7 +39,6 @@ STATUS_ENUM: tuple[str, ...] = (
     "TODO", "ONGOING", "EXISTS", "DONE", "BLOCKED", "DEFERRED", "CANCELED",
 )
 PERIOD_DAYS_MIN, PERIOD_DAYS_MAX, PERIOD_DAYS_DEFAULT = 7, 90, 30
-ACTIVE_PROJECTS_MAX = 12
 WRITER_NAME = "portfolio_kpi_trend"
 DEFAULT_TEMPLATE_REL = "templates/reports/portfolio-kpi-trend.template.md"
 

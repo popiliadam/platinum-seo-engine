@@ -34,6 +34,8 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from scripts.state.active_projects import ACTIVE_PROJECTS_MAX  # noqa: E402
+
 
 # --- Constants (schema-aligned) -------------------------------------------
 
@@ -49,7 +51,6 @@ MASTER_TASK_DATA_START_ROW: int = 4
 MASTER_TASK_CATEGORY_COL_INDEX: int = 6   # F
 MASTER_TASK_PRIORITY_COL_INDEX: int = 7   # G
 MASTER_TASK_STATUS_COL_INDEX: int = 10    # J
-ACTIVE_PROJECTS_MAX: int = 12
 PORTFOLIO_DIR_NAME: str = "_portfolio"
 OUTPUTS_REPORTS_REL: str = "projects/_portfolio/outputs/reports"
 INBOX_LOCAL_REL: str = "projects/_portfolio/inbox/local"
