@@ -68,8 +68,8 @@ RUNTIME_HOOK_SCRIPTS = {
     # See scripts/hooks/README.md §1.
     "outward_action_gate.py",
     # AMO batch-2e PostToolUse AI-disclosure surface rescan — wired into
-    # hooks/post-tool-use.json as the 3rd command (audit_post_tool_use.py +
-    # env_probe.py untouched; matcher "Edit|Write|Bash"). AFTER any Edit/Write/Bash
+    # hooks/post-tool-use.json as the 2nd command (after audit_post_tool_use.py;
+    # matcher "Edit|Write|Bash"). AFTER any Edit/Write/Bash
     # it re-scans a just-written blog-HTML file's surface via content_validator and,
     # on a RED AI-disclosure finding, QUARANTINE-renames it off the live .html path
     # (os.replace → .BLOCKED-ai-disclosure) and emits a {"decision":"block"} stdout
@@ -78,10 +78,6 @@ RUNTIME_HOOK_SCRIPTS = {
     # detection); recency-guarded (a read never triggers); non-blocking-on-error.
     # See scripts/hooks/README.md §1.
     "ai_disclosure_rescan.py",
-    # AMO batch-0a TEMPORARY diagnostic probe — wired (as an appended command
-    # entry) into all five lifecycle events. Remove when the AMO session-binding
-    # mechanism is confirmed. See scripts/hooks/README.md §3.
-    "env_probe.py",
 }
 
 # NOT wired into hooks/*.json — CI/pre-commit/manual guard helpers.
@@ -92,10 +88,15 @@ GUARD_HOOK_SCRIPTS = {
     "validate_before_write.py",
 }
 
-# Manual diagnostic / companion tools — NOT wired into hooks/*.json and NOT a
-# rules-cited enforcement guard. An operator runs them on demand. TEMPORARY
-# (AMO batch 0a); remove together with the probe. See scripts/hooks/README.md §3.
+# Orphaned / companion tools — NOT wired into hooks/*.json and NOT a rules-cited
+# enforcement guard. TEMPORARY (AMO batch 0a): env_probe was UNWIRED from all five
+# lifecycle events (codex-hostile-audit #17) once the session-binding question it
+# answered was settled, so env_probe.py is now an ORPHAN on disk (no longer
+# runtime); env_probe_report.py was always operator-run. Both remain on disk
+# pending the manager's consent-gated deletion at integration (a bare `rm` trips
+# the engine's own fs_delete consent gate). See scripts/hooks/README.md §3.
 DIAGNOSTIC_HOOK_SCRIPTS = {
+    "env_probe.py",
     "env_probe_report.py",
 }
 
@@ -180,3 +181,24 @@ def test_readme_documents_both_classes() -> None:
         RUNTIME_HOOK_SCRIPTS | GUARD_HOOK_SCRIPTS | DIAGNOSTIC_HOOK_SCRIPTS
     ):
         assert name in text, f"{name} not documented in scripts/hooks/README.md"
+
+
+def test_no_hook_references_a_temporary_diagnostic_probe() -> None:
+    """codex-hostile-audit #17 guard — a TEMPORARY diagnostic probe must never be
+    wired into a live hook again.
+
+    The AMO batch-0a env_probe shipped wired into all five lifecycle events with
+    the statusMessage 'AMO batch-0a env probe (temporary diagnostic)…'; it has
+    been UNWIRED. Assert no hooks/*.json references a 'temporary diagnostic' probe
+    or env_probe.py, so a re-introduction — or any NEW temporary-diagnostic hook —
+    trips CI rather than silently shipping diagnostic instrumentation into the
+    live tool lifecycle."""
+    blob = _hooks_json_blob().lower()
+    assert "temporary diagnostic" not in blob, (
+        "a hooks/*.json wires a 'temporary diagnostic' probe — temporary "
+        "diagnostic instrumentation must not ship in a live hook (audit #17)"
+    )
+    assert "env_probe" not in blob, (
+        "env_probe.py is wired into a hooks/*.json again — it is an orphaned "
+        "AMO batch-0a probe pending consent-gated deletion; do not re-wire it"
+    )

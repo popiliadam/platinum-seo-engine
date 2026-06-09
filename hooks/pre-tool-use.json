@@ -27,12 +27,6 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/validate_content_write.py\"",
             "timeout": 15,
             "statusMessage": "Content rule validation..."
-          },
-          {
-            "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/env_probe.py\"",
-            "timeout": 10,
-            "statusMessage": "AMO batch-0a env probe (temporary diagnostic)..."
           }
         ]
       },

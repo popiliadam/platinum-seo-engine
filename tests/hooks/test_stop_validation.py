@@ -32,11 +32,12 @@ def test_stop_hook_config_valid() -> None:
     assert len(handlers) == 1
     handler = handlers[0]
     assert handler["matcher"] == ""
-    # The AMO batch-0a env probe (scripts/hooks/env_probe.py) is appended as a
+    # Additive Stop instrumentation (the AMO batch-2c denetçi) is appended as a
     # second, non-blocking command entry; the stop_validation contract is that it
     # remains the FIRST Stop hook with its plugin-agnostic shape intact. (Relaxed
     # from ``== 1`` so additive instrumentation does not require touching this
-    # contract — only the primary hook's identity/shape is locked.)
+    # contract — only the primary hook's identity/shape is locked.) The batch-0a
+    # env_probe that previously sat here was UNWIRED in codex-hostile-audit #17.
     assert len(handler["hooks"]) >= 1
     cmd = handler["hooks"][0]
     assert cmd["type"] == "command"
