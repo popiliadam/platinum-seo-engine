@@ -136,12 +136,20 @@ def test_persist_workspace_root_creates_dir(tmp_path: Path, monkeypatch: pytest.
     assert json.loads(returned.read_text(encoding="utf-8"))["workspace_root"] == str(ws)
 
 
-def test_resolve_workspace_root_config_wins(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolve_workspace_root_config_wins_via_override(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Audit#2 #7: a DIFFERING env vs config no longer SILENTLY prefers config —
+    # that silent divergence WAS the finding (see
+    # tests/scripts/test_session_binding_workspace_conflict.py for the fail-loud
+    # contract). Config now "wins" only when the operator names it explicitly via
+    # PSEO_WORKSPACE_ROOT_OVERRIDE=config.
     monkeypatch.setenv("HOME", str(tmp_path))
     cfg = tmp_path / ".config" / "pseo" / "config.json"
     cfg.parent.mkdir(parents=True)
     cfg.write_text(json.dumps({"workspace_root": str(tmp_path / "from_config")}), encoding="utf-8")
-    got = sb.resolve_workspace_root(environ={"PSEO_WORKSPACE_ROOT": str(tmp_path / "from_env")})
+    got = sb.resolve_workspace_root(environ={
+        "PSEO_WORKSPACE_ROOT": str(tmp_path / "from_env"),
+        "PSEO_WORKSPACE_ROOT_OVERRIDE": "config",
+    })
     assert got == tmp_path / "from_config"
 
 

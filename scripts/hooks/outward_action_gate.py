@@ -81,6 +81,43 @@ _DELETE_TOKENS = frozenset({"rm", "rmdir", "unlink", "shred"})
 # Leading bash tokens that make an outbound HTTP request.
 _HTTP_TOKENS = frozenset({"curl", "wget"})
 
+# Interpreters that can be coaxed into an outbound HTTP WRITE via a one-liner
+# (#11). _HTTP_TOKENS only caught curl/wget; a python/node/ruby/perl POST sailed
+# past. These are gated ONLY when their source ALSO carries a net-write marker
+# (below) — a plain interpreter call stays non-gated (byte-identical to today).
+_INTERPRETER_TOKENS = frozenset({
+    "python", "python2", "python3", "pythonw",
+    "node", "nodejs", "ruby", "perl", "php", "deno", "bun",
+})
+
+# An HTTP-capable client referenced in interpreter source (matched case-INSENSITIVELY).
+_NET_LIB_MARKERS = (
+    # python
+    "urlopen", "urllib.request", "urllib2", "urllib3", "requests.", "httpx.",
+    "http.client", "httplib", "httpconnection", "httpsconnection",
+    # node
+    "fetch(", "http.request", "https.request", "axios", "xmlhttprequest",
+    "require('http", 'require("http',
+    # ruby / perl
+    "net::http", "net/http", "lwp", "http::tiny",
+)
+
+# A write/POST indicator (matched case-INSENSITIVELY). The lowercase method-call
+# forms (.post( / ->post( / ::post) are specific to HTTP client libraries.
+_NET_WRITE_MARKERS_CI = (
+    "data=", "json=", "body=", "body:", "method=", "method:",
+    ".post(", "->post(", ".put(", "->put(", ".patch(", ".delete(",
+    ".send(", "::post", "::put",
+)
+
+# Uppercase HTTP verbs matched CASE-SENSITIVELY so a word like "compost" /
+# "POSTGRES" can never trip the gate on its own (always AND-ed with a net-lib marker).
+_NET_WRITE_VERBS_CS = ("POST", "PUT", "PATCH", "DELETE")
+
+# An http(s) URL anywhere in the text (incl. inside a quoted interpreter one-liner,
+# where the URL is NOT a standalone shlex token).
+_URL_IN_TEXT_RE = re.compile(r"https?://[^\s'\"`)\\]+")
+
 # Leading command WRAPPERS that prefix a real command (`sudo rm …`, `env FOO=bar
 # git push`, `timeout 5 curl …`). They are NOT gated themselves, but they MUST be
 # unwrapped so the gated command behind them is still classified — otherwise the
@@ -133,6 +170,40 @@ def _first_url(tokens: list[str]) -> str | None:
         if tok.startswith("http://") or tok.startswith("https://"):
             return tok
     return None
+
+
+def _first_url_in_text(text: str) -> str | None:
+    """First http(s) URL anywhere in ``text`` — including inside a quoted
+    interpreter one-liner, where the URL is not a standalone shlex token."""
+    m = _URL_IN_TEXT_RE.search(text)
+    return m.group(0) if m else None
+
+
+def _is_interpreter(bare: str) -> bool:
+    """True iff ``bare`` (a path-stripped leading token) names a script interpreter
+    (incl. version-suffixed pythons: ``python3``, ``python3.11``)."""
+    if bare in _INTERPRETER_TOKENS:
+        return True
+    return bool(re.fullmatch(r"python[0-9](\.[0-9]+)*", bare))
+
+
+def _interpreter_net_write(text: str) -> bool:
+    """True iff ``text`` (a whole bash command) contains an interpreter one-liner
+    HTTP WRITE — i.e. BOTH a net-client marker AND a write/POST indicator (#11).
+
+    Scans the WHOLE command, not a single shell segment: a python one-liner's
+    internal ``;``/``&&`` would otherwise fragment the markers across
+    :func:`_split_segments` boundaries (``import requests; requests.post(...)``)
+    and hide the write. Requiring BOTH markers keeps a plain interpreter call
+    (``python3 -c 'print(1)'``) and a GET (``requests.get(url)``) non-gated, while
+    over-gating (a ``requests.get(url, data=…)``) is acceptable per the #11 ruling.
+    """
+    low = text.lower()
+    if not any(m in low for m in _NET_LIB_MARKERS):
+        return False
+    if any(m in low for m in _NET_WRITE_MARKERS_CI):
+        return True
+    return any(verb in text for verb in _NET_WRITE_VERBS_CS)
 
 
 def _is_loopback_host(host: str) -> bool:
@@ -232,7 +303,7 @@ def _first_command_anchor(region: list[str]) -> int:
     for idx, tok in enumerate(region):
         bare = tok.rsplit("/", 1)[-1]
         if (bare in _DELETE_TOKENS or bare == "git" or bare in _HTTP_TOKENS
-                or bare in _WRAPPER_TOKENS):
+                or bare in _WRAPPER_TOKENS or _is_interpreter(bare)):
             return idx
     return 0
 
@@ -302,6 +373,30 @@ def _classify_segment(segment: str) -> tuple[str, str] | None:
     return None
 
 
+def _classify_interpreter_net_write(command: str) -> tuple[str, str] | None:
+    """(#11) Gate an interpreter one-liner HTTP WRITE — checked at the WHOLE-command
+    level so a python ``import x; x.post(…)`` is not hidden by the ``;`` segment split.
+
+    Two conditions, both required (CONSERVATIVE): an interpreter must LEAD at least
+    one shell segment (so an interpreter NAME used as a mere argument, or echoed
+    text, never trips the gate), AND the whole command must carry an HTTP-client
+    marker AND a write/POST indicator. Target = the first URL found in the command
+    (often inside the quoted code), or the whole command. Routed to ``index_update``
+    when that URL is the Google Indexing host, else ``net_post``.
+    """
+    leads_interpreter = any(
+        (toks := _unwrap_wrappers(_tokenize(seg)))
+        and _is_interpreter(toks[0].rsplit("/", 1)[-1])
+        for seg in _split_segments(command)
+    )
+    if not leads_interpreter or not _interpreter_net_write(command):
+        return None
+    url = _first_url_in_text(command)
+    host = (urlparse(url).hostname or "").lower() if url else ""
+    target = url if url else command.strip()
+    return ("index_update", target) if host == _INDEXING_HOST else ("net_post", target)
+
+
 def _classify_bash(command: str) -> tuple[str, str] | None:
     """Split on shell separators and classify EACH segment; the FIRST gated wins.
 
@@ -312,7 +407,15 @@ def _classify_bash(command: str) -> tuple[str, str] | None:
     UNCHANGED. A multi-gated command (e.g. `git push && rm -rf x`) returns its FIRST
     gated action; the operator approves it, re-runs, and the gate then catches the
     next — each gated action individually consented (iterative approval).
+
+    Interpreter net-writes (#11) are classified FIRST, at the whole-command level,
+    because their quoted code routinely contains shell-meta chars (`;`) that would
+    fragment the per-segment markers. Plain interpreter calls return None here and
+    fall through to the per-segment leading-token parse unchanged.
     """
+    interp = _classify_interpreter_net_write(command)
+    if interp is not None:
+        return interp
     for segment in _split_segments(command):
         hit = _classify_segment(segment)
         if hit is not None:
@@ -368,7 +471,13 @@ def evaluate(
     action, target = gated
 
     session_id = session_id_fn(payload)
-    workspace = workspace_fn()
+    try:
+        workspace = workspace_fn()
+    except Exception:
+        # An unresolvable workspace (e.g. #7 env-vs-config WorkspaceRootConflictError)
+        # cannot prove consent → treat as no workspace so a DETECTED gated action
+        # fails-CLOSED (deny) below, never escaping to main()'s fail-OPEN except.
+        workspace = None
     slug = None
     if workspace is not None and session_id:
         slug = slug_fn(workspace, session_id=session_id, strict=False)

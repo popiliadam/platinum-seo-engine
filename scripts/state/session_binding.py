@@ -61,6 +61,17 @@ _SLUG_RE = re.compile(r"[a-z][a-z0-9-]*")
 
 _ENV_WORKSPACE = "PSEO_WORKSPACE_ROOT"
 _ENV_SESSION = "CLAUDE_CODE_SESSION_ID"
+_ENV_WORKSPACE_OVERRIDE = "PSEO_WORKSPACE_ROOT_OVERRIDE"
+
+
+class WorkspaceRootConflictError(ValueError):
+    """Both PSEO_WORKSPACE_ROOT and ~/.config/pseo/config.json declare a workspace
+    root and they DIFFER (#7 fail-loud, ADR-035). A silent divergence would write
+    to a different workspace than the operator believes they targeted. Resolve by
+    unsetting one source, or by setting ``PSEO_WORKSPACE_ROOT_OVERRIDE=env|config``
+    to name the winner explicitly. Subclasses ``ValueError`` so the bind CLI's
+    existing ValueError handler surfaces it as a clean, non-zero-exit error.
+    """
 
 
 # ---------------------------------------------------------------------------
@@ -150,20 +161,49 @@ def _read_json(path: Path) -> dict | None:
 # Resolution
 # ---------------------------------------------------------------------------
 
+def _norm_root(raw: str) -> str:
+    """Filesystem-independent normal form for conflict comparison: expanduser +
+    normpath (NO symlink resolution, so a missing dir / a test tmp path compares
+    cleanly and a trailing slash is not a false conflict)."""
+    return os.path.normpath(os.path.expanduser(raw))
+
+
 def resolve_workspace_root(environ: Mapping[str, str] = os.environ) -> Path | None:
     """Resolve the workspace root: ~/.config/pseo/config.json → env → None.
 
     Persisted config wins (editor-independent); the env var is only a fallback
     because batch 0a proved it is absent in many sessions.
+
+    #7 fail-loud: when BOTH sources are set and resolve to DIFFERENT paths this
+    raises :class:`WorkspaceRootConflictError` instead of silently preferring
+    config — UNLESS ``PSEO_WORKSPACE_ROOT_OVERRIDE`` (``env``|``config``) names the
+    winner. Every non-conflict case (config-only, env-only, both-equal, neither)
+    is byte-for-byte unchanged.
     """
     data = _read_json(_config_path())
+    config_raw: str | None = None
     if data:
         raw = data.get("workspace_root")
         if isinstance(raw, str) and raw:
-            return Path(os.path.expanduser(raw))
-    raw = environ.get(_ENV_WORKSPACE)
-    if raw:
-        return Path(os.path.expanduser(raw))
+            config_raw = raw
+    env_raw = environ.get(_ENV_WORKSPACE) or None
+
+    if config_raw and env_raw and _norm_root(config_raw) != _norm_root(env_raw):
+        override = (environ.get(_ENV_WORKSPACE_OVERRIDE) or "").strip().lower()
+        if override == "env":
+            return Path(os.path.expanduser(env_raw))
+        if override == "config":
+            return Path(os.path.expanduser(config_raw))
+        raise WorkspaceRootConflictError(
+            f"workspace root conflict: ${_ENV_WORKSPACE}={env_raw!r} != config "
+            f"{_config_path()} workspace_root={config_raw!r}. Unset one, or set "
+            f"${_ENV_WORKSPACE_OVERRIDE}=env|config to choose the winner."
+        )
+
+    if config_raw:
+        return Path(os.path.expanduser(config_raw))
+    if env_raw:
+        return Path(os.path.expanduser(env_raw))
     return None
 
 

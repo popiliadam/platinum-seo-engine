@@ -87,9 +87,11 @@ window to crawl/process the URL, and shorter windows produce false
 `not_indexed` readings.
 
 **Order discipline (Wave 2 dispatch):**
-1. W-G1 `indexing-ping` runs first; emits work events with
-   `indexing_ping={attempted, call_type=URL_UPDATED, response_code,
-   called_at}` sub-object.
+1. W-G1 `indexing-ping` runs first; emits work events with an
+   `indexing_ping={attempted, response_code, called_at}` sub-object recording
+   the **sitemap_submission** (the wired `mcp__gsc__submit_sitemap` path);
+   `call_type` is OMITTED — `URL_UPDATED` / `URL_DELETED` stay reserved for the
+   unbuilt per-URL Indexing API.
 2. ≥24h later, W-G4 `verify-indexing` reads those events
    (`consumes: indexing-ping:_state/events.jsonl`), pulls the URL set
    plus the `called_at` timestamp, queries `mcp__gsc__index_inspect`,
