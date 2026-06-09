@@ -141,10 +141,10 @@ def validate_portfolio_config(
 ) -> None:
     """Draft 7 validate + ActiveProjectsCeiling + ReadOnlyContract DURUR."""
     try:
-        from jsonschema import Draft7Validator
+        from scripts.validation.validate_schema import build_validator
     except ImportError as exc:  # pragma: no cover
         raise PortfolioConfigInvalidError("jsonschema required") from exc
-    errors = sorted(Draft7Validator(dict(schema)).iter_errors(dict(config)),
+    errors = sorted(build_validator(dict(schema)).iter_errors(dict(config)),
                     key=lambda e: list(e.absolute_path))
     if errors:
         raise PortfolioConfigInvalidError(

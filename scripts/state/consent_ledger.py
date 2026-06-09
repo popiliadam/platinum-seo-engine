@@ -59,7 +59,7 @@ import json
 import os
 import re
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
@@ -67,6 +67,7 @@ from jsonschema import Draft7Validator
 from jsonschema.exceptions import ValidationError as _JSValidationError
 
 from scripts.state import session_binding
+from scripts.validation.validate_schema import build_validator
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -164,9 +165,16 @@ def consent_path(workspace_root: Path | str, project_slug: str) -> Path:
 
 @functools.lru_cache(maxsize=4)
 def _get_validator(schema_path: str) -> Draft7Validator:
-    """Cache one Draft7Validator per schema path (lru_cache hashes the str key)."""
+    """Cache one Draft7Validator per schema path (lru_cache hashes the str key).
+
+    Routes through validate_schema.build_validator so granted_at's
+    format:date-time is ENFORCED with the SAME strict UTC '…Z' checker the
+    engine uses everywhere (P1-02 / time-discipline §8.10) — a plain
+    Draft7Validator(schema) treats `format` as a bare annotation and would let a
+    naive or non-UTC granted_at slip into the append-only ledger.
+    """
     with Path(schema_path).open("r", encoding="utf-8") as fh:
-        return Draft7Validator(json.load(fh))
+        return build_validator(json.load(fh))
 
 
 def _validate_entry(entry: dict, schema_path: Path | None = None) -> None:
@@ -485,7 +493,10 @@ def _cmd_approve(
             action=action,
             target=target,
             granted_by=granted_by,
-            now_iso=datetime.now().isoformat(),
+            # Canonical UTC '…Z' (rules/time-discipline.md §8.10; mirrors
+            # events_writer._utc_iso_z). datetime.now().isoformat() emitted a
+            # naive LOCAL stamp that the strict granted_at validator now rejects.
+            now_iso=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
             session_id=session_id,
             note=note,
         )

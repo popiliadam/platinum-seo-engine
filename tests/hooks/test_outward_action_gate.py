@@ -389,7 +389,7 @@ def _seed(ws: Path, *, action: str, target: str, session_id: str) -> None:
     cl.append_consent(
         workspace_root=ws, project_slug="demo", run_id="r-prov",
         action=action, target=target, granted_by="operator",
-        now_iso="2026-06-06T10:00:00", session_id=session_id,
+        now_iso="2026-06-06T10:00:00Z", session_id=session_id,
     )
 
 

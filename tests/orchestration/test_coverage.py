@@ -161,3 +161,23 @@ def test_derive_verdict_ignores_model_attested_for_required() -> None:
         coverage.build_step("blog", "model_attested", "running"),
     ]
     assert coverage.derive_verdict(steps) == (True, "pass")
+
+
+# --- #19 — created_at/updated_at are strict UTC '…Z' -----------------------
+
+def test_write_coverage_rejects_naive_created_at(tmp_path: Path) -> None:
+    """created_at/updated_at carry format:date-time in coverage.schema.json.
+    Routing _validate through the strict build_validator (finding #19) makes
+    write_coverage reject a naive (tz-less) stamp and write NOTHING — the UTC '…Z'
+    discipline is ENFORCED on the coverage marker, not merely annotated."""
+    record = coverage.build_record(
+        run_id=RUN_ID,
+        steps=[coverage.build_step("fetch_gsc", "code_verified", "satisfied")],
+        required_satisfied=True,
+        verdict="pass",
+        created_at="2026-06-05T12:00:00",  # naive — no 'Z'
+    )
+    with pytest.raises(coverage.CoverageValidationError):
+        coverage.write_coverage(record, workspace_root=tmp_path,
+                                project_slug="vento", run_id=RUN_ID)
+    assert not coverage.coverage_path(tmp_path, "vento", RUN_ID).exists()  # nothing written

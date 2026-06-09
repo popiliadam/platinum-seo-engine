@@ -42,6 +42,7 @@ from jsonschema import Draft7Validator
 from jsonschema.exceptions import ValidationError as _JSValidationError
 
 from scripts.state import events_writer
+from scripts.validation.validate_schema import build_validator
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -121,8 +122,12 @@ def _log(msg: str) -> None:
 
 @functools.lru_cache(maxsize=2)
 def _validator(schema_path: str) -> Draft7Validator:
+    # build_validator (not a raw Draft7Validator) so the many date-time fields in
+    # workflow-run.schema.json (started_at/updated_at/created_at/ended_at/…) are
+    # ENFORCED with the strict UTC '…Z' checker — a naive/non-UTC stamp is rejected
+    # before the run state is persisted (P1-02 / time-discipline §8.10).
     with Path(schema_path).open("r", encoding="utf-8") as fh:
-        return Draft7Validator(json.load(fh))
+        return build_validator(json.load(fh))
 
 
 def _utc_iso_z() -> str:

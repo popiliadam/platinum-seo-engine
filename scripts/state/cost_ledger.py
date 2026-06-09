@@ -81,6 +81,7 @@ from jsonschema import Draft7Validator
 from jsonschema.exceptions import ValidationError as _JSValidationError
 
 from scripts.state import session_binding
+from scripts.validation.validate_schema import build_validator
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -172,9 +173,15 @@ def cost_ledger_path(workspace_root: Path | str) -> Path:
 
 @functools.lru_cache(maxsize=4)
 def _get_validator(schema_path: str) -> Draft7Validator:
-    """Cache one Draft7Validator per schema path (lru_cache hashes the str key)."""
+    """Cache one Draft7Validator per schema path (lru_cache hashes the str key).
+
+    Routes through validate_schema.build_validator so recorded_at's
+    format:date-time is ENFORCED with the strict UTC '…Z' checker (P1-02 /
+    time-discipline §8.10) — a plain Draft7Validator treats `format` as a bare
+    annotation and would let a naive/non-UTC recorded_at into the ledger.
+    """
     with Path(schema_path).open("r", encoding="utf-8") as fh:
-        return Draft7Validator(json.load(fh))
+        return build_validator(json.load(fh))
 
 
 def _validate_entry(entry: dict, schema_path: Path | None = None) -> None:

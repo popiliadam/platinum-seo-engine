@@ -615,3 +615,25 @@ def test_paused_reuse_for_external_failure_contract(tmp_path: Path) -> None:
     resumed = workflow_runner.get(handle.run_id, project_slug="test-proj",
                                   workspace_root=tmp_path)
     assert resumed.status == "running"
+
+
+# ---------------------------------------------------------------------------
+# #19 — workflow-run timestamps (started_at/updated_at/created_at) are strict UTC
+# ---------------------------------------------------------------------------
+
+def test_create_run_rejects_naive_timestamp(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """started_at / updated_at / created_at carry format:date-time in
+    workflow-run.schema.json. Routing _validate through the strict build_validator
+    (finding #19) makes create_run reject a naive (tz-less) clock stamp — proving
+    the UTC '…Z' discipline is ENFORCED, not merely annotated. A plain
+    Draft7Validator skipped `format` and let the naive stamp through."""
+    _setup(tmp_path)
+    # Force the clock to emit a naive (tz-less) stamp into every date-time field.
+    monkeypatch.setattr(workflow_runner, "_utc_iso_z", lambda: "2026-06-08T12:00:00")
+    with pytest.raises(ValidationError):
+        workflow_runner.create_run(
+            skill="test-skill",
+            project_slug="test-proj",
+            steps=[{"name": "fetch"}],
+            workspace_root=tmp_path,
+        )

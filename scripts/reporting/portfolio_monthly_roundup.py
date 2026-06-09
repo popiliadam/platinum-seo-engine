@@ -107,10 +107,10 @@ def validate_portfolio_config_for_roundup(
 ) -> None:
     """Optional Draft7 + domain validation."""
     if schema is not None:
-        try: from jsonschema import Draft7Validator
+        try: from scripts.validation.validate_schema import build_validator
         except ImportError as exc:  # pragma: no cover
             raise PortfolioConfigInvalidError("jsonschema required") from exc
-        errs = sorted(Draft7Validator(dict(schema)).iter_errors(dict(config)),
+        errs = sorted(build_validator(dict(schema)).iter_errors(dict(config)),
                       key=lambda e: list(e.absolute_path))
         if errs:
             raise PortfolioConfigInvalidError(

@@ -260,3 +260,23 @@ def test_cli_bind_missing_session_id_nonzero(tmp_path: Path) -> None:
     env.pop("CLAUDE_CODE_SESSION_ID", None)  # force the no-session error path
     result = _run_bind(["demo", "--workspace", str(ws)], env)
     assert result.returncode != 0
+
+
+def test_cli_bind_bound_at_is_utc_z(tmp_path: Path) -> None:
+    """The bind CLI stamps bound_at as canonical UTC ('…Z'), not naive local time
+    (finding #6). datetime.now().isoformat() emitted a tz-less LOCAL string;
+    rules/time-discipline.md §8.10 fixes storage to canonical UTC '…Z'."""
+    from datetime import datetime as _dt
+
+    ws = tmp_path / "ws"
+    (ws / "projects" / "demo").mkdir(parents=True)
+    (ws / "projects" / "demo" / "project.config.json").write_text("{}", encoding="utf-8")
+    env = _base_env(tmp_path)
+    env["CLAUDE_CODE_SESSION_ID"] = "test-sess"
+    result = _run_bind(["demo", "--workspace", str(ws)], env)
+
+    assert result.returncode == 0, result.stderr
+    marker = ws / "shared" / "sessions" / "test-sess.json"
+    bound_at = json.loads(marker.read_text(encoding="utf-8"))["bound_at"]
+    assert bound_at.endswith("Z"), bound_at
+    _dt.fromisoformat(bound_at[:-1] + "+00:00")  # canonical + parseable instant

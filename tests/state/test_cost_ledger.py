@@ -32,7 +32,7 @@ from scripts.state import cost_ledger as cl
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_PATH = REPO_ROOT / "schemas" / "cost-ledger.schema.json"
-_NOW = "2026-06-08T00:00:00+00:00"
+_NOW = "2026-06-08T00:00:00Z"  # canonical UTC '…Z' (strict date-time checker rejects +00:00)
 _DAY = "2026-06-08"
 
 
@@ -210,7 +210,7 @@ while not gate.exists():                       # barrier: all fire together
 try:
     cl.reserve(ws, resource="gsc_calls", period="2026-06-08", amount=10,
                ceiling=50, run_id="run-" + idx, project_id="proj",
-               now_iso="2026-06-08T00:00:00+00:00")
+               now_iso="2026-06-08T00:00:00Z")
     sys.exit(0)                                # reservation fit
 except cl.CostCeilingExceeded:
     sys.exit(3)                                # refused
@@ -335,3 +335,19 @@ def test_public_api_in_all() -> None:
                  "CostLedgerError", "CostValidationError", "CostCeilingExceeded",
                  "main"):
         assert name in cl.__all__, f"{name} missing from __all__"
+
+
+# ---------------------------------------------------------------------------
+# #19 — recorded_at's format:date-time is enforced by the strict validator
+# ---------------------------------------------------------------------------
+
+def test_reserve_rejects_non_utc_recorded_at(tmp_path: Path) -> None:
+    """After routing _validate_entry through validate_schema.build_validator
+    (finding #19), recorded_at's format:date-time is ENFORCED: a naive (tz-less)
+    stamp and an explicit non-UTC/zero offset are rejected BEFORE any write, so
+    the append-only cost ledger never records a non-canonical '…Z' timestamp."""
+    for bad in ("2026-06-08T00:00:00", "2026-06-08T00:00:00+03:00", "2026-06-08T00:00:00+00:00"):
+        with pytest.raises(cl.CostValidationError):
+            cl.reserve(tmp_path, resource="gsc_calls", period=_DAY, amount=10,
+                       ceiling=100, run_id="r-bad", project_id="proj", now_iso=bad)
+    assert cl.read_entries(tmp_path) == []  # nothing written on any reject

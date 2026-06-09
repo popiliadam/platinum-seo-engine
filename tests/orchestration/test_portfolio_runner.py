@@ -30,7 +30,7 @@ from scripts.state import cost_ledger as cl
 from scripts.state import project_lock as pl
 from scripts.orchestration import portfolio_runner as pr
 
-_NOW = "2026-06-08T00:00:00+00:00"
+_NOW = "2026-06-08T00:00:00Z"  # canonical UTC '…Z' (cost_ledger/schedule strict checker rejects +00:00)
 _DAY = "2026-06-08"
 _CREATED = "2026-06-05T00:00:00.000000Z"
 

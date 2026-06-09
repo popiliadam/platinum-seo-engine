@@ -19,7 +19,7 @@
     "bound_at": {
       "type": "string",
       "minLength": 1,
-      "description": "Local ISO 8601 timestamp when the binding was written (datetime.now().isoformat())."
+      "description": "Canonical UTC ISO 8601 with a 'Z' suffix when the binding was written. The /pseo-bind CLI stamps datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%fZ') (rules/time-discipline.md §8.10) — NOT naive local time. Kept minLength:1 (not format:date-time): the pure write_session_binding(now_iso) is a passthrough, and the marker is ephemeral (rewritten every bind)."
     },
     "session_id": {
       "type": "string",

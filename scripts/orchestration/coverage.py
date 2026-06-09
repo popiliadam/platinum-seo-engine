@@ -17,11 +17,13 @@ import json
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
-from jsonschema import Draft7Validator
-
 # Sanctioned reuse of the canonical atomic JSON writer (tempfile -> fsync ->
 # os.replace -> dir fsync) rather than inventing a subtly different one.
 from scripts.state.session_binding import _atomic_write_json
+# build_validator (not a raw Draft7Validator) so coverage.schema.json's
+# created_at/updated_at format:date-time is ENFORCED with the strict UTC '…Z'
+# checker (P1-02 / time-discipline §8.10).
+from scripts.validation.validate_schema import build_validator
 
 _ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_COVERAGE_SCHEMA = _ROOT / "schemas" / "coverage.schema.json"
@@ -130,7 +132,7 @@ def coverage_path(workspace_root: Path | str, project_slug: str, run_id: str) ->
 
 def _validate(record: dict, schema_path: Path) -> None:
     schema = json.loads(Path(schema_path).read_text(encoding="utf-8"))
-    errors = list(Draft7Validator(schema).iter_errors(record))
+    errors = list(build_validator(schema).iter_errors(record))
     if errors:
         msgs = "; ".join(e.message for e in errors)
         raise CoverageValidationError(f"invalid coverage record: {msgs}")
