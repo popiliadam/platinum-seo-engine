@@ -12,6 +12,12 @@
 
 ---
 
+## Contents
+
+[What is this?](#what-is-this) · [Who it's for](#who-is-this-for) · [What it does](#what-it-does) · [Quick start](#quick-start) · [Architecture](#architecture) · [Screaming Frog MCP](#screaming-frog-24-mcp-optional) · [Skills & commands](#skills--commands) · [Tech stack](#tech-stack) · [Roadmap](#status--roadmap) · [Documentation](#documentation) · [Contributing](#contributing) · [License](#license)
+
+---
+
 ## What is this?
 
 `platinum-seo-engine` is a **Claude Code plugin** that runs your full SEO operation from inside the editor — keyword research, on-page audits, content planning, reporting, indexing — all governed by strict contracts so the system can't silently drift.
