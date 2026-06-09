@@ -1,6 +1,6 @@
 # `scripts/hooks/` — runtime session hooks vs CI/guard helpers (P2-06)
 
-This directory holds **three distinct classes** of helper. They live together
+This directory holds **two distinct classes** of helper. They live together
 because they all relate to the Claude Code hook/guard story, but only the runtime
 class runs automatically in a live session. The split is locked by
 [`tests/hooks/test_hook_scripts_runtime_vs_ci.py`](../../tests/hooks/test_hook_scripts_runtime_vs_ci.py)
@@ -45,37 +45,11 @@ layout, schema-before-write), not the live tool lifecycle. Wiring them as
 `PreToolUse` hooks would add per-call latency and false positives on legitimate
 in-session edits; running them at commit/CI time is the right boundary.
 
-## 3. Orphaned diagnostic instrumentation (AMO batch 0a — UNWIRED, pending deletion)
-
-These **temporary** scripts were added to empirically confirm how the AMO
-initiative binds one Claude session to one project — recording the SAFE shape of
-hook stdin payloads (KEYS only — never message / prompt / tool_input /
-tool_response VALUES) and which env vars reach hooks, across VSCode / Mac-app /
-CLI. **That question is now settled, so `env_probe.py` has been UNWIRED from all
-five lifecycle events (codex-hostile-audit #17).** Both scripts below are now
-**orphaned on disk** — present but no longer wired and no longer run. They are
-kept (not `rm`'d) only because a bare delete trips the engine's own
-outward-action `fs_delete` consent gate; **the manager deletes them with consent
-at integration.**
-
-| Script | Class | Wired in | Role |
-|--------|-------|----------|------|
-| `env_probe.py` | orphaned (was runtime/temporary) | — (UNWIRED #17) | Was the batch-0a probe: on each fire appended one JSON line to `${PSEO_PROBE_LOG:-~/.config/pseo/hook-probe.jsonl}` describing the payload's KEYS + `session_id` + env-var presence. No longer wired or run — orphaned, pending consent-gated deletion. |
-| `env_probe_report.py` | diagnostic (manual) | — (operator ran on demand) | Summarised the probe log: per-`session_id` N/5 event coverage + a "session_id stable & present" verdict. Orphaned, pending consent-gated deletion. |
-
-**Removal status (revert batch 0a — the UNWIRE half is DONE):**
-1. ✅ DONE (#17): the `env_probe.py` command entry was removed from all five
-   `hooks/*.json` files (the entry whose `statusMessage` was `"AMO batch-0a env
-   probe (temporary diagnostic)…"`); `tests/hooks/test_env_probe.py` had its two
-   wiring assertions pruned; `env_probe.py` was reclassified `RUNTIME →
-   DIAGNOSTIC` in `tests/hooks/test_hook_scripts_runtime_vs_ci.py`; and a guard
-   test (`test_no_hook_references_a_temporary_diagnostic_probe`) now fails CI if
-   any hook re-wires a "temporary diagnostic" probe.
-2. ⏳ Manager (consent-gated): delete the deletion bundle —
-   `scripts/hooks/env_probe.py` + `scripts/hooks/env_probe_report.py` +
-   `tests/hooks/test_env_probe.py` — then drop the `DIAGNOSTIC_HOOK_SCRIPTS` set
-   (and its test) in `test_hook_scripts_runtime_vs_ci.py`, delete this section,
-   and restore the "two distinct classes" wording above.
+> The batch-0a `env_probe.py` / `env_probe_report.py` diagnostic tools were
+> unwired (codex-hostile-audit #17) and then **deleted** (2026-06-10) once the
+> session-binding question they answered was settled. A guard test
+> (`test_no_hook_references_a_temporary_diagnostic_probe`) fails CI if any hook
+> re-introduces a "temporary diagnostic" probe. They remain in git history.
 
 If you wire one into a `hooks/*.json` (promote it to runtime) or add a new
 helper here, update the relevant set in
