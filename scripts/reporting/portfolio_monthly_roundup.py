@@ -24,11 +24,12 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from scripts.state.active_projects import ACTIVE_PROJECTS_MAX  # noqa: E402
+
 DAY_OF_MONTH_MIN, DAY_OF_MONTH_MAX = 1, 31
 HOUR_MIN, HOUR_MAX = 0, 23
 SLA_MIN_DAYS, SLA_MAX_DAYS = 1, 30
 PRIORITY_MIN, PRIORITY_MAX = 1, 10
-ACTIVE_PROJECTS_MAX = 12
 OVERRIDE_RATIONALE_MIN_LEN = 10
 DELTA_WINDOW_DAYS = 30
 WRITER_NAME = "portfolio_monthly_roundup"

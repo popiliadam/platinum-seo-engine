@@ -34,6 +34,8 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from scripts.state.active_projects import ACTIVE_PROJECTS_MAX  # noqa: E402
+
 
 # --- Constants (schema-aligned) ---------------------------------------------
 
@@ -57,7 +59,6 @@ STATUS_ENUM: tuple[str, ...] = (
 
 MASTER_TASK_DATA_START_ROW = 4
 MASTER_TASK_STATUS_COL_INDEX = 10  # J = 10 (1-based)
-ACTIVE_PROJECTS_MAX = 12
 DEFAULT_TEMPLATE_REL = "templates/reports/portfolio-overview.template.md"
 
 _SUMMABLE_KPIS: tuple[str, ...] = (

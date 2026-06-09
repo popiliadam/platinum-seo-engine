@@ -29,6 +29,8 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from scripts.state.active_projects import ACTIVE_PROJECTS_MAX  # noqa: E402
+
 # --- Constants (schema-aligned) -------------------------------------------
 PRIMARY_SOURCE_ENUM: tuple[str, ...] = (
     "content_decay", "quickwin", "tech_fix", "schema", "pillar",
@@ -44,7 +46,6 @@ SHEET_READ_SPECS: tuple[tuple[str, str, int], ...] = (
 )
 SHEET_NAMES: tuple[str, ...] = tuple(s[0] for s in SHEET_READ_SPECS)
 MASTER_TASK_DATA_START_ROW = 4
-ACTIVE_PROJECTS_MAX = 12
 AGGREGATE_DIMENSION_ENUM: frozenset[str] = frozenset(
     {"category", "priority", "primary_source"})
 DEFAULT_AGGREGATE_DIMENSION = "category"
