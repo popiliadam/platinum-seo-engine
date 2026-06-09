@@ -29,13 +29,13 @@ Bu komut aksiyonu **çalıştırmaz** — sadece izni KAYDEDER. Gate (batch 2b) 
 
 `$1` run_id, `$2` action, `$3` target ZORUNLU. Eksikse DURDUR ve kullanımı göster:
 
-!`if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then echo "MISSING_ARGS: usage /pseo-approve <run_id> <action> <target>"; echo "action ∈ {git_push, fs_delete, net_post, mcp_submit, index_update, dfs_oversized}"; echo "örnek: /pseo-approve demo-furniture-2026-06-06-ab12 index_update https://demo-furniture.example/sitemap.xml"; fi`
+!`set -- $ARGUMENTS; if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then echo "MISSING_ARGS: usage /pseo-approve <run_id> <action> <target>"; echo "action ∈ {git_push, fs_delete, net_post, mcp_submit, index_update, dfs_oversized}"; echo "örnek: /pseo-approve demo-furniture-2026-06-06-ab12 index_update https://demo-furniture.example/sitemap.xml"; fi`
 
 ## 3. Onay komutunu çalıştır
 
 Üç argüman da verildiyse recorder CLI'yi çağır. CLI sırasıyla: action'ı doğrular, workspace root'u çözer (config → `$PSEO_WORKSPACE_ROOT`), session UUID'sini `$CLAUDE_CODE_SESSION_ID`'den alır, bu session'a bağlı projeyi çözer (`shared/sessions/<uuid>.json` → `shared/active.json`), sonra deftere atomik (O_APPEND + flock + fsync) bir satır ekler.
 
-!`cd "$CLAUDE_PLUGIN_ROOT" && python3 -m scripts.state.consent_ledger approve "$1" "$2" "$3" 2>&1`
+!`set -- $ARGUMENTS; cd "$CLAUDE_PLUGIN_ROOT" && python3 -m scripts.state.consent_ledger approve "$1" "$2" "$3" 2>&1`
 
 Başarılı çıktı tek satırlık banner'dır, örn:
 

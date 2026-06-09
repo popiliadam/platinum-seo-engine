@@ -16,7 +16,7 @@ Aktif projenin workflow run state'ini ve önerilecek sonraki adımı listele.
 
 `$1` verilmişse onu kullan; yoksa `shared/active.json`'dan oku.
 
-Aktif marker: !`if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş"; else PROJECT="${1:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/active.json" 2>/dev/null)}"; if [ -z "$PROJECT" ]; then echo "NO_ACTIVE_PROJECT"; else echo "active=$PROJECT"; fi; fi`
+Aktif marker: !`set -- $ARGUMENTS; if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş"; else PROJECT="${1:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/active.json" 2>/dev/null)}"; if [ -z "$PROJECT" ]; then echo "NO_ACTIVE_PROJECT"; else echo "active=$PROJECT"; fi; fi`
 
 **Engine path resolution** — `CLAUDE_PLUGIN_ROOT` Claude Code tarafından set edilmediyse fallback gerekli. Command altyapısı: `${CLAUDE_PLUGIN_ROOT:-${PSEO_ENGINE_ROOT:-$(find /Users/apple/.claude/plugins/cache/*/platinum-seo-engine* -type d 2>/dev/null | sort -V | tail -1)}}` formatı denenir.
 
@@ -26,7 +26,7 @@ Eğer çıktı `NO_ACTIVE_PROJECT` ise: kullanıcıdan slug iste veya `/pseo-act
 
 `scripts/state/workflow_runner.py` modül CLI olarak değil, Python `import` ile expose edilmiş (bkz. `list_runs(project_slug, *, workspace_root=None, status_filter=None)` — döndürdüğü liste `RunHandle` dataclass'lardır). Inline Python ile çağır:
 
-!`if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş — kullanıcıya workspace path'ini sor"; exit 2; fi; ENGINE_ROOT="${CLAUDE_PLUGIN_ROOT:-${PSEO_ENGINE_ROOT:-$(find /Users/apple/.claude/plugins/cache 2>/dev/null -type d -name 'platinum-seo-engine' | sort | tail -1 | xargs -I{} find {} -maxdepth 1 -type d -name '[0-9]*' 2>/dev/null | sort -V | tail -1)}}"; if [ -z "$ENGINE_ROOT" ]; then echo "ERROR: CLAUDE_PLUGIN_ROOT yok ve fallback bulunamadı — PSEO_ENGINE_ROOT env var set edin"; exit 3; fi; PROJECT="${1:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/active.json" 2>/dev/null)}"; PSEO_ENGINE_ROOT="$ENGINE_ROOT" PYTHONPATH="$ENGINE_ROOT" PROJECT="$PROJECT" python3 -c "
+!`set -- $ARGUMENTS; if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş — kullanıcıya workspace path'ini sor"; exit 2; fi; ENGINE_ROOT="${CLAUDE_PLUGIN_ROOT:-${PSEO_ENGINE_ROOT:-$(find /Users/apple/.claude/plugins/cache 2>/dev/null -type d -name 'platinum-seo-engine' | sort | tail -1 | xargs -I{} find {} -maxdepth 1 -type d -name '[0-9]*' 2>/dev/null | sort -V | tail -1)}}"; if [ -z "$ENGINE_ROOT" ]; then echo "ERROR: CLAUDE_PLUGIN_ROOT yok ve fallback bulunamadı — PSEO_ENGINE_ROOT env var set edin"; exit 3; fi; PROJECT="${1:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/active.json" 2>/dev/null)}"; PSEO_ENGINE_ROOT="$ENGINE_ROOT" PYTHONPATH="$ENGINE_ROOT" PROJECT="$PROJECT" python3 -c "
 import json, os, re, sys
 from pathlib import Path
 engine = os.environ.get('CLAUDE_PLUGIN_ROOT') or os.environ.get('PSEO_ENGINE_ROOT')
@@ -80,6 +80,6 @@ SF MCP server health probe (v1.8 ADR-039: HTTP transport `http://127.0.0.1:11435
 
 Aktif projenin son SF crawl özeti (`_state/workflows/*.json` filter by skill=sf-crawl-orchestrator):
 
-!`if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "skip: PSEO_WORKSPACE_ROOT set edilmemiş"; else PROJECT="${1:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/active.json" 2>/dev/null)}"; WF_DIR="$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/workflows"; if [ -d "$WF_DIR" ]; then grep -l '"skill": "sf-crawl-orchestrator"' "$WF_DIR"/*.json 2>/dev/null | xargs -I{} jq -r '[.run_id, .status, (.updated_at // "n/a")] | @tsv' {} 2>/dev/null | sort -k3 | tail -1 || echo "NO_SF_CRAWL"; else echo "skip: workflow dizini yok"; fi; fi`
+!`set -- $ARGUMENTS; if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "skip: PSEO_WORKSPACE_ROOT set edilmemiş"; else PROJECT="${1:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/active.json" 2>/dev/null)}"; WF_DIR="$PSEO_WORKSPACE_ROOT/projects/$PROJECT/_state/workflows"; if [ -d "$WF_DIR" ]; then grep -l '"skill": "sf-crawl-orchestrator"' "$WF_DIR"/*.json 2>/dev/null | xargs -I{} jq -r '[.run_id, .status, (.updated_at // "n/a")] | @tsv' {} 2>/dev/null | sort -k3 | tail -1 || echo "NO_SF_CRAWL"; else echo "skip: workflow dizini yok"; fi; fi`
 
 Detaylı SF MCP status tablosu için: `/pseo-sf-status [<slug>]` (4-kolonlu: project_slug, last_crawl_date, sf_mcp_connection_status, allowed_directory_path).

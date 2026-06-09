@@ -16,7 +16,7 @@ model: sonnet
 
 `$1` zorunlu slug; eksikse durur. NCP id `$2` zorunlu.
 
-!`if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş"; elif [ -z "$1" ]; then echo "MISSING_SLUG: usage /pseo-new-blog <project-slug> <new-content-plan-id> [--mode draft|publish]"; elif [ -z "$2" ]; then echo "MISSING_NCP_ID: <new-content-plan-id> argümanı zorunlu"; else echo "active=$1 ncp_id=$2 mode=${3:---mode=draft}"; fi`
+!`set -- $ARGUMENTS; if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş"; elif [ -z "$1" ]; then echo "MISSING_SLUG: usage /pseo-new-blog <project-slug> <new-content-plan-id> [--mode draft|publish]"; elif [ -z "$2" ]; then echo "MISSING_NCP_ID: <new-content-plan-id> argümanı zorunlu"; else echo "active=$1 ncp_id=$2 mode=${3:---mode=draft}"; fi`
 
 ## 2. Skill chain
 

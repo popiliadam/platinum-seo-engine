@@ -16,7 +16,7 @@ model: sonnet
 
 `$1` opsiyonel; verilmezse tüm `projects/*` taranır (multi-project portfolio mode).
 
-!`if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş"; else PROJECT="${1:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/active.json" 2>/dev/null)}"; if [ -z "$PROJECT" ]; then echo "scope=all_projects (no \$1, no shared/active.json)"; else echo "scope=single project=$PROJECT"; fi; fi`
+!`set -- $ARGUMENTS; if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş"; else PROJECT="${1:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/active.json" 2>/dev/null)}"; if [ -z "$PROJECT" ]; then echo "scope=all_projects (no \$1, no shared/active.json)"; else echo "scope=single project=$PROJECT"; fi; fi`
 
 ## 2. Skill chain
 

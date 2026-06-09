@@ -16,13 +16,13 @@ model: sonnet
 
 `$1` slug ZORUNLU; eksikse mevcut marker'ı oku ve listele:
 
-!`if [ -z "$1" ]; then if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "MISSING_SLUG + NO_WORKSPACE_ROOT: usage /pseo-active <slug> (önce PSEO_WORKSPACE_ROOT env var set et)"; else WS="$PSEO_WORKSPACE_ROOT"; CURRENT=$(jq -r '.active_project // "<unset>"' "$WS/shared/active.json" 2>/dev/null || echo "<no-file>"); echo "MISSING_SLUG: usage /pseo-active <slug>"; echo "current active: $CURRENT"; echo "available projects:"; ls -1 "$WS/projects" 2>/dev/null || echo "  (no projects dir)"; fi; fi`
+!`set -- $ARGUMENTS; if [ -z "$1" ]; then if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "MISSING_SLUG + NO_WORKSPACE_ROOT: usage /pseo-active <slug> (önce PSEO_WORKSPACE_ROOT env var set et)"; else WS="$PSEO_WORKSPACE_ROOT"; CURRENT=$(jq -r '.active_project // "<unset>"' "$WS/shared/active.json" 2>/dev/null || echo "<no-file>"); echo "MISSING_SLUG: usage /pseo-active <slug>"; echo "current active: $CURRENT"; echo "available projects:"; ls -1 "$WS/projects" 2>/dev/null || echo "  (no projects dir)"; fi; fi`
 
 ## 2. Slug doğrulama + marker yazma
 
 `$1` verildiyse: workspace altında `projects/{slug}/project.config.json` var mı kontrol et, yoksa DURDUR (marker'ı YAZMA, `/pseo-init` öner); varsa `shared/active.json`'u atomik yaz (UTC ISO 8601 timestamp ile). Append-only state disiplini bu marker dosyasını HARİÇ TUTAR — `shared/active.json` deliberately mutable bir pointer'dır (rules/append-only-state.md sadece `_state/events.jsonl` ve workflow run JSON'ları için zorlayıcı; `shared/` portföy-genelinde yaşar).
 
-!`SLUG="$1"; if [ -n "$SLUG" ]; then if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş"; else WS="$PSEO_WORKSPACE_ROOT"; CFG="$WS/projects/$SLUG/project.config.json"; if [ ! -f "$CFG" ]; then echo "HATA: $CFG yok — önce '/pseo-init $SLUG' çalıştır. Marker YAZILMADI."; exit 1; fi; mkdir -p "$WS/shared"; SLUG="$SLUG" python3 -c "
+!`set -- $ARGUMENTS; SLUG="$1"; if [ -n "$SLUG" ]; then if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş"; else WS="$PSEO_WORKSPACE_ROOT"; CFG="$WS/projects/$SLUG/project.config.json"; if [ ! -f "$CFG" ]; then echo "HATA: $CFG yok — önce '/pseo-init $SLUG' çalıştır. Marker YAZILMADI."; exit 1; fi; mkdir -p "$WS/shared"; SLUG="$SLUG" python3 -c "
 import json, os, re, sys, tempfile
 from datetime import datetime, timezone
 from pathlib import Path

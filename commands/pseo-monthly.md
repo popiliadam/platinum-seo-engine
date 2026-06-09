@@ -17,7 +17,7 @@ model: sonnet
 
 `$1` opsiyonel `YYYY-MM`; yoksa "geçen ay":
 
-!`MONTH="${1:-$(date -u -v-1m +%Y-%m 2>/dev/null || date -u --date='last month' +%Y-%m)}"; if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "month=$MONTH project=NO_WORKSPACE_ROOT (PSEO_WORKSPACE_ROOT env var set edilmemiş)"; else PROJECT="${2:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/active.json" 2>/dev/null)}"; echo "month=$MONTH project=${PROJECT:-NO_ACTIVE_PROJECT}"; fi`
+!`set -- $ARGUMENTS; MONTH="${1:-$(date -u -v-1m +%Y-%m 2>/dev/null || date -u --date='last month' +%Y-%m)}"; if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "month=$MONTH project=NO_WORKSPACE_ROOT (PSEO_WORKSPACE_ROOT env var set edilmemiş)"; else PROJECT="${2:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/active.json" 2>/dev/null)}"; echo "month=$MONTH project=${PROJECT:-NO_ACTIVE_PROJECT}"; fi`
 
 `PROJECT` boşsa: kullanıcıdan slug iste veya `/pseo-active <slug>` öner; aşağıdaki adımları atla.
 

@@ -14,7 +14,7 @@ model: sonnet
 
 ## 1. Aktif projeyi çöz
 
-!`if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş"; else PROJECT="${1:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/active.json" 2>/dev/null)}"; if [ -z "$PROJECT" ]; then echo "NO_ACTIVE_PROJECT — once /pseo-active <slug>"; else CFG="$PSEO_WORKSPACE_ROOT/projects/$PROJECT/project.config.json"; if [ -f "$CFG" ]; then PROFILES=$(jq -r '.profiles | join(",")' "$CFG" 2>/dev/null); echo "active=$PROJECT profiles=$PROFILES"; if echo ",$PROFILES," | grep -q ",local-service,"; then echo "profile_gate=OK"; else echo "profile_gate=SKIP (local-service yok — skill DURUR #6 ile graceful exit verir)"; fi; else echo "config_missing — /pseo-init önce"; fi; fi; fi`
+!`set -- $ARGUMENTS; if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş"; else PROJECT="${1:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/active.json" 2>/dev/null)}"; if [ -z "$PROJECT" ]; then echo "NO_ACTIVE_PROJECT — once /pseo-active <slug>"; else CFG="$PSEO_WORKSPACE_ROOT/projects/$PROJECT/project.config.json"; if [ -f "$CFG" ]; then PROFILES=$(jq -r '.profiles | join(",")' "$CFG" 2>/dev/null); echo "active=$PROJECT profiles=$PROFILES"; if echo ",$PROFILES," | grep -q ",local-service,"; then echo "profile_gate=OK"; else echo "profile_gate=SKIP (local-service yok — skill DURUR #6 ile graceful exit verir)"; fi; else echo "config_missing — /pseo-init önce"; fi; fi; fi`
 
 ## 2. Skill chain
 
