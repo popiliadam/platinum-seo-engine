@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Claude Code Plugin](https://img.shields.io/badge/Claude_Code-plugin-7C3AED)](https://claude.ai/code)
 
-> Status: **v1.9.5** — production-ready · 45 skills · 18 commands · 6 hooks · 4 MCP servers (3 stdio + 1 HTTP)
+> Status: **v2.0.0** — production-ready · 45 skills · 24 commands · 6 hooks · 4 MCP servers (3 stdio + 1 HTTP)
 
 > **Schema-locked, drift-checked SEO automation for Claude Code.**
 > Turn manual SEO work into auditable, repeatable workflows — backed by JSON Schemas, append-only state, and a tool that audits itself.
