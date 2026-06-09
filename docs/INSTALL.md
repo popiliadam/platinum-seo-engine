@@ -1,6 +1,6 @@
 # Installation
 
-> Status: **v2.0.0** — 45 skills, 24 slash commands, 6 hooks, 4 MCP servers (gsc/dataforseo/scrapling stdio + sf HTTP), production-ready (schema-data aligned + drift-check AMBER: F-16 invariant intentionally reset to 565B baseline at v1.9.x per ADR-040 (sf type:http; 543B at v1.8/ADR-039) + F-17 PASS, F-13 historical).
+> Status: **v2.0.0** — 45 skills, 25 slash commands, 6 hooks, 4 MCP servers (gsc/dataforseo/scrapling stdio + sf HTTP), production-ready (schema-data aligned + drift-check AMBER: F-16 invariant intentionally reset to 565B baseline at v1.9.x per ADR-040 (sf type:http; 543B at v1.8/ADR-039) + F-17 PASS, F-13 historical).
 
 ## Requirements
 
@@ -102,23 +102,20 @@ Open SF → Configuration → API Access → MCP Server tab:
 |---|---|---|
 | Port | `11435` | Default; matches `.mcp.json` `sf.url` |
 | Max Response Size (Bytes) | `100000` | D-SF-05; orchestrator handles large data via file path |
-| Directory | `/Users/apple/seo_spider_mcp_server` | D-SF-03; F-15 governance: SF scratch isolated from PSEO workspace |
+| Directory | `/Users/apple/seo_spider_mcp_server` (recommended; opt-in) | D-SF-03; F-15 path isolation is **opt-in** — `sf.mcp.allowed_directory` defaults to **null** (SF GUI default; isolation not enforced) until you set it to match this path. |
 | Node.js Runtime Environment | ☐ Unchecked | D-SF-04; security (embeddings/custom scripts deferred v1.1+) |
 | MCP Server Status | **Start** (click green button) | Required before any `/pseo-sf-crawl` |
 
 ### 3. Verify Connection
 
-```bash
-curl http://127.0.0.1:11435/mcp/tools | jq '.tools[].name'
-# Expected ≥5: sf_crawl, sf_crawl_progress, sf_generate_report, sf_list_crawls, sf_list_allowed_base_directory
-```
-
-After plugin install:
+SF 24's MCP is **Streamable-HTTP** (stateful and session-based: every request carries an `Mcp-Session-Id` obtained from the `initialize` response header, plus `Accept: application/json, text/event-stream`). It exposes **no** plain tool-listing or health HTTP endpoint — a bare `curl` cannot probe it. Verify from Claude Code instead:
 
 ```bash
 claude mcp list
 # Expected: sf entry showing connected
 ```
+
+For a scripted health check, the repo's canonical client is `SfMcpClient.health()` in `scripts/util/sf_mcp_client.py`, which performs the `initialize` → `notifications/initialized` → `tools/call` handshake. The 5 core tools it can reach are `sf_crawl`, `sf_crawl_progress`, `sf_generate_report`, `sf_list_crawls`, `sf_list_allowed_base_directory`.
 
 ### 4. Migrate Existing Projects (Migration 0005)
 

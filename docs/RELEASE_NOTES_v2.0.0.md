@@ -3,7 +3,7 @@
 **Release date:** 2026-06-09
 **Engine HEAD:** v2.0.0 release commit (5-file sync via `version_bump --apply`)
 **Predecessor:** [v1.9.5](RELEASE_NOTES_v1.9.5.md) (cross-repo codex-audit closure)
-**Status:** 🟢 GREEN — AMO build complete + LIVE-PROVEN (D11 acceptance passed on a real GSC project; full suite 2312 PASS / 7 SKIP / 0 FAIL)
+**Status:** 🟢 GREEN — AMO build complete + LIVE-PROVEN (D11 acceptance passed on a real GSC project; full suite GREEN, 0 FAIL — see CI for the live count)
 
 ## 0. Executive Summary
 
@@ -16,7 +16,7 @@ Around those, v2.0 adds the **safety + enforcement layer** that makes autonomy t
 
 **Build model:** the AMO initiative was built by fresh **Opus-4.8 1M-context worker** sessions, one self-contained TDD batch each, with a **manager session** that independently re-derived every worker's central claim (own code/own data — not the worker's green checkmark) before commit + push. **Design hardened by a 9-agent adversarial review** (51 findings, conditional GO; all must-fixes folded into the spec). **Path A** (hard-coded ordered sequences, no general DAG engine) was deliberately chosen and **vindicated** — Faz 3 surfaced two distinct driver *shapes* (data-driver + artifact-driver), proving a single universal engine would over-abstract.
 
-**Suite: → 2312 PASS / 7 SKIP / 0 FAIL** (+~520 tests across the AMO initiative; zero regression). **D11 live-acceptance PASSED** end-to-end on a real GSC-verified project (demo-furniture), the first live run of the loop — it surfaced and fixed 4 live-only integration bugs no stub test could catch (see §6).
+**Suite: GREEN — 0 FAIL** (+~520 tests across the AMO initiative; zero regression; see CI for the live total). **D11 live-acceptance PASSED** end-to-end on a real GSC-verified project (demo-furniture), the first live run of the loop — it surfaced and fixed 4 live-only integration bugs no stub test could catch (see §6).
 
 ## 1. Faz 0 — Per-session project binding (`09674c5`)
 
@@ -55,7 +55,7 @@ The multi-project payoff, six batches:
 
 ## 6. D11 — Comprehensive live-acceptance (`2a00049`)
 
-The build's closing gate: ONE all-phases live run on a real GSC-verified project (demo-furniture) — the **first time the AMO loop ran live** (it had been stub-tested only). It did exactly its job, surfacing **4 integration bugs the 2312-test suite never caught** (all "stub fixture agrees with buggy code"), each fixed + manager-independently re-verified:
+The build's closing gate: ONE all-phases live run on a real GSC-verified project (demo-furniture) — the **first time the AMO loop ran live** (it had been stub-tested only). It did exactly its job, surfacing **4 integration bugs the full stub-test suite never caught** (all "stub fixture agrees with buggy code"), each fixed + manager-independently re-verified:
 
 1. **`portfolio_runner` / `portfolio_writer` read the non-canonical key `projects`** — the schema (`#/required`) + all reporting readers + the live `portfolio.json` use **`active_projects`**; this blocked all of Faz 4. (Root cause: a wrong key in a manager worker-prompt fact, inherited by the independent re-derivation — only live data caught it.)
 2. **Stale installed plugin cache** — live commands run from the version-keyed install cache, not the dev repo; re-synced (and the v2.0 version bump systematically prevents this class: the cache is keyed by version, so a release forces a fresh install).
@@ -82,11 +82,11 @@ Live `monthly` on demo-furniture reached **verdict = pass** end-to-end, and the 
 
 ## 9. New Commands & Hooks
 
-**Commands** (`/pseo-run`, `/pseo-run-portfolio`, `/pseo-status-portfolio`, `/pseo-schedule`, `/pseo-approve`, `/pseo-bind`) drive the orchestrator, the portfolio sweep, the triage, the scheduler, consent, and session binding. Slash-command count **→ 24**. **Hooks**: the PreToolUse outward-action gate, the PostToolUse AI-disclosure rescan + audit, the Stop-hook denetçi — all classified RUNTIME, READ-ONLY except their sanctioned writes.
+**Commands** (`/pseo-run`, `/pseo-run-portfolio`, `/pseo-status-portfolio`, `/pseo-schedule`, `/pseo-approve`, `/pseo-bind`) drive the orchestrator, the portfolio sweep, the triage, the scheduler, consent, and session binding. Slash-command count **→ 25**. **Hooks**: the PreToolUse outward-action gate, the PostToolUse AI-disclosure rescan + audit, the Stop-hook denetçi — all classified RUNTIME, READ-ONLY except their sanctioned writes.
 
 ## 10. Tests
 
-**After v2.0 ship: 2312 PASS / 7 SKIP / 0 FAIL** (+~520 across the AMO initiative; zero regression). Every batch was TDD (RED → GREEN), and the manager independently re-derived each batch's central safety/correctness claim with its own code + data (e.g. the kill-switch no-leak, the O5 arm-refuse writes-nothing, the oracle reconcile) rather than trusting the worker's report.
+**After v2.0 ship: full suite GREEN — 0 FAIL** (+~520 across the AMO initiative; zero regression; see CI for the live total). Every batch was TDD (RED → GREEN), and the manager independently re-derived each batch's central safety/correctness claim with its own code + data (e.g. the kill-switch no-leak, the O5 arm-refuse writes-nothing, the oracle reconcile) rather than trusting the worker's report.
 
 ## 11. Backward Compatibility
 

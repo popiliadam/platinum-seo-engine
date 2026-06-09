@@ -1,6 +1,6 @@
 # Workflow Catalog (v1 Skills)
 
-> v1.8.0 release **45 skill** — tüm skill'ler implement edildi ve production-ready (Phase 5–13 baseline 43 + v1.7 gbp-audit + v1.8 sf-crawl-orchestrator). Status: **active** (2026-05-27).
+> v2.0.0 — **45 skill** kataloğu (Phase 5–13 baseline 43 + v1.7 gbp-audit + v1.8 sf-crawl-orchestrator). Çoğu skill **active**; **production** (5: new-blog / revise-content / generate-images / content-remediation / faq-optimization), **publishing** (2: indexing-ping / verify-indexing), **mark-done** ve **monitoring-weekly** skill'leri **wip** — SKILL.md + paired test ile kontrat/spec kilitli, runtime ertelendi. Doğruluk kaynağı: her skill'in frontmatter `status`'u.
 
 > **SF MCP call shapes — canonical contract (P3-01).** The inline `mcp__sf__*`
 > tool-call shapes in the SF crawl flow below are illustrative and have evolved.
@@ -83,15 +83,17 @@ Phase 5–13 boyunca parallel worker batch'lerle inşa edildi; pilot demo-dental
 
 ---
 
-## Production — Phase 11 (5 skill)
+## Production — Phase 11 (5 skill, **wip**)
+
+> Tüm production skill'leri `status: wip` — SKILL.md + paired test ile kontrat kilitli, `scripts/production/*` runtime'ı ertelendi. Active'e ancak runtime + canlı smoke kanıtı sonrası terfi eder.
 
 | Skill | Trigger | Status |
 |---|---|---|
-| `new-blog` | "yeni blog yaz" | active |
-| `revise-content` | "içerik revize" | active |
-| `generate-images` | "görsel üret" | active |
-| `content-remediation` | "içerik düzeltme" | active |
-| `faq-optimization` | "FAQ optimize" | active |
+| `new-blog` | "yeni blog yaz" | wip |
+| `revise-content` | "içerik revize" | wip |
+| `generate-images` | "görsel üret" | wip |
+| `content-remediation` | "içerik düzeltme" | wip |
+| `faq-optimization` | "FAQ optimize" | wip |
 
 > Constraint: Phase 10 content rules çıktılarını (`rules/content-*.md`, `templates/content/*`) consume eder.
 
@@ -101,12 +103,15 @@ Phase 5–13 boyunca parallel worker batch'lerle inşa edildi; pilot demo-dental
 
 | Skill | Trigger | Status |
 |---|---|---|
-| `indexing-ping` | "indexlenmesi" | active |
-| `verify-indexing` | "index kontrol" | active |
+| `indexing-ping` | "indexlenmesi" | wip |
+| `verify-indexing` | "index kontrol" | wip |
 | `aio-competitor-map` | "AIO competitor" | active |
 | `brand-onboarding` | "marka onboard" | active |
-| `mark-done` | "tamamlandı" | active |
-| `monitoring-weekly` | "haftalık izleme" | active |
+| `mark-done` | "tamamlandı" | wip |
+| `monitoring-weekly` | "haftalık izleme" | wip |
+
+> **Publishing skill'leri (`indexing-ping`, `verify-indexing`) `wip`** — runtime ertelendi. Ayrıca `indexing-ping` bugünkü Google tarafı yolu **sitemap submit** (`mcp__gsc__submit_sitemap`); per-URL Indexing API `URL_UPDATED` henüz wired değil (F4). `mark-done` da `wip` (lifecycle state owner runtime'ı ertelendi).
+> **`monitoring-weekly` `wip`** — gerçek runtime'ı yalnız drift-check çıktısı + portfolio snapshot okur; advertised **GSC week-over-week delta + budget burn** sinyalleri Phase 14+ placeholder'dır (F9), hesaplanmış değil.
 
 ---
 
@@ -197,4 +202,4 @@ python3 scripts/migrations/migration_0005_project_config_1_4_to_1_5.py --project
 # Idempotent: re-running on already-1.5 docs is no-op
 ```
 
-Migration populates `sf.mcp.{enabled=false, url=http://127.0.0.1:11435/mcp, allowed_directory=/Users/apple/seo_spider_mcp_server, max_wait_minutes=180, per_report_timeout_seconds=300}` defaults. Operator can override per-project (D-SF-18 path parameterization). New projects (`/pseo-init --schema-version=1.5` from v1.8+) auto-cascade Migration 0005 via init-project Step 4.5.
+Migration populates `sf.mcp.{enabled=false, url=http://127.0.0.1:11435/mcp, allowed_directory=null, crawl_config_path=null, max_wait_minutes=180, per_report_timeout_seconds=300}` defaults (per `migration_0005`'s `DEFAULT_SF_MCP`). **`allowed_directory` is `null` by default** — SF's own GUI default applies and F-15 path isolation is **opt-in** until the operator sets a path (D-SF-18 path parameterization). New projects (`/pseo-init --schema-version=1.5` from v1.8+) auto-cascade Migration 0005 via init-project Step 4.5.
