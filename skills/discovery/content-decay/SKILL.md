@@ -41,7 +41,6 @@ consumes:
   - "init-project:projects/{slug}/master.xlsx"
   - "gsc-pull:master.xlsx#gsc_performance"
 produces:
-  - "content-improve"
   - "new-content-plan"
   - "drift-check"
 triggers:
