@@ -264,7 +264,7 @@ def test_idempotent_run(tmp_path: Path) -> None:
     assert created1 is True
     cfg1 = json.loads(cfg_path1.read_text("utf-8"))
     portfolio1 = json.loads(portfolio_path1.read_text("utf-8"))
-    assert len(portfolio1["projects"]) == 1
+    assert len(portfolio1["active_projects"]) == 1
 
     # Pre-emptively scribble a sentinel into the existing master.xlsx
     # bytes? No — we instead trust that _copy_master_xlsx skips when
@@ -287,8 +287,8 @@ def test_idempotent_run(tmp_path: Path) -> None:
 
     # Portfolio is append-only with dedup on slug.
     portfolio2 = json.loads(portfolio_path2.read_text("utf-8"))
-    assert len(portfolio2["projects"]) == 1, "portfolio gained a duplicate entry"
-    assert portfolio2["projects"][0]["slug"] == slug
+    assert len(portfolio2["active_projects"]) == 1, "portfolio gained a duplicate entry"
+    assert portfolio2["active_projects"][0]["slug"] == slug
 
 
 # ---------------------------------------------------------------------------
@@ -415,18 +415,18 @@ def test_portfolio_json_valid(tmp_path: Path) -> None:
     p1 = register_project(ws, "alpha", domain="https://alpha.example/", market="TR", created_at=_FIXED_CREATED_AT)
     portfolio_after_alpha = json.loads(p1.read_text("utf-8"))
     assert portfolio_after_alpha["schema_version"] == "1.0"
-    assert {entry["slug"] for entry in portfolio_after_alpha["projects"]} == {"alpha"}
+    assert {entry["slug"] for entry in portfolio_after_alpha["active_projects"]} == {"alpha"}
 
     p2 = register_project(ws, "beta", domain="https://beta.example/", market="NG", created_at=_FIXED_CREATED_AT)
     portfolio_after_beta = json.loads(p2.read_text("utf-8"))
-    slugs = {entry["slug"] for entry in portfolio_after_beta["projects"]}
+    slugs = {entry["slug"] for entry in portfolio_after_beta["active_projects"]}
     assert slugs == {"alpha", "beta"}, \
         "portfolio.json broke append-only contract"
 
     # Re-add alpha — must dedup.
     register_project(ws, "alpha", domain="https://alpha.example/", market="TR", created_at=_FIXED_CREATED_AT)
     portfolio_dedup = json.loads(p2.read_text("utf-8"))
-    assert len(portfolio_dedup["projects"]) == 2, "duplicate slug entry created"
+    assert len(portfolio_dedup["active_projects"]) == 2, "duplicate slug entry created"
 
 
 # ---------------------------------------------------------------------------

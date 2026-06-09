@@ -41,7 +41,7 @@ _LATER = "2026-06-09T00:00:00+00:00"
 # 3-project portfolio, and a per-run estimate for the `monthly` workflow.
 _CEILINGS = {"gsc_calls": 1000, "dfs_credits": 500, "image_spend": 50}
 _ESTIMATE = {"monthly": {"gsc_calls": 10, "dfs_credits": 5, "image_spend": 2}}
-_PORTFOLIO = {"projects": [{"slug": "alpha"}, {"slug": "beta"}, {"slug": "gamma"}]}
+_PORTFOLIO = {"active_projects": [{"slug": "alpha"}, {"slug": "beta"}, {"slug": "gamma"}]}
 
 
 # ---------------------------------------------------------------------------

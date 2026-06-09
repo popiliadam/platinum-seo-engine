@@ -52,7 +52,7 @@ def _write_portfolio(ws: Path, slugs: list[str]) -> None:
         for s in slugs
     ]
     (_shared(ws) / "portfolio.json").write_text(
-        json.dumps({"schema_version": "1.0", "projects": projects}),
+        json.dumps({"schema_version": "1.1", "active_projects": projects}),
         encoding="utf-8",
     )
 

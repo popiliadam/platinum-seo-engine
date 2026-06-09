@@ -69,9 +69,9 @@ def test_two_concurrent_threads_both_land(tmp_path: Path) -> None:
     assert not errors, f"worker raised: {errors}"
 
     data = _read(tmp_path)
-    assert {p["slug"] for p in data["projects"]} == {"slug-0", "slug-1"}, \
+    assert {p["slug"] for p in data["active_projects"]} == {"slug-0", "slug-1"}, \
         "a concurrent update was lost"
-    assert len(data["projects"]) == 2
+    assert len(data["active_projects"]) == 2
 
 
 def test_high_contention_no_lost_update(tmp_path: Path) -> None:
@@ -82,8 +82,8 @@ def test_high_contention_no_lost_update(tmp_path: Path) -> None:
     assert not errors, f"worker raised: {errors}"
 
     data = _read(tmp_path)
-    assert len(data["projects"]) == 10, "lost update under contention"
-    assert {p["slug"] for p in data["projects"]} == set(slugs)
+    assert len(data["active_projects"]) == 10, "lost update under contention"
+    assert {p["slug"] for p in data["active_projects"]} == set(slugs)
 
 
 def test_reregister_same_slug_is_idempotent(tmp_path: Path) -> None:
@@ -95,9 +95,9 @@ def test_reregister_same_slug_is_idempotent(tmp_path: Path) -> None:
                      created_at="2030-01-01T00:00:00.000000Z")
 
     data = _read(tmp_path)
-    assert len(data["projects"]) == 1, "duplicate slug entry created"
-    assert data["projects"][0]["slug"] == "alpha"
-    assert data["projects"][0]["created_at"] == _CREATED_AT, "dedup overwrote the original"
+    assert len(data["active_projects"]) == 1, "duplicate slug entry created"
+    assert data["active_projects"][0]["slug"] == "alpha"
+    assert data["active_projects"][0]["created_at"] == _CREATED_AT, "dedup overwrote the original"
 
 
 def test_append_only_preserves_prior_entries(tmp_path: Path) -> None:
@@ -108,7 +108,7 @@ def test_append_only_preserves_prior_entries(tmp_path: Path) -> None:
                      created_at=_CREATED_AT)
 
     data = _read(tmp_path)
-    assert [p["slug"] for p in data["projects"]] == ["alpha", "beta"]
+    assert [p["slug"] for p in data["active_projects"]] == ["alpha", "beta"]
 
 
 def test_shape_matches_contract(tmp_path: Path) -> None:
@@ -123,9 +123,9 @@ def test_shape_matches_contract(tmp_path: Path) -> None:
     assert '\n  "schema_version": "1.0"' in raw, "indent=2 pretty-printing expected"
 
     data = json.loads(raw)
-    assert set(data.keys()) == {"schema_version", "projects"}
+    assert set(data.keys()) == {"schema_version", "active_projects"}
     assert data["schema_version"] == "1.0"
-    assert data["projects"][0] == {
+    assert data["active_projects"][0] == {
         "slug": "gamma",
         "domain": "https://gamma.example/",
         "market": "TR",
@@ -162,7 +162,7 @@ def test_cli_register_subprocess(tmp_path: Path) -> None:
     assert res.returncode == 0, f"CLI failed: {res.stderr}"
 
     data = _read(tmp_path)
-    assert data["projects"][0] == {
+    assert data["active_projects"][0] == {
         "slug": "cli-slug",
         "domain": "https://cli.example/",
         "market": "TR",
