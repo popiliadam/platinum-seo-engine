@@ -48,12 +48,23 @@ from typing import Callable
 from scripts.orchestration import committer, coverage
 from scripts.orchestration.run_step import StepSpec, run_step
 from scripts.orchestration.verify import verify_raw_drop
+from scripts.state.engine_version import engine_version as current_engine_version
 
 Transform = Callable[[list[dict]], list[dict]]
 
 
 class WorkflowError(Exception):
     """The model-produced transform output is missing or malformed."""
+
+
+class EngineVersionMismatch(RuntimeError):
+    """A RESUME crossed an engine-version boundary (spec §8).
+
+    Raised at run start when a coverage record already exists for this run_id (a
+    resume) and was stamped by a DIFFERENT engine version than the one now
+    running — feeding OLD-shaped state to NEW code is refused (fail-loud
+    "regenerate") rather than silently mixing versions.
+    """
 
 
 def inbox_path(workspace_root: Path | str, run_id: str, slug: str, step: str) -> Path:
@@ -202,6 +213,58 @@ def _run_one(
     )
 
 
+def _assert_no_version_drift(
+    *, workspace_root: Path | str, project_slug: str, run_id: str,
+    current_version: str,
+) -> None:
+    """Run-start RESUME guard (spec §8). Raise ``EngineVersionMismatch`` ONLY when
+    a coverage record already exists for this run_id (a resume) AND it carries a
+    stored engine_version that DIFFERS from the one now running.
+
+    A fresh run (no prior file), an un-stamped pre-4g prior (no engine_version
+    key), or an unreadable prior is allowed — exactly as before 4g, the prior is
+    treated as "unknown" and the run proceeds. The check reads but never writes,
+    so a mismatch is detected BEFORE the prior record is overwritten.
+    """
+    prior_path = coverage.coverage_path(workspace_root, project_slug, run_id)
+    if not prior_path.exists():
+        return
+    try:
+        prior = json.loads(prior_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return
+    stored = prior.get("engine_version") if isinstance(prior, dict) else None
+    if stored is not None and stored != current_version:
+        raise EngineVersionMismatch(
+            f"Motor sürümü uyuşmuyor: bu run ({run_id}) {stored!r} sürümüyle "
+            f"üretildi, şimdiki sürüm {current_version!r}. Karışık (eski+yeni) "
+            f"state üretmemek için run'ı yeniden oluşturun (regenerate); eski "
+            f"coverage kaydı korundu."
+        )
+
+
+def _resolved_engine_version(
+    engine_version: str | None, *, write: bool,
+    workspace_root: Path | str, project_slug: str, run_id: str,
+) -> str:
+    """Resolve the producing engine version and guard a resume.
+
+    The caller's explicit value wins; otherwise it is sourced ONCE from
+    plugin.json. On a writing run, fail loud (before any step side effect) if this
+    run_id resumes across a version boundary. A dry run (``write=False``) persists
+    nothing, so the resume guard — a write-path concern — is not engaged.
+    """
+    resolved = (
+        engine_version if engine_version is not None else current_engine_version()
+    )
+    if write:
+        _assert_no_version_drift(
+            workspace_root=workspace_root, project_slug=project_slug,
+            run_id=run_id, current_version=resolved,
+        )
+    return resolved
+
+
 def run_workflow(
     steps_table: tuple[dict, ...], run_id: str, project_slug: str,
     workspace_root: Path | str, workbook_path: Path | str, now_epoch: float, *,
@@ -219,6 +282,10 @@ def run_workflow(
     downgrades ``pass -> incomplete`` when any step is not satisfied — load-bearing
     for the soft (model_attested) steps that ``derive_verdict`` treats as optional.
     """
+    resolved_version = _resolved_engine_version(
+        engine_version, write=write, workspace_root=workspace_root,
+        project_slug=project_slug, run_id=run_id,
+    )
     specs = build_steps(steps_table, run_id, project_slug, workspace_root)
     steps = [
         _run_one(
@@ -241,7 +308,7 @@ def run_workflow(
         verdict = "incomplete"
     record = coverage.build_record(
         run_id=run_id, steps=steps, required_satisfied=required_satisfied,
-        verdict=verdict, project_slug=project_slug, engine_version=engine_version,
+        verdict=verdict, project_slug=project_slug, engine_version=resolved_version,
     )
     if write:
         coverage.write_coverage(

@@ -57,6 +57,7 @@ from pathlib import Path
 
 from scripts.orchestration import coverage
 from scripts.orchestration.remediation import remediation, render
+from scripts.state.engine_version import engine_version as current_engine_version
 from scripts.validation.content_validator import validate_content
 
 WORKFLOW = "content"
@@ -176,9 +177,14 @@ def run(
     # produced blog, so any non-satisfied step downgrades pass -> incomplete.
     if verdict == "pass" and not all(s["status"] == "satisfied" for s in steps):
         verdict = "incomplete"
+    # Mirror the data driver: stamp the producing engine version so the artifact
+    # knows which engine made it (caller's explicit value wins; else source it).
+    resolved_version = (
+        engine_version if engine_version is not None else current_engine_version()
+    )
     record = coverage.build_record(
         run_id=run_id, steps=steps, required_satisfied=required_satisfied,
-        verdict=verdict, project_slug=project_slug, engine_version=engine_version,
+        verdict=verdict, project_slug=project_slug, engine_version=resolved_version,
     )
     if write:
         coverage.write_coverage(
