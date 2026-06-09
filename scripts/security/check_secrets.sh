@@ -148,9 +148,12 @@ if [ "$SCAN_STDIN" = "1" ]; then
   for i in "${!PATTERNS[@]}"; do
     p="${PATTERNS[$i]}"
     name="${PATTERN_NAMES[$i]:-pattern_$i}"
-    if grep -qE "$p" "$tmp" 2>/dev/null; then
+    # -e marks "$p" as the pattern so headers that begin with '-' (the PEM /
+    # RSA / OPENSSH key markers) are NOT mis-parsed by grep as options — without
+    # it grep errors (rc=2, stderr suppressed) and silently MISSES those classes.
+    if grep -qE -e "$p" "$tmp" 2>/dev/null; then
       HIT=1
-      c=$(grep -cE "$p" "$tmp" 2>/dev/null || echo 0)
+      c=$(grep -cE -e "$p" "$tmp" 2>/dev/null || echo 0)
       HITS="${HITS}${name}|${c}"$'\n'
     fi
   done
@@ -248,7 +251,7 @@ for i in "${!PATTERNS[@]}"; do
         [ -z "$cf" ] && continue
         full="$ROOT/$cf"
         [ -f "$full" ] || continue
-        if grep -lE "$p" "$full" >/dev/null 2>&1; then
+        if grep -lE -e "$p" "$full" >/dev/null 2>&1; then
           FILES="${FILES}${full}"$'\n'
         fi
       done <<< "$CHANGED_FILES_LIST"
@@ -256,8 +259,11 @@ for i in "${!PATTERNS[@]}"; do
     fi
   else
     # Full mode: recursive grep with policy excludes (ADR-034)
-    # grep -l (files-with-matches only) — never prints match content
-    FILES=$(grep -rlE "$p" "$ROOT" \
+    # grep -l (files-with-matches only) — never prints match content.
+    # -e "$p" guards '-'-prefixed patterns (PEM/RSA/OPENSSH headers) so grep
+    # treats them as the pattern, not flags; the --exclude* flags follow safely
+    # ('--' would consume them as filenames, so -e is the correct guard here).
+    FILES=$(grep -rlE -e "$p" "$ROOT" \
       --exclude-dir=.git \
       --exclude-dir=node_modules \
       --exclude-dir=_backups \
@@ -279,8 +285,8 @@ for i in "${!PATTERNS[@]}"; do
     echo ""
     echo "FAIL pattern: $name"
     while IFS= read -r f; do
-      # grep -c: count only, never echoes match content
-      count=$(grep -cE "$p" "$f" 2>/dev/null || echo 0)
+      # grep -c: count only, never echoes match content (-e guards '-' headers)
+      count=$(grep -cE -e "$p" "$f" 2>/dev/null || echo 0)
       echo "  $f ($count match(es) — content [REDACTED])"
     done <<< "$FILES"
     EXIT=1

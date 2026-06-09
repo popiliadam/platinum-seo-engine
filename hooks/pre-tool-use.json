@@ -2,7 +2,7 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Edit|Write|Bash",
+        "matcher": "Edit|Write|NotebookEdit|Bash",
         "hooks": [
           {
             "type": "command",
@@ -14,7 +14,13 @@
             "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/security/check_secrets.sh\" --changed-since HEAD \"${CLAUDE_PROJECT_DIR:-.}\"",
             "timeout": 60,
-            "statusMessage": "Secret leak scan..."
+            "statusMessage": "Secret leak scan (post-hoc, changed files)..."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/scan_pending_secret.py\"",
+            "timeout": 35,
+            "statusMessage": "Secret leak scan (pending Write/Edit bytes)..."
           },
           {
             "type": "command",
