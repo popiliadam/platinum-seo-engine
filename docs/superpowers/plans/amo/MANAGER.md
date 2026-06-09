@@ -7,6 +7,17 @@
 > fresh **Opus 4.8 1M-context** worker, verifies the returned REPORT (suite-green + code-review +
 > no out-of-scope files), commits, then dispatches the next batch.
 
+> ## 🎉🎉 AMO v2.0.0 RELEASED (2026-06-09) — the build is DONE, LIVE-PROVEN, and TAGGED
+> Faz 0-4 (binding → orchestrator → gates/denetçi/oracle → 4-workflow replication + 2 lints →
+> portfolio fan-out + cost ledger + kill-switch + O5 scheduler + runbook) + **D11 live-acceptance
+> PASSED** on a real GSC project. `version_bump 1.9.5 → 2.0.0` (5-file sync) + `RELEASE_NOTES_v2.0.0.md`
+> + annotated `v2.0.0` tag. Suite **2312/0** (a manager-found test-isolation fix made the audit-hook
+> tests robust to a bound workspace — they had silently relied on a clean CI home). Cost ceilings set
+> + buffered (every full-portfolio sweep fits). **Remaining (deferred, operator-paced):** Mac-app/CLI
+> acceptance columns (operator works VS-Code-only for now), real DataForSEO quota tuning, optional 4g
+> (self-upgrade artifact-versioning), the PRIVATE→PUBLIC marketplace transition. The scheduler ships
+> **disarmed** — autonomy arms only on the operator's explicit, ceiling-gated consent.
+
 ## Build philosophy (operator-chosen 2026-06-05)
 **Path A — start simple.** Hard-coded ordered Python sequences for 3-4 known workflows; NO
 declarative DAG engine and NO auto-derived capability graph yet. "Knows all its parts" is
