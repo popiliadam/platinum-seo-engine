@@ -22,7 +22,11 @@ Three layers:
   * classify() — PURE, no IO. CONSERVATIVE: only a CLEAR match returns an action;
     a non-gated command returns None and is NEVER blocked (only a positive
     classification can reach a deny). Leading-token bash parse (so ``rm`` is
-    gated but ``confirm`` is not), mirroring events_writer._classify_bash_command.
+    gated but ``confirm`` is not), mirroring events_writer._classify_bash_command;
+    leading command WRAPPERS (sudo/command/env/time/nohup/…) are unwrapped first so
+    a wrapped action (``sudo rm``, ``sudo git push``) is still gated (#10), while a
+    loopback request (127.0.0.0/8 · localhost · ::1) is carved out as a local-only,
+    non-outward action (#12).
   * evaluate() — gated + matching same-session consent -> allow; gated +
     no/other-session/tampered/unresolvable consent -> DENY (fail-closed).
   * main() — fail-OPEN on the non-gated path (a parser bug must never brick plain
@@ -77,6 +81,15 @@ _DELETE_TOKENS = frozenset({"rm", "rmdir", "unlink", "shred"})
 # Leading bash tokens that make an outbound HTTP request.
 _HTTP_TOKENS = frozenset({"curl", "wget"})
 
+# Leading command WRAPPERS that prefix a real command (`sudo rm …`, `env FOO=bar
+# git push`, `timeout 5 curl …`). They are NOT gated themselves, but they MUST be
+# unwrapped so the gated command behind them is still classified — otherwise the
+# wrapper token sits at tokens[0] and smuggles the action past the gate (#10).
+_WRAPPER_TOKENS = frozenset({
+    "sudo", "doas", "command", "builtin", "exec", "env", "time",
+    "nohup", "setsid", "stdbuf", "nice", "ionice", "timeout", "xargs",
+})
+
 # A POST to this host is the Google Indexing-API URL_UPDATED surface (index_update);
 # any other outbound POST is net_post.
 _INDEXING_HOST = "indexing.googleapis.com"
@@ -120,6 +133,30 @@ def _first_url(tokens: list[str]) -> str | None:
         if tok.startswith("http://") or tok.startswith("https://"):
             return tok
     return None
+
+
+def _is_loopback_host(host: str) -> bool:
+    """True iff ``host`` addresses THIS machine — a loopback request never leaves
+    it, so it is not an OUTWARD action (#12): ``localhost`` / ``*.localhost``
+    (RFC 6761), the IPv4 ``127.0.0.0/8`` block, and the IPv6 ``::1``.
+
+    CONSERVATIVE: anything we cannot PROVE is loopback returns False and stays
+    gated, so a public POST is never un-gated. The Indexing/IndexNow hosts are
+    never loopback, so this can never carve them out either.
+    """
+    if not host:
+        return False
+    h = host.strip().lower().strip("[]")  # urlparse strips [] already; be defensive
+    if h == "localhost" or h.endswith(".localhost"):
+        return True
+    if h in ("::1", "0:0:0:0:0:0:0:1"):
+        return True
+    parts = h.split(".")
+    if len(parts) == 4 and parts[0] == "127" and all(
+        p.isdigit() and 0 <= int(p) <= 255 for p in parts
+    ):
+        return True
+    return False
 
 
 def _has_post_flag(tokens: list[str]) -> bool:
@@ -182,6 +219,46 @@ def _git_push_target(tokens: list[str]) -> str | None:
     return None
 
 
+def _first_command_anchor(region: list[str]) -> int:
+    """Index in ``region`` of the wrapped command after a leading wrapper: the FIRST
+    gated-command or wrapper token, else 0 (the region start).
+
+    Scanning for the gated token — rather than precisely modelling every wrapper's
+    option grammar — is what keeps the gate CONSERVATIVE across wrappers with
+    arg-taking flags or positional args: ``sudo -u u rm x``, ``timeout 5 git push``,
+    ``nice -n 10 rm x`` all anchor on the real command. A wrong anchor can only ever
+    OVER-gate (acceptable); it can never hide a gated action (under-deny — forbidden).
+    """
+    for idx, tok in enumerate(region):
+        bare = tok.rsplit("/", 1)[-1]
+        if (bare in _DELETE_TOKENS or bare == "git" or bare in _HTTP_TOKENS
+                or bare in _WRAPPER_TOKENS):
+            return idx
+    return 0
+
+
+def _unwrap_wrappers(tokens: list[str]) -> list[str]:
+    """Strip leading command-WRAPPER prefixes so ``sudo rm -rf x`` classifies exactly
+    like ``rm -rf x`` (#10); returns the wrapped command's tokens.
+
+    A plain command (tokens[0] is not a wrapper) is returned UNCHANGED, so every
+    non-wrapped classification stays byte-identical. Nested wrappers (``sudo nohup
+    rm``) are peeled iteratively; a small guard bounds pathological nesting.
+    Unwrapping only ever EXPOSES a gated command — it never hides one.
+    """
+    i = 0
+    guard = 0
+    while i < len(tokens) and guard < 16:
+        if tokens[i].rsplit("/", 1)[-1] not in _WRAPPER_TOKENS:
+            break
+        region = tokens[i + 1:]
+        if not region:
+            break  # a bare wrapper with nothing after it -> nothing to unwrap
+        i = (i + 1) + _first_command_anchor(region)
+        guard += 1
+    return tokens[i:]
+
+
 def _classify_segment(segment: str) -> tuple[str, str] | None:
     """Leading-token classify of ONE shell segment -> (action, target) or None.
 
@@ -192,7 +269,7 @@ def _classify_segment(segment: str) -> tuple[str, str] | None:
         (recognised even behind git global flags, e.g. `git -C <path> push`).
       * net_post / index_update -> the request URL.
     """
-    tokens = _tokenize(segment)
+    tokens = _unwrap_wrappers(_tokenize(segment))  # peel sudo/env/... wrappers (#10)
     if not tokens:
         return None
     first = tokens[0].rsplit("/", 1)[-1]  # strip any leading path (mirror events_writer)
@@ -210,6 +287,13 @@ def _classify_segment(segment: str) -> tuple[str, str] | None:
         host = (urlparse(url).hostname or "").lower() if url else ""
         is_indexing = host == _INDEXING_HOST
         is_indexnow = host.endswith("indexnow.org")
+        # Loopback carve-out (#12): a request to THIS machine never leaves it, so a
+        # local POST (e.g. the /pseo-status SF-MCP health probe to 127.0.0.1:11435)
+        # is NOT an outward action. Guarded by `not is_indexing/indexnow` so the
+        # carve-out can never un-gate the public Indexing/IndexNow surfaces (whose
+        # hosts are never loopback anyway).
+        if _is_loopback_host(host) and not is_indexing and not is_indexnow:
+            return None
         if _has_post_flag(tokens) or is_indexing or is_indexnow:
             target = url if url else segment.strip()
             return ("index_update", target) if is_indexing else ("net_post", target)
