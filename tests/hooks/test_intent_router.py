@@ -401,3 +401,262 @@ def test_main_malformed_active_json_does_not_crash(tmp_path: Path) -> None:
     assert "Traceback" not in res.stderr
     assert "project=<none>" in res.stdout  # unresolved → <none>, no crash
     assert "Drift router:" in res.stdout
+
+
+# ---------------------------------------------------------------------------
+# 9. batch pb0 — mention ≠ request: is_actionable_request + the Tier-1-soft tier
+#
+#    THE LIVE BUG: the router used to ARM the denetçi (write status='declared')
+#    whenever a prompt merely CONTAINED a canonical phrase ("aylık bakım"). It
+#    misfired 3× in one session — including on a Path B research prompt whose only
+#    crime was discussing "aylık bakım" — nagging /pseo-run for a workflow the
+#    operator never asked for. The fix: a canonical match now writes 'declared'
+#    (→ denetçi armed) ONLY when the prompt is an actionable REQUEST; a
+#    mention/question writes 'superseded' (→ denetçi NOT armed) while still
+#    surfacing the command via a soft hint. A genuine command is byte-unchanged.
+# ---------------------------------------------------------------------------
+
+# Genuine-request voice that MUST stay byte-identical to pre-pb0 (vento, bound).
+_DECLARED_VOICE_VENTO = "➤ Niyet: aylık bakım algılandı → çalıştır: /pseo-run monthly vento"
+# Soft "mentioned, not requested" hint (vento, bound) — surfaces the command but
+# does NOT arm the denetçi.
+_SOFT_VOICE_VENTO = "ℹ️ 'aylık bakım' geçti — çalıştırmak istersen: /pseo-run monthly vento"
+
+
+@pytest.mark.parametrize("prompt, expected", [
+    # --- strong actionable signals (each whole-word verb ⇒ True) ---
+    ("aylık bakım yap", True),
+    ("bunu çalıştır", True),
+    ("bunu calistir", True),
+    ("şimdi başlat", True),
+    ("simdi baslat", True),
+    ("hemen koş", True),
+    ("hemen kos", True),
+    ("verileri çek", True),
+    ("verileri cek", True),
+    ("rapor üret", True),
+    ("rapor uret", True),
+    ("içerik oluştur", True),
+    ("icerik olustur", True),
+    ("planı güncelle", True),
+    ("plani guncelle", True),
+    ("brief hazırla", True),
+    ("brief hazirla", True),
+    ("devam et", True),
+    ("please resume", True),
+    ("please run it", True),
+    ("hadi başlatalım", True),
+    ("hadi çalıştıralım", True),
+    ("yapar mısın", True),                 # polite request WITHOUT a '?'
+    ("/pseo-run monthly vento", True),     # explicit command token
+    # --- question / discussion signals (each ⇒ False, OVERRIDES verbs) ---
+    ("aylık bakım nedir?", False),
+    ("bu ne demek", False),
+    ("ne işe yarar", False),
+    ("nasıl çalışır", False),
+    ("nasil calisir", False),
+    ("neden böyle", False),
+    ("niçin", False),
+    ("nicin", False),
+    ("bunun hakkında", False),
+    ("bunun hakkinda", False),
+    ("aylık bakımı açıkla", False),
+    ("bunu acikla", False),
+    ("bana anlat", False),
+    ("şunu araştır", False),
+    ("sunu arastir", False),
+    ("şunu incele", False),
+    ("çalıştırdın mı?", False),
+    ("doğru mu?", False),
+    ("bu mu?", False),
+    ("öyle mü?", False),
+    ("fark ne", False),
+    ("ne zaman olur", False),
+    ("geçerli midir", False),
+    ("geçerli mıdır", False),
+    # --- precedence: a question marker WINS over an actionable verb ---
+    ("aylık bakımı açıkla ve çalıştır", False),  # 'açıkla' beats 'çalıştır'
+    ("aylık bakımı çalıştır mı?", False),        # trailing '?' beats 'çalıştır'
+    # --- word-boundary discipline: 'yap' must NOT match 'yapay' (AI), 'run'
+    #     must NOT match 'running' — these are the dangerous false-positives ---
+    ("yapay zeka ile aylık bakım planı", False),
+    ("the script is running", False),
+    # --- empty / mention / non-str ⇒ False ---
+    ("", False),
+    ("   ", False),
+    ("merhaba", False),
+    ("aylık bakım", False),                # bare MENTION: no verb, no question
+    (None, False),
+    (123, False),
+])
+def test_is_actionable_request_table(prompt, expected) -> None:
+    assert router.is_actionable_request(prompt) is expected
+
+
+# ---- route: a MENTION/question of a canonical workflow → soft + superseded ----
+
+def test_route_mention_research_prompt_is_soft_superseded(tmp_path: Path) -> None:
+    """The live false-positive, locked: a Path B research prompt that merely
+    DISCUSSES 'aylık bakım' must write a SUPERSEDED marker (denetçi NOT armed) and
+    emit the soft hint — NOT the '➤ Niyet … çalıştır' declared voice."""
+    ws = _workspace(tmp_path)
+    sb.write_session_binding("sess-soft", "vento", ws, "2026-06-05T00:00:00")
+    result = router.route(
+        "path b araştırması: aylık bakım router'ı nasıl çalışıyor inceleyelim",
+        session_id="sess-soft",
+        workspace_root=ws,
+        turn_id="t1",
+        intent_id="i1",
+        declared_at="2026-06-05T10:00:00",
+    )
+    m = result["marker"]
+    assert m["status"] == "superseded"            # ← the fix: nothing owed
+    assert "workflow" not in m and "command" not in m
+    assert result["voice"] == _SOFT_VOICE_VENTO   # helpful surfacing of the command
+    assert "➤ Niyet" not in result["voice"]       # NOT the declared actionable voice
+    _validator().validate(m)
+
+
+@pytest.mark.parametrize("prompt", [
+    "aylık bakım nedir?",
+    "monthly maintenance workflow'unu açıkla",
+    "aylık bakım ne işe yarar",
+])
+def test_route_question_mentions_are_soft_superseded(tmp_path: Path, prompt: str) -> None:
+    ws = _workspace(tmp_path)
+    sb.write_session_binding("sess-q", "vento", ws, "2026-06-05T00:00:00")
+    result = router.route(
+        prompt, session_id="sess-q", workspace_root=ws,
+        turn_id="t", intent_id="i", declared_at="2026-06-05T10:00:00",
+    )
+    assert result["tier"] == "1-soft"
+    assert result["marker"]["status"] == "superseded"
+    assert result["voice"] == _SOFT_VOICE_VENTO
+    _validator().validate(result["marker"])
+
+
+def test_route_soft_unbound_uses_slug_placeholder(tmp_path: Path) -> None:
+    """A mention in an UNBOUND session still surfaces the command, with the
+    <slug> placeholder (never a fabricated slug), and stays superseded."""
+    ws = _workspace(tmp_path)  # no binding → unbound
+    result = router.route(
+        "aylık bakım nedir?", session_id="sess-ub", workspace_root=ws,
+        turn_id="t", intent_id="i", declared_at="2026-06-05T10:00:00",
+    )
+    assert result["tier"] == "1-soft"
+    assert result["marker"]["status"] == "superseded"
+    assert result["voice"] == "ℹ️ 'aylık bakım' geçti — çalıştırmak istersen: /pseo-run monthly <slug>"
+    _validator().validate(result["marker"])
+
+
+# ---- route: a GENUINE request stays Tier-1 declared, byte-identical voice ----
+
+@pytest.mark.parametrize("prompt", [
+    "vento'da aylık bakım yap",
+    "aylık bakımı çalıştır",
+    "aylık bakım başlat",
+])
+def test_route_genuine_requests_stay_declared(tmp_path: Path, prompt: str) -> None:
+    ws = _workspace(tmp_path)
+    sb.write_session_binding("sess-req", "vento", ws, "2026-06-05T00:00:00")
+    result = router.route(
+        prompt, session_id="sess-req", workspace_root=ws,
+        turn_id="t", intent_id="i", declared_at="2026-06-05T10:00:00",
+    )
+    assert result["tier"] == 1
+    m = result["marker"]
+    assert m["status"] == "declared"
+    assert m["workflow"] == "monthly"
+    assert m["command"] == "/pseo-run monthly vento"
+
+
+def test_route_declared_voice_is_byte_identical(tmp_path: Path) -> None:
+    """The genuine-request Tier-1 voice is UNCHANGED from pre-pb0 behaviour."""
+    ws = _workspace(tmp_path)
+    sb.write_session_binding("sess-bi", "vento", ws, "2026-06-05T00:00:00")
+    result = router.route(
+        "vento'da aylık bakım yap", session_id="sess-bi", workspace_root=ws,
+        turn_id="t", intent_id="i", declared_at="2026-06-05T10:00:00",
+    )
+    assert result["tier"] == 1
+    assert result["voice"] == _DECLARED_VOICE_VENTO
+
+
+def test_route_bare_slash_command_is_tier2_advisory(tmp_path: Path) -> None:
+    """DISCREPANCY FLAGGED TO MANAGER: the worker-prompt lists '/pseo-run monthly
+    vento' as a 'declared' regression, but classify() matches on the canonical
+    PHRASE ('aylık bakım' / 'monthly maintenance'), which this string does NOT
+    contain → it is Tier-2 (advisory + superseded), not Tier-1. is_actionable_
+    request() correctly sees it as actionable (see the table), but route() never
+    reaches the actionability gate because classify() returns None first.
+
+    This is HARMLESS: typing the slash command runs the workflow THIS turn, so the
+    denetçi sees coverage and would allow turn-end even if it were declared.
+    Making it Tier-1 would require adding a '/pseo-run monthly' classify pattern
+    (a CANONICAL_WORKFLOWS change), which is out of this batch's scope. Pinned so
+    any future classify change to this is a DELIBERATE update."""
+    ws = _workspace(tmp_path)
+    sb.write_session_binding("sess-slash", "vento", ws, "2026-06-05T00:00:00")
+    result = router.route(
+        "/pseo-run monthly vento", session_id="sess-slash", workspace_root=ws,
+        turn_id="t", intent_id="i", declared_at="2026-06-05T10:00:00",
+    )
+    assert result["tier"] == 2
+    assert result["marker"]["status"] == "superseded"
+    assert result["voice"] == _EXPECTED_ADVISORY
+    # the predicate itself is correct — the miss is in classify, not actionability
+    assert router.is_actionable_request("/pseo-run monthly vento") is True
+
+
+def test_route_no_match_is_unchanged_tier2(tmp_path: Path) -> None:
+    """Regression: a prompt with NO canonical phrase is still Tier-2 advisory."""
+    ws = _workspace(tmp_path)
+    sb.write_session_binding("sess-nm", "vento", ws, "2026-06-05T00:00:00")
+    result = router.route(
+        "merhaba nasılsın", session_id="sess-nm", workspace_root=ws,
+        turn_id="t", intent_id="i", declared_at="2026-06-05T10:00:00",
+    )
+    assert result["tier"] == 2
+    assert result["marker"]["status"] == "superseded"
+    assert result["voice"] == _EXPECTED_ADVISORY
+
+
+# ---- main() end-to-end via subprocess: mention → no declared marker on disk ----
+
+def test_main_mention_writes_superseded_not_declared(tmp_path: Path) -> None:
+    """E2E at the process boundary: a payload that only MENTIONS the workflow
+    writes a SUPERSEDED marker (denetçi NOT armed) and prints the soft hint."""
+    ws = _workspace(tmp_path)
+    home = tmp_path / "home"
+    home.mkdir()
+    sb.write_session_binding("sid-m", "vento", ws, "2026-06-05T00:00:00")
+    res = _run_router(
+        json.dumps({"session_id": "sid-m", "prompt": "aylık bakım nedir?"}),
+        home=home, workspace=ws,
+    )
+    assert res.returncode == 0, res.stderr
+    data = json.loads((ws / "shared" / "sessions" / "sid-m.intent.json").read_text(encoding="utf-8"))
+    assert data["status"] == "superseded"          # NOT 'declared'
+    assert "istersen" in res.stdout                # the soft hint surfaced
+    assert "/pseo-run monthly vento" in res.stdout  # …with the runnable command
+    assert "Niyet" not in res.stdout               # NOT the declared voice
+    assert "Traceback" not in res.stderr
+
+
+def test_main_request_writes_declared_marker(tmp_path: Path) -> None:
+    """E2E: a genuine request payload still writes a 'declared' marker (the
+    denetçi-arming half is preserved for real intents)."""
+    ws = _workspace(tmp_path)
+    home = tmp_path / "home"
+    home.mkdir()
+    sb.write_session_binding("sid-r", "vento", ws, "2026-06-05T00:00:00")
+    res = _run_router(
+        json.dumps({"session_id": "sid-r", "prompt": "vento'da aylık bakım yap"}),
+        home=home, workspace=ws,
+    )
+    assert res.returncode == 0, res.stderr
+    data = json.loads((ws / "shared" / "sessions" / "sid-r.intent.json").read_text(encoding="utf-8"))
+    assert data["status"] == "declared"
+    assert data["command"] == "/pseo-run monthly vento"
+    assert "/pseo-run monthly vento" in res.stdout
+    assert "Traceback" not in res.stderr
