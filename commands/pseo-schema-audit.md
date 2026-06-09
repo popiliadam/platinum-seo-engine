@@ -46,5 +46,5 @@ DURUR (6 sentinel): SF export yok / strict_parse=true ile malformed JSON-LD / DF
 - Templates: `templates/reports/schema-audit.template.md`
 - Rules: `rules/schema-first.md` + `rules/budget-events.md`
 - Schemas: `schemas/master-excel.schema.json#schema` + `schemas/dataforseo-endpoint-mapping.schema.json`
-- MCP: `mcp__dataforseo__on_page_content_parsing` (optional, paid cross-validate)
+- MCP (**skill-level** — schema-audit skill çağırır, bu komut DEĞİL; skill frontmatter `mcp_tools`): `mcp__dataforseo__on_page_content_parsing` (optional, paid cross-validate)
 - Upstream: `init-project` (master.xlsx) + `sf-import` (`inbox/sf/{date}-{slug}.json`)

@@ -4,7 +4,7 @@ description: |
   Also use when: SF MCP server live mı kontrol edilecek (`sf_list_allowed_base_directory` probe), aktif veya tüm projelerin son sf-crawl-orchestrator run özetini görme, allowed_directory mismatch tespit etme.
   Do not use when: yeni crawl tetikleme (`/pseo-sf-crawl`), genel workflow status (`/pseo-status` SF MCP Status H2 alt-bölümünü de gösterir), drift kontrol (`/pseo-driftcheck`).
 argument-hint: "[project-slug]"
-allowed-tools: Bash(curl:*), Bash(jq:*), Bash(python3:*), Bash(ls:*), Bash(grep:*), Bash(head:*), Bash(sort:*), Bash(tail:*), Bash(xargs:*), Read
+allowed-tools: Bash(jq:*), Bash(ls:*), Bash(grep:*), Bash(sort:*), Bash(tail:*), Bash(xargs:*), Read, mcp__sf__sf_list_allowed_base_directory
 model: sonnet
 ---
 
@@ -14,19 +14,15 @@ model: sonnet
 
 ## 1. SF MCP connection probe
 
-!`curl -sf -m 3 http://127.0.0.1:11435/mcp/tools 2>/dev/null | jq -r '"tools_advertised=" + ([.tools[]?.name] | length | tostring)' || echo "tools_advertised=DOWN (SF GUI MCP Server not started)"`
+SF MCP, **stateful MCP Streamable-HTTP** transport konuşur (MCP rev 2024-11-05; `scripts/util/sf_mcp_client.py:8-17`) — bare JSON-RPC POST DEĞİL. Health probe için `mcp__sf__sf_list_allowed_base_directory` MCP tool'unu çağır: Claude Code session handshake'i (`initialize` → `notifications/initialized` → `Mcp-Session-Id`'li `tools/call`) otomatik yürütür. Tool bir path döndürürse → `connected`; tool erişilemez/hata verirse → SF GUI MCP Server başlatılmamış (`down`).
 
-Detaylı tool inventory:
-
-!`curl -sf -m 3 http://127.0.0.1:11435/mcp/tools 2>/dev/null | jq -r '.tools[]?.name' | sort | head -10 || echo "(no tools — SF GUI MCP Server kapalı veya port 11435 erişilemez)"`
+> **Obsolete (kullanma):** eski bare HTTP tool-list endpoint'i (öyle bir route yok) ve session'sız bare `tools/call` POST (HTTP 400 `-32600` "Session ID required" döner). Raw `curl` ile health alınamaz; kanonik client `scripts/util/sf_mcp_client.py` (`SfMcpClient.health()` — `initialize` handshake'i kısa timeout'la dener, non-raising bool döner).
 
 Beklenen minimum 5 tool: `sf_crawl`, `sf_crawl_progress`, `sf_generate_report`, `sf_list_crawls`, `sf_list_allowed_base_directory`.
 
 ## 2. allowed_directory probe + drift check
 
-Live allowed_directory (SF GUI Configuration → API Access → Directory):
-
-!`curl -sf -m 3 -X POST http://127.0.0.1:11435/mcp -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"sf_list_allowed_base_directory","arguments":{}}}' 2>/dev/null | jq -r '.result.content[0].text // "MCP_CALL_FAILED"' || echo "MCP_CALL_FAILED"`
+Live allowed_directory (SF GUI Configuration → API Access → Directory): Step 1'deki `mcp__sf__sf_list_allowed_base_directory` çağrısının döndürdüğü path'tir (tek MCP çağrısı hem health hem allowed_directory verir).
 
 Beklenen: `/Users/apple/seo_spider_mcp_server` (D-SF-03; F-15 governance: SF scratch isolated from PSEO workspace). Override için `project.config.sf.mcp.allowed_directory` set edilebilir (D-SF-18 path parameterization).
 

@@ -41,7 +41,7 @@ model: sonnet
 ## 4. Bağımlılıklar
 
 - `skills/ingestion/dfs-pull/SKILL.md` — Phase 6
-- MCP required: `mcp__dataforseo__keywords_data_google_ads_search_volume` + `mcp__dataforseo__dataforseo_labs_google_keyword_overview`
+- MCP required (**skill-level** — dfs-pull skill çağırır, bu komut DEĞİL; skill frontmatter `mcp_tools`): `mcp__dataforseo__keywords_data_google_ads_search_volume` + `mcp__dataforseo__dataforseo_labs_google_keyword_overview`
 - MCP optional: `mcp__dataforseo__dataforseo_labs_google_historical_keyword_data` (historical enrichment, paid +1 credit/keyword)
 - `.mcp.json` bash wrapper, `.env` auto-source (DATAFORSEO_USERNAME + DATAFORSEO_PASSWORD)
 - `project.config.dataforseo.location_code` + `language_code` + `budget_credits_per_day` — required

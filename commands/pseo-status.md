@@ -4,7 +4,7 @@ description: |
   Also use when: bir oturumun başında aktif projenin _state/workflows/ altında bekleyen `running`, `paused`, `awaiting_approval` run'larını listelemek; sonraki adım için Phase 5 `whats-next` skill'ine routing önermek gerekir.
   Do not use when: yeni proje açma (`/pseo-init`), aylık rapor (`/pseo-monthly`), drift kontrol (`/pseo-driftcheck`) veya quick-win analizi (`/pseo-quickwin`) istendiğinde — her birinin kendi komutu vardır.
 argument-hint: "[project-slug]"
-allowed-tools: Bash(python3:*), Bash(cat:*), Bash(jq:*), Bash(ls:*), Bash(curl:*), Bash(find:*), Bash(grep:*), Bash(sort:*), Bash(tail:*), Bash(xargs:*), Read
+allowed-tools: Bash(python3:*), Bash(cat:*), Bash(jq:*), Bash(ls:*), Bash(find:*), Bash(grep:*), Bash(sort:*), Bash(tail:*), Bash(xargs:*), Read, mcp__sf__sf_list_allowed_base_directory
 model: sonnet
 ---
 
@@ -74,9 +74,7 @@ Hiç run yoksa veya kullanıcı "şimdi ne yapayım" sorduğunda `skills/meta/wh
 
 > **v1.8 NEW** — Screaming Frog 24 MCP server bağlantı durumu + son sf-crawl-orchestrator run özeti.
 
-SF MCP server health probe (v1.8 ADR-039: HTTP transport `http://127.0.0.1:11435/mcp`):
-
-!`curl -sf -m 3 -X POST http://127.0.0.1:11435/mcp -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"sf_list_allowed_base_directory","arguments":{}}}' 2>/dev/null | jq -r '.result.content[0].text // "DOWN — SF GUI MCP Server kapalı veya port 11435 unreachable"' || echo "DOWN — SF GUI MCP Server kapalı veya port 11435 unreachable"`
+SF MCP server health probe — `mcp__sf__sf_list_allowed_base_directory` MCP tool'unu çağır (Claude Code stateful Streamable-HTTP session handshake'ini yürütür; ADR-039 `http://127.0.0.1:11435/mcp`). Path dönerse → `connected`; tool erişilemezse → SF GUI MCP Server kapalı / port 11435 unreachable. Raw `curl` ile session'sız bare `tools/call` POST **obsolete** (HTTP 400 `-32600`); kanonik client `scripts/util/sf_mcp_client.py`. Detaylı 4-kolonlu tablo için: `/pseo-sf-status`.
 
 Aktif projenin son SF crawl özeti (`_state/workflows/*.json` filter by skill=sf-crawl-orchestrator):
 
