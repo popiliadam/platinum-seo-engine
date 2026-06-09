@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Claude Code Plugin](https://img.shields.io/badge/Claude_Code-plugin-7C3AED)](https://claude.ai/code)
 
-> Status: **v2.0.0** — production-ready · 45 skills · 24 commands · 6 hooks · 4 MCP servers (3 stdio + 1 HTTP)
+> Status: **v2.0.0** — production-ready · 45 skills · 25 commands · 6 hooks · 4 MCP servers (3 stdio + 1 HTTP)
 
 > **Schema-locked, drift-checked SEO automation for Claude Code.**
 > Turn manual SEO work into auditable, repeatable workflows — backed by JSON Schemas, append-only state, and a tool that audits itself.
@@ -50,7 +50,7 @@ Out of the box, **45 skills** across 8 categories cover an end-to-end SEO loop:
 | **Meta** | Init project, brand onboarding, whats-next router, mark-done | 4 |
 | **Governance** | Schema validation, glossary audit, drift-check, context loader | 4 |
 
-Plus **18 slash commands** (`/pseo-init`, `/pseo-quickwin`, `/pseo-driftcheck`, `/pseo-sf-crawl`, `/pseo-sf-status`, …), **6 hooks** that fire on session start, prompt submit, and tool use, and **4 MCP servers** wired up automatically (GSC, DataForSEO, Scrapling, SF — the last over HTTP `http://127.0.0.1:11435/mcp`).
+Plus **25 slash commands** (`/pseo-init`, `/pseo-quickwin`, `/pseo-driftcheck`, `/pseo-sf-crawl`, `/pseo-sf-status`, …), **6 hooks** that fire on session start, prompt submit, and tool use, and **4 MCP servers** wired up automatically (GSC, DataForSEO, Scrapling, SF — the last over HTTP `http://127.0.0.1:11435/mcp`).
 
 A typical workflow looks like:
 
@@ -128,9 +128,9 @@ The plugin enforces a **two-repo separation** between logic and data:
 │  platinum-seo-engine  (this)     │  reads │  platinum-seo-workspace          │
 │  ─────────────────────────────   │ ─────► │  ─────────────────────────────   │
 │  • skills/        (45 SKILL.md)  │        │  • projects/{slug}/              │
-│  • commands/      (18 slash cmds)│        │     ├ project.config.json        │
+│  • commands/      (25 slash cmds)│        │     ├ project.config.json        │
 │  • hooks/         (6 hooks)      │ writes │     ├ master.xlsx                │
-│  • schemas/       (21 JSON       │ ─────► │     ├ events.jsonl  (append-only)│
+│  • schemas/       (27 JSON       │ ─────► │     ├ events.jsonl  (append-only)│
 │  • scripts/        Schemas)      │        │     └ workflows/{run_id}.json    │
 │  • rules/         (10 disciplines│        │  • shared/                       │
 │  • templates/     enforced by CI)│        │  • _archive/                     │
@@ -240,15 +240,15 @@ Browse the full catalog: [`skills/`](skills/). Slash commands map 1:1 to commonl
   - `dataforseo-mcp-server` (DataForSEO, stdio)
   - `Scrapling` (stealthy site fetching, antibot fallback, stdio)
   - `sf` (Screaming Frog 24 native MCP, **HTTP** `http://127.0.0.1:11435/mcp` — v1.8 ADR-039; `type:http` ADR-040)
-- **JSON Schema** (Draft 7) — 21 schemas in `schemas/` (20 `*.schema.json` + `cross-sheet-invariants.json`).
+- **JSON Schema** (Draft 7) — 27 schemas in `schemas/` (26 `*.schema.json` + `cross-sheet-invariants.json`).
 - **Excel** as the operational data plane (`master.xlsx`), **JSONL** for the append-only event log.
-- **GitHub Actions** — CI runs schema validation, drift-check, lint, and 1,100+ pytest tests on every push.
+- **GitHub Actions** — CI runs schema validation, drift-check, lint, and the full pytest suite on every push.
 
 ---
 
 ## Status & roadmap
 
-**Current:** v1.9.5 — Codex audit remediation: 30 of 31 findings fixed + 1 refuted across governance, workspace contract, commands/hooks, schema validation, state/write paths, and docs. Every fix is locked by a regression test that reads ground truth (filesystem counts, live argparse, schemas, command bodies) so the same drift cannot silently return. Quality/correctness patch — no new features, no breaking changes (full pytest suite green, no regressions).
+**Current:** v2.0.0 — the **AMO milestone (Autonomy & Multi-project Orchestration)**: an autonomous orchestration layer on top of the v1.x schema-locked toolchain. Per-session project binding (N windows = N projects), an orchestrator that runs an intent as an ordered pipeline and **verifies each step's output**, a Stop-hook denetçi that forces skipped steps, per-session consent gates (push / delete / POST / sitemap / Indexing), an AI-disclosure quarantine, an independent correctness oracle (the real ≤5% structured-error number), a portfolio cost/quota ledger with kill-switch, and a fail-closed scheduler. Path A (hard-coded ordered sequences), hardened by a 9-agent adversarial review; live-acceptance (D11) passed end-to-end on a real GSC project. Full pytest suite green, zero regression.
 
 The plugin is delivered in **15 phases**. Foundation phases (0–4) are complete; skill phases (5–13) deliver the ~45 skills in batches; phase 14 covers the workspace + CI + a full pilot run end-to-end. Phase 5 is the **GO/NO-GO gateway** — failing it sends the project back to foundation work rather than papering over gaps.
 
@@ -270,7 +270,7 @@ The plugin is delivered in **15 phases**. Foundation phases (0–4) are complete
 | 13 | Governance Final | done | 4 |
 | 14 | Workspace + CI + Pilot E2E | in progress | — |
 
-Detailed status: **[docs/PHASE_STATUS.md](docs/PHASE_STATUS.md)** · Open questions: **[docs/OPEN_QUESTIONS.md](docs/OPEN_QUESTIONS.md)** · Latest release: **[docs/RELEASE_NOTES_v1.9.5.md](docs/RELEASE_NOTES_v1.9.5.md)**.
+Detailed status: **[docs/PHASE_STATUS.md](docs/PHASE_STATUS.md)** · Open questions: **[docs/OPEN_QUESTIONS.md](docs/OPEN_QUESTIONS.md)** · Latest release: **[docs/RELEASE_NOTES_v2.0.0.md](docs/RELEASE_NOTES_v2.0.0.md)**.
 
 ---
 

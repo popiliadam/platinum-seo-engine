@@ -18,13 +18,13 @@ Bu Claude session'ını (session UUID'sine göre) tek bir SEO projesine bağlar.
 
 `$1` slug ZORUNLU. Eksikse DURDUR ve kullanımı göster:
 
-!`set -- $ARGUMENTS; if [ -z "$1" ]; then echo "MISSING_SLUG: usage /pseo-bind <project-slug> [--workspace <path>]"; echo "ipucu: slug = projects/<slug>/project.config.json olan bir proje"; fi`
+!`eval "set -- $(python3 -c 'import shlex,sys;print(" ".join(shlex.quote(a) for a in shlex.split(sys.argv[1])))' "$ARGUMENTS")"; if [ -z "$1" ]; then echo "MISSING_SLUG: usage /pseo-bind <project-slug> [--workspace <path>]"; echo "ipucu: slug = projects/<slug>/project.config.json olan bir proje"; fi`
 
 ## 2. Bind komutunu çalıştır
 
 `$1` verildiyse primitive CLI'yi çağır. `--workspace` opsiyoneldir: ilk seferinde bir kez geçilirse `~/.config/pseo/config.json`'a kalıcı yazılır (editör-bağımsız), sonraki çağrılarda gerek kalmaz. CLI sırasıyla: workspace root'u çözer (config → `$PSEO_WORKSPACE_ROOT`), session UUID'sini `$CLAUDE_CODE_SESSION_ID`'den alır, `projects/<slug>/project.config.json` var mı doğrular, sonra marker'ı atomik yazar (tempfile + fsync + os.replace).
 
-!`set -- $ARGUMENTS; cd "$CLAUDE_PLUGIN_ROOT" && python3 -m scripts.state.session_binding bind "$1" $2 $3 2>&1`
+!`eval "set -- $(python3 -c 'import shlex,sys;print(" ".join(shlex.quote(a) for a in shlex.split(sys.argv[1])))' "$ARGUMENTS")"; cd "$CLAUDE_PLUGIN_ROOT" && python3 -m scripts.state.session_binding bind "$1" "${2:-}" "${3:-}" 2>&1`
 
 Başarılı çıktı tek satırlık banner'dır, örn:
 
