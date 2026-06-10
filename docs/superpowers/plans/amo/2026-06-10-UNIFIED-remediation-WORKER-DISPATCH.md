@@ -54,14 +54,16 @@ Workers on gap batches: apply the REMAPPED ids everywhere (rule headings, SKILL.
 
 | Wave | Parallel workers | Batches | Key sequencing reason |
 |---|---|---|---|
-| **W1** | ×5 | CODEX-A · CODEX-D · CODEX-E · FIX-I · FIX-L | A=keystone validator; D=gate only; E=commands+README; I=discovery transforms; L=locale skills. All disjoint. |
-| **W2** | ×4 | CODEX-B · CODEX-C · FIX-H · GAP-M-1a | B needs A's strict validator; C touches events_writer patterns + ci.yml (A done); H=rules/content-* + GLOSSARY; M-1a=anomaly/calendar core (new files + gsc-pull + monitoring-weekly). |
-| **W3** | ×4 | CODEX-F · CODEX-G · FIX-K · GAP-M-1b | F after C (pre-tool-use.json); G after B (transaction/workflow_runner); K=production+monthly framing (after H sets canonical numbers); M-1b=quick-wins/AIO/ctr-curve. |
+| **W1** | ×2 | FIX-I · FIX-L | (CODEX-A/D/E cancelled — already shipped, see §CODEX.) I=discovery transforms; L=locale skills. Disjoint. |
+| **W2** | ×3 | FIX-H · GAP-M-1a · FIX-S | H=rules/content-* + GLOSSARY + pseo-quickwin.md; M-1a=anomaly/calendar core; S=approve/bind arg-parsing residual + secret leftovers (commands/pseo-approve.md, pseo-bind.md, scan_pending_secret.py, check_secrets.sh, rules/secrets-management.md — disjoint from H's command file). |
+| **W3** | ×2 | FIX-K · GAP-M-1b | K=production+monthly framing (after H sets canonical numbers); M-1b=quick-wins/AIO/ctr-curve. |
 | **W4** | ×3 | GAP-T1 · GAP-A-B1 · GAP-A-B2 | T1 is the ONLY count-lock toucher this wave (45→47 skills, 25→27 commands) + adds the R-58 cross-link line (after H's edits to the same file in W2). Merchant/local add no skills. |
 | **W5** | ×2 | GAP-T2 · GAP-M-W2 | T2 bumps counts 47→49/27→29 (alone on count-locks); M-W2 = monthly measurement_context + cohorts (after K and M-1b on the same files). |
 | **W6** | ×4 | FIX-MFIN · FIX-R · FIX-N · FIX-J | MFIN=test infra + count-pin consolidation (counts now stable at 49/29); R=.github only; N=misc hygiene; J=schema tightening over the FINAL schema set. |
-| **W7** | ×2 (conditional) | GAP-A-B3 (if Süleyman approves $100/mo) · CODEX-B2 (#7+#20 per D-A/D-D) | B3 bumps 49→50/29→30 + last monthly_report toucher. |
-| **W8** | manager only | Closeout: version bump → v2.1.0 (5-file Y-05 sync), RELEASE_NOTES_v2.1.0.md, annotated tag, final full suite, push. | |
+| **W7** | ×1 (conditional) | GAP-A-B3 (if Süleyman approves $100/mo) | B3 bumps 49→50/29→30 + last monthly_report toucher. (CODEX-B2 cancelled — shipped in `bdf064f`.) |
+| **W8** | manager only | Closeout: version bump → v2.1.0 (5-file Y-05 sync), RELEASE_NOTES_v2.1.0.md, annotated tag, final full suite, push. Plus the F2 decision with the operator: README "production-ready" wording vs 9 wip skills (demote-to-honest precedent from audit#2). | |
+
+> Worker hygiene addenda (all waves): (1) `export PSEO_WORKSPACE_ROOT=/Users/apple/Documents/platinum-seo-workspace` BEFORE running pytest — without it the collected-test count drops (~2703 vs ~2723) and live-fixture tests skip, making baselines incomparable. (2) If your baseline shows exactly one failure in `tests/hooks/test_hook_scripts_runtime_vs_ci.py::test_every_hook_script_is_classified` caused by an UNTRACKED `scripts/hooks/env_probe.py`, delete that stub file (it is a dead recovery artifact from a pre-2026-06-10-restart session) and note it in your report.
 
 Dispatch prompt to paste into each worker session (fill the batch id):
 
@@ -72,17 +74,27 @@ Read docs/superpowers/plans/amo/2026-06-10-UNIFIED-remediation-WORKER-DISPATCH.m
 
 ---
 
-## §CODEX — Batches A–G + B2 (execute from the codex doc, with these OVERRIDES)
+## §CODEX — ⛔ CANCELLED 2026-06-10: ALL codex batches were ALREADY SHIPPED on 2026-06-09 (manager-verified at W1)
 
-Workers read `docs/superpowers/plans/amo/2026-06-09-codex-hostile-audit-remediation-WORKER-PROMPT.md` for their batch section, PLUS:
+**Do NOT dispatch or execute any CODEX-* batch.** Verified at Wave-1 integration (the CODEX-A worker discovered it; manager re-derived the full set):
 
-- **Baseline override:** codex §0 says 2458/10 — stale. Use your session-start full-suite N.
-- **CODEX-A extension:** while in `events_writer.py`, add `normalize_audit_action` to `__all__` (currently exported API uses it but omits it).
-- **CODEX-C extension:** (1) the pending-byte `--scan-stdin` PreToolUse step (codex #1) also closes the untracked-file gap — assert that with a test (secret in a NEVER-tracked new file is caught pre-write). (2) Add a high-entropy base64 heuristic to the canonical inventory ONLY if cheap and low-false-positive (≥24-char base64 value assigned to a secret-ish key name); otherwise document the limitation in `rules/secrets-management.md`. Report which path you took.
-- **CODEX-D:** D-C is RULED (§D) — implement #11 (interpreter net-writes) in the SAME batch as #10/#12, per the ruling's conservative signature list. Tests: python/node/ruby/perl POST one-liners gated; read-only one-liners NOT gated; loopback POST allowed.
-- **CODEX-F extension:** also fix `scripts/hooks/scan_pending_secret.py` to emit the standard `{"decision":"block","reason":...}` JSON to stdout on a hit (consistency with `ai_disclosure_rescan.py`/`denetci.py`); keep stderr + exit-code behavior. **Deliberately NOT adding `NotebookEdit` to the PostToolUse matcher:** the rescan quarantines `.html` surfaces only and NotebookEdit cannot produce `.html` — add one README sentence documenting that reasoning instead.
-- **CODEX-G:** D-B is RULED (§D, option b) — implement the durable-anomaly path using the existing `scripts/state/anomaly_recorder.py` ledger; add a reconciliation surface (drift-check invariant or report line listing unreconciled emit-failure anomalies). Tests per the chosen contract.
-- **CODEX-B2 (W7):** #7 with D-A=(c): conflict between env and config → loud abort + `--workspace-override` escape hatch; align ADR-035 text. #20 with D-D=(b): `sf_mcp_client` follows redirects only to loopback+same-port, else raises with the redirect target in the message. Tests for both.
+| Batch | Shipped commit | Findings |
+|---|---|---|
+| A | `7d33400` | #4,#5,#18 (+`__all__` ext already in `ae5f6ad`) |
+| D | `cf06e10` | #10,#12 |
+| E | `55c180d` | #13,#14,#15 |
+| C | `9893e2a` | #1,#2,#3 |
+| B | `8f1b713` + tail `1d01c03` | #6,#19 |
+| F | `7b5712f` | #16,#17 |
+| G | `c6d0dd5` | #8,#9 (durable anomaly record — matches ruling D-B(b)) |
+| B2 (#7,#11,#20) | `bdf064f` (audit#2 SKILLS batch) | ws-conflict fail-loud + interpreter-net gate + SF redirect-off |
+
+The 12-finding audit#2 (F1–F12) also shipped: `b7fe35c` (DOCS) + `648ed73` (COMMANDS) + `bdf064f` (SKILLS). The manager's 2026-06-10 full-repo audit ran on the POST-fix tree, so every FIX-*/GAP-* batch in this plan remains valid and non-duplicative.
+
+**Residual items extracted from the codex extensions → re-homed into §FIX-S (Wave 2):**
+1. `/pseo-approve` quoted-arg parsing is **STILL broken with the batch-E fix in place** — live repro 2026-06-10: `/pseo-approve sess-df6de1a6 git_push "origin main"` → `error: unknown action 'origin main'` (cache==repo verified byte-identical; the `$ARGUMENTS` textual substitution inside a double-quoted shell context breaks when the argument itself contains quotes).
+2. base64 secret-pattern heuristic (ex CODEX-C ext).
+3. `scan_pending_secret.py` JSON `{"decision":"block"}` stdout output (ex CODEX-F ext).
 
 ---
 
@@ -153,6 +165,18 @@ Workers read `docs/superpowers/plans/amo/2026-06-09-codex-hostile-audit-remediat
 7. **Tests:** TDD all; the framing-invariance test is the keystone (GAP-M-W2 will extend it).
 
 **DONE-when:** suite ≥ start-N/0; both framings produce identical decliners data. **DURUR-if:** monthly-report schema's `required` would need editing (it must not — additive only).
+
+---
+
+## §FIX-S — Command arg-parsing residual + secret leftovers — Wave 2
+
+**Scope (ONLY):** `commands/pseo-approve.md`, `commands/pseo-bind.md` (+ any other command file using the `eval "set -- $(python3 -c 'import shlex...' "$ARGUMENTS")"` idiom — grep for it), optionally a NEW tiny helper `scripts/state/parse_command_args.py`, `scripts/hooks/scan_pending_secret.py`, `scripts/security/check_secrets.sh`, `rules/secrets-management.md`, their tests.
+
+1. **S1 — quoted-arg parsing is still broken (batch-E residual; LIVE repro 2026-06-10).** `/pseo-approve sess-df6de1a6 git_push "origin main"` failed with `error: unknown action 'origin main'` — on the FIXED code (`commands/pseo-approve.md:32,38`, cache verified byte-identical to repo). Root cause: Claude Code substitutes `$ARGUMENTS` TEXTUALLY into the command line; the current idiom embeds it inside a double-quoted shell word (`'...' "$ARGUMENTS"`), so an argument value that itself contains double quotes splits the shell word and corrupts positional mapping. shlex downstream cannot repair what the shell already mis-tokenized. Fix approach (worker chooses, must prove with the live repro as a test case): avoid embedding `$ARGUMENTS` inside quotes — e.g. write it to a temp file / heredoc with a quoted delimiter, or use a single-quoted wrapper with safe escaping, or parse `$1..$N` positionals directly where Claude Code provides them. The fix must survive: plain args, args with double quotes, args with single quotes, args with spaces, empty target. Apply the same idiom to EVERY command file using the pattern.
+2. **S2 — base64 secret heuristic (ex CODEX-C extension).** Add a high-entropy base64 pattern to the canonical inventory in `scripts/security/check_secrets.sh` ONLY if implementable with low false positives (≥24-char base64 value assigned to a secret-ish key name: `key|token|secret|password|credential`); otherwise document the limitation explicitly in `rules/secrets-management.md`. Report which path you took and why.
+3. **S3 — `scan_pending_secret.py` block-decision JSON (ex CODEX-F extension).** On a hit, additionally emit `{"decision":"block","reason":"<label>"}` to stdout (consistency with `ai_disclosure_rescan.py`/`denetci.py`); keep current stderr text + exit-code contract (tests assert both).
+
+**DONE-when:** suite ≥ start-N/0; the exact live-repro invocation round-trips correctly (test simulates the textual `$ARGUMENTS` substitution, not just shlex in isolation). **DURUR-if:** Claude Code's substitution semantics make in-command parsing provably unfixable for embedded quotes — then document the constraint in both command files' argument-hint ("do not quote; use %20 or pass via file") + add defensive MISSING_ARGS errors, and report.
 
 ---
 
