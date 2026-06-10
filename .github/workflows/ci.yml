@@ -31,7 +31,7 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements-lock.txt
 
-      # Step 1 — governance skill drift-check (master.xlsx invariant 20 cross-sheet rules)
+      # Step 1 — governance skill drift-check (master.xlsx invariants: 32 declared / 25 implemented cross-sheet rules)
       # Phase 14 W3-W3-α strict mode (Q-CI-W3-03 RESOLVED runtime kanıt + 4 governance helper exec EXIT=0 4/4 zemin).
       - name: 1. drift-check
         run: python3 scripts/ci/run_skill_python.py skills/governance/drift-check/SKILL.md

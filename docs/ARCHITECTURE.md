@@ -68,7 +68,7 @@ Her biri `rules/*.md`'de tanımlı; drift-check ve CI otomatik denetler.
 | 13 | Governance Final | tamamlandı ✅ | 3 |
 | 14 | Workspace + CI + Pilot End-to-End | devam ediyor 🚧 | — |
 
-**Toplam ~49 skill** (49 SKILL.md filesystem SoT), 9 batch phase'e yayılmış (v1.7'de +1 gbp-audit; v1.8'de +1 sf-crawl-orchestrator). **Güncel durum (engine v2.0.0): foundation (Phase 0–4) + Phase 5–10 + 13 tamamlandı; Phase 11 (production) + Phase 12 (publishing) skill'leri `wip` — SKILL.md + paired test ile kontrat/spec kilitli, runtime ertelendi; Phase 14 (workspace + CI + pilot E2E) devam ediyor.** Foundation (Phase 0–4) skill phase'lerinden önce tamamlandı; Phase 5 **GO/NO-GO gateway** geçildi.
+**Toplam ~49 skill** (49 SKILL.md filesystem SoT), 9 batch phase'e yayılmış (v1.7'de +1 gbp-audit; v1.8'de +1 sf-crawl-orchestrator). **Güncel durum (engine v2.1.0): foundation (Phase 0–4) + Phase 5–10 + 13 tamamlandı; Phase 11 (production) + Phase 12 (publishing) skill'leri `wip` — SKILL.md + paired test ile kontrat/spec kilitli, runtime ertelendi; Phase 14 (workspace + CI + pilot E2E) devam ediyor.** Foundation (Phase 0–4) skill phase'lerinden önce tamamlandı; Phase 5 **GO/NO-GO gateway** geçildi.
 
 ---
 
