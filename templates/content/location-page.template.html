@@ -1,0 +1,89 @@
+<!--
+  location-page.template.html — per-location page skeleton (GAP-A2).
+
+  Dialect: double-brace {{UPPER_SNAKE}} tokens, filled SKILL-side by the
+  content-production skills (templates/manifest.json family "content").
+
+  Anti-doorway discipline — per rules/local-seo-discipline.md
+  (location-page anti-doorway): a location page ships ONLY with at least
+  THREE location-unique elements filled with genuinely local substance
+  (location-specific service detail, local proof, location FAQ, embedded
+  map + per-location NAP). City-swap boilerplate — sibling location pages
+  that differ only in the city name — is the red flag the Screaming Frog
+  near-duplicates export will catch. One page per REAL serviced location
+  only.
+
+  NAP values MUST be rendered from projects/{slug}/local/nap.json
+  (the canonical NAP single source of truth per
+  rules/local-seo-discipline.md) — never hand-typed copy.
+-->
+<article class="location-page">
+
+  <header>
+    <h1>{{LOCATION_NAME}} — {{PRIMARY_SERVICE}}</h1>
+    <!-- Location-unique element 1: intro written for THIS location
+         (service area, neighbourhoods served, what is different here).
+         Not transplantable to a sibling location page. -->
+    <p>{{LOCATION_UNIQUE_INTRO}}</p>
+  </header>
+
+  <section class="location-services">
+    <h2>{{SERVICES_HEADING}}</h2>
+    <!-- Location-unique element 2: the services actually offered AT this
+         location (equipment, brands handled, lead times) — not the
+         site-wide generic service list. -->
+    {{LOCATION_SERVICE_DETAIL}}
+  </section>
+
+  <section class="location-proof">
+    <h2>{{PROOF_HEADING}}</h2>
+    <!-- Location-unique element 3: local proof — completed jobs / case
+         notes / photos taken at this location, named local references
+         where permitted. -->
+    {{LOCAL_PROOF_BLOCK}}
+  </section>
+
+  <section class="location-nap">
+    <h2>{{CONTACT_HEADING}}</h2>
+    <!-- Visible NAP block: render name / address / phone for THIS
+         location from local/nap.json (locations[] entry when
+         multi-location; top-level NAP otherwise). -->
+    {{NAP_BLOCK}}
+    <!-- Embedded map for this location (iframe or static map link). -->
+    {{MAP_EMBED}}
+  </section>
+
+  <section class="location-faq">
+    <h2>{{FAQ_HEADING}}</h2>
+    <!-- Location-unique element 4: questions customers at THIS location
+         actually ask (parking, district coverage, municipal permits).
+         Whether FAQPage JSON-LD accompanies this block is the production
+         skill's call per the content rule pack — this skeleton stays
+         schema-free here. -->
+    {{LOCATION_FAQ}}
+  </section>
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    "name": "{{NAP_BUSINESS_NAME}}",
+    "telephone": "{{NAP_PHONE_E164}}",
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "{{NAP_STREET}}",
+      "addressLocality": "{{NAP_DISTRICT}}",
+      "addressRegion": "{{NAP_CITY}}",
+      "postalCode": "{{NAP_POSTAL_CODE}}",
+      "addressCountry": "{{NAP_COUNTRY}}"
+    },
+    "url": "{{LOCATION_PAGE_URL}}",
+    "hasMap": "{{MAP_SHARE_URL}}"
+  }
+  </script>
+  <!-- JSON-LD fields above map 1:1 to local/nap.json
+       (street / district / city / postal_code / country; phone is the
+       stored E.164 value). Multi-location: use the matching locations[]
+       entry's values; gbp_place_id, when present, backs MAP_SHARE_URL. -->
+
+</article>

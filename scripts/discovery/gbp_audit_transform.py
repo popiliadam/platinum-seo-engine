@@ -18,7 +18,14 @@ Hard-constraint compliance:
 
 Severity matrix (per category, applied in `_analyze_gaps`):
   - nap            HIGH    GBP listing not found (DFS + Scrapling both empty)
-  - nap            HIGH    NAP mismatch with project.config domain (Phase 11)
+  - nap            HIGH    NAP mismatch vs canonical local/nap.json (one row
+                           per mismatched field; GAP-A2 2026-06-10 closed the
+                           declared-but-missing branch via
+                           scripts/discovery/nap_consistency.compare_nap)
+  - nap            MEDIUM  canonical NAP file missing
+                           (projects/{slug}/local/nap.json —
+                           schemas/local-nap.schema.json; single NAP source
+                           of truth per rules/local-seo-discipline.md)
   - categories     HIGH    no primary category
   - categories     MEDIUM  < 2 secondary categories
   - photos         HIGH    < 3 photos
@@ -47,6 +54,7 @@ from typing import Any
 from uuid import uuid4
 
 from scripts.budget import check_budget
+from scripts.discovery import nap_consistency
 
 
 # ---------------------------------------------------------------------------
@@ -147,8 +155,17 @@ def run(
     if not listing:
         listing = _scrapling_fallback(config)
 
+    # Canonical NAP doc (rules/local-seo-discipline.md: single NAP source of
+    # truth at projects/{slug}/local/nap.json). A present-but-corrupt file
+    # fails LOUD (json.JSONDecodeError propagates — SKILL.md DURUR #9):
+    # auditing against half a canonical is worse than stopping.
+    nap_path = project_dir / "local" / "nap.json"
+    canonical_nap: dict | None = None
+    if nap_path.exists():
+        canonical_nap = json.loads(nap_path.read_text("utf-8"))
+
     # Step 6 — pure-compute gap analysis.
-    gap_rows = _analyze_gaps(listing, config)
+    gap_rows = _analyze_gaps(listing, config, canonical_nap=canonical_nap)
 
     return {
         "status": "success",
@@ -187,12 +204,25 @@ def _scrapling_fallback(config: dict) -> dict | None:
 # Gap analysis (pure compute — no I/O)
 # ---------------------------------------------------------------------------
 
-def _analyze_gaps(listing: dict | None, config: dict) -> list[dict]:
+def _analyze_gaps(
+    listing: dict | None,
+    config: dict,
+    canonical_nap: dict | None = None,
+) -> list[dict]:
     """Per-category gap analysis returning master.xlsx[gbp_audit] rows.
 
     Each row is a dict with exactly the 7 columns the schema requires:
     audit_id, audit_date, category, gap_description, severity,
     recommended_action, status.
+
+    ``canonical_nap`` is the parsed ``projects/{slug}/local/nap.json``
+    (schemas/local-nap.schema.json) or None when the file is absent.
+    Absent canonical → one MEDIUM "canonical NAP file missing" row;
+    present → per-field NAP comparison via
+    ``scripts.discovery.nap_consistency.compare_nap`` (each mismatch is a
+    HIGH row). The listing-not-found early return stays nap-comparison-free:
+    without a listing there is nothing to compare, and the not-found row is
+    already the blocking finding.
 
     The matrix is documented in the module docstring above. Severity
     values are codebase severityEnum strict ({CRITICAL, HIGH, MEDIUM,
@@ -208,6 +238,40 @@ def _analyze_gaps(listing: dict | None, config: dict) -> list[dict]:
             "Create or claim a Google Business Profile listing for the business",
         ))
         return rows
+
+    # nap — canonical source of truth comparison (GAP-A2; the matrix
+    # declared this branch since v1.7 Phase 5 without implementing it).
+    if canonical_nap is None:
+        rows.append(_row(
+            "nap", "MEDIUM",
+            "Canonical NAP file missing (projects/{slug}/local/nap.json)",
+            "Create local/nap.json per schemas/local-nap.schema.json — the "
+            "single NAP source of truth (rules/local-seo-discipline.md); "
+            "then re-run gbp-audit for the field-level comparison",
+        ))
+    else:
+        observed = {
+            "business_name": listing.get("business_name") or listing.get("title"),
+            "phone": listing.get("phone"),
+            "address": listing.get("address"),
+            "source": "gbp_listing",
+        }
+        if listing.get("location_id") is not None:
+            observed["location_id"] = listing["location_id"]
+        for finding in nap_consistency.compare_nap(canonical_nap, observed):
+            rows.append(_row(
+                "nap", "HIGH",
+                (
+                    f"NAP mismatch ({finding['field']}): canonical "
+                    f"'{finding['canonical_value']}' vs "
+                    f"{finding['observed_source']} '{finding['observed_value']}'"
+                ),
+                (
+                    f"Sync {finding['field']} across GBP listing + site footer "
+                    "+ LocalBusiness JSON-LD to match local/nap.json — never "
+                    "'fix' the canonical to match a drifted surface"
+                ),
+            ))
 
     # categories
     if not listing.get("primary_category"):

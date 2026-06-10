@@ -1,0 +1,101 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "http://platinum-seo-engine/schemas/local-nap",
+  "title": "Canonical Local NAP v1.0",
+  "description": "Canonical NAP (Name / Address / Phone) document for local-SEO projects — the SINGLE source of truth at projects/{slug}/local/nap.json (rules/local-seo-discipline.md R-144). Every skill/report that prints or compares NAP reads this doc; mismatches observed anywhere (GBP listing, site footer, LocalBusiness JSON-LD) are HIGH findings against it (consumed by scripts/discovery/gbp_audit_transform via scripts/discovery/nap_consistency). GAP-A2 (2026-06-10 acquisition spec, unified dispatch batch GAP-A-B2). STANDALONE by design: folding NAP into project.config.json would force the v1.5->v1.6 const bump + migration_0006 + migration of every live workspace config — this schema is the explicit fold-in candidate at the next scheduled project-config const bump. Multi-location businesses (multi-branch local-service portfolios) are first-class via locations[].",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "business_name", "phone", "address"],
+  "definitions": {
+    "e164Phone": {
+      "type": "string",
+      "pattern": "^\\+[1-9][0-9]{6,14}$",
+      "description": "Strict E.164 (e.g. +902121234567). Looser observed surface forms ('0 (212) 123 45 67') are normalized at COMPARE time by scripts/discovery/nap_consistency.normalize_phone — never stored here."
+    },
+    "address": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["street", "city"],
+      "properties": {
+        "street": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Street line incl. building number (e.g. 'Atatürk Caddesi Numara 5'). Abbreviated surface forms (Cad./No:) are equated at compare time by nap_consistency.normalize_address_tokens."
+        },
+        "district": {
+          "type": "string",
+          "description": "District / neighbourhood (mahalle/ilçe) when applicable."
+        },
+        "city": {
+          "type": "string",
+          "minLength": 1
+        },
+        "postal_code": {
+          "type": "string"
+        },
+        "country": {
+          "type": "string",
+          "pattern": "^[A-Z]{2}$",
+          "description": "ISO 3166-1 alpha-2 (TR, CA, NG, ...). Aligns with project.config market; also drives the phone-normalization country default at compare time."
+        }
+      }
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "description": "Contract version of THIS document (rules/schema-versioning-discipline.md strict const)."
+    },
+    "business_name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Exact public business name as it must appear on GBP, site footer and LocalBusiness JSON-LD. Also the gbp-audit Step 4 query seed (replaces the phantom project.config brand_identity.business_name contract removed in gbp-audit v1.1)."
+    },
+    "phone": {
+      "$ref": "#/definitions/e164Phone"
+    },
+    "address": {
+      "$ref": "#/definitions/address"
+    },
+    "locations": {
+      "type": "array",
+      "description": "Branches/units for multi-location businesses. A location entry may override phone/address; omitted fields fall back to the top-level NAP at compare time (nap_consistency.compare_nap resolves by location_id).",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["location_id", "name"],
+        "properties": {
+          "location_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "description": "Stable kebab-case slug for the branch (used as the compare_nap join key)."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Public branch name (e.g. '<Business> Kadıköy')."
+          },
+          "phone": {
+            "$ref": "#/definitions/e164Phone"
+          },
+          "address": {
+            "$ref": "#/definitions/address"
+          },
+          "gbp_place_id": {
+            "type": "string",
+            "description": "Google Business Profile place id for the branch, when known."
+          }
+        }
+      }
+    },
+    "source_pages": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "format": "uri"
+      },
+      "description": "URIs that PRINT the NAP (contact page, footer template page) — the audit surfaces a future site-side NAP check would crawl."
+    }
+  }
+}
