@@ -51,7 +51,8 @@
             "headline_clicks":   { "type": "integer" },
             "headline_pages_up": { "type": "integer" },
             "headline_wins":     { "type": "array", "items": { "type": "string" }, "maxItems": 5 }
-          }
+          },
+          "additionalProperties": false
         },
         "gsc_positive_trends": {
           "type": "object",
@@ -67,9 +68,11 @@
                 "impressions_delta_pct": { "type": "number" },
                 "ctr_delta_pp":          { "type": "number", "description": "Percentage points (not pct)." },
                 "position_delta":        { "type": "number", "description": "Negative = improved." }
-              }
+              },
+              "additionalProperties": false
             }
-          }
+          },
+          "additionalProperties": false
         },
         "keywords_up": {
           "type": "array",
@@ -84,7 +87,8 @@
               "position_after":   { "type": "number" },
               "impressions_28d":  { "type": "integer", "minimum": 0 },
               "clicks_28d":       { "type": "integer", "minimum": 0 }
-            }
+            },
+            "additionalProperties": false
           }
         },
         "pages_up": {
@@ -99,7 +103,8 @@
               "clicks_after":      { "type": "integer", "minimum": 0 },
               "clicks_delta":      { "type": "integer" },
               "impressions_delta": { "type": "integer" }
-            }
+            },
+            "additionalProperties": false
           }
         },
         "tech_seo_done":   { "$ref": "#/definitions/completedArray" },
@@ -122,7 +127,8 @@
                   "price_after":       { "type": "number" },
                   "currency":          { "type": "string", "description": "ISO 4217" },
                   "delta_pct":         { "type": "number" }
-                }
+                },
+                "additionalProperties": false
               }
             },
             "new_pages_detected": {
@@ -135,10 +141,12 @@
                   "page_url":          { "type": "string", "format": "uri" },
                   "page_type":         { "type": "string" },
                   "detected_at":       { "type": "string", "format": "date-time" }
-                }
+                },
+                "additionalProperties": false
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         "backlink_delta": {
           "type": "object",
@@ -149,7 +157,8 @@
             "toxic_count": { "type": "integer", "minimum": 0 },
             "top_new":  { "type": "array", "items": { "type": "object" }, "maxItems": 10 },
             "top_lost": { "type": "array", "items": { "type": "object" }, "maxItems": 10 }
-          }
+          },
+          "additionalProperties": false
         },
         "next_month_plan": {
           "type": "array",
@@ -164,7 +173,8 @@
               "url":              { "type": "string", "format": "uri" },
               "duration_est_min": { "type": "integer", "minimum": 1 },
               "impact":           { "type": "string" }
-            }
+            },
+            "additionalProperties": false
           },
           "maxItems": 10
         },
@@ -185,7 +195,8 @@
                   "clicks_after":      { "type": "integer", "minimum": 0 },
                   "clicks_delta":      { "type": "integer" },
                   "impressions_delta": { "type": "integer" }
-                }
+                },
+                "additionalProperties": false
               }
             },
             "decaying_content": {
@@ -201,10 +212,12 @@
                   "clicks_delta":  { "type": "integer" },
                   "pillar":        { "type": "string" },
                   "trend":         { "type": "string" }
-                }
+                },
+                "additionalProperties": false
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         "measurement_context": {
           "type": "object",
@@ -227,7 +240,8 @@
                   "end":          { "type": ["string", "null"] },
                   "overlap_days": { "type": "integer", "minimum": 0 },
                   "phase":        { "enum": ["rolling", "rollout_in_period", "settling"] }
-                }
+                },
+                "additionalProperties": false
               }
             },
             "intervention_outcomes": {
@@ -245,11 +259,13 @@
                   "treated":       { "type": "object" },
                   "control":       { "type": "object" },
                   "attrition":     { "type": "object" }
-                }
+                },
+                "additionalProperties": false
               }
             },
             "notes": { "type": "string", "description": "One-line framing-invariant attribution verdict." }
-          }
+          },
+          "additionalProperties": false
         }
       }
     },
@@ -267,7 +283,8 @@
         "html":   { "type": "string" },
         "pdf":    { "type": "string" },
         "notion": { "type": "string", "description": "Notion page URL or page_id." }
-      }
+      },
+      "additionalProperties": false
     },
     "data_sources": {
       "type": "array",
@@ -278,7 +295,8 @@
         "properties": {
           "source":  { "enum": ["gsc_mcp", "dataforseo_mcp", "scrapling_local", "scrapling_mcp", "work_log", "master_task", "completed_work"] },
           "run_ids": { "type": "array", "items": { "type": "integer", "minimum": 1 } }
-        }
+        },
+        "additionalProperties": false
       }
     },
     "framing_policy": {
@@ -296,7 +314,8 @@
         "impressions": { "type": "integer", "minimum": 0 },
         "ctr":         { "type": "number", "minimum": 0, "maximum": 1 },
         "avg_position":{ "type": "number", "minimum": 0 }
-      }
+      },
+      "additionalProperties": false
     },
     "completedArray": {
       "type": "array",
@@ -312,7 +331,8 @@
           "work_log_ref":     { "type": "string" },
           "metric_impact":    { "type": "object" },
           "pillar":           { "type": "string" }
-        }
+        },
+        "additionalProperties": false
       }
     }
   }

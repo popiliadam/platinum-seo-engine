@@ -135,7 +135,8 @@
               "pass": { "type": "integer", "minimum": 0 },
               "warn": { "type": "integer", "minimum": 0 },
               "fail": { "type": "integer", "minimum": 0 }
-            }
+            },
+            "additionalProperties": false
           }
         }
       }

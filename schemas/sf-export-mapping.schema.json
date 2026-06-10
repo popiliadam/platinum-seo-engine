@@ -33,7 +33,8 @@
           "default": true,
           "description": "raw_reports.file_hash must be computed for every required-tier file"
         }
-      }
+      },
+      "additionalProperties": false
     }
   },
   "definitions": {
@@ -87,7 +88,8 @@
           "uniqueItems": true,
           "default": ["IGNORECASE", "UNICODE"]
         }
-      }
+      },
+      "additionalProperties": false
     },
     "alias": {
       "type": "object",
@@ -125,7 +127,8 @@
           "enum": ["v_", "p_", "none"],
           "description": "Diagnostic hint about which SF export mode typically produces this file"
         }
-      }
+      },
+      "additionalProperties": false
     }
   }
 }

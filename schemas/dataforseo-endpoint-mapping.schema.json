@@ -26,7 +26,8 @@
           "minItems": 2,
           "uniqueItems": true
         }
-      }
+      },
+      "additionalProperties": false
     },
     "budget_policy": {
       "type": "object",
@@ -35,7 +36,8 @@
         "source_field":      { "const": "project.config.dataforseo.budget_credits_per_day" },
         "override_flag":     { "const": "--override-budget" },
         "estimator_hook":    { "const": "provenance_logger.estimate_cost" }
-      }
+      },
+      "additionalProperties": false
     },
     "endpoint_groups": {
       "type": "object",
@@ -95,7 +97,8 @@
       "properties": {
         "ttl_hours": { "type": "integer", "minimum": 0, "maximum": 8760 },
         "key":       { "type": "string" }
-      }
+      },
+      "additionalProperties": false
     },
     "cost": {
       "type": "object",
@@ -104,7 +107,8 @@
       "properties": {
         "credits_per_call": { "type": "number", "minimum": 0 },
         "typical_rows":     { "type": "integer", "minimum": 0 }
-      }
+      },
+      "additionalProperties": false
     },
     "inputField": {
       "type": "object",
@@ -121,7 +125,8 @@
           "type": "string",
           "pattern": "^project\\.config(\\.[a-z][a-z0-9_]*)+$"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "fieldPath": {
       "type": "string",
@@ -172,7 +177,8 @@
           "description": "Free-text fallback recipe when the DFS tool errors (e.g. 'scrapling.bulk_get with google.com search URL')."
         },
         "notes": { "type": "string" }
-      }
+      },
+      "additionalProperties": false
     },
     "endpointGroup": {
       "type": "object",
@@ -185,7 +191,8 @@
           "minProperties": 1
         },
         "group_notes": { "type": "string" }
-      }
+      },
+      "additionalProperties": false
     }
   }
 }

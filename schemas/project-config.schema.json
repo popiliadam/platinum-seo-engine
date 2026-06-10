@@ -152,7 +152,8 @@
           "properties": {
             "min": { "type": "integer", "minimum": 0 },
             "max": { "type": "integer", "minimum": 0 }
-          }
+          },
+          "additionalProperties": false
         }
       }
     },
@@ -215,7 +216,8 @@
           "name":    { "type": "string" },
           "hub_url": { "type": "string", "format": "uri" },
           "slug":    { "type": "string" }
-        }
+        },
+        "additionalProperties": false
       }
     },
     "url_patterns": {
@@ -226,7 +228,8 @@
         "properties": {
           "kind":    { "enum": ["product", "category", "blog", "showroom", "hub", "tool", "about", "contact"] },
           "pattern": { "type": "string", "description": "Regex matched against url_normalized" }
-        }
+        },
+        "additionalProperties": false
       }
     },
     "competitors": {
@@ -238,7 +241,8 @@
           "domain": { "type": "string" },
           "tier":   { "enum": ["tier_1_protected", "tier_2_js", "tier_3_static"] },
           "notes":  { "type": "string" }
-        }
+        },
+        "additionalProperties": false
       }
     },
     "ymyl_level": { "enum": ["none", "low", "medium", "high"] },
@@ -267,7 +271,8 @@
               "default": false,
               "description": "Enables the new-blog 5-pass threshold iteration loop. When false, new-blog writes the baseline draft after L1 profile-threshold validation and skips iteration. When true AND the quality_gate/citability_scorer MCP tools are no longer STUBs, the full loop runs."
             }
-          }
+          },
+          "additionalProperties": false
         }
       }
     },

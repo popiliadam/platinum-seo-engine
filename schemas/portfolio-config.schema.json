@@ -56,7 +56,8 @@
           "maximum": 31,
           "description": "Target day-of-month to publish portfolio monthly roundup."
         }
-      }
+      },
+      "additionalProperties": false
     },
     "cadence": {
       "type": "object",
@@ -69,7 +70,8 @@
           "properties": {
             "day": { "enum": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] },
             "hour": { "type": "integer", "minimum": 0, "maximum": 23 }
-          }
+          },
+          "additionalProperties": false
         },
         "monthly_roundup": {
           "type": "object",
@@ -77,9 +79,11 @@
           "properties": {
             "day_of_month": { "type": "integer", "minimum": 1, "maximum": 31 },
             "hour": { "type": "integer", "minimum": 0, "maximum": 23 }
-          }
+          },
+          "additionalProperties": false
         }
-      }
+      },
+      "additionalProperties": false
     },
     "cross_query": {
       "type": "object",
@@ -88,7 +92,8 @@
         "default_timeout_sec": { "type": "integer", "minimum": 1, "maximum": 600, "default": 60 },
         "default_row_limit": { "type": "integer", "minimum": 1, "maximum": 100000, "default": 1000 },
         "read_only": { "const": true, "description": "Portfolio is a read-only aggregator. Cannot be disabled." }
-      }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false,
