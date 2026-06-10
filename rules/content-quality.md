@@ -74,7 +74,7 @@ Bu 3 prensip Phase 10 content rules setinin **üst-prensibidir**. Hiçbir alt-ru
 - **H3 zorunluluk gate** — H2 word count > 200 → min 2 H3 (R-30; AI H2 basıp geçmesin).
 - **Heading keyword density** — H2'lerin %40-60'ında primary/secondary keyword (R-30; stuffing önleme).
 - **Citation density** — per 500 word min 1 max 2 citation (R-106; UX overload önleme).
-- **FAQ count** — 10 sabit, 3000+ word blog 15 hard cap (R-09; AI çok FAQ yazmasın).
+- **FAQ count** — talep-güdümlü: kanıt varsa (PAA / gerçek kullanıcı soruları) 3-6, hard cap 10 (R-09; AI çok FAQ yazmasın).
 - **Stats density** — profile-aware min + max cap (R-104; quality > quantity).
 - **Per-H2 list cap** — max 1 liste per H2 (R-07; multi-list AI padding).
 - **AI signature humanize pass** — post-generate signature words avoid (R-118; "Aslında / Sonuç olarak / Özetle" tekrar düşürme).

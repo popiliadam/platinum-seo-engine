@@ -9,7 +9,7 @@
   - R-39 WCAG 2.1 AA (contrast, alt, heading linear)
   - R-78..R-84 schema markup JSON-LD @graph ONLY (R-83 — microdata/RDFa YASAK)
   - R-29 H2 cevap-önce, R-101 self-contained intro, R-102 AI summary footer
-  - R-09 FAQ 10 statik visible (R-43 accordion yasak), R-79 FAQPage @graph
+  - R-09 FAQ talep-güdümlü 3-6, hard cap 10, statik visible (R-43 accordion yasak), R-79 FAQPage @graph
   - R-26 CTA doğal akış, R-05 "Sonuç" başlığı yasak
   - Principle 1 truth-verifiable + Principle 2 profile-aware + Principle 3 anti-cheap-content
 -->
@@ -81,11 +81,11 @@
   {{/IF_DISCLAIMER_REQUIRED}}
 
   <!-- ========================================================================
-       FAQ (R-09 10 sabit / 3000+ word 15 cap, R-43 accordion YASAK statik visible)
+       FAQ (R-09 talep-güdümlü 3-6, hard cap 10; R-43 accordion YASAK statik visible)
        ======================================================================== -->
   <section class="pse-faq" aria-label="Sıkça Sorulan Sorular">
     <h2>Sıkça Sorulan Sorular</h2>
-    {{!-- 10 (or 15 for 3000+ word) FAQ items, statik visible. Schema → JSON-LD @graph below.
+    {{!-- 3-6 demand-driven FAQ items (hard cap 10), statik visible. Schema → JSON-LD @graph below.
           Her FAQ template → templates/content/faq-block.template.html --}}
     {{FAQ_BLOCK}}
   </section>
