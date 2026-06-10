@@ -80,11 +80,11 @@ Bu doc Phase 10 HTML/CSS/image disiplinini tanımlar. **Foundational Principles*
 
 **Failure mode.** Silent (default `none`).
 
-### R-35: Meta Pixel Cap
+### R-35: Meta Pixel Cap (Title/Description Tek Otorite)
 
-**Statement.** Meta title pixel ≤ 580px (Türkçe ortalama ~60 char) + meta description pixel ≤ 990px (~155 char). Pixel cap char cap'ten otoriter (Türkçe `ş`, `ğ`, `ı` farklı pixel).
+**Statement.** Meta title pixel ≤ 580px (desktop) + meta description pixel ≤ 990px (desktop). **Bu kural başlık/açıklama uzunluğunun TEK otoritesidir (single authority).** Pixel cap karakter cap'inden otoriterdir (Türkçe `ş`, `ğ`, `ı` farklı pixel genişliği). Karakter sayıları (≈60/160 karakter) yalnızca **tech-audit yaklaşık sezgisel ölçüsüdür (approximation heuristic)** — production skill'ler (new-blog vb.) uzunluk için R-35 pixel cap'ini cite eder, sabit karakter sayısını değil.
 
-**Rationale.** Google SERP truncate threshold pixel-based değil character-based değil; tasarım drift önleme.
+**Rationale.** Google SERP truncate eşiği pixel-tabanlıdır; 60/160 karakter yalnızca kaba bir tech-audit tahminidir (Türkçe glif genişlikleri sabit değil). Tek otorite uzunluk/tasarım drift'ini önler: new-blog'un 540px/680px ve tech-audit'in 60/160-char varyantları R-35'e hizalanır.
 
 **Enforcement.** Skill output meta title/description için pixel ölçer (PIL render veya font metric); over-budget → revize.
 
@@ -266,7 +266,9 @@ Bu doc Phase 10 HTML/CSS/image disiplinini tanımlar. **Foundational Principles*
 
 **Failure mode.** RED.
 
-### R-78: AI-Image IPTC Disclosure (Merchant Center Compliance)
+### R-123: AI-Image IPTC Disclosure (Merchant Center Compliance)
+
+> **supersedes:** R-78 (duplicate id). Bu IPTC kuralı başlangıçta R-78 olarak numaralandırılmıştı; oysa R-78 zaten Article Schema (content-seo-discipline.md) için kullanılıyordu. Çakışma 2026-06-10'da giderildi: IPTC kuralı R-78→R-123'e taşındı (ADR-038 history-stable — eski id silinmez/yeniden kullanılmaz, yerinde deprecate edilir). Eski "R-78" IPTC atıfları (skills/generate-images, scripts/util/iptc_metadata.py, ilgili testler) artık R-123'e işaret eder.
 
 **Statement.** Tüm AI ile üretilmiş görseller (Higgsfield, nano-banana veya başka model çıktısı) IPTC `DigitalSourceType=TrainedAlgorithmicMedia` metadata içerir. Tag EXIF `UserComment` ve TIFF `ImageDescription` IFD slot'larına yazılır (RFC 9277 IPTC mapping fallback). AVIF format piexif tarafından desteklenmediğinden AVIF çıktısı silent skip (R-76 cascade WebP+JPG metadata garanti).
 
@@ -276,7 +278,7 @@ Bu doc Phase 10 HTML/CSS/image disiplinini tanımlar. **Foundational Principles*
 
 **Failure mode.** Silent skip — implementation hata atarsa AMBER log; metadata write zorunluluğu RED değil çünkü görsel hala kullanılabilir (Merchant Center reject downstream concern).
 
-**Cross-link.** → R-71 (8K ultra realistic), R-72 (image_model), R-73 (1200x675), R-74 (manual upload), R-75 (LCP `<picture>`), R-76 (format cascade), R-77 (alt text).
+**Cross-link.** → R-71 (8K ultra realistic), R-72 (image_model), R-73 (manual upload), R-74 (multi-skill upload reference), R-75 (LCP `<picture>`), R-76 (format cascade), R-77 (alt text).
 
 ---
 

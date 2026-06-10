@@ -34,7 +34,7 @@ Bu doc Phase 10 LLM/AIO görünürlük disiplinini tanımlar (LLMs.txt, per-bot 
 
 **Statement.** `robots.txt` per-bot LLM allow/disallow rule'ları (`GPTBot`, `ClaudeBot`, `Google-Extended`, `PerplexityBot`, `CCBot`). `project.config.json[ai_bots]` array consume.
 
-**Rationale.** Principle 2. Per-project LLM training opt-in/opt-out kararı; ranking impact (Google-Extended block edersen AIO citation şansı düşer).
+**Rationale.** Principle 2. Per-project LLM training opt-in/opt-out kararı. **Önemli düzeltme:** `Google-Extended` yalnızca **Gemini uygulamaları ve Vertex AI** için training + grounding erişimini kontrol eder; Google **Arama sıralamasını VEYA AI Overview (AIO) kapsamını ETKİLEMEZ** (AIO, Googlebot taraması + snippet kontrolleriyle —`nosnippet`/`max-snippet`/`data-nosnippet`— yönetilir). Bu iki mekanizma ayrıdır; Google-Extended'i bloklamak AIO/Arama görünürlüğünü etkilemez.
 
 **Enforcement.** init-project + content-remediation skill robots.txt patch; ai_bots array per-bot directive render.
 
@@ -72,7 +72,7 @@ Bu doc Phase 10 LLM/AIO görünürlük disiplinini tanımlar (LLMs.txt, per-bot 
 
 ### R-106: Citation Patterns (Universal)
 
-**Statement.** Citation pattern universal (Principle 3): per 500 word **min 1 max 2 citation**. Format: `<a href="URL" rel="external noopener">Source Name</a>` veya inline parenthetical "(Source, 2024)".
+**Statement.** Citation pattern universal (Principle 3): per 500 word **min 1 max 2 citation** (aralık). Aralık içinde örnekle; post'lar arası birebir aynı citation kadansını üretme (mekanik parmak izi önleme). Format: `<a href="URL" rel="external noopener">Source Name</a>` veya inline parenthetical "(Source, 2024)".
 
 **Rationale.** Principle 3 (UX overload önleme) + AIO citation density signal.
 

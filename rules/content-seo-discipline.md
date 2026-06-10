@@ -24,7 +24,7 @@ Bu doc Phase 10 SEO disiplinini tanımlar (heading, internal link, FAQ, keyword,
 
 **Statement.** H1'in hemen altında intro paragrafı. **AEO uyumlu**: ilk 1-2 cümle direkt soruya cevap veren, alıntılanabilir özet (40-60 kelime range).
 
-**Rationale.** Answer Engine (AIO, Perplexity, ChatGPT Search) ilk paragraf → snippet candidate. Quote-friendly intro citation şansı 3x artırır.
+**Rationale.** Answer Engine (AIO, Perplexity, ChatGPT Search) ilk paragraf → snippet candidate. Quote-friendly intro citation şansını artırabilir (3x çarpan **kanıtlanmamış sezgisel** — Principle 1 uydurma yasak; gerçek çarpan ölçülmedi).
 
 **Enforcement.** new-blog skill template `<p class="pse-intro">{{INTRO_PARAGRAPH_AEO_FRIENDLY}}</p>`; ilk 2 cümle sentence-tokenize sonra "answer-shape" pattern check.
 
@@ -72,9 +72,9 @@ Bu doc Phase 10 SEO disiplinini tanımlar (heading, internal link, FAQ, keyword,
 
 ### R-06: İç Linkleme
 
-**Statement.** Her ~300 kelimede 1 iç link. **Bir link 1 kez kullanılır** (duplike anchor/URL yasak). Link kararı `master.xlsx[internal_links]` sheet'inden / `internal-links` skill'inden.
+**Statement.** Her ~250-400 kelimede 1 iç link (sabit sayı değil **aralık**; her post'ta aralık içinde örnekle, post'lar arası birebir aynı yapısal kadansı üretme — mekanik parmak izi riski). **Bir link 1 kez kullanılır** (duplike anchor/URL yasak). Link kararı `master.xlsx[topical_map]` hub/spoke ilişkileri + `master.xlsx[master_task]` `[internal-links/*]` etiketli auto_generated satırlarından (`internal-links` skill'i Option A — 19-sheet şemasında `internal_links` sheet'i YOKTUR).
 
-**Rationale.** Link equity + topical authority (R-11 cluster paterni).
+**Rationale.** Link equity + topical authority (R-11 cluster paterni). Kadans aralığı + post-başı varyasyon: tek sabit sayı portföy-geneli mekanik imza üretir.
 
 **Enforcement.** Pre-publish link count check (word count / 300); duplicate URL set check.
 
@@ -82,7 +82,7 @@ Bu doc Phase 10 SEO disiplinini tanımlar (heading, internal link, FAQ, keyword,
 
 ### R-07: Liste + Tablo (Per H2 Cap)
 
-**Statement.** Her ~1000 kelimede: 1 liste + 1 tablo. Tablolar atıf alabilecek kalitede (data-rich). **Per-H2 max 1 liste** (Principle 3 multi-list AI padding cap).
+**Statement.** Her ~800-1200 kelimede (sabit değil **aralık**): ~1 liste + ~1 tablo. Tablolar atıf alabilecek kalitede (data-rich). **Per-H2 max 1 liste** (Principle 3 multi-list AI padding cap). Aralık içinde örnekle; post'lar arası birebir aynı liste/tablo kadansını tekrarlama.
 
 **Rationale.** Scannable + AIO citation (table + list snippet candidate).
 
@@ -102,11 +102,11 @@ Bu doc Phase 10 SEO disiplinini tanımlar (heading, internal link, FAQ, keyword,
 
 ### R-09: FAQ Bölümü
 
-**Statement.** **10 adet FAQ** standart; 3000+ word blog için 15 hard cap. Her biri snippet kazanmaya uygun (kısa, direkt soru-cevap, schema markup).
+**Statement.** FAQ **talep-güdümlü** (demand-driven): kanıt varsa (PAA varlığı, gerçek kullanıcı soruları) **3-6 FAQ**; kanıt yoksa daha az veya hiç. **Hard cap 10.** Her biri snippet kazanmaya uygun (kısa, direkt soru-cevap, schema markup R-79).
 
-**Rationale.** Principle 3 (AI çok FAQ yazmasın). FAQPage schema AIO citation şansı.
+**Rationale.** Principle 3 (AI çok FAQ yazmasın). FAQ sayısı gerçek arama talebine göre belirlenir; sabit "10 FAQ" mekanik şişirme riskidir. FAQPage schema (R-79) yine AIO citation için değerli.
 
-**Enforcement.** FAQ count check; word count > 3000 ise max 15.
+**Enforcement.** FAQ count check: kanıt (PAA/kullanıcı sorusu) yoksa FAQ üretme; count > 10 → hard cap AMBER.
 
 **Failure mode.** AMBER → 2x AMBER → RED.
 
@@ -140,15 +140,17 @@ Bu doc Phase 10 SEO disiplinini tanımlar (heading, internal link, FAQ, keyword,
 
 **Failure mode.** AMBER (count) → manual review.
 
-### R-13: Bold Disiplini
+### R-13: Bold Disiplini (deprecated)
 
-**Statement.** Her ~250 kelimede 1 primary veya secondary keyword **bold**. Aşırıya kaçma — keyword stuffing yasak. Bold edilen yalnızca **keyword**, generic terim değil.
+> **status: deprecated** (2026-06-10) — "her ~250 kelimede 1 keyword bold" bir sıralama sinyali DEĞİLDİR ve portföy-geneli uygulandığında mekanik parmak-izi (fingerprint) riski yaratır. Kural ADR-038 history-stable politikası gereği silinmez/yeniden numaralanmaz; yerinde deprecate edilir. Yerine: keyword'leri yalnızca doğal vurgu gerektiğinde bold'la, sabit kadans yok.
 
-**Rationale.** Visual scanning + zayıf keyword density signal (over-stuffing penalty).
+**Statement.** (deprecated) Bold yalnızca doğal okunabilirlik için kullanılır; keyword stuffing yasak; bold edilen generic terim değil keyword olmalıdır. Eski sabit "~250 kelimede 1 bold" kadansı artık zorunlu değildir.
 
-**Enforcement.** Bold count check (word_count / 250); non-keyword bold AMBER.
+**Rationale.** Visual scanning faydası korunur ancak sabit "250 kelimede 1 bold" kadansı kanıtlanmış bir sıralama sinyali değildir (deprecated).
 
-**Failure mode.** AMBER → 2x AMBER → RED (stuffing).
+**Enforcement.** Sabit bold-count check kaldırıldı; yalnızca aşırı/non-keyword bold AMBER (okunabilirlik).
+
+**Failure mode.** AMBER (stuffing).
 
 ### R-26: CTA Zorunlu (Doğal Akış)
 
@@ -174,7 +176,7 @@ Bu doc Phase 10 SEO disiplinini tanımlar (heading, internal link, FAQ, keyword,
 
 ### R-30: Heading Enforcement (H3 + Keyword Density)
 
-**Statement.** **H3 zorunluluk gate** — H2 word count > 200 → min 2 H3 (Principle 3). **Heading keyword density** — H2'lerin %40-60'ında primary/secondary keyword.
+**Statement.** **H3 zorunluluk gate** — H2 word count > 200 → min 2 H3 (Principle 3). **Heading keyword density** — H2'lerin %40-60'ında (aralık) primary/secondary keyword; aralık içinde örnekle, post'lar arası birebir aynı oranı hedefleme (mekanik kadans önleme).
 
 **Rationale.** Principle 3 (AI H2 basıp geçmesin) + keyword stuffing önleme.
 
@@ -226,7 +228,7 @@ Bu doc Phase 10 SEO disiplinini tanımlar (heading, internal link, FAQ, keyword,
 
 **Statement.** FAQ block (R-09) için FAQPage schema `@graph` inline. Her FAQ → `Question` entity + `acceptedAnswer.Answer.text`.
 
-**Rationale.** FAQPage rich result (Aralık 2023 sonrası reduced ama domain trust signal); AIO citation.
+**Rationale.** FAQPage rich result **Ağustos 2023** kısıtlamasından sonra yalnızca yetkili kamu (.gov) ve sağlık siteleri için gösterilir — çoğu site için rich result çıkmaz; schema yine de geçerli yapı + AIO citation için değerli.
 
 **Enforcement.** `templates/content/faq-block.template.html` schema inline; FAQ count == JSON-LD Question count.
 
@@ -286,7 +288,7 @@ Bu doc Phase 10 SEO disiplinini tanımlar (heading, internal link, FAQ, keyword,
 
 **Statement.** Featured snippet candidate paragraflar intent-aware: informational → definition snippet (40-50 word "X nedir" cevap-önce); commercial → list snippet (5-8 madde); transactional → table snippet (compare-shop format).
 
-**Rationale.** Snippet pozisyonu trafik 8x; intent map snippet format'ı belirler.
+**Rationale.** Snippet pozisyonu (Position 0) trafiği belirgin artırabilir (8x çarpanı **kanıtlanmamış sezgisel**); intent map snippet format'ı belirler.
 
 **Enforcement.** Skill workflow intent fetch → snippet template select.
 
@@ -306,7 +308,7 @@ Bu doc Phase 10 SEO disiplinini tanımlar (heading, internal link, FAQ, keyword,
 
 **Statement.** AIO citation pattern: H2 cevap-önce (R-29) + per 500 word min 1 max 2 citation (Principle 3 R-106 reuse) + entity reference dense.
 
-**Rationale.** AIO citation pattern empirically — cevap-önce paragrafları top citation candidates.
+**Rationale.** AIO citation pattern (**kanıtlanmamış sezgisel**) — cevap-önce paragrafları muhtemel top citation candidate'ları.
 
 **Enforcement.** Pre-publish per-500-word citation density check.
 
@@ -346,7 +348,7 @@ Bu doc Phase 10 SEO disiplinini tanımlar (heading, internal link, FAQ, keyword,
 
 **Statement.** Primary keyword için SERP feature analiz (R-08 reuse): {snippet, AIO, PAA, image_pack, video_pack, knowledge_panel}. Content render her feature'a uygun slot inject (PAA → FAQ section format).
 
-**Rationale.** Multi-feature kapsamı trafik 3-5x.
+**Rationale.** Multi-feature kapsamı trafiği artırabilir (3-5x çarpanı **kanıtlanmamış sezgisel**).
 
 **Enforcement.** R-08 SERP analiz output'unda feature list; skill render slot select.
 
@@ -360,9 +362,9 @@ Bu doc Phase 10 SEO disiplinini tanımlar (heading, internal link, FAQ, keyword,
 - → [content-html-discipline](content-html-discipline.md) — semantic HTML, image
 - → [content-eeat-discipline](content-eeat-discipline.md) — author byline, otorite domain
 - → [content-llm-discipline](content-llm-discipline.md) — AIO summary, citation pattern
-- → [excel-discipline](excel-discipline.md) — master.xlsx üzerinden cluster_keywords + topical_map + internal_links
+- → [excel-discipline](excel-discipline.md) — master.xlsx üzerinden cluster_keywords + topical_map + master_task (internal-links auto_generated, Option A)
 - → [schema-first](schema-first.md) — JSON-LD validation pre-write
-- → [single-source-of-truth](single-source-of-truth.md) — internal_links sheet otorite
+- → [single-source-of-truth](single-source-of-truth.md) — topical_map hub/spoke + master_task `[internal-links/*]` otorite (19-sheet şemada internal_links sheet'i yok)
 
 ## Enforcement (Plugin-Level)
 
