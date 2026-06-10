@@ -9,10 +9,11 @@ description: |
   Phase 7 geo_analysis staging'i konsume ederek pillar/cluster taxonomyye
   enrich note ekler ve master.xlsx#topical_map sheet'ine yazar (workflow_runner
   approve gate'ten geçer).
-  Also use when: aktif projenin seed keyword'ü tanımlı; TR (location_code=2792,
-  language_code='tr') varsayılan; budget pre-flight PASS; cluster-map (Phase 8
-  W-C1 sibling) F-09 cross-sheet konsume edilecek; new-content-plan için
-  pillar/cluster strüktürü gerekiyor.
+  Also use when: aktif projenin seed keyword'ü tanımlı; location_code/
+  language_code project.config.dataforseo'dan config-first çözülür
+  (engine-level ülke varsayılanı YOK); budget pre-flight PASS; cluster-map
+  (Phase 8 W-C1 sibling) F-09 cross-sheet konsume edilecek; new-content-plan
+  için pillar/cluster strüktürü gerekiyor.
   Do not use when: GSC veri ingestion (gsc-pull), DFS volume lookup
   (dfs-pull), ham keyword aday havuzu üretimi (content-gaps), kümelenmiş
   keyword listesi üretimi (cluster-map), URL çakışması (cannibalization)
@@ -34,13 +35,11 @@ inputs:
   location_code:
     type: integer
     required: false
-    default: 2792
-    description: "DFS location_code; varsayılan 2792 = Turkey."
+    description: "DFS location_code. NO engine default — resolved config-first from project.config.dataforseo.location_code. Explicit value overrides config. See '## Locale resolution'."
   language_code:
     type: string
     required: false
-    default: "tr"
-    description: "DFS language_code; varsayılan 'tr' = Turkish."
+    description: "DFS language_code. NO engine default — resolved config-first from project.config.dataforseo.language_code (derived from language.content_locale at init). See '## Locale resolution'."
   max_pillars:
     type: integer
     required: false
@@ -128,8 +127,8 @@ changes. Deviate only with an ADR.
 |-------------------------------|---------|---------|------------------------------------------------------------------------|
 | `project_slug`                | string  | —       | Required. Resolves `projects/{slug}/master.xlsx`.                      |
 | `seed_keyword`                | string  | —       | Required. Becomes pillar #1; anchors the taxonomy.                     |
-| `location_code`               | integer | 2792    | DFS Turkey.                                                            |
-| `language_code`               | string  | "tr"    | DFS Turkish.                                                           |
+| `location_code`               | integer | *(config)* | Config-first from `project.config.dataforseo.location_code`; no engine default. See **Locale resolution**. |
+| `language_code`               | string  | *(config)* | Config-first from `project.config.dataforseo.language_code`. See **Locale resolution**.                    |
 | `max_pillars`                 | integer | 5       | Upper bound on pillar rows.                                            |
 | `max_clusters_per_pillar`     | integer | 6       | Upper bound on cluster rows per pillar.                                |
 | `max_supporting_per_cluster`  | integer | 0       | Supporting rows per pillar bucket (0 = OFF).                           |
@@ -138,6 +137,42 @@ changes. Deviate only with an ADR.
 
 `workspace_root` is resolved via `PSEO_WORKSPACE_ROOT` env or explicit
 test override (mirrors workflow_runner / events_writer).
+
+## Locale resolution (config-first — NO engine-level country default)
+
+`location_code` / `language_code` are resolved **config-first** from the
+project's own `project.config.dataforseo` block — schema-required fields
+(`schemas/project-config.schema.json`). There is **no engine-level country
+default**: the engine is project-agnostic and must never assume Turkey (or
+any country). Resolution order:
+
+1. Explicit `location_code` / `language_code` input (operator override).
+2. `project.config.dataforseo.location_code` + `project.config.dataforseo.language_code`.
+3. Neither available → **DURUR #9** (config locale unresolvable). The skill
+   STOPS before any paid MCP call; it never falls back to a country.
+
+`language_code` is the DFS short code (`tr`, `en`), set in the config at
+init from `language.content_locale` (e.g. `tr-TR`→`tr`, `en-CA`→`en`).
+
+### Per-market reference (codes VERIFIED from live project configs)
+
+| `market` | `content_locale` | `location_code` | `language_code` | Note |
+|----------|------------------|-----------------|-----------------|------|
+| TR       | tr-TR            | 2792            | tr              | Turkey (country). |
+| CA       | en-CA            | 20120           | en              | "Ontario,Canada" — a **sub-country** location; a coarse country code would be wrong. |
+| NG       | en-NG            | 2566            | en              | Nigeria (country). |
+
+These are the markets currently in the portfolio; every code above is read
+straight from that project's `project.config.dataforseo` (the authoritative
+source — not hardcoded here). For a NEW market, resolve the DFS
+`location_code` at init via a `serp_locations` lookup and persist it into
+`project.config.dataforseo` — never guess a country code in skill logic.
+
+> **TR caveat.** TR projects (location 2792) are subject to the same
+> dataforseo-mcp-server@2.8.9 TR-forwarding bug documented in
+> `skills/ingestion/dfs-pull/SKILL.md`; the imported `_normalize_dfs_response`
+> tolerates the response shapes, and TR-locale verification stays mandatory
+> for TR projects (do not remove it).
 
 ## Outputs (artifacts produced)
 
@@ -271,10 +306,12 @@ handle = workflow_runner.create_run(
 
 ```python
 workflow_runner.start_step(handle.run_id, 1, project_slug=project_slug)
+# location_code / language_code resolved config-first (see "Locale
+# resolution") — no engine-level country default.
 raw_ideas = mcp__dataforseo__dataforseo_labs_google_keyword_ideas(
     keywords=[seed_keyword],
-    location_code=location_code,    # 2792 = Turkey
-    language_code=language_code,    # "tr"
+    location_code=location_code,    # from project.config.dataforseo
+    language_code=language_code,    # from project.config.dataforseo
     limit=keyword_cap,
 )
 raw_related = mcp__dataforseo__dataforseo_labs_google_related_keywords(
@@ -468,6 +505,10 @@ Stop and flag the manager — do not patch, do not fall back.
 8. **`inbox/dfs/` path unwritable** (workspace misconfigured / readonly)
    or `workflow_runner.create_run` fails schema validation
    (`schemas/workflow-run.schema.json`).
+9. **Config locale unresolvable** — `location_code` / `language_code`
+   cannot be resolved (no explicit input AND `project.config.dataforseo`
+   missing/unreadable). STOP before any paid MCP call; never default to a
+   country (engine is project-agnostic). See **Locale resolution**.
 
 ## Cross-references
 

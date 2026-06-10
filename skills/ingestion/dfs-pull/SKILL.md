@@ -7,10 +7,11 @@ description: |
   inbox/dfs/ altına persist eder ve `_state/staging/` altına shape-adapted
   staging table yazar (Phase 8 `cluster-map` skill konsume eder, Excel
   projection downstream).
-  Also use when: aktif projenin keyword listesi config'te tanımlı; TR
-  (location_code=2792, language_code='tr') varsayılan; budget pre-flight
-  PASS; dataforseo-mcp-server@2.8.9 wrapper TR forwarding bug için A/B/C
-  workaround stratejisi uygulanacak.
+  Also use when: aktif projenin keyword listesi config'te tanımlı;
+  location_code/language_code project.config.dataforseo'dan config-first
+  çözülür (engine-level ülke varsayılanı YOK); budget pre-flight PASS;
+  TR projelerinde dataforseo-mcp-server@2.8.9 wrapper TR forwarding bug
+  için A/B/C workaround stratejisi uygulanacak.
   Do not use when: GSC veri ingestion (gsc-pull), SF csv ingestion
   (sf-import), Scrapling competitor crawl (scrapling-ops) gerekiyor —
   ayrı ingestion skill'leri. Master.xlsx yokken çağırma; init-project
@@ -30,13 +31,11 @@ inputs:
   location_code:
     type: integer
     required: false
-    default: 2792
-    description: "DFS location_code; varsayılan 2792 = Turkey."
+    description: "DFS location_code. NO engine default — resolved config-first from project.config.dataforseo.location_code. Explicit value overrides config. See '## Locale resolution'."
   language_code:
     type: string
     required: false
-    default: "tr"
-    description: "DFS language_code; varsayılan 'tr' = Turkish."
+    description: "DFS language_code. NO engine default — resolved config-first from project.config.dataforseo.language_code (derived from language.content_locale at init). See '## Locale resolution'."
 outputs:
   - "_state/staging/dfs_keyword_overview_{date}_{slug}.json"
   - "_state/staging/dfs_search_volume_{date}_{slug}.json"
@@ -91,8 +90,8 @@ the TR forwarding workaround block is DFS-specific.
 |------------------|---------|------------------|--------------------------------------------------------|
 | `project_slug`   | string  | —                | Required. Resolves `projects/{slug}/master.xlsx`.       |
 | `keywords`       | array   | —                | Required. Seed keyword list; transforms drive credits.  |
-| `location_code`  | integer | 2792             | DFS Turkey. Workaround gates the response server-side.  |
-| `language_code`  | string  | "tr"             | DFS Turkish.                                            |
+| `location_code`  | integer | *(config)*       | Config-first from `project.config.dataforseo.location_code`; no engine default. See **Locale resolution**. |
+| `language_code`  | string  | *(config)*       | Config-first from `project.config.dataforseo.language_code`. See **Locale resolution**.                    |
 
 > **Removed input — `cluster`:** dfs-pull is staging-only (D-003); it never
 > writes `cluster_keywords`. Cluster assignment is the Phase 8 `cluster-map`
@@ -101,6 +100,42 @@ the TR forwarding workaround block is DFS-specific.
 
 `workspace_root` is resolved via `PSEO_WORKSPACE_ROOT` env or explicit
 test override (mirrors workflow_runner / events_writer).
+
+## Locale resolution (config-first — NO engine-level country default)
+
+`location_code` / `language_code` are resolved **config-first** from the
+project's own `project.config.dataforseo` block — schema-required fields
+(`schemas/project-config.schema.json`). There is **no engine-level country
+default**: the engine is project-agnostic and must never assume Turkey (or
+any country). Resolution order:
+
+1. Explicit `location_code` / `language_code` input (operator override).
+2. `project.config.dataforseo.location_code` + `project.config.dataforseo.language_code`.
+3. Neither available → **DURUR #9** (config locale unresolvable). The skill
+   STOPS before any paid MCP call; it never falls back to a country.
+
+`language_code` is the DFS short code (`tr`, `en`), set in the config at
+init from `language.content_locale` (e.g. `tr-TR`→`tr`, `en-CA`→`en`).
+
+### Per-market reference (codes VERIFIED from live project configs)
+
+| `market` | `content_locale` | `location_code` | `language_code` | Note |
+|----------|------------------|-----------------|-----------------|------|
+| TR       | tr-TR            | 2792            | tr              | Turkey (country). |
+| CA       | en-CA            | 20120           | en              | "Ontario,Canada" — a **sub-country** location; a coarse country code would be wrong. |
+| NG       | en-NG            | 2566            | en              | Nigeria (country). |
+
+These are the markets currently in the portfolio; every code above is read
+straight from that project's `project.config.dataforseo` (the authoritative
+source — not hardcoded here). For a NEW market, resolve the DFS
+`location_code` at init via a `serp_locations` lookup and persist it into
+`project.config.dataforseo` — never guess a country code in skill logic.
+
+> **TR-only workaround scope.** The **TR Forwarding Workaround** below
+> applies ONLY when the resolved location is TR (2792); CA/NG/other markets
+> skip it — the dataforseo-mcp-server@2.8.9 forwarding bug is TR-specific.
+> The Method-C `detect_response_locale` verification stays mandatory for TR
+> projects (do not remove it).
 
 ## Outputs (artifacts produced)
 
@@ -181,10 +216,12 @@ workflow_runner.finish_step(handle.run_id, 0, project_slug=project_slug,
 
 ```python
 workflow_runner.start_step(handle.run_id, 1, project_slug=project_slug)
+# location_code / language_code resolved config-first (see "Locale
+# resolution") — no engine-level country default.
 raw_overview = mcp__dataforseo__dataforseo_labs_google_keyword_overview(
     keywords=keywords,
-    location_code=location_code,    # 2792 = Turkey
-    language_code=language_code,    # "tr"
+    location_code=location_code,    # from project.config.dataforseo
+    language_code=language_code,    # from project.config.dataforseo
 )
 inbox_path = (
     workspace_root / "projects" / project_slug
@@ -233,8 +270,8 @@ or wrapper shapes uniformly, then builds two staging payloads:
 python3 scripts/ingestion/dfs_pull.py \
     --raw-overview  inbox/dfs/{date}-keyword_overview-{slug}.json \
     --raw-volume    inbox/dfs/{date}-search_volume-{slug}.json \
-    --location-code 2792 \
-    --language-code tr \
+    --location-code {location_code} \
+    --language-code {language_code} \
     --staging-dir   _state/staging/ \
     --project-slug  {project_slug}
 ```
@@ -329,9 +366,11 @@ workflow_runner.complete(handle.run_id, project_slug=project_slug, outputs={
 
 ## TR Forwarding Workaround (REQUIRED — paid-MCP correctness gate)
 
-**Background.** Live test 1835229 confirmed: dataforseo-mcp-server@2.8.9
+**Background.** This workaround is **TR-market-specific** (it runs only when
+the config-resolved location is TR — `2792`, per the Locale resolution
+reference table). Live test 1835229 confirmed: dataforseo-mcp-server@2.8.9
 returns `location_code=2840` (US) and `language_code="en"` even when the
-caller passes `location_code=2792 / language_code="tr"`. The wrapper's
+caller passes the TR locale (`2792` / `"tr"`). The wrapper's
 `dataforseo_labs_google_keyword_overview` code path silently drops the
 locale params before issuing the upstream REST call. **Never trust the
 echoed request — always inspect the served `result[0].location_code`.**
@@ -352,8 +391,8 @@ from scripts.ingestion import dfs_pull
 # Detect served locale.
 loc, lang = dfs_pull.detect_response_locale(raw_overview)
 honors = dfs_pull.response_honors_tr(raw_overview,
-                                     expected_location=2792,
-                                     expected_language="tr")
+                                     expected_location=location_code,   # TR=2792 (config)
+                                     expected_language=language_code)    # TR="tr" (config)
 if not honors:
     # A's filter is unreliable on its own when locale is wrong (the
     # whole payload is US); proceed to B.
@@ -381,8 +420,8 @@ keyword. The transform's `--raw-volume` argument enables this:
 result = dfs_pull.transform(
     raw_overview,
     raw_volume=raw_volume,        # honored TR data
-    location_code=2792,
-    language_code="tr",
+    location_code=location_code,  # TR=2792 (config-resolved)
+    language_code=language_code,  # TR="tr" (config-resolved)
     skip_tr_check=True,           # B has signed off; skip overview check
 )
 ```
@@ -407,8 +446,8 @@ from scripts.ingestion import dfs_pull
 user, pwd = dfs_pull.http_credentials_from_env()        # CredentialError if missing
 body = dfs_pull.build_http_payload_tr(
     keywords=keywords,
-    location_code=2792,
-    language_code="tr",
+    location_code=location_code,   # TR=2792 (config-resolved)
+    language_code=language_code,   # TR="tr" (config-resolved)
 )
 resp = requests.post(
     "https://api.dataforseo.com/v3/dataforseo_labs/google/keyword_overview/live",
@@ -418,7 +457,7 @@ resp = requests.post(
 )
 resp.raise_for_status()
 raw_overview = resp.json()
-assert dfs_pull.response_honors_tr(raw_overview, expected_location=2792)
+assert dfs_pull.response_honors_tr(raw_overview, expected_location=location_code)
 ```
 
 **Failure mode.** Doubles credit cost (one billable call to the wrapper
@@ -447,7 +486,7 @@ looking signal, not a current-rank signal), this proxy ranks by
 volume-weighted competition headroom. Quick-wins later overrides with
 GSC-derived `impressions × headroom` once the URL is assigned.
 
-## DURUR conditions (8)
+## DURUR conditions (9)
 
 Stop and flag the manager — do not patch, do not fall back.
 
@@ -467,6 +506,12 @@ Stop and flag the manager — do not patch, do not fall back.
    (workspace path missing or read-only).
 8. `DATAFORSEO_USERNAME` / `DATAFORSEO_PASSWORD` env unset when method
    C is the only remaining option (`CredentialError`).
+9. **Config locale unresolvable** — `location_code` / `language_code`
+   cannot be resolved (no explicit input AND `project.config.dataforseo`
+   missing/unreadable). STOP before any paid MCP call; never default to a
+   country (the engine is project-agnostic). `project.config` schema
+   *requires* these fields, so this fires only on a malformed/legacy
+   config — surface it, do not paper over it.
 
 ## Cross-references
 

@@ -123,6 +123,36 @@ modify either side without an ADR.
 `workspace_root` is resolved via `PSEO_WORKSPACE_ROOT` env or explicit
 test override (mirrors workflow_runner / events_writer).
 
+## Locale resolution (config-first — NO engine-level country default)
+
+The DFS `location_code` / `language_code` used by Step 2
+(`competitors_domain`) are resolved **config-first** from the project's own
+`project.config.dataforseo` block — schema-required fields
+(`schemas/project-config.schema.json`). There is **no engine-level country
+default** and this skill does **not** inherit a hardcoded locale from
+dfs-pull: the engine is project-agnostic and must never assume Turkey (or
+any country). Resolution order:
+
+1. Explicit `location_code` / `language_code` (operator override).
+2. `project.config.dataforseo.location_code` + `project.config.dataforseo.language_code`.
+3. Neither available → DURUR (config locale unresolvable): STOP before any
+   paid MCP call; never fall back to a country.
+
+### Per-market reference (codes VERIFIED from live project configs)
+
+| `market` | `content_locale` | `location_code` | `language_code` | Note |
+|----------|------------------|-----------------|-----------------|------|
+| TR       | tr-TR            | 2792            | tr              | Turkey (country). |
+| CA       | en-CA            | 20120           | en              | "Ontario,Canada" — a **sub-country** location; a coarse country code would be wrong. |
+| NG       | en-NG            | 2566            | en              | Nigeria (country). |
+
+Every code above is read straight from that project's
+`project.config.dataforseo` (the authoritative source — not hardcoded
+here). For a NEW market, resolve the DFS `location_code` at init via a
+`serp_locations` lookup and persist it into `project.config.dataforseo` —
+never guess a country code in skill logic. (Same contract as
+`skills/ingestion/dfs-pull/SKILL.md`, the paid-MCP convention authority.)
+
 ## Outputs (artifacts produced)
 
 - `projects/{slug}/_state/staging/competitive_analysis_{date}_{slug}.json`
@@ -202,10 +232,12 @@ ca.preflight_budget(
 ### Step 2 — `fetch_competitors_domain` (DFS, paid)
 
 ```python
+# location_code / language_code resolved config-first from
+# project.config.dataforseo (see "Locale resolution") — no engine default.
 raw_competitors = mcp__dataforseo__dataforseo_labs_google_competitors_domain(
     target=target_domain,
-    location_code=2792,           # TR; reuse dfs_pull DEFAULTS
-    language_code="tr",
+    location_code=location_code,   # from project.config.dataforseo
+    language_code=language_code,   # from project.config.dataforseo
     limit=20,
 )
 ```
