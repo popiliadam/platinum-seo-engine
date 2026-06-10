@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "http://platinum-seo-engine/schemas/facet-policy",
+  "title": "Facet Policy Override v1.0",
+  "description": "OPTIONAL per-project override file projects/{slug}/config/facet-policy.json, validated when present (absence = engine heuristic defaults). Lets an operator pin project-specific or non-English parameter vocabularies (Ticimax/Ideasoft/imagaza, Turkish 'sirala'/'arama', etc.) into the R-128 taxonomy; these classifications WIN over facet_nav_audit_transform's heuristic platform seeds. Additive standalone schema — no existing schema is touched, no migration. See rules/tech-seo-governance.md R-128.",
+  "schema_version": "1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version"],
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "description": "Schema version this override conforms to (rules/schema-versioning-discipline.md)."
+    },
+    "classifications": {
+      "type": "object",
+      "description": "Map of query-parameter name -> R-128 taxonomy class. Overrides the transform's heuristic seeds for this project.",
+      "additionalProperties": {
+        "type": "string",
+        "enum": [
+          "facet_filter",
+          "sort",
+          "pagination",
+          "internal_search",
+          "session_or_tracking",
+          "functional",
+          "unknown"
+        ]
+      }
+    },
+    "indexable_facets": {
+      "type": "array",
+      "description": "Facet parameter names that ARE allowed to be indexable for this project (demand confirmed) — suppresses the R-129 'facet_filter indexable without demand' finding for these params.",
+      "items": {"type": "string"},
+      "uniqueItems": true
+    },
+    "notes": {
+      "type": "string",
+      "description": "Free-text operator note (provenance / confirmation date)."
+    }
+  }
+}

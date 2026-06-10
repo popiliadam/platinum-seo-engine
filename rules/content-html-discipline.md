@@ -126,6 +126,8 @@ Bu doc Phase 10 HTML/CSS/image disiplinini tanımlar. **Foundational Principles*
 
 **Failure mode.** AMBER (default `index,follow` fallback).
 
+**Cross-link:** R-132 (tech-seo-governance — deployment path).
+
 ### R-59: W3C HTML Validation Pre-Publish
 
 **Statement.** Pre-publish W3C Nu HTML Checker veya equivalent validator pass; warnings tolere edilir, error'lar RED.

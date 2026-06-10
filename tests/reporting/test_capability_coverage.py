@@ -84,7 +84,7 @@ def test_classify_skills_partitions_all_45_real_skills():
     assert len(flat) == len(set(flat)), "a skill landed in two buckets"
     from scripts.validation.skill_graph_consistency import parse_graph
     assert set(flat) == set(parse_graph(_REPO_ROOT)), "buckets != skill roster"
-    assert out["total"] == 45
+    assert out["total"] == 47
     assert out["counts"]["orchestrated"] == len(out["orchestrated"])
 
 
@@ -353,7 +353,7 @@ def test_runtime_coverage_missing_project_is_empty_not_crash(tmp_path):
 def test_coverage_report_static_only_has_no_runtime():
     report = cc.coverage_report(_REPO_ROOT)
     assert report["runtime"] is None
-    assert report["skills"]["total"] == 45
+    assert report["skills"]["total"] == 47
     assert set(report["mcp"].keys()) >= {"orchestrated", "declared_only", "unused"}
     assert "scripts" in report and "recommendations" in report
 
@@ -372,7 +372,7 @@ def test_coverage_report_with_workspace_has_runtime(tmp_path):
 def test_render_report_contains_headline_counts_and_categories():
     report = cc.coverage_report(_REPO_ROOT)
     out = cc.render_report(report)
-    assert "45" in out  # the skill total
+    assert "47" in out  # the skill total
     # the three skill buckets are surfaced (Turkish operator labels)
     assert "orchestrated" in out.lower() or "orkestr" in out.lower()
     assert "ad-hoc" in out.lower()
@@ -425,7 +425,7 @@ def test_module_reuses_pb1_and_3a():
 def test_main_static_exit_zero(capsys):
     assert cc.main([]) == 0
     out = capsys.readouterr().out
-    assert "45" in out
+    assert "47" in out
 
 
 def test_main_with_workspace_exit_zero(tmp_path, capsys):
