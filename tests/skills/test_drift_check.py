@@ -56,18 +56,23 @@ def _build_clean_wb(path: Path) -> None:
     # quick_wins (D-03 idempotent URLs)
     qw = wb.active
     qw.title = "quick_wins"
+    # NOTE: K-N are the GAP-M-1b additive AIO/uplift columns (F-05 is an
+    # exact header-count invariant — synthetic fixture must track the schema).
     qw.append(["query", "url", "current_position", "impressions_30d",
                "clicks_30d", "ctr_pct", "potential_clicks", "opportunity",
-               "action", "priority"])
+               "action", "priority",
+               "aio_presence", "aio_own_cited", "aio_checked_date",
+               "expected_uplift_clicks"])
     qw.append(["foo", "https://example.com/a", 12, 100, 5, 5.0, 10,
-               "High", "do x", "MEDIUM"])
-    # opportunity (F-16 fk: every qw url ⊆ opp.url)
+               "High", "do x", "MEDIUM",
+               "unchecked", False, "", 20])
+    # opportunity (F-16 fk: every qw url ⊆ opp.url) — +I/J GAP-M-1b additive
     op = wb.create_sheet("opportunity")
     op.append(["query", "opportunity_score", "current_position", "ctr_pct",
                "impressions_30d", "clicks_30d", "potential_clicks",
-               "assigned_url_action"])
+               "assigned_url_action", "aio_presence", "expected_uplift_clicks"])
     op.append(["foo", 800, 12, 5.0, 100, 5, 10,
-               "https://example.com/a | do x"])
+               "https://example.com/a | do x", "unchecked", 20])
     # crawl_sitemap (F-08: provide URL coverage)
     cs = wb.create_sheet("crawl_sitemap")
     cs.append(["category", "metric", "value", "status", "action"])
@@ -199,15 +204,17 @@ def test_high_fail_red_verdict(tmp_path: Path) -> None:
     qw.title = "quick_wins"
     qw.append(["query", "url", "current_position", "impressions_30d",
                "clicks_30d", "ctr_pct", "potential_clicks", "opportunity",
-               "action", "priority"])
+               "action", "priority",
+               "aio_presence", "aio_own_cited", "aio_checked_date",
+               "expected_uplift_clicks"])
     qw.append(["foo", "https://example.com/orphan", 12, 100, 5, 5.0, 10,
-               "High", "x", "MEDIUM"])
+               "High", "x", "MEDIUM", "unchecked", False, "", 20])
     op = wb.create_sheet("opportunity")
     op.append(["query", "opportunity_score", "current_position", "ctr_pct",
                "impressions_30d", "clicks_30d", "potential_clicks",
-               "assigned_url_action"])
+               "assigned_url_action", "aio_presence", "expected_uplift_clicks"])
     op.append(["foo", 800, 12, 5.0, 100, 5, 10,
-               "https://example.com/orphan | x"])
+               "https://example.com/orphan | x", "unchecked", 20])
     wb.save(str(wb_path))
 
     wb_ro = load_workbook(str(wb_path), data_only=True, read_only=True)
@@ -264,12 +271,14 @@ def test_skip_missing_sheet_amber(tmp_path: Path) -> None:
     qw.title = "quick_wins"
     qw.append(["query", "url", "current_position", "impressions_30d",
                "clicks_30d", "ctr_pct", "potential_clicks", "opportunity",
-               "action", "priority"])
+               "action", "priority",
+               "aio_presence", "aio_own_cited", "aio_checked_date",
+               "expected_uplift_clicks"])
     # Add an opportunity sheet so F-16 doesn't SKIP+AMBER but PASSes.
     op = wb.create_sheet("opportunity")
     op.append(["query", "opportunity_score", "current_position", "ctr_pct",
                "impressions_30d", "clicks_30d", "potential_clicks",
-               "assigned_url_action"])
+               "assigned_url_action", "aio_presence", "expected_uplift_clicks"])
     # Add crawl_sitemap so F-08 doesn't trigger sparse-pilot path
     cs = wb.create_sheet("crawl_sitemap")
     cs.append(["category", "metric", "value", "status", "action"])

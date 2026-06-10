@@ -15,12 +15,20 @@ Pure function discipline:
   - No file write side-effects when imported as a module (CLI only).
   - Idempotent: same input → same output.
 
+Opportunity scoring is the GAP-M3 expected-CTR-uplift model: ranked by
+``expected_uplift_clicks`` (impressions × CTR(target position) × AIO factor −
+current clicks), with the legacy headroom score retained as a deterministic
+tiebreaker. CTR/AIO numbers come from ``ctr-curve.json`` (R-139 — no literals
+here). AIO presence (R-140) rides optional columns K–N / I–J.
+
 CLI:
   python3 scripts/discovery/quickwins_transform.py \
       --raw inbox/gsc/{date}-detect_quick_wins-{slug}.json \
       [--enriched inbox/gsc/{date}-enhanced_search_analytics-{slug}.json] \
       [--top-n 50] \
       [--threshold-position-max 20] \
+      [--ctr-curve ctr-curve.json] \
+      [--aio-presence inbox/dfs/{date}-aio_presence-{slug}.json] \
       [--output-dir .]
 
 Stdout: JSON {"quick_wins": [...], "opportunity": [...], "meta": {...}}.
@@ -53,6 +61,7 @@ from scripts.util.profile_aware_defaults import (  # noqa: E402
     cascade_default,
 )
 from scripts.util.url_normalize import normalize_url  # noqa: E402,F401
+from scripts.util import ctr_curve as _ctr_curve  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Constants — schema-aligned column names (master-excel.schema.json)
@@ -69,6 +78,13 @@ QUICK_WINS_COLUMNS = (
     "opportunity",
     "action",
     "priority",
+    # GAP-M2 D3 additive (ADR-018; no schema_version bump). aio_presence ∈
+    # {present, not_detected, unchecked} (measurement-discipline R-140);
+    # expected_uplift_clicks = GAP-M3 CTR-uplift model (R-139 curve).
+    "aio_presence",
+    "aio_own_cited",
+    "aio_checked_date",
+    "expected_uplift_clicks",
 )
 
 OPPORTUNITY_COLUMNS = (
@@ -80,6 +96,10 @@ OPPORTUNITY_COLUMNS = (
     "clicks_30d",
     "potential_clicks",
     "assigned_url_action",
+    # GAP-M2 D3 additive (mirrors quick_wins; opportunity_score col stays the
+    # legacy headroom number — expected_uplift_clicks carries the v2 model).
+    "aio_presence",
+    "expected_uplift_clicks",
 )
 
 # ---------------------------------------------------------------------------
@@ -121,6 +141,79 @@ def opportunity_score(
     except (TypeError, ValueError):
         return 0.0
     return imp * max(0.0, float(threshold_position_max) - pos)
+
+
+def expected_uplift_clicks(
+    impressions: float,
+    position: float,
+    clicks: float | None,
+    curve: "_ctr_curve.Curve",
+    aio_presence: str = "unchecked",
+) -> int:
+    """Expected 28-day click gain from moving a quick-win onto page 1.
+
+    Model (GAP-M3; forecast-style scoring):
+
+        target  = min(10, max(5, position - 5))   # page-1 bottom half, never top-3
+        ctr_t   = curve.expected_ctr(target) * curve.aio_factor(target, aio_presence)
+        uplift  = max(0, round(impressions * ctr_t - current_clicks))
+
+    Observed clicks are subtracted so a row that already converts well does
+    not double-count. AIO-`present` queries carry the curve's per-position
+    discount; `not_detected`/`unchecked` are NOT discounted (R-140 honesty —
+    an unproven AIO is flagged, never penalised). All CTR/discount numbers
+    come from ``curve`` (ctr-curve.json), never literals (R-139).
+    """
+    if impressions is None or position is None:
+        return 0
+    try:
+        imp = float(impressions)
+        pos = float(position)
+    except (TypeError, ValueError):
+        return 0
+    target = min(10.0, max(5.0, pos - 5.0))
+    ctr_t = curve.expected_ctr(target) * curve.aio_factor(target, aio_presence)
+    try:
+        current = float(clicks or 0)
+    except (TypeError, ValueError):
+        current = 0.0
+    return max(0, int(round(imp * ctr_t - current)))
+
+
+def load_aio_presence(path: Path) -> dict[str, dict]:
+    """Read a consolidated AIO-presence file → ``{query: presence-info}``.
+
+    Expected shape (built by quick-wins Step `fetch_aio_presence` from the
+    raw SERP inbox payload): ``{query: {"aio_presence": "present"|"not_detected",
+    "own_domain_cited": bool, "checked_date": str, "detection_source": str}}``.
+    Only decisive presence rows (`present`/`not_detected`) are recorded;
+    queries absent from the file stay ``unchecked`` downstream. Missing or
+    malformed file → ``{}`` (AIO enrichment is optional — never DURUR here;
+    the curve scorer simply treats every query as `unchecked`).
+    """
+    p = Path(path)
+    if not p.exists():
+        return {}
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    out: dict[str, dict] = {}
+    for query, info in data.items():
+        if not isinstance(info, dict):
+            continue
+        presence = info.get("aio_presence")
+        if presence not in ("present", "not_detected"):
+            continue
+        out[str(query)] = {
+            "aio_presence": presence,
+            "own_domain_cited": bool(info.get("own_domain_cited")),
+            "checked_date": str(info.get("checked_date") or ""),
+            "detection_source": str(info.get("detection_source") or ""),
+        }
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -197,20 +290,38 @@ def _safe_float(v: Any) -> float | None:
 # Core transform
 # ---------------------------------------------------------------------------
 
-def _opportunity_label(score: float) -> str:
-    """Coarse opportunity label used as an at-a-glance hint in the sheet."""
-    if score >= 5000:
+# GAP-M3: labels are re-banded on click units (expected_uplift_clicks/28d),
+# NOT the legacy headroom score. Thresholds are cascade_default-overridable
+# (keys uplift_high_threshold / uplift_medium_threshold). These are label
+# bands, not curve constants — outside R-139's grep-sentinel scope.
+_UPLIFT_HIGH_THRESHOLD: int = 50
+_UPLIFT_MEDIUM_THRESHOLD: int = 15
+
+
+def _opportunity_label(
+    uplift: float,
+    *,
+    high: float = _UPLIFT_HIGH_THRESHOLD,
+    medium: float = _UPLIFT_MEDIUM_THRESHOLD,
+) -> str:
+    """Coarse opportunity label (expected-clicks band) — at-a-glance sheet hint."""
+    if uplift >= high:
         return "High"
-    if score >= 1500:
+    if uplift >= medium:
         return "Medium"
     return "Low"
 
 
-def _priority_label(score: float) -> str:
-    """severityEnum-aligned priority (CRITICAL/HIGH/MEDIUM/LOW)."""
-    if score >= 5000:
+def _priority_label(
+    uplift: float,
+    *,
+    high: float = _UPLIFT_HIGH_THRESHOLD,
+    medium: float = _UPLIFT_MEDIUM_THRESHOLD,
+) -> str:
+    """severityEnum-aligned priority (HIGH/MEDIUM/LOW) on the expected-clicks band."""
+    if uplift >= high:
         return "HIGH"
-    if score >= 1500:
+    if uplift >= medium:
         return "MEDIUM"
     return "LOW"
 
@@ -251,6 +362,8 @@ def transform(
     top_n: int = 50,
     threshold_position_max: int = 20,
     dedup_by_url: bool = True,
+    curve: "_ctr_curve.Curve | None" = None,
+    aio_presence: dict[str, dict] | None = None,
 ) -> dict:
     """
     Transform an mcp__gsc__detect_quick_wins payload into schema-shaped
@@ -263,16 +376,25 @@ def transform(
                   used to back-fill clicks/impressions/ctr/position when
                   the quick-wins payload is sparse.
         top_n: Cap on output row count (after ranking).
-        threshold_position_max: Position ceiling used in scoring.
+        threshold_position_max: Position ceiling used in the LEGACY headroom
+                  score (retained as the v2 ranking tiebreaker + col B).
         dedup_by_url: D-011 fix (Phase 7 closeout). When True (default),
-                      keep only the highest-_score row per url_normalized
-                      (collapses multi-query rows that share a URL).
-                      Phase 6 live capture surfaced 33 quick_wins rows
-                      → 7 unique URLs (~26 duplicate). Set False for
-                      multi-query analysis where duplicates are desired.
+                      keep only the best row per url_normalized (collapses
+                      multi-query rows that share a URL). Phase 6 live capture
+                      surfaced 33 quick_wins rows → 7 unique URLs (~26
+                      duplicate). Set False for multi-query analysis.
+        curve: GAP-M3 CTR-uplift curve. None ⇒ load the bundled
+               ``ctr-curve.json`` (DURUR #11 if missing/invalid — never a
+               silent fallback to the legacy formula). The curve is ALWAYS
+               applied; "required" is satisfied by no-fallback, not by a
+               mandatory positional arg (keeps existing callers working).
+        aio_presence: GAP-M2 consolidated ``{query: presence-info}`` map (see
+               ``load_aio_presence``). None ⇒ every query is ``unchecked``.
 
     Returns:
         {"quick_wins": [...], "opportunity": [...], "meta": {...}}.
+        Primary ranking key = expected_uplift_clicks (desc); legacy
+        opportunity_score is tiebreaker #2 (then query asc, url asc).
     """
     if not isinstance(raw, dict):
         raise ValueError(f"raw must be a dict, got {type(raw).__name__}")
@@ -283,7 +405,13 @@ def transform(
     if not isinstance(items, list):
         raise ValueError("raw['quickWins'] must be a list")
 
+    if curve is None:
+        # DURUR #11: missing/invalid ctr-curve.json raises CurveLoadError —
+        # no silent fallback to the legacy headroom formula.
+        curve = _ctr_curve.load_curve(_REPO_ROOT / "ctr-curve.json")
+
     enrich = enriched or {}
+    aio_map = aio_presence or {}
 
     scored: list[dict] = []
     for entry in items:
@@ -325,15 +453,31 @@ def transform(
             # caller can audit raw JSON for sparse rows.
             continue
 
-        score = opportunity_score(
+        # Legacy headroom score — retained as the v2 ranking tiebreaker and as
+        # the opportunity sheet's col B (no column re-semantics).
+        legacy_score = opportunity_score(
             impressions, position,
             threshold_position_max=threshold_position_max,
+        )
+
+        # GAP-M2: per-query AIO presence (consolidated map). Decisive only;
+        # queries absent from the map stay "unchecked" (R-140: unchecked ≠
+        # not_detected).
+        aio_info = aio_map.get(str(query))
+        row_presence = aio_info["aio_presence"] if aio_info else "unchecked"
+        row_own_cited = bool(aio_info["own_domain_cited"]) if aio_info else False
+        row_checked_date = aio_info["checked_date"] if aio_info else ""
+
+        # GAP-M3: expected 28-day click uplift (CTR curve × AIO factor).
+        uplift = expected_uplift_clicks(
+            impressions, position, clicks, curve, aio_presence=row_presence,
         )
 
         ctr_pct = _row_pct(ctr_raw)
 
         scored.append({
-            "_score": score,
+            "_uplift": uplift,
+            "_legacy": legacy_score,
             "query": str(query),
             "url": url_n,
             "current_position": round(float(position), 2),
@@ -341,29 +485,32 @@ def transform(
             "clicks_30d": int(clicks) if clicks is not None else 0,
             "ctr_pct": ctr_pct,
             "potential_clicks": int(potential) if potential is not None else 0,
-            "opportunity": _opportunity_label(score),
+            "opportunity": _opportunity_label(uplift),
             "action": _action_text(float(position)),
-            "priority": _priority_label(score),
+            "priority": _priority_label(uplift),
+            "aio_presence": row_presence,
+            "aio_own_cited": row_own_cited,
+            "aio_checked_date": row_checked_date,
+            "expected_uplift_clicks": uplift,
         })
 
+    # Ranking key (GAP-M3): expected_uplift_clicks desc (primary), then the
+    # legacy headroom score desc (tiebreaker #2), then query/url asc — the
+    # existing deterministic tiebreak discipline.
+    def _rank_key(r: dict) -> tuple:
+        return (-r["_uplift"], -r["_legacy"], r["query"], r["url"])
+
     # D-011 fix (Phase 7 closeout): collapse rows that share the same
-    # url_normalized — keep the row with the highest _score per URL.
-    # Tie-break by query asc for determinism (stable on identical scores).
+    # url_normalized — keep the best row per URL by the v2 rank key.
     if dedup_by_url:
         by_url: dict[str, dict] = {}
         for r in scored:
             existing = by_url.get(r["url"])
-            if existing is None:
-                by_url[r["url"]] = r
-                continue
-            if r["_score"] > existing["_score"]:
-                by_url[r["url"]] = r
-            elif r["_score"] == existing["_score"] and r["query"] < existing["query"]:
+            if existing is None or _rank_key(r) < _rank_key(existing):
                 by_url[r["url"]] = r
         scored = list(by_url.values())
 
-    # Stable sort: score desc, then by query asc for determinism.
-    scored.sort(key=lambda r: (-r["_score"], r["query"], r["url"]))
+    scored.sort(key=_rank_key)
     top = scored[:top_n]
 
     quick_wins_rows = [
@@ -371,31 +518,37 @@ def transform(
         for r in top
     ]
 
-    # Opportunity sheet aggregates by query (one row per query, max score).
+    # Opportunity sheet aggregates by query (one row per query, best rank).
     opp_by_query: dict[str, dict] = {}
     for r in top:
         q = r["query"]
         existing = opp_by_query.get(q)
-        if existing is None or r["_score"] > existing["_score"]:
+        if existing is None or _rank_key(r) < _rank_key(existing):
             opp_by_query[q] = {
-                "_score": r["_score"],
+                "_uplift": r["_uplift"],
+                "_legacy": r["_legacy"],
                 "query": q,
-                "opportunity_score": round(float(r["_score"]), 2),
+                "url": r["url"],
+                "opportunity_score": round(float(r["_legacy"]), 2),
                 "current_position": r["current_position"],
                 "ctr_pct": r["ctr_pct"],
                 "impressions_30d": r["impressions_30d"],
                 "clicks_30d": r["clicks_30d"],
                 "potential_clicks": r["potential_clicks"],
                 "assigned_url_action": f"{r['url']} | {r['action']}",
+                "aio_presence": r["aio_presence"],
+                "expected_uplift_clicks": r["expected_uplift_clicks"],
             }
 
     opportunity_rows = [
         {k: v[k] for k in OPPORTUNITY_COLUMNS}
-        for v in sorted(
-            opp_by_query.values(),
-            key=lambda r: (-r["_score"], r["query"]),
-        )
+        for v in sorted(opp_by_query.values(), key=_rank_key)
     ]
+
+    aio_checked_count = sum(
+        1 for r in quick_wins_rows
+        if r["aio_presence"] in ("present", "not_detected")
+    )
 
     return {
         "quick_wins": quick_wins_rows,
@@ -408,6 +561,9 @@ def transform(
             "threshold_position_max": threshold_position_max,
             "enriched_used": bool(enrich),
             "dedup_by_url_applied": bool(dedup_by_url),
+            "score_version": "2.0",
+            "curve_version": curve.curve_version,
+            "aio_checked_count": aio_checked_count,
         },
     }
 
@@ -435,6 +591,14 @@ def _parse_args(argv: Iterable[str]) -> argparse.Namespace:
                         f"override via Y-06 cascade_default).")
     p.add_argument("--output-dir", default=None,
                    help="If set, write quick_wins.json + opportunity.json here.")
+    p.add_argument("--ctr-curve", default=str(_REPO_ROOT / "ctr-curve.json"),
+                   help="Path to the versioned CTR/AIO curve (R-139). "
+                        "Default: engine-root ctr-curve.json. Missing/invalid "
+                        "→ DURUR (no silent fallback to the legacy formula).")
+    p.add_argument("--aio-presence", default=None,
+                   help="Optional consolidated AIO-presence JSON "
+                        "({query: presence-info}); absent → all queries "
+                        "'unchecked' (GAP-M2).")
     return p.parse_args(list(argv))
 
 
@@ -467,12 +631,26 @@ def main(argv: list[str]) -> int:
         override=args.threshold_position_max,
     )
 
+    # GAP-M3: load the versioned curve (DURUR #11 on missing/invalid).
+    try:
+        curve = _ctr_curve.load_curve(args.ctr_curve)
+    except _ctr_curve.CurveLoadError as exc:
+        print(f"ctr-curve load failed (DURUR #11): {exc}", file=sys.stderr)
+        return 1
+
+    # GAP-M2: optional consolidated AIO-presence map (absent → all unchecked).
+    aio_presence = (
+        load_aio_presence(Path(args.aio_presence)) if args.aio_presence else None
+    )
+
     try:
         result = transform(
             raw,
             enriched=enriched,
             top_n=top_n,
             threshold_position_max=threshold_position_max,
+            curve=curve,
+            aio_presence=aio_presence,
         )
     except ValueError as exc:
         print(f"transform failed: {exc}", file=sys.stderr)
@@ -511,6 +689,8 @@ __all__ = (
     "OPPORTUNITY_COLUMNS",
     "normalize_url",
     "opportunity_score",
+    "expected_uplift_clicks",
+    "load_aio_presence",
     "transform",
     "main",
 )

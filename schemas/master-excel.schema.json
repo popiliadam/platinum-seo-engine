@@ -100,6 +100,7 @@
     "quick_wins": {
       "header_row": 4,
       "data_start_row": 5,
+      "description": "GAP-M2/M3 (additive, ADR-018 paterni — schema_version bump değil): +K aio_presence (AI Overview varlığı, R-140: present/not_detected/unchecked — asla absent), +L aio_own_cited, +M aio_checked_date, +N expected_uplift_clicks (CTR-uplift modeli, R-139 ctr-curve.json). transaction.replace header'ı kanonik sırada yeniden yazar → mevcut workbook'lar bir sonraki quick-wins run'da yeni kolonları alır (migration script gerekmez).",
       "required_columns": [
         { "col": "A", "name": "query" },
         { "col": "B", "name": "url" },
@@ -110,7 +111,11 @@
         { "col": "G", "name": "potential_clicks", "type": "integer" },
         { "col": "H", "name": "opportunity" },
         { "col": "I", "name": "action" },
-        { "col": "J", "name": "priority" }
+        { "col": "J", "name": "priority" },
+        { "col": "K", "name": "aio_presence",          "enum": ["present", "not_detected", "unchecked"] },
+        { "col": "L", "name": "aio_own_cited",         "type": "boolean" },
+        { "col": "M", "name": "aio_checked_date",      "type": "date" },
+        { "col": "N", "name": "expected_uplift_clicks", "type": "integer" }
       ]
     },
     "new_content_plan": {
@@ -197,6 +202,7 @@
     "opportunity": {
       "header_row": 4,
       "data_start_row": 5,
+      "description": "GAP-M2/M3 (additive, ADR-018 paterni): +I aio_presence (R-140 enum), +J expected_uplift_clicks (R-139 CTR-uplift modeli). opportunity_score (col B) LEGACY headroom skorunu korur — yeni model expected_uplift_clicks kolonunda taşınır (kolon yeniden-anlamlandırma yok).",
       "required_columns": [
         { "col": "A", "name": "query" },
         { "col": "B", "name": "opportunity_score", "type": "number" },
@@ -205,7 +211,9 @@
         { "col": "E", "name": "impressions_30d",   "type": "integer" },
         { "col": "F", "name": "clicks_30d",        "type": "integer" },
         { "col": "G", "name": "potential_clicks",  "type": "integer" },
-        { "col": "H", "name": "assigned_url_action" }
+        { "col": "H", "name": "assigned_url_action" },
+        { "col": "I", "name": "aio_presence",          "enum": ["present", "not_detected", "unchecked"] },
+        { "col": "J", "name": "expected_uplift_clicks", "type": "integer" }
       ]
     },
     "tech_seo": {

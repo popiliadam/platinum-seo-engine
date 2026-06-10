@@ -12,13 +12,21 @@
 
 $report_summary
 
-## En yüksek skor
+## En yüksek fırsat
 
 - **Sorgu:** $top_query
 - **URL:** $top_url
-- **Opportunity score:** $top_score
+- **Beklenen tıklama kazanımı (28g):** $top_uplift
+- **Headroom skoru (legacy tiebreak):** $top_score
 - **Mevcut pozisyon:** $top_position
 - **Önerilen aksiyon:** $top_action
+
+## AI Overview (GAP-M2)
+
+- AI Overview tespit edilen sorgu sayısı: $aio_present_count
+- (present/not_detected only; mevcut tıklama gözlemden, hedef-pozisyon CTR
+  eğrisi `ctr-curve.json`'dan — measurement-discipline: AIO presence +
+  versioned CTR curve provenance.)
 
 ## Tetikleyici eşikler
 

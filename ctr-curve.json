@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.0",
+  "curve_version": "2026.06",
+  "sources": [
+    {"name": "first_page_sage_2026", "url": "https://firstpagesage.com/reports/google-click-through-rates-ctrs-by-ranking-position/", "retrieved": "2026-06-10", "covers": "positions 1-10"},
+    {"name": "ahrefs_aio_2026_02", "url": "https://ahrefs.com/blog/ai-overviews-reduce-clicks-update/", "retrieved": "2026-06-10", "covers": "aio_discount_by_position"},
+    {"name": "pew_research_2025", "url": "https://www.pewresearch.org/", "retrieved": "2026-06-10", "covers": "aio_discount_default cross-check"}
+  ],
+  "positions": [
+    {"position": 1, "ctr": 0.398, "provenance": "first_page_sage_2026"},
+    {"position": 2, "ctr": 0.187, "provenance": "first_page_sage_2026"},
+    {"position": 3, "ctr": 0.102, "provenance": "first_page_sage_2026"},
+    {"position": 4, "ctr": 0.072, "provenance": "first_page_sage_2026"},
+    {"position": 5, "ctr": 0.051, "provenance": "first_page_sage_2026"},
+    {"position": 6, "ctr": 0.044, "provenance": "first_page_sage_2026"},
+    {"position": 7, "ctr": 0.030, "provenance": "first_page_sage_2026"},
+    {"position": 8, "ctr": 0.021, "provenance": "first_page_sage_2026"},
+    {"position": 9, "ctr": 0.019, "provenance": "first_page_sage_2026"},
+    {"position": 10, "ctr": 0.016, "provenance": "first_page_sage_2026"},
+    {"position": 11, "ctr": 0.010, "provenance": "engine_estimate"},
+    {"position": 15, "ctr": 0.006, "provenance": "engine_estimate"},
+    {"position": 20, "ctr": 0.003, "provenance": "engine_estimate"}
+  ],
+  "interpolation": "linear_between_listed_positions",
+  "aio_discount": {
+    "default": 0.5,
+    "by_position": {"1": 0.420, "2": 0.492, "3": 0.536, "4": 0.612, "5": 0.674,
+                    "6": 0.695, "7": 0.703, "8": 0.712, "9": 0.703, "10": 0.806},
+    "fallback_11_20": 0.806
+  }
+}

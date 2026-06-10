@@ -2,7 +2,7 @@
 name: quick-wins
 description: |
   Use when: kullanıcı "quick win", "hızlı kazanım", "kolay yükselebilecek
-  sayfalar", "8-20 sıradaki keyword", "low-hanging fruit", "pozisyon 11-20",
+  sayfalar", "low-hanging fruit", "pozisyon 11-20",
   "CTR düşük yüksek impression" der ya da /pseo-quickwin çağırır.
   Also use when: aktif projenin GSC verisi master.xlsx'te mevcut; opportunity
   scoring yapılacak; kullanıcı sıralamada yükselebilecek fırsatlar arıyor.
@@ -19,6 +19,8 @@ inputs:
   threshold_position_max: { type: integer, required: false, default: 20 }
   threshold_impressions: { type: integer, required: false, default: 100 }
   top_n: { type: integer, required: false, default: 50 }
+  aio_check: { type: boolean, required: false, default: false }
+  aio_top_k: { type: integer, required: false, default: 20 }
 outputs:
   - "master.xlsx#quick_wins"
   - "master.xlsx#opportunity"
@@ -26,6 +28,7 @@ outputs:
   - "events.jsonl"
   - "inbox/gsc/{date}-detect_quick_wins-{slug}.json"
   - "inbox/gsc/{date}-enhanced_search_analytics-{slug}.json"
+  - "inbox/dfs/{date}-aio_presence-{slug}.json"
 consumes:
   - "init-project:projects/{slug}/master.xlsx"
   - "sf-import:master.xlsx#crawl_sitemap"
@@ -45,7 +48,10 @@ mcp_tools:
   required:
     - "mcp__gsc__detect_quick_wins"
     - "mcp__gsc__enhanced_search_analytics"
-  optional: ["mcp__gsc__search_analytics"]
+  optional:
+    - "mcp__gsc__search_analytics"
+    # GAP-M2: paid, used ONLY when aio_check=true (default false ⇒ free path).
+    - "mcp__dataforseo__serp_organic_live_advanced"
 budget:
   uses_paid_mcp: false
   estimated_credits: 0
@@ -76,6 +82,20 @@ deviate only with an ADR.
 | `threshold_position_max`   | integer | 20      | Upper bound; also the scoring ceiling (D-03 invariant). |
 | `threshold_impressions`    | integer | 100     | Minimum `impressions` per row to qualify.               |
 | `top_n`                    | integer | 50      | Cap on rows written into `quick_wins`.                  |
+| `aio_check`                | boolean | false   | When true, fetch AI-Overview presence for the top `aio_top_k` queries (GAP-M2). |
+| `aio_top_k`                | integer | 20      | How many provisional top queries to AIO-check (only when `aio_check`).  |
+
+### Budget + consent (aio_check)
+
+`budget.uses_paid_mcp`/`estimated_credits` in the frontmatter describe the
+DEFAULT path (`aio_check=false` ⇒ free, 0 credits). When `aio_check=true` the
+skill additionally calls the paid `mcp__dataforseo__serp_organic_live_advanced`
+for the top `aio_top_k` queries: estimated **~0.07–0.14 credits** (K=20 ×
+0.0035, AIO discount honesty per measurement-discipline R-140). The runtime
+budget pre-flight applies (reuse the aio-competitor-map DURUR #1 pattern).
+**Consent is NOT required** for `aio_check`: it is a read-only SERP fetch, and
+consent gates outward/irreversible actions only — say so to the operator
+rather than blocking.
 
 ## Outputs (artifacts produced)
 
@@ -105,6 +125,7 @@ handle = workflow_runner.create_run(
         {"name": "fetch_quick_wins"},
         {"name": "fetch_enriched"},
         {"name": "transform"},
+        {"name": "fetch_aio_presence"},  # GAP-M2 — only runs when aio_check=true
         {"name": "request_approval"},
         {"name": "write_excel"},
         {"name": "render_report"},
@@ -153,12 +174,35 @@ python3 scripts/discovery/quickwins_transform.py \
     --enriched inbox/gsc/{date}-enhanced_search_analytics-{slug}.json \
     --top-n 50 \
     --threshold-position-max 20 \
+    --ctr-curve ctr-curve.json \
+    --aio-presence inbox/dfs/{date}-aio_presence-{slug}.json \
     --output-dir _state/transform/{run_id}/
 ```
 
 Produces two JSON arrays (`quick_wins`, `opportunity`) shaped to the
 master-excel schema. URL normalization (D-03) is applied here, not at
 fetch time, so the raw inbox copy is byte-faithful to the MCP response.
+`--ctr-curve` defaults to the engine-root `ctr-curve.json`; `--aio-presence`
+is omitted on pass-1 (no `aio_check`) and supplied on pass-2 after
+`fetch_aio_presence` writes the consolidated presence map.
+
+### Step 4b — `fetch_aio_presence` (optional; only when `aio_check=true`)
+
+Two-pass discipline (GAP-M2). After the pass-1 `transform`, for the
+provisional top-`aio_top_k` queries call
+`mcp__dataforseo__serp_organic_live_advanced(keyword=query,
+language_code=…, location_name=…, depth=10)`. Persist the consolidated raw
+to `projects/{slug}/inbox/dfs/{date}-aio_presence-{slug}.json` (raw-inbox-
+first), keyed by query, each value `{aio_presence, own_domain_cited,
+checked_date, detection_source}` (derive presence via the
+aio-competitor-map `build_serp_aio` contract — `references[]` only, R-140;
+MCP-sync may record `present`/`not_detected`, never asserting absence). Then re-run
+the pass-2 `transform` with `--aio-presence <that path>`. Provenance event:
+`event_kind=provenance, source.kind=dataforseo_mcp, operation=ingest,
+target_table="dfs_aio_presence", cost={"provider":"dataforseo",
+"credits": K*0.0035}`. The transform helper `load_aio_presence(path)` maps
+query → presence-info; queries missing from the file stay `unchecked`
+(`unchecked ≠ not_detected`, R-140).
 
 ### Step 5 — `request_approval` (skill EXIT awaiting_approval)
 
@@ -210,7 +254,9 @@ committer.commit(
 `render_template.py templates/reports/quickwin.template.md data.json`
 → `outputs/reports/{date}-quickwin.md`. Variables: `$project_slug`,
 `$date`, `$top_n`, `$total_opportunities`, `$top_query`, `$top_url`,
-`$top_score`, `$report_summary`.
+`$top_uplift` (GAP-M3 expected_uplift_clicks), `$top_score` (legacy headroom
+tiebreak), `$aio_present_count` (GAP-M2), `$top_position`, `$top_action`,
+`$report_summary`.
 
 ### Step 9 — Provenance event
 
@@ -246,17 +292,44 @@ Rules: lowercase scheme+host, IDN→punycode, strip default ports, strip
 trailing slash (root excluded), drop fragment, drop tracking params,
 sort remaining query keys.
 
-## Opportunity score
+## Opportunity score (GAP-M3 — expected-CTR-uplift model)
 
+Rows are ranked by **`expected_uplift_clicks`** (28-day): the modelled click
+gain from moving a page-2 query onto page 1, discounted when an AI Overview
+is present. The formula + a worked example (all curve constants live inside
+this fence — R-139):
+
+```text
+target = min(10, max(5, position - 5))     # page-1 bottom half, never top-3
+ctr_t  = curve.expected_ctr(target) * curve.aio_factor(target, aio_presence)
+expected_uplift_clicks = max(0, round(impressions * ctr_t - current_clicks))
+
+# Worked example (frozen curve):
+#   pos 12, 1000 impressions, 10 clicks, aio unchecked:
+#     target=7 -> ctr(7)=0.030 -> 1000*0.030 - 10 = 20
+#   same row, AIO present (position-7 discount factor 0.703):
+#     1000*0.030*0.703 - 10 = 11
+#   (unchecked / not_detected -> factor 1.0, NO discount — R-140 honesty)
 ```
-score = impressions * max(0, threshold_position_max - position)
-```
 
-Monotonic in both impressions (more = better) and headroom
-(threshold − position). Capped at 0 to keep rows that drift past the
-threshold from polluting the leaderboard.
+All CTR/discount numbers come from the versioned `ctr-curve.json` +
+`schemas/ctr-curve.schema.json` (loader `scripts/util/ctr_curve.py`), never
+literal copies in the transform/SKILL body — **R-139** (grep-sentinel-tested).
+Observed clicks are subtracted so an already-converting row does not
+double-count. The legacy headroom score
+`impressions * max(0, threshold_position_max - position)` is RETAINED as the
+deterministic ranking tiebreaker #2 (then query asc, url asc) and as the
+`opportunity` sheet's `opportunity_score` column (no column re-semantics).
 
-## DURUR conditions (10)
+**AIO presence columns (R-140).** `quick_wins` gains K `aio_presence`
+(`present`/`not_detected`/`unchecked`; absence is never asserted),
+L `aio_own_cited`,
+M `aio_checked_date`, N `expected_uplift_clicks`; `opportunity` gains I
+`aio_presence`, J `expected_uplift_clicks`. With `aio_check=false` every row
+is `unchecked` / `false` / `""` plus the computed uplift; `unchecked ≠
+not_detected`.
+
+## DURUR conditions (11)
 
 Stop and flag the manager — do not patch, do not fall back.
 
@@ -271,16 +344,22 @@ Stop and flag the manager — do not patch, do not fall back.
 9. `quickwins_transform.py` output is not schema-shaped.
 10. F-08 (quick_wins.url ⊆ crawl_sitemap.url ∪ gsc_performance.url) fails
     — flag Wave 2 `drift-check` to expect a RED.
+11. `ctr-curve.json` missing or schema-invalid (GAP-M3) — the scorer DURURs;
+    no silent fallback to the legacy headroom formula (`load_curve` raises
+    `CurveLoadError`). Cite R-139.
 
 ## Cross-references
 
-- Schemas: `schemas/master-excel.schema.json` (quick_wins, opportunity,
-  definitions), `schemas/events.schema.json`,
+- Schemas: `schemas/master-excel.schema.json` (quick_wins K–N, opportunity
+  I–J, definitions), `schemas/events.schema.json`,
   `schemas/cross-sheet-invariants.json` (D-03 + F-08 invariants),
-  `schemas/skill-frontmatter.schema.json`.
+  `schemas/skill-frontmatter.schema.json`, `schemas/ctr-curve.schema.json`.
+- Data: `ctr-curve.json` (engine-root versioned CTR/AIO curve — R-139).
+- Rules: `rules/measurement-discipline.md` R-139 (versioned measurement
+  constants), R-140 (AIO presence recording — `present`/`not_detected` only).
 - Cross-modules: `scripts/state/workflow_runner.py`,
   `scripts/excel/transaction.py`, `scripts/state/events_writer.py`,
-  `scripts/reporting/render_template.py`.
+  `scripts/reporting/render_template.py`, `scripts/util/ctr_curve.py`.
 - Transform: `scripts/discovery/quickwins_transform.py`.
 - Tests: `tests/skills/test_quick_wins.py` (8 cases incl. live MCP).
 - Template: `templates/reports/quickwin.template.md`.
