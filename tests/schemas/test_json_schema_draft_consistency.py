@@ -53,8 +53,9 @@ def test_schemas_count_matches_lock_set() -> None:
     live filesystem count.)"""
     count = len(list(SCHEMAS_DIR.glob("*.schema.json")))
     # 28 -> 29: GAP-M-1b adds schemas/ctr-curve.schema.json (2026-06-10);
-    # 29 -> 30: GAP-T1 adds schemas/facet-policy.schema.json (2026-06-10).
-    assert count == 30, f"expected 30 *.schema.json files, found {count}"
+    # 29 -> 30: GAP-T1 adds schemas/facet-policy.schema.json (2026-06-10);
+    # 30 -> 31: GAP-T2 adds schemas/migration-mapping.schema.json (2026-06-10).
+    assert count == 31, f"expected 31 *.schema.json files, found {count}"
 
 
 def test_validator_pins_draft7() -> None:
