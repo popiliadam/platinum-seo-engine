@@ -27,7 +27,7 @@ $drift_section
 
 $gsc_anomaly_section
 
-> Kaynak: `master.xlsx[gsc_performance]` read-only (openpyxl). Week-over-week delta vs trailing 8-week mean; >5σ → DURUR #5 alert.
+> Kaynak: `_state/metrics/gsc-weekly.jsonl` (gsc-pull Step 7b ledger), `scripts/reporting/weekly_anomaly.py` — median+MAD modified-z (|M|≥3.5) + Ranking-update calendar overlap (per `rules/measurement-discipline.md`). severity=RED → DURUR #5 ikinci audit satırı.
 
 ## Budget Burn Section
 

@@ -18,14 +18,22 @@ Pure function discipline:
   - Idempotent: same input -> same output. Re-running with the same
     --raw and --enriched files writes byte-identical outputs.
 
-CLI:
+CLI (two modes):
+  # 1) gsc_performance transform (default)
   python3 scripts/ingestion/gsc_pull.py \
       --raw inbox/gsc/2026-04-30-search_analytics-{slug}.json \
       [--enriched inbox/gsc/2026-04-30-enhanced_search_analytics-{slug}.json] \
       [--output-dir .]
 
-Stdout: JSON {"gsc_performance": [...], "meta": {...}}.
-With --output-dir set: also writes gsc_performance.json into that dir
+  # 2) weekly ISO-week ledger append (GAP-M4 D1 — anomaly-detection history)
+  python3 scripts/ingestion/gsc_pull.py --append-weekly-ledger \
+      --daily inbox/gsc/{date}-search_analytics_daily-{slug}.json \
+      --ledger projects/{slug}/_state/metrics/gsc-weekly.jsonl \
+      --today 2026-06-10
+
+Stdout: JSON {"gsc_performance": [...], "meta": {...}} (mode 1) or
+{"appended": [...], "skipped": [...], "ledger": "..."} (mode 2).
+With --output-dir set (mode 1): also writes gsc_performance.json into that dir
 and prints the absolute path.
 
 Refs: schemas/master-excel.schema.json (gsc_performance sheet
@@ -38,9 +46,12 @@ spec §6 + §12.2 (raw JSON inbox + transform stage), spec §16.5
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
+import os
 import sys
 from dataclasses import dataclass
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable
 # scripts is a namespace package; ensure repo root on sys.path so absolute
@@ -343,20 +354,206 @@ def transform(
 
 
 # ---------------------------------------------------------------------------
+# Weekly ISO-week ledger (GAP-M4 D1) — pre/post anomaly-detection history store
+# ---------------------------------------------------------------------------
+#
+# master.xlsx#gsc_performance is a recent-vs-previous SNAPSHOT (no date column,
+# rewritten on every run), so it cannot hold a weekly time series. The anomaly
+# detector (scripts/reporting/weekly_anomaly.py, R-141) needs one. This module
+# owns an append-only sidecar ledger at projects/{slug}/_state/metrics/
+# gsc-weekly.jsonl, one line per COMPLETE ISO week, fed from a free site-level
+# daily GSC series (dimensions=["date"]).
+#
+# Append discipline mirrors scripts/state/anomaly_recorder._atomic_append_line
+# (O_APPEND + flock + fsync) — append-only-state rule, never rewrites a line.
+
+LEDGER_SOURCE = "gsc_mcp"
+_GSC_DATA_LAG_DAYS = 2  # GSC daily data lags ~2 days; the most-recent week is unsafe
+
+
+def _as_date(value: Any) -> date:
+    """Coerce a date / 'YYYY-MM-DD' / ISO datetime string to a date."""
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value
+    if isinstance(value, datetime):
+        return value.date()
+    s = str(value).strip()
+    return date.fromisoformat(s[:10])
+
+
+def _iso_week_label(d: date) -> str:
+    iso = d.isocalendar()
+    return f"{iso[0]}-W{iso[1]:02d}"
+
+
+def _week_bounds(d: date) -> tuple[date, date]:
+    """Monday (start) and Sunday (end) of the ISO week containing `d`."""
+    monday = d - timedelta(days=d.weekday())
+    return monday, monday + timedelta(days=6)
+
+
+def aggregate_iso_weeks(daily_rows: Iterable[dict], today: Any) -> list[dict]:
+    """Aggregate a site-level daily GSC series into COMPLETE ISO-week rows.
+
+    Args:
+        daily_rows: GSC search_analytics rows with dimensions=["date"]:
+            {"keys": ["2026-06-01"], "clicks": N, "impressions": M, "position": p}.
+        today: anchor date (frozen arg; rules/time-discipline.md). The week
+            containing `today` is excluded, AND any week whose Sunday is within
+            `_GSC_DATA_LAG_DAYS` of `today` is excluded (data-lag guard).
+
+    Returns weekly dicts (newest-week LAST, ascending iso_week) shaped for the
+    ledger: {iso_week, week_start, week_end, clicks, impressions, ctr,
+    avg_position, source}. Pure + deterministic.
+    """
+    today_d = _as_date(today)
+    cutoff = today_d - timedelta(days=_GSC_DATA_LAG_DAYS)
+
+    buckets: dict[str, dict] = {}
+    for row in daily_rows:
+        if not isinstance(row, dict):
+            continue
+        keys = row.get("keys") or []
+        if not keys:
+            continue
+        try:
+            d = _as_date(keys[0])
+        except (ValueError, TypeError):
+            continue
+        clicks = _safe_int(row.get("clicks")) or 0
+        impressions = _safe_int(row.get("impressions")) or 0
+        position = _safe_float(row.get("position")) or 0.0
+        label = _iso_week_label(d)
+        monday, sunday = _week_bounds(d)
+        b = buckets.setdefault(label, {
+            "clicks": 0, "impressions": 0, "pos_w_sum": 0.0,
+            "monday": monday, "sunday": sunday,
+        })
+        b["clicks"] += clicks
+        b["impressions"] += impressions
+        b["pos_w_sum"] += position * impressions
+
+    out: list[dict] = []
+    for label in sorted(buckets):
+        b = buckets[label]
+        if not (b["sunday"] < cutoff):   # week not fully elapsed past the lag → skip
+            continue
+        impressions = b["impressions"]
+        ctr = round(b["clicks"] / impressions, 4) if impressions > 0 else 0.0
+        avg_position = round(b["pos_w_sum"] / impressions, 2) if impressions > 0 else 0.0
+        out.append({
+            "iso_week": label,
+            "week_start": b["monday"].isoformat(),
+            "week_end": b["sunday"].isoformat(),
+            "clicks": b["clicks"],
+            "impressions": impressions,
+            "ctr": ctr,
+            "avg_position": avg_position,
+            "source": LEDGER_SOURCE,
+        })
+    return out
+
+
+def _atomic_append_line(path: Path, payload: bytes) -> None:
+    """Append one line atomically (O_APPEND + flock + fsync).
+
+    Copied from scripts/state/anomaly_recorder._atomic_append_line (append-only-
+    state discipline) to keep gsc_pull free of a private cross-module import.
+    """
+    fd = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        try:
+            written = os.write(fd, payload)
+            if written != len(payload):
+                raise GscPullError(
+                    f"short write on {path}: {written} of {len(payload)} bytes"
+                )
+            os.fsync(fd)
+        finally:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_UN)
+            except OSError:  # pragma: no cover
+                pass
+    finally:
+        os.close(fd)
+
+
+def append_weekly_ledger(
+    ledger_path: Path | str,
+    weeks: Iterable[dict],
+    *,
+    source: str = LEDGER_SOURCE,
+) -> dict:
+    """Append only the missing weeks to the ISO-week ledger (idempotent).
+
+    Dedup key is `iso_week`: a week already present is skipped, so re-running is
+    a no-op and existing lines are NEVER rewritten (append-only-state). Each new
+    row gains a `written_at` UTC stamp at append time.
+    """
+    ledger = Path(ledger_path)
+    existing: set[str] = set()
+    if ledger.exists():
+        for line in ledger.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                wk = json.loads(line).get("iso_week")
+            except json.JSONDecodeError:
+                continue
+            if wk:
+                existing.add(wk)
+
+    appended: list[str] = []
+    skipped: list[str] = []
+    ledger.parent.mkdir(parents=True, exist_ok=True)
+    for wk in sorted(weeks, key=lambda w: str(w.get("iso_week", ""))):
+        label = wk.get("iso_week")
+        if not label:
+            continue
+        if label in existing:
+            skipped.append(label)
+            continue
+        rec = dict(wk)
+        rec.setdefault("source", source)
+        rec["written_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        payload = (json.dumps(rec, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
+        _atomic_append_line(ledger, payload)
+        existing.add(label)
+        appended.append(label)
+
+    return {"appended": appended, "skipped": skipped, "ledger": str(ledger)}
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
 def _parse_args(argv: Iterable[str]) -> argparse.Namespace:
     p = argparse.ArgumentParser(
         prog="gsc_pull.py",
-        description="Transform GSC search_analytics JSON -> gsc_performance rows.",
+        description="Transform GSC search_analytics JSON -> gsc_performance rows, "
+                    "or append the weekly ISO-week ledger (--append-weekly-ledger).",
     )
-    p.add_argument("--raw", required=True,
+    # Default mode: gsc_performance transform. --raw is required ONLY here, so
+    # validation moves to main() to keep the ledger sub-mode argument-free of it.
+    p.add_argument("--raw", default=None,
                    help="Path to raw mcp__gsc__search_analytics JSON (recent window).")
     p.add_argument("--enriched", default=None,
                    help="Optional path to enhanced_search_analytics JSON (previous window).")
     p.add_argument("--output-dir", default=None,
                    help="If set, write gsc_performance.json here.")
+    # Weekly-ledger sub-mode (GAP-M4 D1).
+    p.add_argument("--append-weekly-ledger", action="store_true",
+                   help="Aggregate a daily series into complete ISO weeks and "
+                        "append the missing ones to --ledger.")
+    p.add_argument("--daily", default=None,
+                   help="Daily site-level search_analytics JSON (dimensions=['date']).")
+    p.add_argument("--ledger", default=None,
+                   help="Path to the projects/{slug}/_state/metrics/gsc-weekly.jsonl ledger.")
+    p.add_argument("--today", default=None,
+                   help="UTC date anchor (YYYY-MM-DD) for complete-week computation.")
     return p.parse_args(list(argv))
 
 
@@ -368,6 +565,30 @@ def _read_json(path: Path) -> dict:
 def main(argv: list[str]) -> int:
     args = _parse_args(argv)
 
+    # ---- Weekly-ledger sub-mode (GAP-M4 D1) -------------------------------
+    if args.append_weekly_ledger:
+        missing = [f for f, v in (("--daily", args.daily),
+                                  ("--ledger", args.ledger),
+                                  ("--today", args.today)) if not v]
+        if missing:
+            print(f"--append-weekly-ledger requires {', '.join(missing)}",
+                  file=sys.stderr)
+            return 2
+        daily_path = Path(args.daily)
+        if not daily_path.exists():
+            print(f"daily JSON not found: {daily_path}", file=sys.stderr)
+            return 2
+        daily_payload = _read_json(daily_path)
+        daily_rows = daily_payload.get("rows") or daily_payload.get("data") or []
+        weeks = aggregate_iso_weeks(daily_rows, args.today)
+        result = append_weekly_ledger(args.ledger, weeks)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
+
+    # ---- Default mode: gsc_performance transform --------------------------
+    if not args.raw:
+        print("--raw is required (gsc_performance transform mode)", file=sys.stderr)
+        return 2
     raw_path = Path(args.raw)
     if not raw_path.exists():
         print(f"raw JSON not found: {raw_path}", file=sys.stderr)
@@ -413,5 +634,7 @@ __all__ = (
     "GscPullError",
     "normalize_url",
     "transform",
+    "aggregate_iso_weeks",
+    "append_weekly_ledger",
     "main",
 )
