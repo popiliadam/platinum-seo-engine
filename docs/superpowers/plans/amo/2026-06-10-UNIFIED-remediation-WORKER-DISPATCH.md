@@ -178,6 +178,16 @@ The 12-finding audit#2 (F1–F12) also shipped: `b7fe35c` (DOCS) + `648ed73` (CO
 
 **DONE-when:** suite ≥ start-N/0; `grep -rn 'R-78' skills/ scripts/ tests/` shows only Article-Schema/range contexts; no IPTC ref says R-78. **DURUR-if:** an R-78 reference's context is genuinely ambiguous (Article vs IPTC) — report it, don't guess.
 
+## §FIX-RESIDUAL — stale-catalog + FAQ-contract sweep (after FIX-K lands) — Wave 3-tail/6
+
+**Why:** FIX-H (R-123/R-124 add) + FIX-H-tail (R-09 FAQ correction) left non-test-pinned stale text in files outside their scope. None is RED (no test pins them) but they are real rule↔rule / rule↔skill contradictions. **Sequence AFTER FIX-K** (FIX-K owns `new-blog/SKILL.md` + `new-blog.template.html` — this batch also touches them, so it must not run concurrently with FIX-K; re-read those files fresh).
+**Scope (ONLY):** `rules/content-quality.md`, `skills/production/new-blog/SKILL.md`, `templates/content/new-blog.template.md`, `templates/content/new-blog.template.html`, `templates/content/faq-block.template.html`, + the ~7 files carrying the stale `R-01..R-122` catalog range (`rules/content-quality.md`, `skills/production/generate-images/SKILL.md`, `skills/production/new-blog/SKILL.md`, `skills/publishing/verify-indexing/SKILL.md`, `skills/publishing/indexing-ping/SKILL.md`, `skills/meta/mark-done/SKILL.md`, `skills/reporting/monitoring-weekly/SKILL.md`) + any test pins (grep first; none expected).
+
+1. **R1 — FAQ-contract residual (⚠️ includes a rule↔rule contradiction).** `rules/content-quality.md:77` still says "10 sabit / 3000+ word → 15 hard cap (R-09)" — directly contradicts the corrected R-09 (`content-seo-discipline.md:103`: demand-driven 3-6, hard cap 10). FIX-H fixed `content-quality.md:14` but missed `:77`. Align `:77` to R-09. Also align the stale FAQ-cap text in `new-blog/SKILL.md:187,390`, `new-blog.template.md:58,113`, `new-blog.template.html:84,88` (the latter two template files carry NO R-token, keep it that way), `faq-block.template.html:6,24,38` (no batch owned this — the template new-blog/faq-optimization consume). TDD: add a pin asserting no "10 sabit"/"15 cap"/"3000" FAQ language survives in these files; RED→GREEN.
+2. **R2 — stale `R-01..R-122` catalog range.** FIX-H added R-123/R-124, so any doc/skill citing the rule range as "R-01..R-122" is now stale. Source: `rules/content-quality.md:20` + ~9 sites across the 6 skills listed. Bump to the current max (R-148 after all GAP rules land — so **run R2 LAST, in W6 alongside FIX-MFIN**, when the rule-id ceiling is final). Mechanical; no test pins it (grep-confirm).
+
+**DONE-when:** suite ≥ start-N/0; grep shows no FAQ "10 sabit/15 cap/3000" outside historical records; catalog range cites the live max. **DURUR-if:** the R-09 alignment would require touching a file a concurrent batch holds — STOP, report (sequence issue).
+
 ## §FIX-S — Command arg-parsing residual + secret leftovers — Wave 2
 
 **Scope (ONLY):** `commands/pseo-approve.md`, `commands/pseo-bind.md` (+ any other command file using the `eval "set -- $(python3 -c 'import shlex...' "$ARGUMENTS")"` idiom — grep for it), optionally a NEW tiny helper `scripts/state/parse_command_args.py`, `scripts/hooks/scan_pending_secret.py`, `scripts/security/check_secrets.sh`, `rules/secrets-management.md`, their tests.
