@@ -1,0 +1,10 @@
+# CODEOWNERS — review routing (FIX-R CI hardening, 2026-06-10).
+# Last matching pattern wins; later lines override the catch-all.
+
+# Default owner for everything.
+* @popiliadam
+
+# Security-critical surfaces — explicit ownership so changes to the secret
+# scanner or the CI pipeline itself always carry visible review routing.
+/scripts/security/ @popiliadam
+/.github/workflows/ @popiliadam
