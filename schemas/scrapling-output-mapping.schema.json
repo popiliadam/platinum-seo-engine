@@ -26,7 +26,8 @@
           "minItems": 2,
           "uniqueItems": true
         }
-      }
+      },
+      "additionalProperties": false
     },
     "scenarios": {
       "type": "object",
@@ -90,7 +91,8 @@
       "oneOf": [
         { "required": ["threshold"] },
         { "required": ["value"] }
-      ]
+      ],
+      "additionalProperties": false
     },
     "scenario": {
       "type": "object",
@@ -143,7 +145,8 @@
         },
         "tier_escalation":  { "$ref": "#/definitions/tierEscalation" },
         "autonomous_rule":  { "$ref": "#/definitions/autonomousRule" }
-      }
+      },
+      "additionalProperties": false
     }
   }
 }

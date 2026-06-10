@@ -40,9 +40,11 @@
               "default": "{filename}-before-{operation}-{YYYYMMDD-HHMMSS}.xlsx",
               "description": "Tokens: {filename}, {operation}, {YYYYMMDD-HHMMSS}, {run_id}"
             }
-          }
+          },
+          "additionalProperties": false
         }
-      }
+      },
+      "additionalProperties": false
     },
     "source_manifest": {
       "type": "string",
@@ -81,10 +83,12 @@
                 "col":  { "type": "string", "pattern": "^[A-Z]+$" },
                 "name": { "type": "string" },
                 "type": { "enum": ["string", "integer", "number", "date", "boolean"] }
-              }
+              },
+              "additionalProperties": false
             }
           }
-        }
+        },
+        "additionalProperties": false
       }
     }
   }

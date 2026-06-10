@@ -155,7 +155,24 @@ sf-import projects to 6 sheets (`crawl_sitemap`, `inlinks`, `outlinks`, `redirec
 
 ### Plugin manifest counts (v1.8+)
 
-- 45 SKILL.md files (was 44 pre-v1.8; +1 sf-crawl-orchestrator)
+- 49 SKILL.md files (44 pre-v1.8 → 45 with +sf-crawl-orchestrator → 47 with GAP-T facet-nav-audit/robots-policy-audit → 49 with GAP-T2 hreflang-audit/migration-map)
 - 29 commands/*.md files (16 pre-v1.8 → 18 with +2 pseo-sf-crawl/pseo-sf-status → 25 at v2.0 with the AMO command suite: pseo-run/-run-portfolio/-status-portfolio/-schedule/-approve/-bind + pseo-coverage → 27 with GAP-T pseo-facet-audit/pseo-robots-policy → 29 with GAP-T2 pseo-hreflang-audit/pseo-migration-map)
 - 6 hooks (UNCHANGED; Q-SF-MCP-08 RESOLVED → NO; stop_validation.py perf budget intact)
 - 4 MCP servers (was 3; +sf HTTP)
+
+### Events `event_type` enum is forward-declared (by design, not drift)
+
+`schemas/events.schema.json` declares **12** `event_type` enum values
+(`content_new`, `content_revise`, `content_remove`, `tech_fix`,
+`quickwin_applied`, `pillar_launch`, `schema_fix`, `redirect_deployed`,
+`backlink_outreach`, `manual`, `skill_content_remediation`, `skill_whats_next`).
+Only a small subset (~2) is emitted in practice today — the skill-lifecycle
+events, of which `skill_whats_next` is emitted from `whats-next` and
+`skill_content_remediation` from content-remediation; these are the canonical
+emitters added when the enum grew 10→12 (additive, v1.6 Phase-2, per the
+events-schema enum work in `docs/superpowers`). The remaining values
+**forward-declare** event sources (content / tech / quick-win / backlink
+lifecycle) that publish-side skills will emit as those pipelines are wired up.
+A declared-but-not-yet-emitted enum value is therefore expected and is **not**
+schema drift — it must not be raised as a consistency-report finding. (Documented
+during FIX-J schema hardening, 2026-06-10.)

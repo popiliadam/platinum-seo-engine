@@ -118,7 +118,8 @@
           "enum": ["values_only"],
           "description": "Enforces §8.3 zero-formula rule at the sheet level"
         }
-      }
+      },
+      "additionalProperties": false
     }
   }
 }

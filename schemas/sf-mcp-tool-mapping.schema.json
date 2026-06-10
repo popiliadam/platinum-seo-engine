@@ -27,7 +27,8 @@
           "minItems": 2,
           "uniqueItems": true
         }
-      }
+      },
+      "additionalProperties": false
     },
     "use_cases": {
       "type": "object",
@@ -92,7 +93,8 @@
       "properties": {
         "ttl_hours": { "type": "integer", "minimum": 0, "maximum": 8760 },
         "key":       { "type": "string" }
-      }
+      },
+      "additionalProperties": false
     },
     "inputField": {
       "type": "object",
@@ -109,7 +111,8 @@
           "description": "Dot-path into project.config.* for runtime binding (e.g. project.config.sf.mcp.url, project.config.sf.mcp.allowed_directory).",
           "pattern": "^project\\.config(\\.[a-z][a-z0-9_]*)+$"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "useCase": {
       "type": "object",
@@ -149,7 +152,8 @@
           "enum": ["tier_1", "tier_2", "tier_3", "meta"]
         },
         "note":         { "type": "string" }
-      }
+      },
+      "additionalProperties": false
     }
   }
 }

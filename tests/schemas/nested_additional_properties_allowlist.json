@@ -1,0 +1,20 @@
+{
+  "_README": "FIX-J (2026-06-10): allowlist of type:object schema nodes that INTENTIONALLY omit `additionalProperties` and are therefore exempt from tests/schemas/test_nested_additional_properties.py. Every other type:object node MUST declare additionalProperties (set to false during FIX-J). Each entry: schema filename -> JSON-pointer -> one-line justification. Adding an entry is a deliberate decision (a node that must stay open); the test also fails if an allowlisted node no longer exists or is no longer open (keeps this file honest).",
+  "dataforseo-endpoint-mapping.schema.json": {
+    "#/definitions/inputField/properties/items": "Polymorphic JSON-Schema-fragment descriptor: holds an arbitrary item-type sub-schema (e.g. {\"type\":\"object\"}); closing it would forbid the very type/format/items keys it exists to carry. Mirrors gsc/sf-mcp inputField shape (cross-MCP symmetry)."
+  },
+  "gsc-tool-mapping.schema.json": {
+    "#/definitions/inputField/properties/items": "Polymorphic JSON-Schema-fragment descriptor (same node as dataforseo/sf-mcp inputField.items); inherently open — closing forbids the item-type keys it carries."
+  },
+  "sf-mcp-tool-mapping.schema.json": {
+    "#/definitions/inputField/properties/items": "Polymorphic JSON-Schema-fragment descriptor; live engine instance templates/sf-mcp/use-case-example.json puts {\"type\":\"object\"} here (url_list.items), so closing would reject a real instance."
+  },
+  "monthly-report.schema.json": {
+    "#/properties/sections/properties/backlink_delta/properties/top_new/items": "Backlink entry shape is not yet modeled (free-form object, no declared properties); closing would forbid all keys. Tighten when GAP-A-B3 backlinks lands a concrete entry schema.",
+    "#/properties/sections/properties/backlink_delta/properties/top_lost/items": "Backlink entry shape is not yet modeled (free-form object, no declared properties); closing would forbid all keys. Tighten when GAP-A-B3 backlinks lands a concrete entry schema.",
+    "#/properties/sections/properties/measurement_context/properties/intervention_outcomes/items/properties/treated": "Cohort metric bag (free-form object, no declared properties) — holds arbitrary treated-cohort measures; closing would forbid all keys.",
+    "#/properties/sections/properties/measurement_context/properties/intervention_outcomes/items/properties/control": "Cohort metric bag (free-form object, no declared properties) — holds arbitrary control-cohort measures; closing would forbid all keys.",
+    "#/properties/sections/properties/measurement_context/properties/intervention_outcomes/items/properties/attrition": "Cohort metric bag (free-form object, no declared properties) — holds arbitrary attrition measures; closing would forbid all keys.",
+    "#/definitions/completedArray/items/properties/metric_impact": "Free-form metric-impact bag (no declared properties) — holds arbitrary before/after KPI keys; closing would forbid all keys."
+  }
+}

@@ -50,7 +50,8 @@
         "hash_mismatch":       { "const": "RED" },
         "header_mismatch":     { "const": "RED" },
         "row_count_mismatch":  { "const": "RED" }
-      }
+      },
+      "additionalProperties": false
     }
   },
   "definitions": {
@@ -113,9 +114,11 @@
             "expected_columns":        { "type": "array", "items": { "type": "string" }, "minItems": 1 },
             "case_insensitive":        { "type": "boolean", "default": true },
             "allow_additional_columns":{ "type": "boolean", "default": true }
-          }
+          },
+          "additionalProperties": false
         }
-      }
+      },
+      "additionalProperties": false
     }
   }
 }
