@@ -11,7 +11,7 @@ spec_section: "Phase 10 — Content Rules Processing"
 
 Bu doc Phase 10 content kuralları setinin **master** dosyasıdır. Diğer 5 dosya (`content-html-discipline.md`, `content-seo-discipline.md`, `content-eeat-discipline.md`, `content-llm-discipline.md`, `content-update-discipline.md`) bu dosyadaki **Foundational Principles** bölümüne `→ rules/content-quality.md#foundational-principles` ile referans verir; tekrar yazılmaz (DRY, → [single-source-of-truth](single-source-of-truth.md)).
 
-R-XX numbering integrity: R-01..R-26 input doc'tan korundu (content-rules-input.md SUPERSEDED — R-26 CTA Zorunlu v1.4-deep-audit-fix Tier 2 K-01 closure ile content-seo-discipline.md'ye aktarıldı), R-27..R-122 Phase 10'da eklendi (Süleyman 266-cevap matrix). Çakışma yok.
+R-XX numbering integrity: R-01..R-26 input doc'tan korundu (content-rules-input.md SUPERSEDED — R-26 CTA Zorunlu v1.4-deep-audit-fix Tier 2 K-01 closure ile content-seo-discipline.md'ye aktarıldı), R-27..R-122 Phase 10'da eklendi (Süleyman 266-cevap matrix). **R-78 başlangıçta iki kez tanımlanmıştı** (Article Schema + AI-Image IPTC); IPTC kuralı 2026-06-10'da **R-123**'e taşındı (ADR-038 history-stable) → artık tüm `### R-NN` başlıkları tekildir (invariant: `tests/rules/test_rule_id_uniqueness.py`). R-124 (YMYL expert-review sign-off) 2026-06-10'da content-eeat-discipline.md'ye eklendi.
 
 ---
 
@@ -129,7 +129,7 @@ Bu 3 prensip Phase 10 content rules setinin **üst-prensibidir**. Hiçbir alt-ru
 
 ### R-44: Source Verification 3-Katman
 
-**Statement.** Her external claim 3 katman doğrulama: (1) URL liveness HTTP 200, (2) domain otorite skoru ≥ profile threshold (YMYL: ≥ 60 / e-commerce: ≥ 40), (3) claim cite edilen sayfada literal mevcut.
+**Statement.** Her external claim 3 katman doğrulama: (1) URL liveness HTTP 200, (2) domain güvenilirliği — önce **küratörlü per-proje kaynak allowlist'i** (birincil); opsiyonel sayısal kapı kullanılırsa açıkça **Ahrefs DR** (örn. YMYL DR≥60 / e-commerce DR≥40; isimsiz "otorite skoru" yok, Moz DA ≠ Ahrefs DR), (3) claim cite edilen sayfada literal mevcut.
 
 **Rationale.** Principle 1. URL canlı ama claim sayfada yok → "uydurma kaynak" özel hali.
 

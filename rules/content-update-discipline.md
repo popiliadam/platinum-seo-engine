@@ -26,7 +26,7 @@ Bu doc Phase 10 content lifecycle (decay → revise → sunset/prune) disiplinin
 - `master.xlsx[cluster_keywords]` → primary + secondary keywords (R-12).
 - `master.xlsx[topical_map]` → pillar + cluster context (R-11).
 - `master.xlsx[new_content_plan]` → planlanan başlık, target word count, intent (R-10).
-- `master.xlsx[internal_links]` → eklenecek linkler (R-06).
+- `master.xlsx[topical_map]` hub/spoke + `master.xlsx[master_task]` `[internal-links/*]` auto_generated satırları → eklenecek linkler (R-06; 19-sheet şemasında `internal_links` sheet'i YOK — `internal-links` skill'i Option A).
 - `dataforseo_labs_keyword_*` MCP → keyword desteği.
 - `Scrapling` MCP → SERP top-5 (R-08).
 - `dataforseo_on_page_content_parsing` MCP → site mevcut içerik (R-15 doğrulama).

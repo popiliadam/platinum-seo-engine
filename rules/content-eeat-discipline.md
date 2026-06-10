@@ -33,13 +33,25 @@ Bu doc Phase 10 EEAT (Experience, Expertise, Authoritativeness, Trustworthiness)
 
 **Failure mode.** YMYL'da author missing → RED; non-YMYL'da silent.
 
+### R-124: YMYL Uzman İnceleme İmzası (Expert-Review Sign-Off)
+
+**Statement.** YMYL profilinde yazar künyesi (R-28) yalnızca **kayıtlı bir insan incelemesi** ile geçerlidir. Yayından ÖNCE şu üç alan bir `events.jsonl` audit satırına (`event_kind=audit`) kaydedilmelidir: (1) **inceleyen** kişinin adı, (2) inceleme **tarihi** (ISO 8601), (3) içerik **sürümü** (content hash veya revision id). İnceleme kaydı yoksa → RED (yayın bloklu).
+
+**Rationale.** Makine-taslağı YMYL metnine belgelenmiş inceleme olmadan adlı bir yazar künyesi koymak **uydurulmuş yazarlık sinyalidir** (Google rater-guideline "Lowest" — fabricated authorship/expertise). R-28 künyeyi görünür kılar; R-124 künyenin arkasında gerçek bir insan inceleme kanıtı olmasını zorunlu kılar. Principle 1 (Truth-Verifiable) + EEAT Trustworthiness tezahürü.
+
+**Enforcement.** Bu batch (FIX-H) kuralı + failure mode'u yazar; uygulama kontratı (new-blog / revise-content pre-publish step'i + `events_writer.append_audit` çağrısı) FIX-K'de iner. Pre-publish gate: profiles ⊇ {ymyl} ve künye (R-28) var ama `events.jsonl`'da eşleşen inceleyen+tarih+sürüm audit satırı yok → RED.
+
+**Failure mode.** YMYL'da inceleme kaydı eksik → RED.
+
+**Cross-link.** → R-28 (EEAT künye, profile-aware), R-82 (Author Person schema), R-89 (dateModified), [content-quality](content-quality.md#foundational-principles) (Principle 1 Truth-Verifiable).
+
 ### R-37: Otorite Domain (Profile-Aware)
 
-**Statement.** External outbound link otorite domain skoru profile-aware threshold: YMYL ≥ 60 (.gov/.edu/kurumsal yayın), e-commerce ≥ 40 (sektörel), b2b-saas ≥ 50 (sektörel + tech publication), local-service ≥ 30 (lokal/sektörel), portfolio esnek.
+**Statement.** Outbound link güvenilirliği önce **küratörlü per-proje kaynak allowlist'i** ile belirlenir (`project.config` allowlist / manuel kurumsal kaynak listesi) — birincil mekanizma budur. Sayısal kapı OPSİYONELdir ve kullanılırsa açıkça **Ahrefs DR** olmalıdır (isimsiz tek bir "otorite skoru" yok; Moz DA ≠ Ahrefs DR — aynı ölçek değil). Profile-aware referans aralıkları (Ahrefs DR, opsiyonel): YMYL ~DR≥60 (.gov/.edu/kurumsal yayın), e-commerce ~DR≥40 (sektörel), b2b-saas ~DR≥50, local-service ~DR≥30, portfolio esnek.
 
-**Rationale.** Principle 2. YMYL düşük otorite kaynak Trustworthiness sıfırlar; e-commerce'te .gov bulmak zor (sektörel kaynak yeterli).
+**Rationale.** Principle 2. YMYL düşük otorite kaynak Trustworthiness sıfırlar; e-commerce'te .gov bulmak zor (sektörel kaynak yeterli). İsimsiz "otorite skoru ≥60" bir metrik belirtmez (Moz DA ile Ahrefs DR karıştırılamaz) → birincil mekanizma küratörlü allowlist; sayısal eşik yalnızca açıkça Ahrefs DR olarak ikincil filtredir.
 
-**Enforcement.** Pre-publish outbound link audit: domain_authority_score (Moz/Ahrefs proxy veya manual list) + profile threshold; threshold altı → AMBER (YMYL'da RED).
+**Enforcement.** Pre-publish outbound link audit: önce allowlist üyeliği; opsiyonel sayısal filtre kullanılırsa Ahrefs DR + profile referans aralığı; eşik altı → AMBER (YMYL'da RED).
 
 **Failure mode.** YMYL'da RED, kalanlarda AMBER.
 
@@ -81,6 +93,8 @@ Bu doc Phase 10 EEAT (Experience, Expertise, Authoritativeness, Trustworthiness)
 - b2b-saas: min 1 stat / 600 word, max 1 stat / 250 word.
 - local-service: min 1 stat / 1000 word, max esnek.
 - portfolio: esnek.
+
+**Bu kural stats-density sayılarının TEK kaynağıdır (single source).** Production skill'ler (new-blog, revise-content) bu eşikleri kendi SKILL.md'lerinde farklı sayılarla tekrarlamaz; R-104'ü cite eder (örn. new-blog'un "min 3/1000w, üst sınır yok" varyantı R-104'e hizalanmalıdır).
 
 **Rationale.** Principle 3 (quality > quantity). Stats density data-driven content sinyali ama over-density "veri bombardımanı" UX kırar.
 

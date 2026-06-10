@@ -1,6 +1,6 @@
 ---
 description: |
-  Use when: kullanıcı "quick win", "hızlı kazanım", "8-20 sıradaki keyword", "low-hanging fruit", "kolay yükselebilir sayfalar" der ya da `/pseo-quickwin` çağırırsa.
+  Use when: kullanıcı "quick win", "hızlı kazanım", "11-20 sıradaki keyword", "low-hanging fruit", "kolay yükselebilir sayfalar" der ya da `/pseo-quickwin` çağırırsa.
   Also use when: aktif projenin GSC verisi master.xlsx içinde mevcut; sıralamada eşik bandında olan sorgular için `gsc-pull` → `quick-wins` skill chain'i tetiklenmek isteniyor.
   Do not use when: yeni içerik planı (`new-content-plan`), içerik decay (`content-decay`), tech audit (`tech-audit`) ya da cannibalization analizi gerekiyor; bunlar ayrı skill'lerdir.
 argument-hint: "[project-slug]"
@@ -10,7 +10,7 @@ model: sonnet
 
 # /pseo-quickwin — GSC Quick-Wins Chain
 
-> **Skill chain:** `skills/ingestion/gsc-pull/SKILL.md` (Phase 6) → `skills/discovery/quick-wins/SKILL.md` (Phase 5). Aktif. GSC son 28 gün (`days_back` default) → pozisyon 11–20 bandı (`threshold_position_min/max` defaults), impressions ≥100, top_n=50 → `master.xlsx#quick_wins` + `master.xlsx#opportunity` + onay gate + `outputs/reports/{date}-quick-wins.md`.
+> **Skill chain:** `skills/ingestion/gsc-pull/SKILL.md` (Phase 6) → `skills/discovery/quick-wins/SKILL.md` (Phase 5). Aktif. GSC son 28 gün (`days_back` default) → pozisyon 11–20 bandı (`threshold_position_min/max` defaults), impressions ≥100, top_n=50 → `master.xlsx#quick_wins` + `master.xlsx#opportunity` + onay gate + `outputs/reports/{date}-quickwin.md`.
 
 ## 1. Aktif projeyi çöz
 
