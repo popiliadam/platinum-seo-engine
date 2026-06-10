@@ -1,0 +1,103 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "http://platinum-seo-engine/schemas/ctr-curve",
+  "title": "Position CTR Curve + AIO Discount v1.0",
+  "description": "Versioned, machine-readable per-position organic CTR curve and AI-Overview discount factors, consumed by the quick-win opportunity scorer (scripts/util/ctr_curve.py + scripts/discovery/quickwins_transform.py). Honors measurement-discipline R-139 (versioned measurement constants): CTR/AIO numbers live here with provenance fields, never as literals in Python/SKILL bodies. The engine ships a curated seed (ctr-curve.json at repo root, same layout as mcp-tool-registry.json / google-update-calendar.json); curve_version bumps when a newer study lands. Positions 11-20 are engine_estimate fallback-only (the scorer's target is always page-1 by design). AIO factors come from the Ahrefs 2026-02 300K-keyword study; unknown/unchecked AIO presence is NOT discounted (factor 1.0) — see R-140.",
+  "schema_version": "1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "curve_version", "sources", "positions", "aio_discount"],
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "description": "File schema version. Additive changes keep this const (ADR-018 precedent)."
+    },
+    "curve_version": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Data version of the curve itself (e.g. '2026.06'); bumps when the underlying study changes."
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Provenance for every number in the file. No fabricated curves — each source carries a real URL + retrieval date.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "url", "retrieved", "covers"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "url": { "type": "string", "minLength": 8 },
+          "retrieved": { "type": "string", "minLength": 8 },
+          "covers": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "positions": {
+      "type": "array",
+      "minItems": 2,
+      "description": "Per-position CTR anchors, strictly increasing by position (loader enforces strict monotonicity). expected_ctr() interpolates linearly between listed positions and clamps at the ends.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["position", "ctr", "provenance"],
+        "properties": {
+          "position": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "SERP position (1-based)."
+          },
+          "ctr": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "exclusiveMaximum": 1,
+            "description": "Expected organic click-through rate at this position on a clean SERP (fraction 0-1)."
+          },
+          "provenance": {
+            "type": "string",
+            "enum": ["first_page_sage_2026", "engine_estimate"],
+            "description": "Where this CTR value came from. 'engine_estimate' marks fallback-only 11-20 values."
+          }
+        }
+      }
+    },
+    "interpolation": {
+      "type": "string",
+      "enum": ["linear_between_listed_positions"],
+      "description": "Interpolation contract between listed positions (loader implements exactly this)."
+    },
+    "aio_discount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["default", "by_position", "fallback_11_20"],
+      "description": "Multiplicative CTR discount applied ONLY when an AI Overview is present (R-140). Factor in (0,1]; 1.0 would mean no discount.",
+      "properties": {
+        "default": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "description": "Cross-check default discount (Pew ~-47% ⇒ 0.5) used when a per-position factor is unavailable."
+        },
+        "by_position": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "description": "Per-target-position AIO discount factor (Ahrefs 2026-02). Keys '1'..'10'.",
+          "patternProperties": {
+            "^([1-9]|10)$": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        "fallback_11_20": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "description": "Discount factor for target positions 11-20 (rarely reached — scorer targets page 1)."
+        }
+      }
+    }
+  }
+}

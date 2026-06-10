@@ -441,3 +441,99 @@ def test_dedup_by_url_keeps_top_score() -> None:
         f"opt-out must preserve duplicates, got {page_x_count} page-x rows"
     )
     assert out2["meta"]["dedup_by_url_applied"] is False
+
+
+# ---------------------------------------------------------------------------
+# Tests 10+ — quick-wins SKILL.md body contract (GAP-M2/M3 + dispatch addenda)
+# ---------------------------------------------------------------------------
+
+QW_SKILL = REPO_ROOT / "skills" / "discovery" / "quick-wins" / "SKILL.md"
+
+
+def _qw_text() -> str:
+    return QW_SKILL.read_text(encoding="utf-8")
+
+
+def _qw_frontmatter() -> dict:
+    import yaml
+    m = re.match(r"^---\n(.*?)\n---\n", _qw_text(), re.DOTALL)
+    assert m, "no frontmatter in quick-wins SKILL.md"
+    return yaml.safe_load(m.group(1))
+
+
+def test_qw_trigger_band_drops_stale_8_20() -> None:
+    """Dispatch addendum: the stale '8-20' band must be gone (canonical 11-20)."""
+    text = _qw_text()
+    assert "8-20" not in text, "stale '8-20' band must be dropped (canonical 11-20)"
+    assert "11-20" in text
+
+
+def test_qw_report_filename_canonical() -> None:
+    """§GAP addendum: output report filename matches the template (quickwin.template.md)."""
+    text = _qw_text()
+    assert "{date}-quickwin.md" in text
+    assert "{date}-quick-wins.md" not in text
+
+
+def test_qw_aio_inputs_present() -> None:
+    fm = _qw_frontmatter()
+    assert fm["inputs"]["aio_check"]["type"] == "boolean"
+    assert fm["inputs"]["aio_check"]["default"] is False
+    assert fm["inputs"]["aio_top_k"]["type"] == "integer"
+    assert fm["inputs"]["aio_top_k"]["default"] == 20
+
+
+def test_qw_durur_11_ctr_curve() -> None:
+    text = _qw_text()
+    # quick-wins enumerates DURURs as a numbered list under a counted header
+    # (its convention), not inline "DURUR #N" tokens.
+    assert "DURUR conditions (11)" in text  # count bumped 10 -> 11
+    assert "ctr-curve.json" in text
+    assert "CurveLoadError" in text  # the DURUR mechanism (no silent fallback)
+
+
+def test_qw_step4_cli_has_curve_and_aio_flags() -> None:
+    text = _qw_text()
+    assert "--ctr-curve" in text
+    assert "--aio-presence" in text
+
+
+def test_qw_opportunity_score_is_uplift_model() -> None:
+    text = _qw_text()
+    assert "expected_uplift_clicks" in text
+    assert "R-139" in text  # versioned curve constants citation
+
+
+def test_qw_aio_presence_columns_cite_r140() -> None:
+    text = _qw_text()
+    assert "aio_presence" in text
+    assert "R-140" in text
+    assert "not_detected" in text
+    # honesty: MCP-sync can never assert absence
+    assert not re.search(r"\babsent\b", text)
+
+
+def test_qw_aio_consent_not_required_note() -> None:
+    text = _qw_text().lower()
+    assert "consent" in text
+    assert "read-only" in text
+
+
+def test_qw_r139_curve_constants_only_in_fences() -> None:
+    """R-139 grep sentinel: curve constants must not appear in SKILL prose;
+    only inside fenced worked-examples."""
+    defenced = re.sub(r"```.*?```", "", _qw_text(), flags=re.DOTALL)
+    for forbidden in ("0.398", "0.703"):
+        assert forbidden not in defenced, (
+            f"R-139: curve constant {forbidden} leaked into SKILL prose"
+        )
+
+
+def test_quickwin_template_uplift_labels() -> None:
+    """GAP-M3 D3: report template surfaces the uplift model + AIO count."""
+    t = (REPO_ROOT / "templates" / "reports" / "quickwin.template.md").read_text("utf-8")
+    assert "$top_uplift" in t
+    assert "$aio_present_count" in t
+    assert "Beklenen tıklama kazanımı" in t
+    # the old standalone "Opportunity score:" headline label is renamed
+    assert "Opportunity score:" not in t

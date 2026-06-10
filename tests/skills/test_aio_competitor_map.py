@@ -422,3 +422,86 @@ def test_durur_list_parity_5_conditions() -> None:
     text = _skill_text()
     for n in range(1, 6):
         assert f"DURUR #{n}" in text, f"DURUR #{n} missing from skill body"
+
+
+# ---------------------------------------------------------------------------
+# GAP-M2 D1 — serp_aio premise correction (AIO presence, not schema-proxy)
+# ---------------------------------------------------------------------------
+
+def _fixture_serp_with_aio() -> list[dict]:
+    return [
+        {"type": "ai_overview", "asynchronous_ai_overview": True,
+         "references": [
+             {"domain": "competitor.com", "url": "https://competitor.com/a", "title": "A"},
+             {"domain": "example.com", "url": "https://example.com/b", "title": "B"},
+         ]},
+        {"type": "organic", "url": "https://competitor.com/a", "rank_group": 1},
+    ]
+
+
+def _fixture_serp_without_aio() -> list[dict]:
+    return [{"type": "organic", "url": "https://x.com/a", "rank_group": 1}]
+
+
+def _extract_fenced_func(name: str):
+    """Extract+exec the self-contained ```python fence that defines `name`
+    from the SKILL body — the skill is llm_native (script-less); its
+    reference helper IS the documented contract (same as detect_aio_signals)."""
+    text = _skill_text()
+    for block in re.findall(r"```python\n(.*?)```", text, re.DOTALL):
+        if f"def {name}" in block:
+            ns: dict = {}
+            exec(block, ns)  # noqa: S102 — trusted skill body, test-only
+            return ns[name]
+    raise AssertionError(f"no python fence defines {name} in SKILL body")
+
+
+def test_serp_aio_present_parse() -> None:
+    build = _extract_fenced_func("build_serp_aio")
+    out = build(_fixture_serp_with_aio(), "example.com")
+    assert out["record_kind"] == "serp_aio"
+    assert out["aio_presence"] == "present"
+    assert out["reference_count"] == 2
+    assert out["own_domain_cited"] is True
+    assert out["asynchronous_ai_overview"] is True
+    assert out["detection_source"] == "dfs_mcp_sync"
+    assert "competitor.com" in out["cited_domains"]
+
+
+def test_serp_aio_not_detected_parse() -> None:
+    build = _extract_fenced_func("build_serp_aio")
+    out = build(_fixture_serp_without_aio(), "example.com")
+    assert out["aio_presence"] == "not_detected"
+    assert out["reference_count"] == 0
+    assert out["own_domain_cited"] is False
+    assert out["asynchronous_ai_overview"] is None
+
+
+def test_absent_string_banned_r140() -> None:
+    """R-140: MCP-sync path can never assert absence — the literal enum
+    'absent' must not appear anywhere in the skill body."""
+    text = _skill_text()
+    assert not re.search(r"\babsent\b", text), (
+        "R-140: 'absent' must not appear (use not_detected; absence unprovable)"
+    )
+
+
+def test_load_async_limitation_section_present() -> None:
+    text = _skill_text()
+    assert "load_async_ai_overview" in text
+    assert "2.8.10" in text  # wrapper version named in the limitation section
+
+
+def test_premise_reworded_references_are_citation_evidence() -> None:
+    text = _skill_text()
+    # Real citation evidence is references[]/cited_domains, NOT schema markup.
+    assert "cited_domains" in text
+    assert "references" in text
+    # The old false proxy claim must be gone.
+    assert "AIO citation pattern empirik olarak" not in text
+
+
+def test_r140_cited() -> None:
+    text = _skill_text()
+    assert "R-140" in text
+    assert "measurement-discipline" in text

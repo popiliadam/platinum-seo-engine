@@ -6,13 +6,14 @@ description: |
   AIO map", "AI overview rakip", "rakip içerik AIO citation", "SERP
   pattern map" der ya da /pseo-aio-competitor-map çağırır; SERP top-N
   fetch (DataForSEO heavy) + Scrapling tier-1 fetch (per URL) +
-  R-109/R-110/R-111 AIO signal detect (schema markup + entity reference
-  + author authority) + competitor_pages.jsonl staging.
+  R-109/R-110/R-111 competitor content-quality signal detect (schema markup
+  + entity reference + author authority) + serp_aio AIO presence
+  (references[]) + competitor_pages.jsonl staging.
   Also use when: yeni keyword için pre-content-plan AIO landscape
   haritalanacak; mevcut pillar için competitor refresh yapılacak;
-  brand'ın AIO-friendly olup olmadığını competitor citation pattern'ı
-  ile test edilecek; cluster-map sonrası seçilen ana keyword için
-  competitor R-109..R-111 sinyalleri ölçülecek.
+  brand'ın AIO-friendly olup olmadığını competitor content-quality + AIO
+  presence (serp_aio references[]) ile test edilecek; cluster-map sonrası
+  seçilen ana keyword için competitor R-109..R-111 sinyalleri ölçülecek.
   Do not use when: SERP rank tracking için (gsc skill); manuel tek URL
   analiz için (on-page-audit kullan); content gap için (content-gaps
   kullan); kendi sitemizin AIO-friendliness denetimi için (schema-audit
@@ -149,7 +150,7 @@ raw_serp = mcp__dataforseo__serp_organic_live_advanced(
 )
 ```
 
-### Step 2 — Top-N URL list extract
+### Step 2 — Top-N URL list extract + AIO presence (serp_aio)
 
 ```python
 serp_items = raw_serp.get("tasks", [{}])[0].get("result", [{}])[0].get("items", [])
@@ -159,7 +160,46 @@ if not organic_urls:
     raise SerpEmptyError("DURUR #2 — SERP top_n result 0")
 ```
 
-Paralel processing OK — her URL bağımsız Scrapling fetch + transform.
+**AIO presence (premise-correct).** The REAL AI-Overview citation evidence is
+the SERP's own `ai_overview` item and its `references[]` payload — NOT the
+schema markup of organic results (that is a *content-quality* signal, see
+Step 4). Scan `serp_items` for the `ai_overview` item and build one
+`serp_aio` record per run. `build_serp_aio` is the deterministic, self-
+contained contract:
+
+```python
+def build_serp_aio(serp_items, project_domain):
+    """SERP items -> one serp_aio record. MCP-sync detection can prove
+    'present' but never absence (R-140): no AIO item -> 'not_detected'."""
+    aio_item = next((i for i in serp_items if i.get("type") == "ai_overview"), None)
+    references = (aio_item.get("references") or []) if aio_item else []
+    cited_domains = sorted({r.get("domain") for r in references if r.get("domain")})
+    return {
+        "record_kind": "serp_aio",
+        "aio_presence": "present" if aio_item else "not_detected",
+        "asynchronous_ai_overview": (
+            bool(aio_item.get("asynchronous_ai_overview")) if aio_item else None
+        ),
+        "reference_count": len(references),
+        "cited_domains": cited_domains,
+        "own_domain_cited": project_domain in cited_domains,
+        "detection_source": "dfs_mcp_sync",
+    }
+```
+
+Apply it once per run, then compute the citation map:
+
+```text
+serp_aio = build_serp_aio(serp_items, project_config["domain"])
+# New comparison output: which top-10 organic domains the AIO actually cites.
+organic_domains = [urlparse(u).netloc for u in organic_urls]
+aio_cited = [d for d in organic_domains if d in serp_aio["cited_domains"]]
+```
+
+`project_domain` from `project-config[domain]` (already in `consumes`). The
+`organic_rank ∩ aio_cited` map (`aio_cited` above) replaces the old "schema
+markup == AIO citation" proxy. Paralel processing OK — her URL bağımsız
+Scrapling fetch + transform.
 
 ### Step 3 — Each URL Scrapling fetch (tier-1 fallback Apify v1.2+)
 
@@ -187,7 +227,14 @@ if all_failed:
 Tier-1 fallback Apify v1.2+ (§14.5 ladder canonical 'fetch' →
 'stealthy_fetch' eşdeğeri) dokümante — Phase 13+ aktivasyonu.
 
-### Step 4 — AIO citation pattern detect (R-109 + R-110 + R-111)
+### Step 4 — Competitor content-quality signals (R-109 + R-110 + R-111)
+
+> **Premise correction (R-140).** The schema markup of organic results is a
+> *competitor content-quality* signal — it is **not** AIO citation evidence.
+> Real AIO citation evidence comes only from `serp_aio.cited_domains` (the
+> `references[]` payload, Step 2). The signals below characterise how
+> competitors build authoritative content; they do not prove who an AIO
+> cites.
 
 Her fetched URL için 3 sinyal grubu hesaplanır. Saf-compute,
 deterministik:
@@ -259,20 +306,25 @@ def detect_aio_signals(html: str) -> dict:
     }
 ```
 
-**R-109 Enforcement:** schema.org markup presence (Article / NewsArticle
-/ FAQPage / HowTo). AIO citation pattern empirik olarak bu @type'lar
-top citation candidate.
+**R-109 (content-quality signal):** schema.org markup presence (Article /
+NewsArticle / FAQPage / HowTo). A content-quality indicator on the
+competitor page — a candidate authority signal, **not** proof of AIO
+citation (citation evidence = `serp_aio.cited_domains`).
 
-**R-110 Enforcement:** entity reference count (Person / Organization /
-Place / LocalBusiness). AIO anti-pattern dökümante; empty count = AIO
-citation reddi sinyali.
+**R-110 (content-quality signal):** entity reference count (Person /
+Organization / Place / LocalBusiness). Thin entity coverage is a known
+content-quality anti-pattern; it is a competitor-quality signal, not an AIO
+citation verdict.
 
-**R-111 Enforcement:** author authority (sameAs, credentials, byline
-structure). Quality-driven hijack için competitor'ın authority skoru
+**R-111 (content-quality signal):** author authority (sameAs, credentials,
+byline structure). Quality-driven hijack için competitor'ın authority skoru
 kıyas tabanı.
 
 DURUR #4: tüm URL'lerde aio_signal toplam 0 (R-109..R-111 hiçbiri
-detect edilemedi) → AMBER + report empty payload.
+detect edilemedi) **VE** `serp_aio["aio_presence"] == "not_detected"` →
+AMBER + report empty payload. Report wording: "sync-path could not detect an
+AIO; absence not proven (wrapper lacks load_async_ai_overview)". The
+content-quality signals being 0 says nothing about whether an AIO exists.
 
 ### Step 5 — competitor_pages.jsonl staging write
 
@@ -284,6 +336,11 @@ staging_path = (
 staging_path.parent.mkdir(parents=True, exist_ok=True)
 total_signals = 0
 with staging_path.open("w", encoding="utf-8") as f:
+    # One header line per run carries the AIO presence verdict (record_kind=
+    # "serp_aio"); the per-URL content-quality rows follow.
+    f.write(_json.dumps({**serp_aio, "snapshot_date": snapshot_iso_utc,
+                         "target_keyword": target_keyword},
+                        ensure_ascii=False) + "\n")
     for fetched_url, signals in zip(organic_urls, all_signals):
         record = {
             "snapshot_date": snapshot_iso_utc,
@@ -360,6 +417,30 @@ events_writer.append_provenance(
 
 `target_excel_sheet=null` intentional — staging-only path. Append-only
 invariant: events.jsonl asla in-place rewrite görmez (line-append).
+
+## Async AIO limitation (2.8.10) + Method C upgrade path
+
+The MCP wrapper `mcp__dataforseo__serp_organic_live_advanced`
+(dataforseo-mcp-server@2.8.10) exposes only sync params (`keyword`,
+`language_code`, `location_name`, `depth`, `device`, …). It does **NOT**
+expose `load_async_ai_overview` and does **NOT** accept `location_code`.
+Consequence: many AI Overviews load asynchronously and come back as
+`ai_overview: null`, so the MCP-sync path **undercounts** presence — it may
+only ever record `present` or `not_detected`, never absence
+(measurement-discipline **R-140**). `unchecked ≠ not_detected`.
+
+**Optional `aio_rest` upgrade path (Method C, default `false`).** When the
+operator sets `aio_rest: true`, the skill bypasses the wrapper and POSTs
+directly to `{DFS_API_BASE}/serp/google/organic/live/advanced` with
+`[{"keyword": …, "location_code": …, "language_code": …, "depth": …,
+"load_async_ai_overview": true}]`, reusing
+`scripts/ingestion/dfs_pull.http_credentials_from_env()`. This sets
+`detection_source: "dfs_rest_async"` and surfaces async AIOs the wrapper
+hides. Cost **doubles** per call ($0.0035 → $0.007 credit accounting); DFS
+refunds the surcharge when no async AIO exists — record the *requested* cost
+in the provenance event and note the refund rule. TR projects MUST verify the
+served locale via `dfs_pull.detect_response_locale` (existing wrapper-TR-bug
+discipline — see [[feedback_dfs_wrapper_tr_bug]]).
 
 ## DURUR conditions (5)
 
