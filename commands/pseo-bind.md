@@ -18,13 +18,13 @@ Bu Claude session'ını (session UUID'sine göre) tek bir SEO projesine bağlar.
 
 `$1` slug ZORUNLU. Eksikse DURDUR ve kullanımı göster:
 
-!`eval "set -- $(python3 -c 'import shlex,sys;print(" ".join(shlex.quote(a) for a in shlex.split(sys.argv[1])))' "$ARGUMENTS")"; if [ -z "$1" ]; then echo "MISSING_SLUG: usage /pseo-bind <project-slug> [--workspace <path>]"; echo "ipucu: slug = projects/<slug>/project.config.json olan bir proje"; fi`
+!`set -- $ARGUMENTS; if [ -z "$1" ]; then echo "MISSING_SLUG: usage /pseo-bind <project-slug> [--workspace <path>]"; echo "ipucu: slug = projects/<slug>/project.config.json olan bir proje"; fi`
 
 ## 2. Bind komutunu çalıştır
 
 `$1` verildiyse primitive CLI'yi çağır. `--workspace` opsiyoneldir: ilk seferinde bir kez geçilirse `~/.config/pseo/config.json`'a kalıcı yazılır (editör-bağımsız), sonraki çağrılarda gerek kalmaz. CLI sırasıyla: workspace root'u çözer (config → `$PSEO_WORKSPACE_ROOT`), session UUID'sini `$CLAUDE_CODE_SESSION_ID`'den alır, `projects/<slug>/project.config.json` var mı doğrular, sonra marker'ı atomik yazar (tempfile + fsync + os.replace).
 
-!`eval "set -- $(python3 -c 'import shlex,sys;print(" ".join(shlex.quote(a) for a in shlex.split(sys.argv[1])))' "$ARGUMENTS")"; cd "$CLAUDE_PLUGIN_ROOT" && python3 -m scripts.state.session_binding bind "$1" "${2:-}" "${3:-}" 2>&1`
+!`cd "$CLAUDE_PLUGIN_ROOT" && python3 -m scripts.state.session_binding bind $ARGUMENTS 2>&1`
 
 Başarılı çıktı tek satırlık banner'dır, örn:
 
@@ -46,4 +46,5 @@ Marker yazıldıktan sonra `/pseo-status` çağırarak bu session'a bağlı proj
 - Marker shape: `schemas/session-marker.schema.json` (active_project + bound_at + session_id, additionalProperties:false).
 - Atomik yazma: tempfile + fsync + os.replace + parent dir fsync (transaction.py::_atomic_save ile aynı disiplin).
 - Engine root `$CLAUDE_PLUGIN_ROOT`'tan alınır; cwd'den TÜRETME (batch 0a: güvenilmez).
+- Argüman aktarımı: `$ARGUMENTS` **tırnaksız** argparse'a verilir (`bind $ARGUMENTS`). Claude Code `$ARGUMENTS`'ı blok kaynağına metin-ikamesi yapar; boşluklu `--workspace` yolu kullanıcının tırnaklarıyla tek argüman kalır, argparse (slug + `--workspace`) parser'dır. `"$ARGUMENTS"` / `eval`+`shlex` `set --` reparse / `"$1" "${2:-}"` KULLANMA — text-sub altında tırnakları bozar ve boş `"${2:-}"` argparse'a "unrecognized arguments" verir (finding #13).
 - `shared/sessions/` workspace-geneldir (active.json'ın yanında), per-proje `_state/` ALTINDA DEĞİL.
