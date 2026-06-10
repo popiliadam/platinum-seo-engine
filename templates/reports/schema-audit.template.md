@@ -1,6 +1,6 @@
 <!--
   Reports Frontmatter Policy: single-project descriptive (rules/single-source-of-truth.md#reports-frontmatter-policy).
-  Rules consumed: rules/schema-first.md, rules/schema-versioning-discipline.md, rules/events-writer.md, rules/append-only-state.md
+  Rules consumed: rules/schema-first.md, rules/schema-versioning-discipline.md, rules/events-writer.md, rules/append-only-state.md, rules/merchant-structured-data.md
 -->
 # Schema Audit — $project_slug
 
@@ -22,6 +22,14 @@ $report_summary
 
 - **Schema:** $top_schema_type
 - **Önerilen aksiyon:** $top_remaining_work
+
+## Merchant listing bulguları (e-ticaret)
+
+$merchant_findings_md
+
+> Merchant kontrolleri (M1–M7) yalnız e-commerce profilli projelerde
+> çalışır; çerçeve per rules/merchant-structured-data.md (offer accuracy
+> + shipping/returns org-level-first).
 
 ## Kanıt zinciri
 

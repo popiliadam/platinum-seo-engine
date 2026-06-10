@@ -16,7 +16,7 @@ description: |
   taraması (quick-wins), title/meta coverage (on-page-audit), tech-seo
   issues (tech-audit) — ayrı discovery skill'leri. Master.xlsx yokken
   çağırma; init-project önce çalışmalı (DURUR #6).
-version: "1.0"
+version: "1.1"
 status: active
 category: discovery
 inputs:
@@ -48,6 +48,15 @@ inputs:
     required: false
     default: false
     description: "Opt-in (D-SF-11): when true, calls SF MCP via scripts/util/sf_mcp_client.SfMcpClient for live structured_data_all rows (bypasses file requirement for fresh JSON-LD). Resolves the crawl id from sf_list_crawls (domain match → instanceDirName), client.load_crawl(...) (resilient), then exports structured_data_all via SF_EXPORT_DISPATCH (sf_export_seo_element_urls 'Structured Data') to file_path (the >100KB inline cap is resolved by writing to disk, not a non-existent 'truncated' flag); the seo-element export is NDJSON → converted via sf_crawl_orchestrator.ndjson_to_csv → csv.DictReader → transform(raw_sf={'rows': ...}). Requires SF GUI + MCP server running (preflight via client.health(); on FAIL / no matching crawl / SfMcpToolError / load timeout → AMBER fallback to file-based path, NEVER hard fail per R9)."
+  merchant_checks:
+    type: boolean
+    required: false
+    description: "Merchant listing checks M1–M7 (Step 4c, pure compute, 0 credits). NO static default: omitted → auto-resolves from project.config.profiles (on when the project declares the e-commerce profile, off otherwise). Explicit true/false overrides the profile gate. Rows ride master.xlsx#schema; rules/merchant-structured-data.md governs framing."
+  price_parity_sample:
+    type: boolean
+    required: false
+    default: false
+    description: "M7 flag: sample ≤10 product URLs (free Scrapling bulk_get, pre-fetched by the orchestrator) and compare JSON-LD price vs rendered page text (TR number formats tolerated). Heuristic — default off; only meaningful when merchant checks run."
 outputs:
   - "master.xlsx#schema"
   - "outputs/reports/{date}-schema-audit.md"
@@ -77,6 +86,8 @@ mcp_tools:
     - "mcp__sf__sf_list_crawls"
     - "mcp__sf__sf_load_crawl"
     - "mcp__sf__sf_export_seo_element_urls"
+    - "mcp__ScraplingServer__fetch"
+    - "mcp__ScraplingServer__bulk_get"
 budget:
   uses_paid_mcp: false
   estimated_credits: 0
@@ -112,6 +123,8 @@ changes. Deviate only with an ADR.
 | `default_status`      | string  | "TODO"  | statusEnum seed; per-row gap analysis can override per row.         |
 | `cross_validate_dfs`  | boolean | false   | When true, runs DFS on_page_content_parsing cross-validate (paid).  |
 | `strict_parse`        | boolean | false   | Strict JSON-LD parse mode (raise on malformed blob).                |
+| `merchant_checks`     | boolean | auto    | Merchant M1–M7 (Step 4c). Omitted → on iff `e-commerce` ∈ profiles. |
+| `price_parity_sample` | boolean | false   | M7: ≤10 URL price-parity sample over pre-fetched HTML (heuristic).  |
 
 `workspace_root` is resolved via `PSEO_WORKSPACE_ROOT` env or explicit
 test override (mirrors workflow_runner / events_writer).
@@ -261,6 +274,71 @@ incurs DFS credits, and it is gated by an explicit input + budget
 pre-flight (Q-W-A4-01 lesson — no per-call/per-url leakage in
 frontmatter).
 
+### Step 4c — `merchant_listing_audit` (pure compute, profile-gated)
+
+Merchant listing experience checks M1–M7 per
+`rules/merchant-structured-data.md` (offer accuracy + shipping/returns
+org-level-first). Pure compute via
+`scripts/discovery/merchant_listing_audit.py` over the SAME parsed SF
+envelope — 0 credits, no new MCP requirement. Gate: explicit
+`merchant_checks` wins; omitted → auto-on iff `"e-commerce"` is in
+`project.config.profiles`.
+
+> Placement note: the gap spec drafted this as "Step 6b" (post-approval).
+> It runs as Step 4c — BEFORE Step 5 — so the approval subject's row
+> count covers the merchant rows; injecting rows after the operator
+> approved a smaller count would hollow out the consent gate.
+
+```python
+from scripts.discovery import merchant_listing_audit as mla
+
+run_merchant = (
+    merchant_checks
+    if merchant_checks is not None
+    else "e-commerce" in project_config.get("profiles", [])
+)
+merchant_md = (
+    "Merchant listing kontrolleri: atlandı (merchant_checks kapalı / "
+    "profil e-commerce değil)."
+)
+if run_merchant:
+    jsonld_index = mla.build_jsonld_index(flat_envelope)
+    org_nodes = mla.collect_org_nodes(jsonld_index)
+    # Org markup surface (homepage/policy pages) is normally already in
+    # the SF export. If org_nodes is empty, OPTIONALLY do ONE free
+    # mcp__ScraplingServer__fetch of the homepage ("/"), parse its JSON-LD
+    # <script> blocks into nodes and extend org_nodes; on ANY fetch
+    # failure just continue — M4/M5 then carry the explicit
+    # "not observable" wording instead of asserting absence.
+    parity_html_by_url = None
+    if price_parity_sample:
+        # M7: ≤10 product URLs via free mcp__ScraplingServer__bulk_get;
+        # pass the {url: html} dict through — the module does NO I/O and
+        # caps the sample at mla.PARITY_SAMPLE_CAP itself.
+        parity_html_by_url = fetched_html_by_url
+    merchant_result = mla.audit_merchant_listings(
+        jsonld_index, org_nodes, project_config,
+        today=today.isoformat(),
+        rendered_html_by_url=parity_html_by_url,
+        price_parity_sample=price_parity_sample,
+    )
+    schema_rows = schema_rows + merchant_result["rows"]  # no mutation
+    merchant_md = mla.render_merchant_findings_md(merchant_result)
+```
+
+Merchant rows are TODO-seeded 5-col `schema` sheet rows (priority words
+encoded in `remaining_work`, e.g. `merchant M1/high: …` — the sheet has
+no severity column by design). They are written by the SAME Step-7
+`committer.commit` call and covered by the SAME Step-9 `sf_csv`
+provenance event (`rows_written` includes them; the module itself writes
+no events — D-003). Shipping/returns gaps yield ONE site-level
+opportunity row each, never per-product spam; recommendation defaults to
+org-level `Organization.hasShippingService` → `ShippingService` +
+`Organization.hasMerchantReturnPolicy` (single policy-page script — the
+only deploy mechanism limited-template TR platforms reliably support),
+with per-offer `OfferShippingDetails`/`hasMerchantReturnPolicy` reserved
+for genuine per-product deviations.
+
 ### Step 5 — `request_approval` (skill EXIT awaiting_approval)
 
 ```python
@@ -309,7 +387,14 @@ committer.commit(
 data.json` → `outputs/reports/{date}-schema-audit.md`. Variables:
 `$project_slug`, `$date`, `$row_count`, `$blocked_count`, `$todo_count`,
 `$exists_count`, `$done_count`, `$top_schema_type`,
-`$top_remaining_work`, `$report_summary`.
+`$top_remaining_work`, `$report_summary`, `$merchant_findings_md`.
+
+`$merchant_findings_md` is ALWAYS provided (the CLI renderer substitutes
+strictly — a missing key aborts): when Step 4c ran it is
+`mla.render_merchant_findings_md(merchant_result)`, otherwise the
+skipped-state string from the Step 4c snippet. The block never contains
+bare rule-id tokens (template R-token lock) — it cites
+`rules/merchant-structured-data.md` by path.
 
 ### Step 9 — Provenance event
 
@@ -607,9 +692,16 @@ DURUR #7 clean exit.)
 - Transform: `scripts/discovery/schema_audit_transform.py` (pure;
   zero `transaction.append` direct calls, zero
   `scripts.excel.transaction` imports).
+- Merchant module (Step 4c): `scripts/discovery/merchant_listing_audit.py`
+  (pure, deterministic — `today` injected; same import discipline) +
+  `rules/merchant-structured-data.md`.
 - Tests: `tests/skills/test_schema_audit.py` (≥6 cases incl. budget +
-  smoke E2E + statusEnum coverage).
-- Template: `templates/reports/schema-audit.template.md`.
+  smoke E2E + statusEnum coverage),
+  `tests/discovery/test_merchant_listing_audit.py` (M1–M7 contract),
+  `tests/rules/test_merchant_structured_data_rules.py` (rule sentinels +
+  template R-token lock).
+- Template: `templates/reports/schema-audit.template.md`
+  (incl. `$merchant_findings_md`).
 
 ## Discipline checklist
 
@@ -634,3 +726,15 @@ DURUR #7 clean exit.)
 - [x] Append-only state — `events.jsonl` only grows; no in-place rewrite.
 - [x] statusEnum strict — every emitted row's status is in the canonical
       7-value enum, validated at row-emission time.
+
+## Changelog
+
+- **v1.1 (2026-06-10, GAP-A3 / GAP-A-B1):** merchant listing module
+  (M1–M7) added as Step 4c — pure compute via
+  `scripts/discovery/merchant_listing_audit.py`, profile-gated
+  (`merchant_checks` auto-on for e-commerce), 0 credits. Report gains
+  `$merchant_findings_md`; `rules/merchant-structured-data.md` created.
+  Deviation from the gap spec recorded: spec drafted the step as
+  "Step 6b" (after approval); placed at 4c so the Step-5 approval count
+  covers merchant rows (consent integrity).
+- **v1.0:** initial 10-step protocol (Phase 7 Wave 2).
