@@ -59,7 +59,7 @@ def test_continue_on_error_all_steps_strict_mode():
     mode'a alındı (CI Run 10 mask removed actual exit code surface kanıtı +
     pytest 610 PASS + plugin-agnostik-grep 0 hit since W2 + secret-grep 0 hit
     [4 exclude path: .env.example, docs/superpowers/specs/, docs/CONTEXT_LEDGER.md,
-    scripts/ci/check_secrets.sh] + frontmatter-compile 47 SKILL.md Draft7 verified).
+    scripts/ci/check_secrets.sh] + frontmatter-compile 49 SKILL.md Draft7 verified).
 
     Lesson 21 cross-skill convention worker proaktif scope expansion 8 ardışık
     production-ready: bu test W3-W3-β closure ile ci.yml flip aynı wave'de

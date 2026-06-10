@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Claude Code Plugin](https://img.shields.io/badge/Claude_Code-plugin-7C3AED)](https://claude.ai/code)
 
-> Status: **v2.0.0** — production-ready · 47 skills · 27 commands · 6 hooks · 4 MCP servers (3 stdio + 1 HTTP)
+> Status: **v2.0.0** — production-ready · 49 skills · 29 commands · 6 hooks · 4 MCP servers (3 stdio + 1 HTTP)
 
 > **Schema-locked, drift-checked SEO automation for Claude Code.**
 > Turn manual SEO work into auditable, repeatable workflows — backed by JSON Schemas, append-only state, and a tool that audits itself.
@@ -43,20 +43,20 @@ You will get the most out of this if you are comfortable with a CLI, JSON, and t
 
 ## What it does
 
-Out of the box, **47 skills** across 8 categories cover an end-to-end SEO loop:
+Out of the box, **49 skills** across 8 categories cover an end-to-end SEO loop:
 
 | Category | What it covers | Skills |
 |---|---|---|
 | **Ingestion** | Pull data from Google Search Console, DataForSEO, Screaming Frog (file-drop + native MCP-primary orchestrator), Scrapling | 5 |
-| **Discovery** | Quick wins, content gaps, cannibalization, content decay, on-page audit, schema audit, tech audit, geo analysis, competitive analysis, AIO competitor map, GBP audit, faceted-nav audit, robots-policy audit | 13 |
-| **Planning** | Topical map, cluster map, new content plan, internal links, master task sync | 5 |
+| **Discovery** | Quick wins, content gaps, cannibalization, content decay, on-page audit, schema audit, tech audit, geo analysis, competitive analysis, AIO competitor map, GBP audit, faceted-nav audit, robots-policy audit, hreflang audit | 14 |
+| **Planning** | Topical map, cluster map, new content plan, internal links, master task sync, migration map | 6 |
 | **Production** | New blog drafting, content revision, FAQ optimization, content remediation, image generation | 5 |
 | **Publishing** | Indexing ping (URL Indexing API), index status verification | 2 |
 | **Reporting** | Weekly/monthly site reports + 6 portfolio-level reports (overview, heatmap, KPI trend, etc.) | 9 |
 | **Meta** | Init project, brand onboarding, whats-next router, mark-done | 4 |
 | **Governance** | Schema validation, glossary audit, drift-check, context loader | 4 |
 
-Plus **27 slash commands** (`/pseo-init`, `/pseo-quickwin`, `/pseo-driftcheck`, `/pseo-sf-crawl`, `/pseo-sf-status`, …), **6 hooks** that fire on session start, prompt submit, and tool use, and **4 MCP servers** wired up automatically (GSC, DataForSEO, Scrapling, SF — the last over HTTP `http://127.0.0.1:11435/mcp`).
+Plus **29 slash commands** (`/pseo-init`, `/pseo-quickwin`, `/pseo-driftcheck`, `/pseo-sf-crawl`, `/pseo-sf-status`, …), **6 hooks** that fire on session start, prompt submit, and tool use, and **4 MCP servers** wired up automatically (GSC, DataForSEO, Scrapling, SF — the last over HTTP `http://127.0.0.1:11435/mcp`).
 
 A typical workflow looks like:
 
@@ -133,8 +133,8 @@ The plugin enforces a **two-repo separation** between logic and data:
 ┌──────────────────────────────────┐        ┌──────────────────────────────────┐
 │  platinum-seo-engine  (this)     │  reads │  platinum-seo-workspace          │
 │  ─────────────────────────────   │ ─────► │  ─────────────────────────────   │
-│  • skills/        (47 SKILL.md)  │        │  • projects/{slug}/              │
-│  • commands/      (27 slash cmds)│        │     ├ project.config.json        │
+│  • skills/        (49 SKILL.md)  │        │  • projects/{slug}/              │
+│  • commands/      (29 slash cmds)│        │     ├ project.config.json        │
 │  • hooks/         (6 hooks)      │ writes │     ├ master.xlsx                │
 │  • schemas/       (31 JSON       │ ─────► │     ├ events.jsonl  (append-only)│
 │  • scripts/        Schemas)      │        │     └ workflows/{run_id}.json    │
@@ -255,7 +255,7 @@ Browse the full catalog: [`skills/`](skills/). Slash commands map 1:1 to commonl
 
 **Current:** v2.0.0 — the **AMO milestone (Autonomy & Multi-project Orchestration)**: an autonomous orchestration layer on top of the v1.x schema-locked toolchain. Per-session project binding (N windows = N projects), an orchestrator that runs an intent as an ordered pipeline and **verifies each step's output**, a Stop-hook denetçi that forces skipped steps, per-session consent gates (push / delete / POST / sitemap / Indexing), an AI-disclosure quarantine, an independent correctness oracle (the real ≤5% structured-error number), a portfolio cost/quota ledger with kill-switch, and a fail-closed scheduler. Path A (hard-coded ordered sequences), hardened by a 9-agent adversarial review; live-acceptance (D11) passed end-to-end on a real GSC project. Full pytest suite green, zero regression.
 
-The plugin is delivered in **15 phases**. Foundation phases (0–4) are complete; skill phases (5–13) deliver the ~47 skills in batches; phase 14 covers the workspace + CI + a full pilot run end-to-end. Phase 5 is the **GO/NO-GO gateway** — failing it sends the project back to foundation work rather than papering over gaps.
+The plugin is delivered in **15 phases**. Foundation phases (0–4) are complete; skill phases (5–13) deliver the ~49 skills in batches; phase 14 covers the workspace + CI + a full pilot run end-to-end. Phase 5 is the **GO/NO-GO gateway** — failing it sends the project back to foundation work rather than papering over gaps.
 
 | Phase | Title | Status | Skills |
 |---|---|---|---|
@@ -288,7 +288,7 @@ Detailed status: **[docs/PHASE_STATUS.md](docs/PHASE_STATUS.md)** · Open questi
 | [`ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Vision, two-repo strategy, 10 disciplines, phase roadmap, v1 acceptance criteria |
 | [`INSTALL.md`](docs/INSTALL.md) | Requirements, install, configuration, first-run smoke test, troubleshooting |
 | [`CONTRIBUTING.md`](docs/CONTRIBUTING.md) | Manager/worker protocol, skill authoring, phase discipline |
-| [`WORKFLOWS.md`](docs/WORKFLOWS.md) | The full 47-skill catalog with inputs/outputs |
+| [`WORKFLOWS.md`](docs/WORKFLOWS.md) | The full 49-skill catalog with inputs/outputs |
 | [`GLOSSARY.md`](docs/GLOSSARY.md) | Spec terminology — every technical term defined once |
 | [`DECISIONS.md`](docs/DECISIONS.md) | Architecture Decision Records (append-only) |
 | [`PHASE_STATUS.md`](docs/PHASE_STATUS.md) | Current phase + history |

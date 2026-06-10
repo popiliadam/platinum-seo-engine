@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "http://platinum-seo-engine/schemas/migration-mapping",
+  "title": "Migration Mapping Rules v1.0",
+  "description": "OPTIONAL operator file projects/{slug}/migration/{date}-mapping-rules.json, validated when present (absence = explicit old_url,new_url pairs from the {date}-url-mapping.csv only). Holds ordered regex redirect rules the migration-map skill expands over the full old-site crawl inventory (R-134); each rule maps an old-URL pattern to a new-URL template with a 301/410 action. Additive standalone schema — no existing schema is touched, no migration (mirrors the GAP-T2 facet-policy.schema.json precedent). See rules/tech-seo-governance.md R-134.",
+  "schema_version": "1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version"],
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "description": "Schema version this mapping-rules file conforms to (rules/schema-versioning-discipline.md)."
+    },
+    "rules": {
+      "type": "array",
+      "description": "Ordered regex redirect rules applied (lowest `order` first) to every old URL the explicit pairs did not already map. First match wins.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["match", "replace", "action", "order"],
+        "properties": {
+          "match": {
+            "type": "string",
+            "description": "Python `re` pattern matched against the old URL (path or absolute). Capture groups feed the `replace` template."
+          },
+          "replace": {
+            "type": "string",
+            "description": "New-URL template; `$1`/`$2` (or `\\1`) reference `match` capture groups. Empty string is valid for an action:410 rule (no target)."
+          },
+          "action": {
+            "type": "string",
+            "enum": ["301", "410"],
+            "description": "Disposition for matched URLs: 301 (redirect to the expanded `replace` target) or 410 (gone — no target)."
+          },
+          "order": {
+            "type": "integer",
+            "description": "Application order; rules are applied ascending, first match wins (deterministic, operator-controlled)."
+          }
+        }
+      }
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Disposition for old URLs that no explicit pair and no rule matched.",
+      "properties": {
+        "unmatched": {
+          "type": "string",
+          "enum": ["flag", "410"],
+          "description": "`flag` = list the URL as unmapped for operator triage (never silently dropped, per R-134); `410` = treat every unmatched URL as gone."
+        }
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Free-text operator note (provenance / confirmation date)."
+    }
+  }
+}
