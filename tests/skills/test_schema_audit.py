@@ -228,7 +228,8 @@ def test_frontmatter_validates(skill_frontmatter: dict,
     fm = skill_frontmatter
     assert fm["name"] == "schema-audit"
     assert fm["status"] in {"active", "deprecated", "wip"}
-    assert fm["version"] == "1.0"
+    # v1.1: merchant_checks module added (GAP-A3 / GAP-A-B1, additive).
+    assert fm["version"] == "1.1"
     assert fm["category"] == "discovery"
 
     inputs = fm["inputs"]
@@ -736,3 +737,77 @@ def test_cli_default_status_flag_threads_through(tmp_path: Path) -> None:
     assert rc == 0
     rows = json.loads((out / "schema_audit.json").read_text("utf-8"))
     assert rows and rows[0]["status"] == "DEFERRED"
+
+
+# ---------------------------------------------------------------------------
+# Tests — v1.1 merchant module (GAP-A3 / GAP-A-B1): additive frontmatter
+# inputs + Step 4c body contract. No new skill, no count change, 0 credits.
+# ---------------------------------------------------------------------------
+
+def test_merchant_inputs_declared_and_frontmatter_still_valid(
+    skill_frontmatter: dict,
+    skill_frontmatter_schema: dict,
+) -> None:
+    """v1.1 (GAP-A3): `merchant_checks` (boolean, optional, NO static default —
+    auto-resolves by profile: on when "e-commerce" ∈ project.config.profiles)
+    + `price_parity_sample` (boolean, optional, default False — M7 flag).
+    Scrapling fetch tools are declared optional (free; org-homepage fallback +
+    M7 sample). Budget stays 0-credit / uses_paid_mcp=false."""
+    fm = skill_frontmatter
+    inputs = fm["inputs"]
+
+    assert "merchant_checks" in inputs
+    mc = inputs["merchant_checks"]
+    assert mc["type"] == "boolean"
+    assert mc["required"] is False
+    assert "default" not in mc, (
+        "merchant_checks must NOT pin a static default — it auto-resolves "
+        "from project.config.profiles (e-commerce → on)"
+    )
+    assert "e-commerce" in mc["description"]
+
+    assert "price_parity_sample" in inputs
+    pps = inputs["price_parity_sample"]
+    assert pps["type"] == "boolean"
+    assert pps["required"] is False
+    assert pps["default"] is False
+
+    opt = fm["mcp_tools"]["optional"]
+    assert "mcp__ScraplingServer__fetch" in opt
+    assert "mcp__ScraplingServer__bulk_get" in opt
+
+    # Merchant checks are pure compute on already-crawled data: budget block
+    # unchanged (0 credits; Scrapling is free).
+    assert fm["budget"]["uses_paid_mcp"] is False
+    assert fm["budget"].get("estimated_credits", 0) == 0
+
+    validator = Draft7Validator(skill_frontmatter_schema)
+    errs = sorted(
+        validator.iter_errors(fm), key=lambda e: list(e.absolute_path),
+    )
+    assert not errs, (
+        "frontmatter invalid after merchant inputs added: "
+        f"{[(list(e.absolute_path), e.message) for e in errs]}"
+    )
+
+
+def test_skill_md_documents_merchant_step_4c() -> None:
+    """The merchant module runs as Step 4c — BEFORE the Step-5 approval gate,
+    so the approval subject's row count covers merchant rows (consent
+    integrity; the gap spec drafted this as 'Step 6b' which would have added
+    rows AFTER the operator approved a smaller count)."""
+    text = SKILL_PATH.read_text(encoding="utf-8")
+    assert "merchant_listing_audit" in text, (
+        "SKILL.md must wire scripts/discovery/merchant_listing_audit.py"
+    )
+    assert "Step 4c" in text
+    # Compute precedes consent: 4c documented before the approval step.
+    assert text.index("Step 4c") < text.index("Step 5 — `request_approval`")
+    # Report wiring: the prerendered merchant block is ALWAYS provided
+    # (render_template CLI substitution is strict).
+    assert "$merchant_findings_md" in text
+    # Org-level coverage chain documented with the REAL types.
+    assert "hasShippingService" in text
+    assert "hasMerchantReturnPolicy" in text
+    # Discipline: merchant rows are TODO-seeded schema-sheet rows.
+    assert "rules/merchant-structured-data.md" in text
