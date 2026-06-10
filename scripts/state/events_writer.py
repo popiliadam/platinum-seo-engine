@@ -82,7 +82,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_SCHEMA_PATH = _REPO_ROOT / "schemas" / "events.schema.json"
 
 # Secret VALUE patterns — a MIRROR of the canonical inventory in
-# scripts/security/check_secrets.sh (its 16 PATTERN_NAMES classes), so an event
+# scripts/security/check_secrets.sh (its 17 PATTERN_NAMES classes), so an event
 # can never persist a secret class the repo otherwise claims to detect (hostile
 # audit #3). Python redaction can't shell out per event, so the inventory is
 # mirrored here; the drift tripwire is tests/scripts/test_events_writer_secret_
@@ -113,6 +113,15 @@ _SECRET_VALUE_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r'"private_key"\s*:\s*"-----BEGIN'),
     # dataforseo hardcoded creds    [dataforseo_env_hardcoded_literal]
     re.compile(r"DATAFORSEO_(?:LOGIN|USERNAME|PASSWORD)\s*=\s*[\"'][^\"']+[\"']"),
+    # generic base64 high-entropy secret  [base64_high_entropy_secret_assignment]
+    #   secret-ish key + quoted, '='-padded base64 value (>=24 b64 chars). The '='
+    #   padding mirrors the scanner's precision anchor so hex hashes / git SHAs /
+    #   identifiers / paths (no '=') are not over-redacted. re.I covers KEY/Key/key.
+    re.compile(
+        r"(?:key|token|secret|password|credential)[\"']?\s*[:=]\s*"
+        r"[\"'][A-Za-z0-9+/]{24,}={1,2}[\"']",
+        re.IGNORECASE,
+    ),
 )
 
 # Secret FIELD-NAME suffixes — case-insensitive endswith match.

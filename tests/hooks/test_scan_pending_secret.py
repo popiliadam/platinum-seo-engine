@@ -9,7 +9,7 @@ a ``--scan-stdin`` literal-bytes mode wired nowhere.
 This hook (``scripts/hooks/scan_pending_secret.py``) extracts the LITERAL
 pending content of a Write/Edit/NotebookEdit (and a write-shaped Bash command)
 and pipes it to the canonical scanner ``--scan-stdin <file_path>`` BEFORE the
-write lands — delegating to the SAME 16-class inventory (single source of
+write lands — delegating to the SAME 17-class inventory (single source of
 truth), never re-implementing patterns.
 
 Contract under test:
@@ -182,6 +182,59 @@ def test_bash_read_command_allows(tmp_path: Path) -> None:
     payload = {"tool_name": "Bash", "tool_input": {"command": "grep -r foo ."}}
     proc = _run_hook(payload, cwd=str(tmp_path))
     assert proc.returncode == 0
+
+
+# ---------------------------------------------------------------------------
+# S3 (codex-F extension) — on a hit, ALSO emit a {"decision":"block",...} JSON
+# line to STDOUT (consistency with ai_disclosure_rescan.py / denetci.py), while
+# KEEPING the existing exit-2 + stderr-text contract and never leaking content.
+# ---------------------------------------------------------------------------
+
+def test_block_emits_decision_json_to_stdout(tmp_path: Path) -> None:
+    """A secret hit emits a parseable block decision on STDOUT carrying the
+    scanner's pattern LABEL (never the matched bytes), and still exits 2 with the
+    BLOCKED stderr text."""
+    sk = "sk-" + "Y" * 24
+    payload = {"tool_name": "Write",
+               "tool_input": {"file_path": str(tmp_path / "x.html"),
+                              "content": f"key = '{sk}'"}}
+    proc = _run_hook(payload, cwd=str(tmp_path))
+    # existing contract preserved
+    assert proc.returncode == 2, f"exit-code contract broken: {proc.stderr!r}"
+    assert "BLOCKED" in proc.stderr, f"stderr text contract broken: {proc.stderr!r}"
+    # NEW: stdout carries exactly a block-decision JSON object
+    decision = json.loads(proc.stdout.strip())
+    assert decision["decision"] == "block"
+    # reason is derived from the scanner's REDACTED pattern label, not hardcoded
+    assert "openai_or_anthropic_sk_prefix" in decision["reason"], (
+        f"reason should carry the scanner pattern label: {decision!r}"
+    )
+    # never leak the matched secret in either stream (incl. the new JSON)
+    assert sk not in proc.stdout and sk not in proc.stderr
+
+
+def test_clean_write_emits_no_decision_json(tmp_path: Path) -> None:
+    """A benign write stays allow (exit 0) and writes NOTHING to stdout — the
+    block JSON is emitted ONLY on a definitive hit."""
+    payload = {"tool_name": "Write",
+               "tool_input": {"file_path": str(tmp_path / "x.html"),
+                              "content": "<h1>no secrets</h1>"}}
+    proc = _run_hook(payload, cwd=str(tmp_path))
+    assert proc.returncode == 0
+    assert proc.stdout.strip() == "", f"clean write must not emit decision JSON: {proc.stdout!r}"
+
+
+def test_failopen_emits_no_decision_json() -> None:
+    """A malformed payload fails open (exit 0) and emits no block JSON to stdout
+    (a buggy gate must not masquerade as a deterministic block)."""
+    env = dict(os.environ)
+    env["CLAUDE_PLUGIN_ROOT"] = str(_REPO)
+    proc = subprocess.run(
+        [sys.executable, str(_HOOK)], input="not json at all",
+        capture_output=True, text=True, timeout=30, env=env,
+    )
+    assert proc.returncode == 0
+    assert proc.stdout.strip() == "", f"fail-open must not emit decision JSON: {proc.stdout!r}"
 
 
 # ---------------------------------------------------------------------------

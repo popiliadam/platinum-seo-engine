@@ -149,3 +149,73 @@ def test_scan_stdin_fails_on_openai_sk_shape() -> None:
     assert "openai_or_anthropic_sk_prefix" in result.stdout
     assert sk not in result.stdout, "matched secret must never be echoed"
     assert sk not in result.stderr, "matched secret must never be echoed"
+
+
+# ---------------------------------------------------------------------------
+# S2 (codex-C extension) — generic high-entropy base64 secret heuristic.
+#   Contract: a secret-ish key (key|token|secret|password|credential) assigned a
+#   QUOTED, PADDED base64 value (>=24 base64 chars ending in '=' / '==') FAILs.
+#   Padding is the precision anchor — hex hashes / git SHAs / identifiers / paths
+#   never carry '=', so it sidesteps the false-positive surface a bare
+#   [A-Za-z0-9+/]{24,} run hits (a loose variant matched 195 benign repo paths).
+#   Fixtures are built by RUNTIME split-concatenation so no contiguous match lands
+#   on disk (the full-mode scanner does NOT exclude this test file).
+# ---------------------------------------------------------------------------
+
+def test_scan_stdin_fails_on_padded_base64_secret() -> None:
+    """A padded base64 blob assigned to a secret-ish key is caught (exit 1),
+    REDACTED, and labelled base64_high_entropy_secret_assignment."""
+    padded = "QUJDREVGR0hJSktMTU5P" + "UFFSU1RVVldYWVo="  # 32 b64 chars + '=' pad
+    result = _run_scan_stdin(f'api_key = "{padded}"\n')
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "base64_high_entropy_secret_assignment" in result.stdout
+    assert padded not in result.stdout, "matched secret must never be echoed"
+    assert padded not in result.stderr, "matched secret must never be echoed"
+
+
+def test_scan_stdin_base64_no_fp_on_hex_hash() -> None:
+    """A quoted hex hash (md5/sha shape) under a key field must NOT trip the
+    heuristic — hex ⊂ base64 but has no '=' padding. The repo is built on
+    hash-chained ledgers; a false-block here would be intolerable."""
+    hexhash = "634c8ed5b7cf3c85" + "2d9b41e1c0e1d3b5"  # 32 hex chars, no padding
+    result = _run_scan_stdin(f'baseline_key: "{hexhash}"\n')
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_scan_stdin_base64_no_fp_on_quoted_path() -> None:
+    """A quoted path under a 'key' field (the 195-match false-positive class the
+    loose pattern hit) must NOT trip the heuristic — paths carry '-'/'.' and no
+    '=' padding."""
+    result = _run_scan_stdin('"key": "skills/discovery/content-decay/x.md"\n')
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_scan_stdin_base64_recall_gap_unpadded_not_flagged() -> None:
+    """Documented boundary (rules/secrets-management.md): an UNPADDED
+    all-alphanumeric base64 value is regex-indistinguishable from an identifier/
+    hash, so it is intentionally NOT flagged (flagging it reintroduces the
+    hash/path false positives). A dedicated entropy scanner is the right tool."""
+    unpadded = "QUJDREVGR0hJSktM" + "TU5PUFFSU1RV"  # 28 alnum b64 chars, no padding
+    result = _run_scan_stdin(f'api_key = "{unpadded}"\n')
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_base64_heuristic_registered_in_inventory() -> None:
+    """The base64 label is registered in the canonical inventory so a future edit
+    cannot silently drop the heuristic (the behavioural tests prove it fires)."""
+    body = SCRIPT.read_text(encoding="utf-8")
+    assert "base64_high_entropy_secret_assignment" in body, (
+        "base64 high-entropy heuristic label missing from canonical inventory"
+    )
+
+
+def test_secrets_management_documents_base64_boundary() -> None:
+    """S2 (implement-AND-document): the base64 heuristic's coverage AND its
+    deliberate recall boundary (unpadded all-alphanumeric base64 not flagged)
+    are documented in the rule file, so the limitation is explicit, not silent."""
+    rule = (REPO_ROOT / "rules" / "secrets-management.md").read_text(encoding="utf-8")
+    low = rule.lower()
+    assert "base64" in low, "secrets-management.md must document the base64 heuristic"
+    assert ("padding" in low) or ("padded" in low), (
+        "must document the '=' padding precision anchor / recall boundary"
+    )

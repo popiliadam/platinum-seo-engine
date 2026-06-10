@@ -11,7 +11,7 @@ on disk — closing the gap the post-hoc ``--changed-since`` scan leaves open
 gitignored-non-.env target is invisible to it; hostile-audit finding #1).
 
 Single source of truth: this hook re-implements NO secret pattern. It delegates
-to the SAME 16-class inventory in ``check_secrets.sh`` that CI and the event
+to the SAME 17-class inventory in ``check_secrets.sh`` that CI and the event
 redactor mirror, so the three surfaces cannot drift. The scanner's gitignored
 local ``.env`` carve-out (WARN/allow) is preserved exactly by passing the
 intended target as the ``--scan-stdin`` pseudo-path.
@@ -25,12 +25,16 @@ Contract (mirrors scripts/hooks/validate_content_write.py):
       command, is skipped (exit 0). The post-hoc ``--changed-since`` scan + the
       PostToolUse ``ai_disclosure_rescan`` quarantine remain as backstops for
       Bash forms this best-effort extractor cannot see.
-    * Verdict — scanner exit 1 (secret) → exit 2 (BLOCK); exit 0 → allow.
+    * Verdict — scanner exit 1 (secret) → exit 2 (BLOCK) AND a
+      ``{"decision":"block","reason":<label>}`` line on STDOUT (consistency with
+      ai_disclosure_rescan.py / denetci.py); exit 0 → allow (no stdout).
     * Failure — fail-OPEN on any internal error (scanner missing, bad JSON,
       timeout): a buggy gate must not brick all edits, and the incremental scan
-      backstops it. A definitive secret hit is fail-CLOSED (exit 2).
+      backstops it. A definitive secret hit is fail-CLOSED (exit 2). Fail-open
+      paths emit NO decision JSON (only a deterministic hit blocks).
     * Security — only the scanner's REDACTED label report is forwarded; the
-      matched content is never echoed (same invariant as the scanner).
+      matched content is never echoed (same invariant as the scanner). The
+      STDOUT decision ``reason`` carries the same labels, never the bytes.
 """
 
 from __future__ import annotations
@@ -144,6 +148,17 @@ def main() -> int:
 
     if rc == 1:
         target = pseudo_path or "<bash command>"
+        # Block-decision JSON on STDOUT (consistency with
+        # ai_disclosure_rescan.py / denetci.py). The reason carries ONLY the
+        # scanner's REDACTED pattern label(s) — never the matched bytes — so the
+        # same no-leak invariant holds on stdout as on stderr.
+        labels = [
+            line.split("FAIL pattern:", 1)[1].strip()
+            for line in out.splitlines()
+            if "FAIL pattern:" in line
+        ]
+        reason = "secret-shaped bytes" + (": " + ", ".join(labels) if labels else "")
+        print(json.dumps({"decision": "block", "reason": reason}))
         sys.stderr.write(
             f"[scan-pending-secret] BLOCKED — secret-shaped bytes in pending "
             f"write to {target}:\n"
