@@ -1,0 +1,70 @@
+{
+  "schema_version": "1.0",
+  "retrieved_at": "2026-06-10T00:00:00Z",
+  "source_url": "https://status.search.google.com/incidents.json",
+  "updates": [
+    {
+      "id": "wdAXJk6LRRihEjpzEeWE",
+      "name": "May 2026 core update",
+      "begin": "2026-05-21T15:40:00Z",
+      "end": "2026-06-02T12:40:00Z",
+      "service_name": "Ranking",
+      "severity": "low",
+      "source": "google_status_dashboard"
+    },
+    {
+      "id": "7eTbAa2jWdToLkraZj5y",
+      "name": "March 2026 core update",
+      "begin": "2026-03-27T09:00:00Z",
+      "end": "2026-04-08T13:00:00Z",
+      "service_name": "Ranking",
+      "severity": "low",
+      "source": "google_status_dashboard"
+    },
+    {
+      "id": "VbnSXAH4SmEcxPtx4YSD",
+      "name": "March 2026 spam update",
+      "begin": "2026-03-24T19:00:00Z",
+      "end": "2026-03-25T14:30:00Z",
+      "service_name": "Ranking",
+      "severity": "low",
+      "source": "google_status_dashboard"
+    },
+    {
+      "id": "mYbNTqV1ytDc2fA8hUz4",
+      "name": "February 2026 Discover update",
+      "begin": "2026-02-05T17:00:00Z",
+      "end": "2026-02-27T10:00:00Z",
+      "service_name": "Ranking",
+      "severity": "low",
+      "source": "google_status_dashboard"
+    },
+    {
+      "id": "DsirqJ1gpPRgVQeccPRv",
+      "name": "December 2025 core update",
+      "begin": "2025-12-11T17:25:00Z",
+      "end": "2025-12-29T19:00:00Z",
+      "service_name": "Ranking",
+      "severity": "low",
+      "source": "google_status_dashboard"
+    },
+    {
+      "id": "a7Aainy6E9rZsmfq82xt",
+      "name": "August 2025 spam update",
+      "begin": "2025-08-26T16:00:00Z",
+      "end": "2025-09-22T07:00:00Z",
+      "service_name": "Ranking",
+      "severity": "low",
+      "source": "google_status_dashboard"
+    },
+    {
+      "id": "riq1AuqETW46NfBCe5NT",
+      "name": "June 2025 core update",
+      "begin": "2025-06-30T14:30:00Z",
+      "end": "2025-07-17T08:00:00Z",
+      "service_name": "Ranking",
+      "severity": "low",
+      "source": "google_status_dashboard"
+    }
+  ]
+}

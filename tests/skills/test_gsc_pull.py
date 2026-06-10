@@ -393,3 +393,123 @@ def test_transform_without_enrichment(synthetic_recent: dict) -> None:
         assert r["clicks_previous"] == 0
         assert r["impressions_previous"] == 0
         assert r["position_previous"] == 0.0
+
+
+# ===========================================================================
+# GAP-M-1a (Wave 1a): weekly ISO-week ledger for anomaly detection (GAP-M4 D1)
+# ===========================================================================
+
+from datetime import date, timedelta  # noqa: E402
+
+
+def _daily_rows(start: "date", n: int, *, clicks: int = 10,
+                impressions: int = 100, position: float = 12.0) -> list[dict]:
+    """A site-level daily GSC series (dimensions=['date'])."""
+    rows = []
+    for i in range(n):
+        d = start + timedelta(days=i)
+        rows.append({"keys": [d.isoformat()], "clicks": clicks,
+                     "impressions": impressions, "position": position})
+    return rows
+
+
+def test_aggregate_iso_weeks_buckets_and_excludes_current() -> None:
+    """28 contiguous days (Mon 2026-05-18 .. Sun 2026-06-14) span 4 ISO weeks.
+    With today=2026-06-10 (mid-week of the 4th), only the 3 fully-elapsed weeks
+    aggregate; the current partial week is excluded."""
+    rows = _daily_rows(date(2026, 5, 18), 28)
+    weeks = gsc_pull.aggregate_iso_weeks(rows, "2026-06-10")
+
+    assert len(weeks) == 3, f"current partial week not excluded: {weeks}"
+    # Expected labels = isocalendar of the three elapsed Mondays.
+    expected = [
+        f"{date(2026, 5, 18).isocalendar()[0]}-W{date(2026, 5, 18).isocalendar()[1]:02d}",
+        f"{date(2026, 5, 25).isocalendar()[0]}-W{date(2026, 5, 25).isocalendar()[1]:02d}",
+        f"{date(2026, 6, 1).isocalendar()[0]}-W{date(2026, 6, 1).isocalendar()[1]:02d}",
+    ]
+    assert [w["iso_week"] for w in weeks] == expected
+
+    # The W24 (06-08..06-14) bucket must NOT appear.
+    cur_label = (f"{date(2026, 6, 8).isocalendar()[0]}-"
+                 f"W{date(2026, 6, 8).isocalendar()[1]:02d}")
+    assert cur_label not in {w["iso_week"] for w in weeks}
+
+    # Per-week aggregation: 7 days × (10 clicks, 100 impressions, pos 12).
+    w0 = weeks[0]
+    assert w0["clicks"] == 70
+    assert w0["impressions"] == 700
+    assert w0["ctr"] == 0.1
+    assert w0["avg_position"] == 12.0
+    assert w0["week_start"] == "2026-05-18"   # Monday
+    assert w0["week_end"] == "2026-05-24"     # Sunday
+    assert w0["source"] == "gsc_mcp"
+
+
+def test_aggregate_iso_weeks_excludes_recent_week_within_lag() -> None:
+    """GSC daily data lags ~2 days: a week whose Sunday is within 2 days of
+    `today` is excluded even though it is calendar-complete."""
+    rows = _daily_rows(date(2026, 6, 1), 7)   # full week ending Sun 2026-06-07
+    # today=2026-06-09 → cutoff 06-07; week_end 06-07 is NOT < 06-07 → excluded.
+    assert gsc_pull.aggregate_iso_weeks(rows, "2026-06-09") == []
+    # today=2026-06-10 → cutoff 06-08; week_end 06-07 < 06-08 → included.
+    assert len(gsc_pull.aggregate_iso_weeks(rows, "2026-06-10")) == 1
+
+
+def test_append_weekly_ledger_idempotent(tmp_path: Path) -> None:
+    """Append-only, dedup by iso_week: a second append of the same weeks is a
+    no-op (file byte-identical); existing lines are never rewritten."""
+    ledger = tmp_path / "_state" / "metrics" / "gsc-weekly.jsonl"
+    weeks = gsc_pull.aggregate_iso_weeks(_daily_rows(date(2026, 5, 18), 21), "2026-06-10")
+    assert len(weeks) == 3
+
+    res1 = gsc_pull.append_weekly_ledger(ledger, weeks)
+    assert sorted(res1["appended"]) == sorted(w["iso_week"] for w in weeks)
+    assert res1["skipped"] == []
+    first_bytes = ledger.read_bytes()
+    first_lines = ledger.read_text(encoding="utf-8").splitlines()
+    assert len(first_lines) == 3
+    # Each ledger line carries the required ledger fields.
+    rec0 = json.loads(first_lines[0])
+    for key in ("iso_week", "week_start", "week_end", "clicks", "impressions",
+                "ctr", "avg_position", "source", "written_at"):
+        assert key in rec0, f"ledger row missing {key}"
+
+    # Second append of the SAME weeks → all skipped, no new lines, byte-identical.
+    res2 = gsc_pull.append_weekly_ledger(ledger, weeks)
+    assert res2["appended"] == []
+    assert sorted(res2["skipped"]) == sorted(w["iso_week"] for w in weeks)
+    assert ledger.read_bytes() == first_bytes, "append-only ledger mutated on re-run"
+
+
+def test_append_weekly_ledger_appends_only_missing(tmp_path: Path) -> None:
+    """A later run with one new week appends ONLY that week; prior lines stay
+    byte-identical (append-only-state)."""
+    ledger = tmp_path / "gsc-weekly.jsonl"
+    first = gsc_pull.aggregate_iso_weeks(_daily_rows(date(2026, 5, 18), 14), "2026-06-10")
+    gsc_pull.append_weekly_ledger(ledger, first)
+    prefix_bytes = ledger.read_bytes()
+
+    # A superset including a new third week.
+    more = gsc_pull.aggregate_iso_weeks(_daily_rows(date(2026, 5, 18), 21), "2026-06-10")
+    res = gsc_pull.append_weekly_ledger(ledger, more)
+    assert len(res["appended"]) == 1, f"only the new week should append: {res}"
+    # The previously-written bytes are an untouched prefix of the new file.
+    assert ledger.read_bytes().startswith(prefix_bytes), "existing ledger lines were modified"
+
+
+def test_append_weekly_ledger_cli_smoke(tmp_path: Path) -> None:
+    """--append-weekly-ledger CLI path: daily JSON in → ledger out."""
+    daily = tmp_path / "daily.json"
+    daily.write_text(json.dumps({"rows": _daily_rows(date(2026, 5, 18), 21)}),
+                     encoding="utf-8")
+    ledger = tmp_path / "gsc-weekly.jsonl"
+    rc = gsc_pull.main([
+        "--append-weekly-ledger",
+        "--daily", str(daily),
+        "--ledger", str(ledger),
+        "--today", "2026-06-10",
+    ])
+    assert rc == 0
+    assert ledger.exists()
+    lines = [L for L in ledger.read_text(encoding="utf-8").splitlines() if L.strip()]
+    assert len(lines) == 3

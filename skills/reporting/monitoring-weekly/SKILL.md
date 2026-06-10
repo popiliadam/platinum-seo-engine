@@ -7,25 +7,27 @@ description: |
   çağırır; week range filter events.jsonl + drift-check output reuse +
   GSC week-over-week delta + budget burn rate aggregation →
   outputs/reports/{date}-monitoring-weekly.md.
-  Wave-3 inline scope (truth-in-advertising): drift + portfolio health
-  snapshot ACTIVE; GSC 5σ anomaly alarm + budget-burn (cost.credits)
-  aggregation are PLACEHOLDERS deferred to Phase 14+ — the inline
-  runtime emits a deferral string, not a computed alarm.
+  Wave-1a scope (truth-in-advertising): drift + portfolio health
+  snapshot ACTIVE; GSC weekly anomaly ACTIVE (median+MAD modified-z,
+  R-141, sourced from _state/metrics/gsc-weekly.jsonl — NOT master.xlsx);
+  ONLY budget-burn (cost.credits) aggregation remains a PLACEHOLDER
+  deferred to Phase 14+.
   Also use when: cron scheduled weekly run her Pazartesi 09:00 UTC
   report-only mode; reporting suite extension Phase 9 8 reporting skill
   no-write paterni reuse; Foundational Principle 1 truth-verifiable
-  enforcement audit-only (Wave-3 inline: consistency-report.json +
-  portfolio.json kaynaklı; events.jsonl + master.xlsx Phase 14+ scope;
+  enforcement audit-only (Wave-1a inline: consistency-report.json +
+  portfolio.json + _state/metrics/gsc-weekly.jsonl kaynaklı; master.xlsx
+  read YOK, sadece budget-burn Phase 14+ scope;
   fabrikasyon yok); manager portfolio-overview öncesi tek-proje haftalık
   sağlık özeti istediğinde.
   Do not use when: ad-hoc daily check (out of scope, daily skill ayrı —
   bu skill rolling 7-day window aggregator); events.jsonl empty week
   range (DURUR #1 SKIP, no report write); GSC api auth fail (out of
   scope, gsc-bootstrap skill önce çalışmalı); template path missing →
-  inline fallback (DURUR #4 AMBER, manuel inceleme); 5σ anomaly
-  threshold hit ise CRITICAL escalation severity=alert (DURUR #5 —
-  PLACEHOLDER, Phase 14+ deferred; not computed in Wave-3 inline);
-  master.xlsx WRITE talep edilirse
+  inline fallback (DURUR #4 AMBER, manuel inceleme); MAD anomali
+  severity=RED ise CRITICAL escalation (DURUR #5 — ikinci audit satırı,
+  median+MAD modified-z R-141; ≥6 tam ISO hafta yoksa insufficient_history
+  dürüst render, alarm değil); master.xlsx WRITE talep edilirse
   YASAK (Phase 9 reporting paterni: 8 skill no-write invariant).
 version: "1.0"
 status: wip
@@ -47,6 +49,7 @@ consumes:
   - "drift-check:_state/cache/consistency-report.json"
   - "init-project:shared/portfolio.json"
   - "templates/reports/monitoring-weekly.template.md"
+  - "gsc-pull:_state/metrics/gsc-weekly.jsonl"
 produces: []
 triggers:
   manual: ["/pseo-monitoring-weekly"]
@@ -72,23 +75,31 @@ autonomy:
 
 # monitoring-weekly — reporting skill (Phase 12 Wave 2, W-G6)
 
-Weekly health check aggregator. **Wave-3 inline scope** (what the
+Weekly health check aggregator. **Wave-1a inline scope** (what the
 runtime actually reads): drift-check output
 (`_state/cache/consistency-report.json`) + project health
-(`shared/portfolio.json`), then renders
-`outputs/reports/{date}-monitoring-weekly.md`. **No MCP**, **no DFS**,
-**no budget pre-flight**, **no master.xlsx WRITE** — strict read-only.
+(`shared/portfolio.json`) + the GSC weekly anomaly ledger
+(`_state/metrics/gsc-weekly.jsonl`, written by gsc-pull Step 7b), then
+renders `outputs/reports/{date}-monitoring-weekly.md`. **No MCP**, **no
+DFS**, **no master.xlsx WRITE** — strict read-only.
 
-*Deferred to Phase 14+ (PLACEHOLDER strings today, NOT active reads):*
-drift reuse via the `governance/drift-check` `_state/events.jsonl`
-audit filter (`event_kind=audit AND audit_action=accessed AND
-audit_target=invariants:*`), week-over-week GSC delta from
-`master.xlsx[gsc_performance]` via `openpyxl read_only=True`, and
+**GSC anomaly is ACTIVE (GAP-M4 / R-141).** It uses the robust
+median + MAD modified z-score (NIST/Iglewicz–Hoaglin, |M| ≥ 3.5) with
+percent + absolute floors over ≥6 complete ISO weeks, replacing the old
+5-standard-deviation / trailing-8-week-mean placeholder (which was both
+statistically meaningless at n≈8 and unimplementable — the
+`master.xlsx[gsc_performance]` sheet is a recent-vs-previous SNAPSHOT
+with **no date column**, so it never held a weekly series; the
+`_state/metrics/gsc-weekly.jsonl` ledger does). An anomaly whose week
+overlaps a Google Ranking-update window (`google-update-calendar.json`,
+R-137) is capped at AMBER with an attribution caution. Detection is
+imported from `scripts.reporting.weekly_anomaly` + `scripts.reporting.update_calendar`.
+
+*Still deferred to Phase 14+ (PLACEHOLDER string, NOT an active read):*
 budget burn rate (events.jsonl `cost.credits` aggregation per day vs
 `project-config.budget_credits_per_day` baseline). The inline runtime
-does **not** open `master.xlsx` or `project-config`, and does not
-filter `events.jsonl` — it reads the consistency-report + portfolio
-snapshots above.
+does **not** open `master.xlsx` or `project-config` — it reads the
+consistency-report + portfolio + weekly-ledger snapshots above.
 
 This skill follows the Phase 9 reporting **convention authority**
 established by `skills/reporting/weekly-summary/SKILL.md` (W-E2 — local
@@ -146,10 +157,10 @@ format raises `MonitoringWeeklyValidationError` (DURUR #0 envelope).
 ## Outputs (artifacts produced — 2 entries, master.xlsx ABSENT)
 
 - `_state/events.jsonl` — single-row audit append (or 2 rows if
-  DURUR #5 5σ anomaly fires; the second row carries
-  `audit_action="accessed"` + an additional `note` field flagged as
-  alert via the report; severity is encoded report-side, not via a
-  schema field).
+  DURUR #5 MAD anomaly severity=RED fires; the second row carries
+  `audit_action="accessed"` + `audit_target=...:anomaly` + a `notes`
+  field flagging metric/direction/modified-z; severity is encoded
+  report-side, not via a schema field).
 - `outputs/reports/{date}-monitoring-weekly.md` — human-readable
   health check report with 5 sections (exec_summary, drift_section,
   gsc_anomaly_section, budget_burn_section, escalations).
@@ -194,20 +205,32 @@ swallow.
    section below). The report renders, and the audit event records
    the fallback path was used.
 
-5. **DURUR #5 — 5σ GSC anomaly threshold hit** → CRITICAL escalation.
-   **Wave-3 inline scope: PLACEHOLDER — NOT active.** The 5σ alarm +
-   `cost.credits` aggregation are **deferred to Phase 14+**; the inline
-   runtime (Block 3) emits a deferral string for `gsc_anomaly_section`
-   and `escalations`, never a computed alarm. No second audit-event row
-   is appended today.
+5. **DURUR #5 — MAD GSC anomaly severity=RED** → CRITICAL escalation.
+   **Wave-1a inline scope: ACTIVE (GAP-M4 / R-141).** Block 3 reads the
+   `_state/metrics/gsc-weekly.jsonl` ledger and runs
+   `scripts.reporting.weekly_anomaly.detect()` — the robust
+   **median + MAD modified z-score** (NIST/Iglewicz–Hoaglin,
+   `M = 0.6745·(x − median)/MAD`, flagged at `|M| ≥ 3.5`) gated by
+   percent + absolute floors over a trailing window of complete ISO
+   weeks. A flagged worsening of `clicks` / `impressions` / `avg_position`
+   yields severity **RED**; a `ctr` drop yields **AMBER**; an improvement
+   direction is **INFO**. When the anomaly severity is **RED**, the report's
+   `escalations` section is populated AND a **second** `append_audit` row is
+   written (`audit_target="reports:monitoring-weekly:{week}:anomaly"`,
+   `notes` carrying metric / direction / `modified_z`).
 
-   *When implemented (Phase 14+):* week-over-week delta on any of
-   `clicks`, `impressions`, `ctr`, `position` exceeding 5 standard
-   deviations from the trailing 8-week mean (computed locally from
-   `master.xlsx[gsc_performance]` rows ordered by date_iso) will make the
-   report's `escalations` section carry severity=alert and append a
-   separate audit event row flagging the metric, magnitude, and
-   direction. The manager would act on this in Phase 14+ governance.
+   **Calendar guard (R-137):** if the week overlaps a Google *Ranking*
+   update window (`google-update-calendar.json`, incl. a 7-day settling
+   buffer), the anomaly is capped at **AMBER** with an
+   `attribution_caution` — Google's own guidance is not to attribute
+   movement during/just after a rollout, so it is NOT escalated to a
+   second-row CRITICAL.
+
+   **Insufficient history is NOT a DURUR.** With fewer than 6 complete
+   ISO weeks the detector returns `insufficient_history` and the section
+   renders the honest `points_used/6` string — no alarm, no second row,
+   severity unchanged from the drift/portfolio rollup. (The discredited
+   standard-deviation-on-n≈8 placeholder this replaces is described in the intro.)
 
 ## Workflow (8 step)
 
@@ -221,13 +244,16 @@ swallow.
 3. **drift-check output reuse** — filter events on
    `event_kind=audit AND audit_target startswith "invariants:"`.
    0 rows in window → DURUR #3 AMBER.
-4. **GSC anomaly detect** — **Wave-3 inline scope: PLACEHOLDER (deferred
-   Phase 14+).** The current inline runtime (Block 3) emits a deferral
-   string for `gsc_anomaly_section`, not a computed delta. *When
-   implemented:* read `master.xlsx[gsc_performance]` via
-   `openpyxl.load_workbook(read_only=True, data_only=True)`, compute the
-   week-over-week delta against the previous 7-day window, and if any
-   metric delta exceeds 5σ of the trailing 8-week mean, fire DURUR #5.
+4. **GSC anomaly detect** — **Wave-1a inline scope: ACTIVE (GAP-M4 /
+   R-141).** Block 3 reads `_state/metrics/gsc-weekly.jsonl` (the
+   gsc-pull Step 7b ledger), derives `current_iso_week` from the
+   validated `week_start`, loads the Ranking-update calendar
+   (`google-update-calendar.json` engine seed ∪ `shared/cache/...`
+   workspace overlay) and computes the week's overlaps, then calls
+   `weekly_anomaly.detect(records, current_iso_week, update_overlaps=...)`.
+   Severity rolls up `max(drift/portfolio severity, anomaly severity)`.
+   RED → DURUR #5. Missing/sparse ledger → `insufficient_history` honest
+   render (no crash, no alarm).
 5. **Budget burn rate** — **Wave-3 inline scope: PLACEHOLDER (deferred
    Phase 14+).** The current inline runtime reports a recent-events count
    from `portfolio.json`, not a computed burn rate. *When implemented:*
@@ -368,29 +394,115 @@ else:
 generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
+# --- GSC weekly anomaly (GAP-M4 / R-141): median+MAD over the ledger ---
+from scripts.reporting import weekly_anomaly, update_calendar
+from datetime import date as _date
+
+ledger_path = (
+    workspace_root / "projects" / project_slug / "_state" / "metrics" / "gsc-weekly.jsonl"
+)
+ledger_records = []
+if ledger_path.exists():
+    for _line in ledger_path.read_text(encoding="utf-8").splitlines():
+        _line = _line.strip()
+        if not _line:
+            continue
+        try:
+            ledger_records.append(json.loads(_line))
+        except json.JSONDecodeError:
+            continue
+
+try:
+    _iso = _date.fromisoformat(week_start[:10]).isocalendar()
+    current_iso_week = f"{_iso[0]}-W{_iso[1]:02d}"
+except (ValueError, TypeError):
+    current_iso_week = ""
+
+# Ranking-update calendar overlap (R-137): engine seed ∪ workspace overlay.
+engine_cal = REPO_ROOT / "google-update-calendar.json"
+overlay_cal = workspace_root / "shared" / "cache" / "google-update-calendar.json"
+update_overlaps = None
+if engine_cal.exists() and week_start and week_end:
+    try:
+        _cal = update_calendar.load_calendar(
+            engine_cal, overlay_cal if overlay_cal.exists() else None
+        )
+        update_overlaps = update_calendar.overlaps(week_start, week_end, _cal)
+    except (OSError, ValueError, KeyError):
+        update_overlaps = None
+
+anomaly = weekly_anomaly.detect(
+    ledger_records, current_iso_week, update_overlaps=update_overlaps
+)
+anomaly_sev = anomaly.get("severity", "none")
+
+
+def _sev_rank(s):
+    return {"GREEN": 0, "none": 0, "INFO": 0, "AMBER": 2, "RED": 3}.get(s, 0)
+
+
+# Severity rollup: max(drift/portfolio severity, GSC anomaly severity).
+if _sev_rank(anomaly_sev) > _sev_rank(severity):
+    severity = anomaly_sev
+
 exec_summary = (
     f"Haftalık sağlık özeti: drift={red_count}R/{amber_count}A/{green_count}G "
     f"(verdict={drift_verdict}); completion={completion_pct:.1f}%; "
-    f"active_oq={active_oq_count}; recent_events_7day={recent_events}."
+    f"active_oq={active_oq_count}; recent_events_7day={recent_events}; "
+    f"gsc_anomaly={anomaly['status']}/{anomaly_sev}."
 )
 drift_section = (
     f"Drift counts (consistency-report.json): RED={red_count} "
     f"AMBER={amber_count} GREEN={green_count}. "
     f"Verdict: {drift_verdict}. Available: {drift_available}."
 )
-gsc_anomaly_section = (
-    "GSC week-over-week delta — Wave 3 inline scope: raw counts placeholder "
-    "(Phase 14+ governance refinement scope: 5σ threshold compute via "
-    "master.xlsx[gsc_performance] read-only)."
-)
+if anomaly["status"] == "insufficient_history":
+    gsc_anomaly_section = (
+        "GSC anomali tespiti (median+MAD modified-z, R-141): yetersiz geçmiş — "
+        f"{anomaly['points_used']}/{anomaly['needed']} tam ISO hafta (≥6 gerekir). "
+        "Ledger biriktikçe aktifleşir (cold-start: gsc-pull days_back=112)."
+    )
+elif anomaly["status"] == "current_week_missing":
+    gsc_anomaly_section = (
+        f"GSC anomali tespiti: {current_iso_week} ledger'da yok — gsc-pull bu "
+        "hafta için weekly ledger satırı yazmadı."
+    )
+else:
+    _cells = []
+    for _m in ("clicks", "impressions", "ctr", "avg_position"):
+        _md = anomaly["metrics"].get(_m)
+        if not _md:
+            continue
+        _cells.append(
+            f"{_m}={_md['value']} (medyan {_md['median']}, z={_md['modified_z']}, "
+            f"bayrak={'EVET' if _md['flagged'] else 'hayır'}, yön={_md['direction']})"
+        )
+    _names = anomaly.get("anomalies") or "yok"
+    gsc_anomaly_section = (
+        f"GSC anomali (median+MAD, {anomaly['points_used']} hafta baz, R-141): "
+        f"severity={anomaly_sev}, anomaliler={_names}. " + " | ".join(_cells)
+    )
+    if anomaly.get("attribution_caution"):
+        gsc_anomaly_section += " ⚠ " + anomaly["attribution_caution"]
 budget_burn_section = (
     f"Recent events 7-day count: {recent_events} (portfolio.json available={portfolio_available}). "
     "Budget burn rate calc Phase 14+ scope (events.jsonl cost.credits aggregation)."
 )
-escalations = (
-    "DURUR #5 5σ anomaly threshold check Phase 14+ governance scope. "
-    f"Mevcut severity={severity}. RED ≥5 invariant FAIL veya AMBER ≥1 trigger."
-)
+_esc = []
+if anomaly.get("severity") == "RED":
+    _det = "; ".join(
+        f"{_m} {anomaly['metrics'][_m]['direction']} "
+        f"(modified_z={anomaly['metrics'][_m]['modified_z']})"
+        for _m in anomaly.get("anomalies", [])
+    )
+    _esc.append(
+        f"CRITICAL (DURUR #5): GSC anomali RED — {_det} — ikinci audit satırı yazıldı."
+    )
+if anomaly.get("attribution_caution"):
+    _esc.append("Dikkat: " + anomaly["attribution_caution"])
+if not _esc:
+    _esc.append(f"Eskalasyon yok. Genel severity={severity}.")
+escalations = " ".join(_esc)
 
 variables = {
     "project_slug": project_slug,
@@ -430,6 +542,24 @@ events_writer.append_audit(
     ),
 )
 
+# DURUR #5: a SECOND audit row when the GSC anomaly severity is RED (an overlap
+# cap to AMBER deliberately suppresses this — overlapping movement is not a
+# CRITICAL engine regression, R-137).
+if anomaly.get("severity") == "RED":
+    _anote = "; ".join(
+        f"{_m}:{anomaly['metrics'][_m]['direction']}:"
+        f"z={anomaly['metrics'][_m]['modified_z']}"
+        for _m in anomaly.get("anomalies", [])
+    )
+    events_writer.append_audit(
+        project_id=project_slug,
+        audit_action="accessed",
+        audit_target=f"reports:monitoring-weekly:{week_start}_{week_end}:anomaly",
+        actor="agent:monitoring-weekly",
+        workspace_root=workspace_root,
+        notes=f"gsc_anomaly RED {_anote}",
+    )
+
 print(f"monitoring-weekly report written: {report_path}")
 print(f"audit event appended: project={project_slug} severity={severity}")
 ```
@@ -455,26 +585,31 @@ overrides them.
 
 ### Principle 1 — Truth-Verifiable Health Report
 
-Every datum in the report is sourced from a tangible artifact. **Wave-3
+Every datum in the report is sourced from a tangible artifact. **Wave-1a
 inline scope** — what the runtime actually reads today:
 - `drift_section` ← `_state/cache/consistency-report.json`
   (drift-check output: red/amber/green counts + verdict).
 - `exec_summary` ← computed roll-up of the drift counts +
   `shared/portfolio.json` health fields (completion %, active OQ
   count, recent-events count); no free-form fabrication.
+- `gsc_anomaly_section` ← `_state/metrics/gsc-weekly.jsonl` (the
+  gsc-pull Step 7b ledger) run through `weekly_anomaly.detect()`
+  (median + MAD modified-z, R-141) + the Ranking-update calendar
+  (`google-update-calendar.json`, R-137). With <6 complete weeks it
+  renders the honest `insufficient_history` string — never a fabricated
+  delta. The discredited standard-deviation-on-n≈8 placeholder is gone.
+- `escalations` ← computed from the anomaly result (RED ⇒ a second
+  audit row; calendar overlap ⇒ AMBER cap + attribution caution).
 
-**Deferred to Phase 14+ (PLACEHOLDER strings in the current runtime):**
-- `gsc_anomaly_section` ← *will* read `master.xlsx[gsc_performance]`
-  rows (Phase 6 GSC ingestion writer authority) for the 5σ delta.
-  Today it emits a deferral string.
+**ONLY still deferred to Phase 14+ (PLACEHOLDER string):**
 - `budget_burn_section` ← *will* aggregate events.jsonl `cost.credits`
   (Phase 7+8 work events). Today it reports a recent-events count from
   `portfolio.json`.
 
-The skill never invents values; the placeholder sections honestly
-announce the deferral rather than fabricating a delta. AI suistimal
-yasağı: hayali delta fabrikasyonu YASAK — when the GSC path lands
-(Phase 14+) it will read `master.xlsx[gsc_performance]`, never guess.
+The skill never invents values; the GSC section reports computed
+robust statistics or honestly announces insufficient history. AI
+suistimal yasağı: hayali delta fabrikasyonu YASAK — the GSC path reads
+the ledger, never guesses.
 
 ### Principle 2 — Profile-Aware Severity
 

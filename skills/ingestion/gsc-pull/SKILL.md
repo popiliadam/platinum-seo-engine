@@ -36,6 +36,8 @@ outputs:
   - "events.jsonl"
   - "inbox/gsc/{date}-search_analytics-{slug}.json"
   - "inbox/gsc/{date}-enhanced_search_analytics-{slug}.json"
+  - "inbox/gsc/{date}-search_analytics_daily-{slug}.json"
+  - "_state/metrics/gsc-weekly.jsonl"
 consumes:
   - "init-project:projects/{slug}/master.xlsx"
 produces:
@@ -126,6 +128,7 @@ handle = workflow_runner.create_run(
         {"name": "transform"},
         {"name": "request_approval"},
         {"name": "write_excel"},
+        {"name": "append_weekly_ledger"},
         {"name": "render_report"},
     ],
 )
@@ -155,6 +158,27 @@ workflow_runner.finish_step(handle.run_id, 0,
                             project_slug=project_slug,
                             output_ref=str(inbox_path))
 ```
+
+**Daily series for the weekly ledger (GAP-M4 D1).** In the SAME step, ALSO
+fetch a free site-level *daily* series for the anomaly-detection history store
+(see Step 7b). `master.xlsx#gsc_performance` is a recent-vs-previous snapshot
+with no date column, so it cannot hold a weekly time series — the ledger does.
+
+```python
+daily = mcp__gsc__search_analytics(
+    siteUrl=project_config["gsc"]["site_url"],
+    startDate=(today - days_back).isoformat(),   # cold-start backfill: days_back=112
+    endDate=today.isoformat(),
+    dimensions=["date"],                          # site-level, one row per day
+)
+daily_path = (
+    workspace_root / "projects" / project_slug / "inbox" / "gsc"
+    / f"{today.isoformat()}-search_analytics_daily-{project_slug}.json"
+)
+daily_path.write_text(json.dumps(daily, ensure_ascii=False, indent=2))
+```
+
+Raw-inbox-first (§16.5): the daily payload lands on disk before any transform.
 
 ### Step 3 — `fetch_enriched` (previous window for delta)
 
@@ -216,6 +240,45 @@ committer.commit(
     writer="gsc-pull",
 )
 ```
+
+### Step 7b — `append_weekly_ledger` (GAP-M4 D1 — anomaly history, NOT master.xlsx)
+
+Aggregate the daily series (Step 2) into COMPLETE ISO weeks and append the
+missing ones to the append-only ledger `projects/{slug}/_state/metrics/
+gsc-weekly.jsonl`. This is a `_state` sidecar (append-only-state rule, mirrors
+`consent.jsonl` / `cost_ledger.jsonl`), NOT a `master.xlsx` write — so it is
+free of the gsc_performance approval gate. The week containing `today` and any
+week whose Sunday is within 2 days of `today` (GSC data lag) are excluded; the
+appender dedups by `iso_week`, so re-runs are no-ops and never rewrite a line.
+
+```bash
+python3 scripts/ingestion/gsc_pull.py --append-weekly-ledger \
+    --daily  inbox/gsc/{date}-search_analytics_daily-{slug}.json \
+    --ledger _state/metrics/gsc-weekly.jsonl \
+    --today  {date}
+```
+
+Then emit a provenance event for the staging write (operation `staging`,
+`target_excel_sheet=None`, `target_table="gsc_weekly_ledger"` — the
+`operation` enum already carries `staging`; no events schema change needed):
+
+```python
+from scripts.state import events_writer
+events_writer.append_provenance(
+    project_id=project_slug,
+    source={"kind": "gsc_mcp", "mcp_server": "gsc",
+            "mcp_tool": "gsc__search_analytics"},
+    operation="staging",
+    target_excel_sheet=None,
+    target_table="gsc_weekly_ledger",
+)
+```
+
+**Cold-start backfill (one-shot).** Every project starts with an empty ledger,
+so anomaly detection reports `insufficient_history` until ≥6 complete weeks
+accumulate. To prime it in a single free GSC call, run Step 2 + Step 7b once
+with `days_back=112` (16 complete weeks). No separate skill — same step, larger
+window.
 
 ### Step 8 — `render_report`
 

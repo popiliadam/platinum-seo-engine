@@ -206,10 +206,10 @@ def test_consumes_contract_actual_reads() -> None:
     fm = _parse_frontmatter(SKILL_PATH)
     consumes = fm.get("consumes", [])
     assert isinstance(consumes, list)
-    assert len(consumes) == 3, (
-        f"consumes[] must declare the 3 actual inline reads (drift-check "
-        f"consistency-report + portfolio.json + template); got "
-        f"{len(consumes)}: {consumes}"
+    assert len(consumes) == 4, (
+        f"consumes[] must declare the 4 actual inline reads (drift-check "
+        f"consistency-report + portfolio.json + template + gsc-weekly ledger); "
+        f"got {len(consumes)}: {consumes}"
     )
     joined = " | ".join(consumes)
     assert "drift-check" in joined and "consistency-report" in joined, (
@@ -220,11 +220,18 @@ def test_consumes_contract_actual_reads() -> None:
         "consumes[] must declare shared/portfolio.json (the actual Block 2 read)"
     )
     assert "monitoring-weekly.template.md" in joined
-    # Phase-14+ future reads must NOT masquerade as live dependency edges.
-    assert "gsc_performance" not in joined, (
-        "master.xlsx[gsc_performance] is a Phase-14+ future read; the inline "
-        "runtime never opens master.xlsx (B2-03 reconcile)"
+    # GAP-M4: the GSC anomaly path reads the weekly ledger (NOT master.xlsx).
+    assert "gsc-weekly.jsonl" in joined, (
+        "consumes[] must declare the _state/metrics/gsc-weekly.jsonl ledger "
+        "(the active Block 3 anomaly read, GAP-M4)"
     )
+    # master.xlsx[gsc_performance] is NOT read (it has no date column / is a
+    # snapshot) — the ledger replaced that false claim.
+    assert "gsc_performance" not in joined, (
+        "master.xlsx[gsc_performance] is a snapshot with no weekly series; the "
+        "inline runtime never opens master.xlsx — the ledger is the source"
+    )
+    # budget_credits_per_day remains a Phase-14+ future read (still deferred).
     assert "budget_credits_per_day" not in joined, (
         "project-config[budget_credits_per_day] is a Phase-14+ future read; "
         "the inline runtime never opens project-config (B2-03 reconcile)"
@@ -313,17 +320,29 @@ def test_durur_4_template_inline_fallback_documented() -> None:
 # ---------------------------------------------------------------------------
 
 def test_durur_5_gsc_anomaly_escalation_documented() -> None:
-    """DURUR #5: 5σ deviation on week-over-week GSC delta → CRITICAL
-    escalation (severity=alert), separate audit event row appended."""
+    """DURUR #5 v2 (GAP-M4 / R-141): the GSC anomaly is now ACTIVE — a robust
+    median+MAD modified z-score (NOT 5σ). A severity=RED anomaly → CRITICAL
+    escalation with a SECOND audit row. The discredited 5σ placeholder is
+    fully removed (grep sentinel)."""
     body = _skill_body()
     assert "DURUR #5" in body, "DURUR #5 sentinel missing"
-    assert re.search(
-        r"DURUR #5.{0,500}5σ|DURUR #5.{0,500}5\s*(?:sigma|standard\s*deviation)",
-        body, re.DOTALL | re.IGNORECASE,
-    ), "DURUR #5 must declare 5σ threshold"
-    assert re.search(
-        r"DURUR #5.{0,800}(?:CRITICAL|alert)", body, re.DOTALL,
-    ), "DURUR #5 must escalate CRITICAL/alert severity"
+    # Anchor on the unique dedicated-section header ("MAD GSC anomaly"); the
+    # Outputs mention says "MAD anomaly" (no GSC) so this is unambiguous.
+    m = re.search(r"DURUR #5.{0,6}MAD GSC anomaly(.{0,1800})", body, re.DOTALL)
+    assert m, "dedicated DURUR #5 (MAD GSC anomaly) section missing"
+    region = m.group(1)
+    assert re.search(r"median.?\+?.?MAD|modified.z", region, re.IGNORECASE), (
+        "DURUR #5 must declare the median+MAD modified-z detector"
+    )
+    assert "R-141" in region, "DURUR #5 must cite R-141"
+    assert "CRITICAL" in region, "DURUR #5 must escalate to CRITICAL"
+    assert re.search(r"second|ikinci", region, re.IGNORECASE), (
+        "DURUR #5 must declare a SECOND audit row on RED"
+    )
+    assert "audit" in region.lower()
+    # The discredited 5σ placeholder must be GONE from the whole SKILL.
+    full = _skill_text()
+    assert "5σ" not in full, "the 5σ placeholder must be fully removed (R-141 replaces it)"
 
 
 # ---------------------------------------------------------------------------
@@ -666,11 +685,20 @@ def test_inline_orchestration_executes_against_tmp_workspace(
     )
     assert "AMBER" in report  # severity: amber_count>0 and red_count<5
 
-    # 3. GSC + budget sections honestly surface the Phase-14+ deferral (B2-02).
-    assert "Phase 14+" in report, (
-        "placeholder sections must honestly surface the Phase-14+ deferral, "
-        "not imply an active 5σ/budget alarm"
+    # 3. GAP-M4: with NO ledger, the GSC anomaly section renders the honest
+    #    `insufficient_history` string (active path, not a fabricated alarm and
+    #    not a deferral placeholder). Budget remains the ONLY Phase-14+ deferral.
+    assert "yetersiz geçmiş" in report, (
+        "missing ledger must render the honest insufficient_history string "
+        "(GAP-M4 active path), not a 5σ/deferral placeholder"
     )
+    assert "R-141" in report, "GSC anomaly section must cite the R-141 detector"
+    assert "Phase 14+" in report, (
+        "the budget-burn section remains an honest Phase-14+ deferral"
+    )
+    # severity unchanged from the drift rollup (insufficient history ⇒ no escalation).
+    assert "severity: AMBER" in report or "severity:AMBER" in report or \
+        "Genel severity:** AMBER" in report, "drift rollup severity (AMBER) must survive"
 
     # 4. Exactly ONE events.jsonl audit row (no 5σ second row this Wave).
     events_path = ws / "projects" / slug / "_state" / "events.jsonl"
@@ -695,3 +723,105 @@ def test_inline_orchestration_executes_against_tmp_workspace(
         "monitoring-weekly must NOT write master.xlsx (Phase 9 8-reporting "
         "no-write invariant)"
     )
+
+
+# ---------------------------------------------------------------------------
+# Test 18 — GAP-M4: a RED MAD anomaly fires DURUR #5 (exactly 2 audit rows)
+# ---------------------------------------------------------------------------
+
+def test_inline_red_anomaly_writes_second_audit_row(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With a populated weekly ledger showing a clear clicks collapse in a week
+    that does NOT overlap a Ranking update, Block 3 computes severity=RED and
+    appends a SECOND audit row (audit_target ...:anomaly) — the DURUR #5
+    CRITICAL escalation. The drift output is GREEN so the RED comes solely from
+    the GSC anomaly (proving the severity rollup)."""
+    import sys as _sys
+    from datetime import date as _d, timedelta as _td
+
+    def _monday_of(d: "_d") -> "_d":
+        return d - _td(days=d.weekday())
+
+    def _isolabel(d: "_d") -> str:
+        c = d.isocalendar()
+        return f"{c[0]}-W{c[1]:02d}"
+
+    blocks = _inline_orchestration_blocks()
+    slug = "demo-project"
+    ws = tmp_path / "ws"
+
+    # Drift: all GREEN so any RED must come from the GSC anomaly.
+    cache_dir = ws / "projects" / slug / "_state" / "cache"
+    cache_dir.mkdir(parents=True)
+    (cache_dir / "consistency-report.json").write_text(
+        json.dumps({"red_count": 0, "amber_count": 0, "green_count": 20,
+                    "verdict": "GREEN"}),
+        encoding="utf-8",
+    )
+    shared_dir = ws / "shared"
+    shared_dir.mkdir(parents=True)
+    (shared_dir / "portfolio.json").write_text(
+        json.dumps({"projects": [{"slug": slug, "completion_percentage": 80.0,
+                                  "active_oq_count": 0,
+                                  "recent_events_count_7day": 4}]}),
+        encoding="utf-8",
+    )
+
+    # Weekly ledger: 12 flat baseline weeks (~100 clicks) + a current week that
+    # COLLAPSES to 40 clicks. Current week = 2026-04-20..04-26 (no calendar
+    # overlap — between the March-2026 settling window and the May-2026 rollout).
+    current_monday = _monday_of(_d(2026, 4, 22))   # → 2026-04-20 (Monday)
+    metrics_dir = ws / "projects" / slug / "_state" / "metrics"
+    metrics_dir.mkdir(parents=True)
+    base = [98, 102, 99, 101, 100, 103, 97, 100, 102, 98, 101, 99]
+    lines = []
+    for i, c in enumerate(reversed(base), start=1):
+        mon = current_monday - _td(weeks=i)
+        sun = mon + _td(days=6)
+        lines.append(json.dumps({
+            "iso_week": _isolabel(mon), "week_start": mon.isoformat(),
+            "week_end": sun.isoformat(), "clicks": c, "impressions": 5000,
+            "ctr": 0.02, "avg_position": 15.0, "source": "gsc_mcp",
+            "written_at": "2026-01-01T00:00:00Z"}))
+    cur_sun = current_monday + _td(days=6)
+    lines.append(json.dumps({
+        "iso_week": _isolabel(current_monday), "week_start": current_monday.isoformat(),
+        "week_end": cur_sun.isoformat(), "clicks": 40, "impressions": 5000,
+        "ctr": 0.02, "avg_position": 15.0, "source": "gsc_mcp",
+        "written_at": "2026-01-01T00:00:00Z"}))
+    (metrics_dir / "gsc-weekly.jsonl").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    monkeypatch.setenv("PSEO_PROJECT_ID", slug)
+    monkeypatch.setenv("PSEO_WORKSPACE_ROOT", str(ws))
+    monkeypatch.setenv("MONITORING_WEEK_START", current_monday.isoformat())
+    monkeypatch.setenv("MONITORING_WEEK_END", cur_sun.isoformat())
+    monkeypatch.chdir(REPO_ROOT)
+
+    saved_path = list(_sys.path)
+    try:
+        exec(compile("\n".join(blocks), "<monitoring-weekly-inline>", "exec"), {})
+    finally:
+        _sys.path[:] = saved_path
+
+    report = next((ws / "projects" / slug / "outputs" / "reports").glob(
+        "*-monitoring-weekly.md")).read_text(encoding="utf-8")
+
+    # The GSC anomaly section reports the computed RED clicks drop (R-141).
+    assert "R-141" in report
+    assert "clicks" in report
+    assert "CRITICAL" in report, "RED anomaly must populate the escalations section"
+    # Overall severity escalated to RED purely from the anomaly (drift was GREEN).
+    assert "RED" in report
+
+    # Exactly TWO audit rows: the base accessed row + the :anomaly escalation row.
+    events_path = ws / "projects" / slug / "_state" / "events.jsonl"
+    rows = [json.loads(L) for L in events_path.read_text(encoding="utf-8").splitlines()
+            if L.strip()]
+    assert len(rows) == 2, f"RED anomaly must append exactly 2 audit rows, got {len(rows)}"
+    targets = [r["audit_target"] for r in rows]
+    assert any(t.endswith(":anomaly") for t in targets), (
+        "the second audit row must carry the ...:anomaly target"
+    )
+    assert all(r["event_kind"] == "audit" and r["actor"] == "agent:monitoring-weekly"
+               for r in rows)
