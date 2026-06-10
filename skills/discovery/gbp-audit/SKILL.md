@@ -20,7 +20,7 @@ description: |
   (content-decay) gerekiyorsa — her birinin ayrı komutu vardır.
   Otonom GBP API submit YASAK (feedback_indexing_api_consent): bu skill
   sadece audit + rapor üretir, GBP dashboard'una hiçbir şey yazmaz.
-version: "1.0"
+version: "1.1"
 status: active
 category: discovery
 inputs:
@@ -28,6 +28,11 @@ inputs:
     type: string
     required: true
     description: "Slug; resolves projects/{slug}/master.xlsx + project.config.json."
+  nap_source:
+    type: string
+    required: false
+    default: "local/nap.json"
+    description: "Project-relative path of the canonical NAP doc (schemas/local-nap.schema.json; rules/local-seo-discipline.md R-144). Missing file => one MEDIUM 'Canonical NAP file missing' gap row; corrupt file => DURUR #9 fail-loud."
 outputs:
   - "master.xlsx#gbp_audit"
   - "outputs/reports/{date}-gbp-audit.md"
@@ -86,9 +91,10 @@ emits a report. The operator decides what to fix manually.
 
 ## Inputs (frontmatter contract)
 
-| Name           | Type    | Default | Notes                                                |
-|----------------|---------|---------|------------------------------------------------------|
-| `project_slug` | string  | —       | Required. Resolves `projects/{slug}/master.xlsx`.    |
+| Name           | Type    | Default          | Notes                                                |
+|----------------|---------|------------------|------------------------------------------------------|
+| `project_slug` | string  | —                | Required. Resolves `projects/{slug}/master.xlsx`.    |
+| `nap_source`   | string  | `local/nap.json` | Optional. Canonical NAP doc, project-relative (`schemas/local-nap.schema.json`, R-144). |
 
 `workspace_root` is resolved via `PSEO_WORKSPACE_ROOT` env or explicit
 test override (mirrors workflow_runner / events_writer / tech-audit).
@@ -177,10 +183,24 @@ handle = workflow_runner.create_run(
 
 ### Step 4 — `fetch_listing` (MCP §16.5 — raw inbox first)
 
+Identity inputs come from the canonical NAP doc (rules/local-seo-
+discipline.md R-144), NOT from `brand_identity` — that block is a
+VISUAL-identity contract (`project-config.schema.json#brand_identity`,
+`additionalProperties: false`) and has never carried
+`business_name`/`primary_location` keys; the pre-v1.1 contract here was
+a phantom that could not validate against any live config.
+
 ```python
+nap_path = project_dir / nap_source           # default "local/nap.json"
+canonical_nap = (
+    json.loads(nap_path.read_text("utf-8")) if nap_path.exists() else None
+)  # corrupt file => json.JSONDecodeError propagates (DURUR #9 fail-loud)
+business_name = (canonical_nap or {}).get("business_name") or config["display_name"]
+location_hint = ((canonical_nap or {}).get("address") or {}).get("city", "")
+
 raw = mcp__dataforseo__business_data_business_listings_search(
-    business_name=config["brand_identity"]["business_name"],
-    location=config["brand_identity"]["primary_location"],
+    business_name=business_name,
+    location=location_hint,
     limit=1,
 )
 inbox_path = (
@@ -248,12 +268,21 @@ result = gbp_audit_transform.run(
 ```
 
 The gap analysis consumes the fetched listing dict directly and applies
-the per-category severity matrix:
+the per-category severity matrix. The NAP branch (v1.1, GAP-A2 — the
+matrix declared it since v1.7 Phase 5 without an implementation)
+compares listing name/phone/address against the canonical
+`local/nap.json` via `scripts.discovery.nap_consistency.compare_nap`
+(Turkish-aware folding, E.164 phone normalization, abbreviation-
+expanded address tokens, multi-location resolution by `location_id`).
+The listing-not-found path stays comparison-free — without a listing
+there is nothing to compare, and the not-found row is already the
+blocking finding:
 
 | Category    | Gap                          | Severity | Recommended action                                    |
 |-------------|------------------------------|----------|-------------------------------------------------------|
 | nap         | listing not found            | HIGH     | Create or claim GBP listing                           |
-| nap         | NAP mismatch with config     | HIGH     | Sync name/address/phone across GBP + site footer      |
+| nap         | NAP mismatch vs `local/nap.json` (one row per mismatched field) | HIGH | Sync the field across GBP + site footer + LocalBusiness JSON-LD to match the canonical (R-144) |
+| nap         | canonical NAP file missing   | MEDIUM   | Create `local/nap.json` per `schemas/local-nap.schema.json`, re-run |
 | categories  | primary missing              | HIGH     | Set primary category in GBP dashboard                 |
 | categories  | < 2 secondary                | MEDIUM   | Add at least 2 relevant secondary categories          |
 | photos      | < 3 photos                   | HIGH     | Add ≥ 3 high-quality photos                           |
@@ -330,7 +359,7 @@ workflow_runner.complete(handle.run_id, project_slug=project_slug, outputs={
 })
 ```
 
-## DURUR conditions (8)
+## DURUR conditions (9)
 
 Stop and flag the manager — do not patch, do not fall back.
 
@@ -350,6 +379,11 @@ Stop and flag the manager — do not patch, do not fall back.
 7. `workflow_runner.create_run` fails schema validation
    (workflow-run.schema.json).
 8. `PSEO_WORKSPACE_ROOT` env unset and no `workspace_root` arg passed.
+9. `local/nap.json` present but unparseable → STOP (fail-loud
+   `json.JSONDecodeError`; v1.1 GAP-A2). Never audit against half a
+   canonical — fix or delete the file, then re-run. (A MISSING file is
+   NOT a DURUR: the audit runs and emits the MEDIUM "canonical NAP file
+   missing" row instead.)
 
 ## Hard Constraint Audit (memory-derived)
 
@@ -367,13 +401,38 @@ This skill MUST honor three feedback memory constraints:
   is a discovery skill, not a content production skill; no HTML
   output).
 
+## Changelog
+
+- **v1.1 (2026-06-10, GAP-A2 / unified batch GAP-A-B2):** Step-4
+  identity source FIXED — the v1.0 contract read
+  `brand_identity.business_name` / `brand_identity.primary_location`
+  from project.config, keys that have never existed in
+  `project-config.schema.json#brand_identity` (visual-identity block,
+  `additionalProperties: false`) — a phantom contract that could not
+  validate against any live config. v1.1 reads the canonical
+  `local/nap.json` (fallback `config["display_name"]`). NAP-mismatch
+  branch IMPLEMENTED (declared in the severity matrix since v1.7
+  Phase 5 but never coded): per-field HIGH rows via
+  `scripts.discovery.nap_consistency.compare_nap`; canonical file
+  missing → one MEDIUM row. New optional input `nap_source`; new
+  DURUR #9 (corrupt `nap.json` fail-loud). Rules:
+  `rules/local-seo-discipline.md` (R-144/R-145/R-146).
+- **v1.0 (v1.7 Phase 5):** Initial release — G-AI-02 finding closure
+  (8-category GBP gap audit, profile gate, budget pre-flight,
+  read-only consent posture).
+
 ## Cross-references
 
 - Schemas: `schemas/master-excel.schema.json#gbp_audit` (7 cols;
-  severityEnum + statusEnum reuse), `schemas/events.schema.json`
+  severityEnum + statusEnum reuse), `schemas/local-nap.schema.json`
+  (canonical NAP doc at `projects/{slug}/local/nap.json`, R-144),
+  `schemas/events.schema.json`
   (`source.kind=dataforseo_mcp`, `target_excel_sheet=gbp_audit`,
   `cost.credits` per ADR-016), `schemas/skill-frontmatter.schema.json`
   (this frontmatter).
+- Rules: `rules/local-seo-discipline.md` (R-144 NAP single source of
+  truth · R-145 review-acquisition white-hat · R-146 location-page
+  anti-doorway).
 - Cross-modules (IMPORT-only, not modified):
   `scripts/state/workflow_runner.py`, `scripts/excel/transaction.py`,
   `scripts/state/events_writer.py`, `scripts/budget/check_budget.py`,
