@@ -29,6 +29,7 @@ outputs:
   - "inbox/gsc/{date}-detect_quick_wins-{slug}.json"
   - "inbox/gsc/{date}-enhanced_search_analytics-{slug}.json"
   - "inbox/dfs/{date}-aio_presence-{slug}.json"
+  - "_state/metrics/quickwin-cohorts/{date}-cohort.json"
 consumes:
   - "init-project:projects/{slug}/master.xlsx"
   - "sf-import:master.xlsx#crawl_sitemap"
@@ -128,6 +129,7 @@ handle = workflow_runner.create_run(
         {"name": "fetch_aio_presence"},  # GAP-M2 — only runs when aio_check=true
         {"name": "request_approval"},
         {"name": "write_excel"},
+        {"name": "cohort_snapshot"},  # GAP-M-W2 — R-138 treated+control snapshot
         {"name": "render_report"},
     ],
 )
@@ -249,6 +251,54 @@ committer.commit(
 )
 ```
 
+### Step 7b — `cohort_snapshot` (intervention cohort tagging, measurement-discipline R-138)
+
+Persist the **treated + control** cohort the transform matched, so a later
+`monthly-report` can compute a treated-vs-control OUTCOME (never a raw treated
+delta — measurement-discipline R-138). The treated group is the selected
+quick-wins; the control group is `transform()`'s `control_cohort` (same-band,
+untouched queries — position within ±2 and impressions within 0.5×–2× of a
+treated row). This is staging JSON ONLY — no master.xlsx write.
+
+```python
+import json
+from scripts.state import events_writer
+
+# `result` is the transform() output: quick_wins + control_cohort + meta.
+treated = [
+    {"query": r["query"], "url": r["url"], "position": r["current_position"],
+     "impressions_30d": r["impressions_30d"], "clicks_30d": r["clicks_30d"]}
+    for r in result["quick_wins"]
+]
+cohort = {
+    "cohort_date": today.isoformat(),
+    "score_version": result["meta"]["score_version"],
+    "treated": treated,
+    "controls": result["control_cohort"],
+    "matching": result["meta"]["cohort_matching"],
+}
+cohort_path = (
+    workspace_root / "projects" / project_slug
+    / "_state" / "metrics" / "quickwin-cohorts"
+    / f"{today.isoformat()}-cohort.json"
+)
+cohort_path.parent.mkdir(parents=True, exist_ok=True)
+cohort_path.write_text(json.dumps(cohort, ensure_ascii=False, indent=2))
+
+# Provenance: tool-computed staging record (no Excel sheet target).
+events_writer.append_provenance(
+    project_id=project_slug,
+    source={"kind": "tool_computed", "tool": "quickwins_transform"},
+    operation="staging",
+    target_excel_sheet=None,
+    target_table="quickwin_cohort",
+    notes="cohort_tagged",
+)
+```
+
+The cohort file is read ≥21 days later by `scripts/reporting/intervention_outcome.py`
+(paired with a fresh GSC payload) → `monthly-report`'s `measurement_context`.
+
 ### Step 8 — `render_report`
 
 `render_template.py templates/reports/quickwin.template.md data.json`
@@ -355,8 +405,10 @@ Stop and flag the manager — do not patch, do not fall back.
   `schemas/cross-sheet-invariants.json` (D-03 + F-08 invariants),
   `schemas/skill-frontmatter.schema.json`, `schemas/ctr-curve.schema.json`.
 - Data: `ctr-curve.json` (engine-root versioned CTR/AIO curve — R-139).
-- Rules: `rules/measurement-discipline.md` R-139 (versioned measurement
-  constants), R-140 (AIO presence recording — `present`/`not_detected` only).
+- Rules: `rules/measurement-discipline.md` R-138 (intervention cohort tagging —
+  Step 7b treated+control snapshot + `control_cohort` transform output),
+  R-139 (versioned measurement constants), R-140 (AIO presence recording —
+  `present`/`not_detected` only).
 - Cross-modules: `scripts/state/workflow_runner.py`,
   `scripts/excel/transaction.py`, `scripts/state/events_writer.py`,
   `scripts/reporting/render_template.py`, `scripts/util/ctr_curve.py`.

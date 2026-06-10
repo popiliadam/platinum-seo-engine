@@ -27,6 +27,13 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+# GAP-M-W2: core-update overlap read side (R-137). update_calendar imports only
+# stdlib (no network) — pure parse + date math; no circular import risk.
+from scripts.reporting.update_calendar import (  # noqa: E402
+    load_calendar as _load_calendar,
+    overlaps as _calendar_overlaps,
+)
+
 # --- Constants — schema authority surface --------------------------------
 
 SCHEMA_VERSION = "1.0"
@@ -316,19 +323,33 @@ def _build_gsc_positive_trends(gsc_perf: Sequence[Mapping[str, Any]]) -> dict:
 
 
 def _build_keywords_up(opportunity: Sequence[Mapping[str, Any]]) -> list[dict]:
-    """Section 3 — derived from opportunity. The pre/after split is not
-    stored locally; we infer position_before = position_after + 3 as a
-    transparent positive-framing approximation. Phase 6 GSC longitudinal
-    will replace this with actual diffs.
+    """Section 3 — derived from opportunity. position_after is the real
+    current_position; position_before is the stored prior-period position when
+    a longitudinal source supplies it, else null.
+
+    GAP-M-W2 (measurement honesty, R-137): the retired implementation
+    fabricated ``position_before = position_after + 3`` as a "transparent
+    positive-framing approximation" — but that INVENTS a rise that may never
+    have happened (Principle 1, uydurma yasak). We now emit
+    ``position_before = None`` whenever no stored prior position exists (the
+    local opportunity sheet carries none) — an honest "unknown", never a
+    synthetic delta. When a future GSC-longitudinal feed populates an optional
+    ``position_before`` on the opportunity rows, we pass it through verbatim.
     """
     out: list[dict] = []
     for r in opportunity:
         pos_after = _safe_float(r.get("current_position"))
         if pos_after <= 0:
             continue
+        raw_before = r.get("position_before")
+        pos_before = (
+            round(_safe_float(raw_before), 2)
+            if raw_before not in (None, "") and _safe_float(raw_before) > 0
+            else None
+        )
         out.append({
             "query": _safe_str(r.get("query")),
-            "position_before": round(pos_after + 3.0, 2),
+            "position_before": pos_before,
             "position_after": round(pos_after, 2),
             "impressions_28d": _safe_int(r.get("impressions_30d")),
             "clicks_28d": _safe_int(r.get("clicks_30d")),
@@ -420,6 +441,86 @@ def _build_decliners(
         "net_clicks_delta_pct": gsc_trends["deltas"].get("clicks_delta_pct", 0.0),
         "pages_down": _build_pages_down(gsc_perf),
         "decaying_content": _build_decaying_content(content_decay),
+    }
+
+
+# --- GAP-M-W2: measurement_context (R-137 overlap + R-138 outcomes) -------
+
+def _measurement_quality(
+    overlap: Sequence[Mapping[str, Any]],
+    calendar_updates: Sequence[Mapping[str, Any]],
+) -> str:
+    """Derive the measurement-quality verdict from the calendar overlap (R-137).
+
+    Empty calendar ⇒ ``insufficient_history`` (overlap UNDETERMINABLE — never
+    asserted ``clean`` without data to check). An active rollout/rolling overlap
+    ⇒ ``update_overlap``; an only-settling overlap ⇒ ``post_update_settling``;
+    a populated calendar with no overlap ⇒ ``clean``.
+    """
+    if not calendar_updates:
+        return "insufficient_history"
+    phases = {o.get("phase") for o in overlap}
+    if phases & {"rollout_in_period", "rolling"}:
+        return "update_overlap"
+    if "settling" in phases:
+        return "post_update_settling"
+    return "clean"
+
+
+def _measurement_notes(
+    quality: str,
+    overlap: Sequence[Mapping[str, Any]],
+    outcomes: Sequence[Mapping[str, Any]],
+) -> str:
+    """One-line, framing-INVARIANT attribution verdict (R-137). The wording is
+    identical under every framing — only TONE elsewhere may differ."""
+    names = ", ".join(
+        _safe_str(o.get("name")) for o in overlap if _safe_str(o.get("name"))
+    )
+    if quality == "update_overlap":
+        head = (
+            f"Bu dönem {names} ile çakışıyor — trafik deltaları tek başına "
+            f"motor çalışmasına atfedilemez"
+        )
+    elif quality == "post_update_settling":
+        head = (
+            f"{names} yerleşme tamponunda (rollout yeni bitti) — deltalar henüz "
+            f"oturmadı, atıf temkinli"
+        )
+    elif quality == "insufficient_history":
+        head = "Core-update takvimi yüklenmedi — pencere örtüşmesi doğrulanamadı"
+    else:
+        head = "Bu dönem bilinen bir Google Ranking güncellemesiyle çakışmıyor"
+    return head + ("" if outcomes else " | kohort verisi yok")
+
+
+def _build_measurement_context(
+    period_start: str,
+    period_end: str,
+    calendar_updates: Sequence[Mapping[str, Any]],
+    cohort_results: Sequence[Mapping[str, Any]] | None,
+) -> dict:
+    """Section 12 (additive-OPTIONAL) — measurement-honesty annotation.
+
+    FRAMING-INVARIANT by construction: this builder takes NO ``framing_policy``
+    parameter, so the core-update overlap table (R-137), the measurement_quality
+    verdict, and the treated-vs-control intervention outcomes (R-138) are
+    byte-identical under positive_client and internal. Framing only ever
+    reorders / softens the prose AROUND these facts, never the facts (FIX-K K1
+    contract, extended to measurement honesty).
+    """
+    overlap = list(_calendar_overlaps(period_start, period_end, calendar_updates))
+    quality = _measurement_quality(overlap, calendar_updates)
+    if isinstance(cohort_results, Mapping):
+        cohort_results = [cohort_results]
+    outcomes = [
+        dict(o) for o in (cohort_results or []) if isinstance(o, Mapping)
+    ]
+    return {
+        "measurement_quality": quality,
+        "core_updates_overlap": overlap,
+        "intervention_outcomes": outcomes,
+        "notes": _measurement_notes(quality, overlap, outcomes),
     }
 
 
@@ -595,13 +696,21 @@ def assemble_report(
     generated_by: str = "monthly_report",
     data_sources: Sequence[Mapping[str, Any]] | None = None,
     artifacts: Mapping[str, str] | None = None,
+    calendar_updates: Sequence[Mapping[str, Any]] = (),
+    cohort_results: Sequence[Mapping[str, Any]] | None = None,
 ) -> dict:
     """Pure assembler: ReportInputs → schema-conformant dict.
 
     Validates framing_policy + output_formats + data_sources enums up
-    front (DURUR fast-fail). Builds all 10 required sections.
-    Idempotent: same inputs → byte-identical output (modulo
-    `generated_at` if not pinned).
+    front (DURUR fast-fail). Builds all 10 required sections + two additive
+    optional sections (decliners, measurement_context). Idempotent: same inputs
+    → byte-identical output (modulo `generated_at` if not pinned).
+
+    `calendar_updates` (R-137 core-update list — engine seed ∪ workspace overlay,
+    loaded by the CLI) and `cohort_results` (R-138 intervention outcomes) feed
+    the framing-INVARIANT `measurement_context` section. Both default empty so
+    the pure assembler stays callable without external data (then the section
+    honestly reports `insufficient_history` / no cohort).
     """
     _ensure_framing_policy(framing_policy)
     _ensure_output_formats(list(output_formats))
@@ -623,6 +732,9 @@ def assemble_report(
     decliners = _build_decliners(
         inputs.gsc_performance, inputs.content_decay, gsc_trends,
     )
+    measurement_context = _build_measurement_context(
+        inputs.period_start, inputs.period_end, calendar_updates, cohort_results,
+    )
     exec_summary = _build_exec_summary(
         gsc_trends, pages_up, tech_done, content_revised, new_content,
         framing_policy,
@@ -642,6 +754,9 @@ def assemble_report(
         # FIX-K K1(b): additive optional section — present in BOTH framings
         # with byte-identical content (NOT a member of REQUIRED_SECTIONS).
         "decliners": decliners,
+        # GAP-M-W2: additive optional measurement-honesty section — likewise
+        # framing-invariant and NOT a member of REQUIRED_SECTIONS.
+        "measurement_context": measurement_context,
     }
     missing = [s for s in REQUIRED_SECTIONS if s not in sections]
     if missing:
@@ -712,9 +827,32 @@ def _flatten_for_template(report: Mapping[str, Any]) -> dict[str, str]:
     decliners_md = "\n".join(dec_lines) if dec_lines else (
         "_(düşen sayfa/içerik yok)_"
     )
+    # GAP-M-W2: measurement_context → bullet lines (framing-invariant facts:
+    # quality verdict + core-update overlap table + intervention outcomes).
+    mc = sections.get("measurement_context", {})
+    mc_lines: list[str] = [
+        f"- Ölçüm kalitesi: **{_safe_str(mc.get('measurement_quality'))}**",
+    ]
+    for o in mc.get("core_updates_overlap", []):
+        mc_lines.append(
+            f"- {_safe_str(o.get('name'))} "
+            f"({_safe_str(o.get('phase'))}, {o.get('overlap_days', 0)} gün "
+            f"örtüşme): {_safe_str(o.get('begin'))} → {_safe_str(o.get('end'))}"
+        )
+    for oc in mc.get("intervention_outcomes", []):
+        mc_lines.append(
+            f"- Kohort {_safe_str(oc.get('cohort_date'))}: "
+            f"{_safe_str(oc.get('verdict'))} (fark {oc.get('difference_pp', 0)}pp; "
+            f"{_safe_str(oc.get('caveat'))})"
+        )
+    if _safe_str(mc.get("notes")):
+        mc_lines.append(f"- {_safe_str(mc.get('notes'))}")
+    measurement_context_md = "\n".join(mc_lines)
     return {
         "net_clicks_delta_pct": str(dec.get("net_clicks_delta_pct", 0.0)),
         "decliners_md": decliners_md,
+        "measurement_context_md": measurement_context_md,
+        "measurement_quality": _safe_str(mc.get("measurement_quality")),
         "project_id": _safe_str(report.get("project_id")),
         "report_id": _safe_str(report.get("report_id")),
         "period_start": _safe_str(report.get("period_start")),
@@ -732,8 +870,18 @@ def _flatten_for_template(report: Mapping[str, Any]) -> dict[str, str]:
         "previous_impressions": str(prev.get("impressions", 0)),
         "clicks_delta_pct": str(deltas.get("clicks_delta_pct", 0.0)),
         "impressions_delta_pct": str(deltas.get("impressions_delta_pct", 0.0)),
-        "keywords_up_md": _bulleted(sections.get("keywords_up", []),
-            "{query} — pozisyon {position_before}→{position_after}"),
+        # GAP-M-W2: a null position_before (no longitudinal source) renders as
+        # "?" — an honest unknown, never a literal "None" or a fabricated number.
+        "keywords_up_md": _bulleted(
+            [
+                {**it, "position_before": (
+                    "?" if it.get("position_before") is None
+                    else it.get("position_before")
+                )}
+                for it in sections.get("keywords_up", [])
+            ],
+            "{query} — pozisyon {position_before}→{position_after}",
+        ),
         "pages_up_md": _bulleted(sections.get("pages_up", []),
             "{page} — clicks_delta=+{clicks_delta}"),
         "tech_done_md": _bulleted(sections.get("tech_seo_done", []),
@@ -800,6 +948,16 @@ def _parse_args(argv: Iterable[str]) -> argparse.Namespace:
                    help="Path to template.md (default: bundled).")
     p.add_argument("--output-dir", default=None,
                    help="Directory for snapshot.json + report.md outputs.")
+    p.add_argument("--calendar-path", default=None,
+                   help="Core-update calendar JSON (R-137 engine seed). Default: "
+                        "<repo>/google-update-calendar.json. Missing → "
+                        "measurement_context = insufficient_history.")
+    p.add_argument("--overlay-calendar-path", default=None,
+                   help="Optional fresh workspace overlay calendar "
+                        "(shared/cache/google-update-calendar.json; wins by id).")
+    p.add_argument("--cohort-results", default=None,
+                   help="Optional JSON array of intervention_outcome results "
+                        "(R-138) → measurement_context.intervention_outcomes.")
     return p.parse_args(list(argv))
 
 
@@ -847,10 +1005,32 @@ def main(argv: list[str]) -> int:
         {"source": "master_task", "run_ids": [1]},
         {"source": "completed_work", "run_ids": [1]},
         {"source": "work_log", "run_ids": [1]}]
+    # GAP-M-W2: core-update calendar (engine seed ∪ optional workspace overlay) +
+    # optional intervention-outcome cohort results feed measurement_context.
+    cal_path = (Path(args.calendar_path) if args.calendar_path
+                else _REPO_ROOT / "google-update-calendar.json")
+    overlay_path = (Path(args.overlay_calendar_path)
+                    if args.overlay_calendar_path else None)
+    calendar_updates: list[dict] = []
+    if cal_path.is_file():
+        try:
+            calendar_updates = _load_calendar(cal_path, overlay_path)
+        except (OSError, ValueError) as exc:
+            print(f"calendar load skipped ({exc}); measurement_context → "
+                  f"insufficient_history", file=sys.stderr)
+    cohort_results = None
+    if args.cohort_results:
+        cr_path = Path(args.cohort_results)
+        if cr_path.is_file():
+            try:
+                cohort_results = json.loads(cr_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                print(f"cohort-results load skipped ({exc})", file=sys.stderr)
     try:
         report = assemble_report(
             inputs=inputs, framing_policy=args.framing_policy,
-            output_formats=output_formats, data_sources=data_sources)
+            output_formats=output_formats, data_sources=data_sources,
+            calendar_updates=calendar_updates, cohort_results=cohort_results)
     except MonthlyReportError as exc:
         print(f"assemble failed: {exc}", file=sys.stderr)
         return 1

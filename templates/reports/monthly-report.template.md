@@ -68,6 +68,12 @@ _(DataForSEO entegrasyonu opsiyonel — bu skill LOCAL aggregation, paid MCP kul
 
 $next_plan_md
 
+## 12. Ölçüm Bağlamı
+
+_(Google core-update örtüşmesi + müdahale-vs-kontrol sonucu — bkz. `rules/measurement-discipline.md` (core-update overlap & intervention cohort). Framing'den bağımsız: her iki çerçevede de aynı.)_
+
+$measurement_context_md
+
 ---
 
 ## Kanıt zinciri

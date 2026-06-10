@@ -73,14 +73,14 @@
         },
         "keywords_up": {
           "type": "array",
-          "description": "§22.2 section 3 — keywords whose position improved ≥ 3. Typically top-20.",
+          "description": "§22.2 section 3 — opportunity-derived keywords (top-20 by clicks). position_before is the stored prior-period position when a longitudinal source supplies it, else null (GAP-M-W2 retired the pos_after+3 fabrication — null is honest 'unknown').",
           "items": {
             "type": "object",
             "required": ["query", "position_before", "position_after"],
             "properties": {
               "query":            { "type": "string" },
               "page":             { "type": "string", "format": "uri" },
-              "position_before":  { "type": "number" },
+              "position_before":  { "type": ["number", "null"], "description": "Prior-period position, or null when no longitudinal source stored it (GAP-M-W2: the retired pos_after+3 fabrication was removed — null is honest 'unknown', never a synthetic delta)." },
               "position_after":   { "type": "number" },
               "impressions_28d":  { "type": "integer", "minimum": 0 },
               "clicks_28d":       { "type": "integer", "minimum": 0 }
@@ -204,6 +204,51 @@
                 }
               }
             }
+          }
+        },
+        "measurement_context": {
+          "type": "object",
+          "description": "GAP-M-W2 (R-137 core-update overlap + R-138 intervention outcomes) — measurement-honesty annotation. Additive OPTIONAL section (NOT in sections.required). Framing-INVARIANT: built identically under both framings (the builder takes no framing_policy). measurement_quality flags whether period deltas are attributable; core_updates_overlap annotates Google Search Ranking-update windows (incl. 7-day settling buffer); intervention_outcomes carries treated-vs-control quick-win verdicts (difference in pp, n<30 directional caveat).",
+          "properties": {
+            "measurement_quality": {
+              "enum": ["clean", "update_overlap", "post_update_settling", "insufficient_history"],
+              "description": "clean = no Ranking-update overlap; update_overlap = window overlaps an active rollout; post_update_settling = within the 7-day settle buffer after rollout end; insufficient_history = no calendar loaded (overlap undeterminable, never asserted clean)."
+            },
+            "core_updates_overlap": {
+              "type": "array",
+              "description": "Google Search Ranking updates overlapping the report window (R-137). Source: update_calendar.overlaps().",
+              "items": {
+                "type": "object",
+                "required": ["name", "phase"],
+                "properties": {
+                  "id":           { "type": ["string", "null"] },
+                  "name":         { "type": ["string", "null"] },
+                  "begin":        { "type": ["string", "null"] },
+                  "end":          { "type": ["string", "null"] },
+                  "overlap_days": { "type": "integer", "minimum": 0 },
+                  "phase":        { "enum": ["rolling", "rollout_in_period", "settling"] }
+                }
+              }
+            },
+            "intervention_outcomes": {
+              "type": "array",
+              "description": "Treated-vs-control quick-win outcomes (R-138) from scripts/reporting/intervention_outcome.py — reported as the treated−control difference in pp, never a raw treated delta; n<30 directional caveat; no p-values.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "cohort_date":   { "type": "string" },
+                  "score_version": { "type": "string" },
+                  "post_date":     { "type": "string" },
+                  "difference_pp": { "type": "number" },
+                  "verdict":       { "enum": ["engine_positive", "engine_negative", "indistinguishable"] },
+                  "caveat":        { "type": "string" },
+                  "treated":       { "type": "object" },
+                  "control":       { "type": "object" },
+                  "attrition":     { "type": "object" }
+                }
+              }
+            },
+            "notes": { "type": "string", "description": "One-line framing-invariant attribution verdict." }
           }
         }
       }

@@ -355,6 +355,77 @@ def _row_pct(ctr: float | None) -> float:
     return round(val, 4)
 
 
+# ---------------------------------------------------------------------------
+# Control-cohort matching (GAP-M-W2 — R-138 intervention cohort tagging)
+# ---------------------------------------------------------------------------
+
+# Same-band match tolerances (R-138). Cohort-file `matching` block mirrors these.
+_COHORT_POSITION_TOLERANCE: float = 2.0
+_COHORT_IMPRESSIONS_RATIO_MAX: float = 2.0
+_COHORT_ROW_KEYS = ("query", "url", "position", "impressions_30d", "clicks_30d")
+
+
+def _cohort_row(r: dict) -> dict:
+    """Project a scored row into the cohort-file shape consumed by
+    scripts/reporting/intervention_outcome.py (position = current_position)."""
+    return {
+        "query": r["query"],
+        "url": r["url"],
+        "position": r["current_position"],
+        "impressions_30d": r["impressions_30d"],
+        "clicks_30d": r["clicks_30d"],
+    }
+
+
+def _select_control_cohort(
+    treated: list[dict],
+    candidates: list[dict],
+    *,
+    position_tolerance: float = _COHORT_POSITION_TOLERANCE,
+    impressions_ratio_max: float = _COHORT_IMPRESSIONS_RATIO_MAX,
+) -> list[dict]:
+    """Greedy nearest-position control match (R-138).
+
+    For each treated row, pick the nearest UNUSED candidate (from the
+    scored-but-not-selected tail) whose position is within ``position_tolerance``
+    and whose impressions are within ``[1/ratio_max, ratio_max]`` of the treated
+    row. Each candidate is used at most once; candidates whose query collides
+    with ANY treated query are skipped (the downstream outcome indexes by query,
+    so treated/control must be query-disjoint). Deterministic: ``candidates`` is
+    already rank-sorted, so candidate index breaks distance ties.
+    """
+    ratio_min = 1.0 / impressions_ratio_max
+    treated_queries = {t["query"] for t in treated}
+    used: set[int] = set()
+    controls: list[dict] = []
+    for t in treated:
+        t_pos = float(t["current_position"])
+        t_imp = float(t["impressions_30d"])
+        if t_imp <= 0:
+            continue
+        best_idx: int | None = None
+        best_key: tuple[float, int] | None = None
+        for idx, c in enumerate(candidates):
+            if idx in used or c["query"] in treated_queries:
+                continue
+            c_imp = float(c["impressions_30d"])
+            if c_imp <= 0:
+                continue
+            pos_diff = abs(float(c["current_position"]) - t_pos)
+            if pos_diff > position_tolerance:
+                continue
+            ratio = c_imp / t_imp
+            if not (ratio_min <= ratio <= impressions_ratio_max):
+                continue
+            key = (pos_diff, idx)
+            if best_key is None or key < best_key:
+                best_key, best_idx = key, idx
+        if best_idx is not None:
+            used.add(best_idx)
+            controls.append(_cohort_row(candidates[best_idx]))
+    return controls
+
+
 def transform(
     raw: dict,
     *,
@@ -550,9 +621,16 @@ def transform(
         if r["aio_presence"] in ("present", "not_detected")
     )
 
+    # GAP-M-W2 (R-138): match a control cohort from the scored-but-not-selected
+    # tail (rank top_n+1 ..) — same-band, untouched queries used for the
+    # treated-vs-control attribution. `scored` is rank-sorted; `top` is its
+    # selected prefix, so `scored[len(top):]` is the candidate pool.
+    control_cohort = _select_control_cohort(top, scored[len(top):])
+
     return {
         "quick_wins": quick_wins_rows,
         "opportunity": opportunity_rows,
+        "control_cohort": control_cohort,
         "meta": {
             "input_count": len(items),
             "scored_count": len(scored),
@@ -564,6 +642,11 @@ def transform(
             "score_version": "2.0",
             "curve_version": curve.curve_version,
             "aio_checked_count": aio_checked_count,
+            "controls_matched": len(control_cohort),
+            "cohort_matching": {
+                "position_tolerance": _COHORT_POSITION_TOLERANCE,
+                "impressions_ratio_max": _COHORT_IMPRESSIONS_RATIO_MAX,
+            },
         },
     }
 
