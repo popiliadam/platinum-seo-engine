@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Claude Code Plugin](https://img.shields.io/badge/Claude_Code-plugin-7C3AED)](https://claude.ai/code)
 
-> Status: **v2.0.0** — production-ready · 49 skills · 29 commands · 6 hooks · 4 MCP servers (3 stdio + 1 HTTP)
+> Status: **v2.1.0** — production-ready core (production/publishing suites + 4 new tech-SEO skills are `wip`: contracts + tests locked, runtime deferred) · 49 skills · 29 commands · 6 hooks · 4 MCP servers (3 stdio + 1 HTTP)
 
 > **Schema-locked, drift-checked SEO automation for Claude Code.**
 > Turn manual SEO work into auditable, repeatable workflows — backed by JSON Schemas, append-only state, and a tool that audits itself.
@@ -253,7 +253,7 @@ Browse the full catalog: [`skills/`](skills/). Slash commands map 1:1 to commonl
 
 ## Status & roadmap
 
-**Current:** v2.0.0 — the **AMO milestone (Autonomy & Multi-project Orchestration)**: an autonomous orchestration layer on top of the v1.x schema-locked toolchain. Per-session project binding (N windows = N projects), an orchestrator that runs an intent as an ordered pipeline and **verifies each step's output**, a Stop-hook denetçi that forces skipped steps, per-session consent gates (push / delete / POST / sitemap / Indexing), an AI-disclosure quarantine, an independent correctness oracle (the real ≤5% structured-error number), a portfolio cost/quota ledger with kill-switch, and a fail-closed scheduler. Path A (hard-coded ordered sequences), hardened by a 9-agent adversarial review; live-acceptance (D11) passed end-to-end on a real GSC project. Full pytest suite green, zero regression.
+**Current:** v2.1.0 — the **unified remediation + capability-gaps release** on top of the v2.0.0 AMO milestone (Autonomy & Multi-project Orchestration): SEO-methodology corrections (decay R-85, cannibalization rewrite, rule-pack fixes R-123+), measurement discipline (core-update calendar, MAD anomaly, intervention-vs-control cohorts, AIO presence + CTR-uplift scoring), 4 new tech-SEO skills (faceted-nav, robots-policy, hreflang, migration-map), merchant + local-SEO modules, schema hardening (63 nodes), and hermetic tests. The AMO layer beneath: per-session project binding, an orchestrator that runs an intent as an ordered pipeline and **verifies each step's output**, a Stop-hook denetçi that forces skipped steps, per-session consent gates (push / delete / POST / sitemap / Indexing), an AI-disclosure quarantine, an independent correctness oracle (the real ≤5% structured-error number), a portfolio cost/quota ledger with kill-switch, and a fail-closed scheduler. Full pytest suite green, zero regression. Per-session project binding (N windows = N projects), an orchestrator that runs an intent as an ordered pipeline and **verifies each step's output**, a Stop-hook denetçi that forces skipped steps, per-session consent gates (push / delete / POST / sitemap / Indexing), an AI-disclosure quarantine, an independent correctness oracle (the real ≤5% structured-error number), a portfolio cost/quota ledger with kill-switch, and a fail-closed scheduler. Path A (hard-coded ordered sequences), hardened by a 9-agent adversarial review; live-acceptance (D11) passed end-to-end on a real GSC project. Full pytest suite green, zero regression.
 
 The plugin is delivered in **15 phases**. Foundation phases (0–4) are complete; skill phases (5–13) deliver the ~49 skills in batches; phase 14 covers the workspace + CI + a full pilot run end-to-end. Phase 5 is the **GO/NO-GO gateway** — failing it sends the project back to foundation work rather than papering over gaps.
 
@@ -277,7 +277,7 @@ The plugin is delivered in **15 phases**. Foundation phases (0–4) are complete
 
 > Phases 11 (Production) and 12 (Publishing) are **in progress**: their skills are spec- and contract-locked (SKILL.md + paired tests) but the runtime scripts are deferred, so each one's frontmatter is `status: wip`. The docs track that frontmatter rather than over-advertise.
 
-Detailed status: **[docs/PHASE_STATUS.md](docs/PHASE_STATUS.md)** · Open questions: **[docs/OPEN_QUESTIONS.md](docs/OPEN_QUESTIONS.md)** · Latest release: **[docs/RELEASE_NOTES_v2.0.0.md](docs/RELEASE_NOTES_v2.0.0.md)**.
+Detailed status: **[docs/PHASE_STATUS.md](docs/PHASE_STATUS.md)** · Open questions: **[docs/OPEN_QUESTIONS.md](docs/OPEN_QUESTIONS.md)** · Latest release: **[docs/RELEASE_NOTES_v2.1.0.md](docs/RELEASE_NOTES_v2.1.0.md)**.
 
 ---
 
