@@ -184,7 +184,7 @@ ancak `profile` enum dışı (DURUR #2).
 - Heading keyword density %40–60 — primary_keyword count / total heading
   count (hard cap, R-30 stuffing önleme).
 - Citation density per 500 word 1-2 (R-106).
-- FAQ count 10 sabit / 3000+ word 15 cap (R-09).
+- FAQ count talep-güdümlü 3-6 (kanıt varsa), hard cap 10 (R-09).
 - Stats density profile-aware min/max (R-104 **tek kaynak / single
   source**; yukarıdaki tablo R-104'ün min+max cap'lerini birebir taşır,
   new-blog kendi sayısını uydurmaz — FIX-H5 hizalaması).
@@ -379,7 +379,7 @@ assigned_url == null`. Internal link plan: relevant
    (frontmatter + H1/H2/H3 outline). Planning-only, NOT yayınlanır.
 2. `templates/content/new-blog.template.html` — HTML article fragment
    (`<article class="pse-blog-post">` kök, R-22 fragment boundary).
-3. `templates/content/faq-block.template.html` — 10 FAQ statik R-43
+3. `templates/content/faq-block.template.html` — FAQ statik R-43
    (accordion `<details>` + `<summary>` YASAK, R-43 statik HTML zorunlu).
 4. `templates/content/upload-instructions.template.md` — Section A
    new-blog kısmı.
@@ -422,7 +422,7 @@ JSON-LD `@graph` 5 entity render:
   lookup; uydurma yasak — Principle 1 Layer 3).
 - `BreadcrumbList` — Home > Pillar > Cluster > Article (R-83 4-level
   cap).
-- `FAQPage` — 10 FAQ Q&A items (R-79; 3000+ word blog → 15 cap, R-09).
+- `FAQPage` — talep-güdümlü 3-6 FAQ Q&A items, hard cap 10 (R-79; R-09).
 
 Validate: Google Rich Results Test API mock validate (skill internal —
 actual API call optional). DURUR #8 trigger: REJECT → schema fix önce.

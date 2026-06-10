@@ -55,8 +55,8 @@ H2: Karşı Argümanlar                                                    # R-5
 [YMYL medical/legal/financial profile only:]
 disclaimer block (project.config.json[content_settings.disclaimer_templates], R-51)
 
-H2: Sıkça Sorulan Sorular (FAQ)                                         # R-09: 10 standart, 3000+ word 15 cap
-  10 Q&A (snippet-friendly, statik visible R-43)                        # FAQPage schema R-79
+H2: Sıkça Sorulan Sorular (FAQ)                                         # R-09: talep-güdümlü 3-6, hard cap 10
+  3-6 Q&A (snippet-friendly, statik visible R-43)                        # FAQPage schema R-79
 
 [Pre-CTA]
 pse-key-takeaways aside (3-5 bullet başlıksız, R-102)                   # AI summary footer
@@ -110,7 +110,7 @@ expert_quotes:                            # R-105 bank-driven, project.config.js
 - [ ] Per-H2 cevap-önce mini paragraf (R-29)
 - [ ] H2 word > 200 → min 2 H3 (R-30)
 - [ ] H2 keyword density %40-60 (R-30)
-- [ ] FAQ 10 (3000+ word 15 cap) statik visible (R-09 + R-43)
+- [ ] FAQ talep-güdümlü 3-6, hard cap 10, statik visible (R-09 + R-43)
 - [ ] Per-H2 max 1 liste (R-07 + Principle 3)
 - [ ] Per ~1000 word 1 tablo (R-07)
 - [ ] Per ~300 word 1 internal link, dupe yok (R-06)

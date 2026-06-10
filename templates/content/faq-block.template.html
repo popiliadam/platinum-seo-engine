@@ -3,7 +3,7 @@
   Phase 10 deliverable. Consumed by Phase 11 new-blog + faq-optimization skills.
 
   Rules consumed:
-  - R-09 FAQ 10 sabit / 3000+ word 15 cap
+  - R-09 FAQ talep-güdümlü 3-6, hard cap 10
   - R-43 accordion YASAK — statik visible
   - R-79 FAQPage schema @graph inline
   - R-21 semantic HTML5 (h3, p)
@@ -17,11 +17,11 @@
 -->
 
 <!-- ============================================================================
-     FAQ STATIC VISIBLE BLOCK (R-43 accordion YASAK, R-09 10 sabit)
+     FAQ STATIC VISIBLE BLOCK (R-43 accordion YASAK, R-09 talep-güdümlü 3-6 hard cap 10)
      ============================================================================ -->
 <div class="pse-faq__list">
 
-  {{!-- Repeat 10 (or 15 for 3000+ word) FAQ items.
+  {{!-- Repeat the demand-driven FAQ items (3-6, hard cap 10).
         Skill yields one <div class="pse-faq-item"> per Q&A.
         Schema @graph below renders parallel JSON-LD entries (R-79 + R-83). --}}
 
@@ -35,7 +35,7 @@
     <p class="pse-faq-item__answer">{{ANSWER_2}}</p>
   </div>
 
-  <!-- ... 8 more for 10 standard, or up to 15 for 3000+ word ... -->
+  <!-- ... more items as needed (3-6 demand-driven, hard cap 10) ... -->
 
   <div class="pse-faq-item">
     <h3 class="pse-faq-item__question">{{QUESTION_N}}</h3>
@@ -85,7 +85,7 @@
 
 <!-- ============================================================================
      CONSTRAINTS REFERENCE (skill validation)
-     - count: 10 standard; if word_count >= 3000 then up to 15 (R-09)
+     - count: demand-driven 3-6 where evidence exists, hard cap 10 (R-09)
      - each Q ≤ 100 char (snippet truncation, R-108)
      - each A 40-50 word (definition snippet, R-107)
      - no `:` or `-` in Question text (R-04)
