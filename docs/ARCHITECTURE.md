@@ -80,7 +80,7 @@ v1 release için TÜM şunlar geçmeli:
 2. ~47 skill çalışıyor (her kategori için en az 1 happy-path test).
 3. 27 command (`/pseo-*`) çalışıyor.
 4. 6 hook (session-start, pre/post-tool-use, user-prompt-submit, stop, subagent-stop) tetikleniyor.
-5. 29 schema validation PASS (schemas/*.json).
+5. 31 schema validation PASS (schemas/*.json).
 6. Content rules input doc tamamen işlenmiş (Phase 10).
 7. Pilot proje (demo-dental) end-to-end: init → ingest → discovery → planning → reporting → production → publishing zinciri çalışıyor; drift-check GREEN; whats-next priority list doğru.
 8. CI pipeline 7 check PASS.
