@@ -381,8 +381,9 @@ def _classify_interpreter_net_write(command: str) -> tuple[str, str] | None:
     one shell segment (so an interpreter NAME used as a mere argument, or echoed
     text, never trips the gate), AND the whole command must carry an HTTP-client
     marker AND a write/POST indicator. Target = the first URL found in the command
-    (often inside the quoted code), or the whole command. Routed to ``index_update``
-    when that URL is the Google Indexing host, else ``net_post``.
+    (often inside the quoted code), or the whole command. A loopback target is
+    carved out (#12 applies EQUALLY per the D-C ruling); otherwise routed to
+    ``index_update`` when the URL is the Google Indexing host, else ``net_post``.
     """
     leads_interpreter = any(
         (toks := _unwrap_wrappers(_tokenize(seg)))
@@ -393,8 +394,18 @@ def _classify_interpreter_net_write(command: str) -> tuple[str, str] | None:
         return None
     url = _first_url_in_text(command)
     host = (urlparse(url).hostname or "").lower() if url else ""
+    is_indexing = host == _INDEXING_HOST
+    is_indexnow = host.endswith("indexnow.org")
+    # Loopback carve-out (#12) applies EQUALLY to interpreter net-writes (D-C
+    # ruling): a one-liner POST to THIS machine (e.g. a python health-probe to the
+    # SF-MCP server on 127.0.0.1:11435) never leaves it, so it is not an outward
+    # action — mirrors the curl/wget carve-out in _classify_segment. Guarded by
+    # `not is_indexing/indexnow` so it can never un-gate the public Indexing/IndexNow
+    # surfaces (whose hosts are never loopback anyway).
+    if _is_loopback_host(host) and not is_indexing and not is_indexnow:
+        return None
     target = url if url else command.strip()
-    return ("index_update", target) if host == _INDEXING_HOST else ("net_post", target)
+    return ("index_update", target) if is_indexing else ("net_post", target)
 
 
 def _classify_bash(command: str) -> tuple[str, str] | None:

