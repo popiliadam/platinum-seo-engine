@@ -1,0 +1,29 @@
+# Dependabot — weekly dependency streams (FIX-R CI hardening, 2026-06-10).
+# - pip: requirements.txt / requirements-lock.txt at repo root.
+# - github-actions: refreshes the commit-SHA pins (+ trailing version-tag
+#   comments) in .github/workflows/ci.yml so pinning never rots.
+# Minor/patch updates arrive grouped (one PR per ecosystem per week);
+# major updates stay individual PRs for focused review.
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      pip-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      actions-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"

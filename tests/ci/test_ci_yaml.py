@@ -1,5 +1,6 @@
 """tests/ci/test_ci_yaml.py — ci.yml structure invariant test."""
 import pathlib
+import re
 
 import yaml
 
@@ -173,6 +174,72 @@ def test_plugin_agnostik_step5_no_or_true_mask():
     assert "|| true" not in step5["run"], (
         "Wave 2 strict mode regression: step 5 must not mask exit code with `|| true`"
     )
+
+
+def test_actions_pinned_by_full_commit_sha():
+    """FIX-R item 1 (2026-06-10): supply-chain hardening — every third-party
+    action is pinned by full 40-hex commit SHA, never by a mutable tag
+    (a `vN` tag can be re-pointed upstream; a commit SHA cannot).
+
+    Deliberately asserts the FORMAT, not the exact SHA values: weekly
+    Dependabot `github-actions` bumps (FIX-R item 4) rewrite the SHA and
+    its trailing human-tag comment together — exact-SHA pins here would
+    make every Dependabot update PR self-failing. The action-name
+    inventory IS pinned so a new unpinned action cannot slip in silently.
+    """
+    cfg = yaml.safe_load(CI_YAML.read_text())
+    uses_refs = [s["uses"] for s in cfg["jobs"]["ci"]["steps"] if "uses" in s]
+    actions = {ref.partition("@")[0] for ref in uses_refs}
+    assert actions == {"actions/checkout", "actions/setup-python"}, (
+        f"Unexpected action inventory {actions} — new actions must be "
+        "consciously added here AND SHA-pinned"
+    )
+    for ref in uses_refs:
+        action, _, pin = ref.partition("@")
+        assert re.fullmatch(r"[0-9a-f]{40}", pin), (
+            f"{action} must be pinned by full commit SHA, got @{pin!r}"
+        )
+
+
+def test_actions_sha_pins_carry_human_tag_comment():
+    """FIX-R item 1 companion: a bare SHA is unreviewable by humans — each
+    pinned `uses:` line must carry the resolved version tag as a trailing
+    comment (`# vX.Y.Z`), the convention Dependabot keeps updated.
+    """
+    body = CI_YAML.read_text()
+    uses_lines = [
+        line for line in body.splitlines()
+        if "uses:" in line and "actions/" in line
+    ]
+    assert len(uses_lines) == 2, f"expected 2 uses: lines, got {len(uses_lines)}"
+    for line in uses_lines:
+        assert re.search(r"@[0-9a-f]{40} # v\d+\.\d+\.\d+$", line.rstrip()), (
+            f"SHA pin missing human-tag comment: {line.strip()!r}"
+        )
+
+
+def test_pytest_step_uses_short_tracebacks():
+    """FIX-R item 2: `--tb=no` hid every traceback on CI failures, forcing a
+    local re-run to diagnose; `--tb=short` surfaces the failure site in the
+    CI log itself.
+    """
+    cfg = yaml.safe_load(CI_YAML.read_text())
+    step4 = next(
+        s for s in cfg["jobs"]["ci"]["steps"] if s.get("name", "") == "4. pytest"
+    )
+    assert "--tb=short" in step4["run"], "pytest step must show short tracebacks"
+    assert "--tb=no" not in step4["run"], "pytest step must not suppress tracebacks"
+
+
+def test_coverage_gate_deferral_documented():
+    """FIX-R item 6: the coverage gate is DELIBERATELY deferred (a measured
+    baseline must exist before any fail-under threshold is meaningful).
+    The deferral decision must stay visible as a ci.yml comment so it reads
+    as a choice, not an omission.
+    """
+    body = CI_YAML.read_text().lower()
+    assert "coverage gate" in body, "coverage-gate deferral comment missing"
+    assert "deferred" in body, "coverage-gate comment must state it is deferred"
 
 
 def test_plugin_agnostik_step5_adjacent_pair_filter_present():

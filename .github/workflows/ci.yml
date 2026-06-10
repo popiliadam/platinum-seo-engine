@@ -13,12 +13,15 @@ jobs:
       matrix:
         python-version: ["3.10", "3.14"]
     steps:
-      - uses: actions/checkout@v5
+      # Supply-chain: actions pinned by full commit SHA (mutable tags can be
+      # re-pointed upstream); human tag kept as trailing comment, refreshed by
+      # the weekly Dependabot github-actions stream (.github/dependabot.yml).
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -47,8 +50,10 @@ jobs:
         continue-on-error: false
 
       # Step 4 — pytest baseline + W2 yeni, no regression
+      # Coverage gate deliberately deferred (FIX-R 2026-06-10): a measured
+      # coverage baseline must exist before any fail-under threshold is added.
       - name: 4. pytest
-        run: pytest --tb=no -q
+        run: pytest --tb=short -q
         continue-on-error: false
 
       # Step 4a — events.schema sanity (ADR-031: ensure schema is loadable; the
