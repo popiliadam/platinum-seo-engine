@@ -93,8 +93,13 @@ def test_frontmatter_required_fields_and_draft7_validity() -> None:
     assert fm["budget"]["uses_paid_mcp"] is False
     assert fm["budget"]["estimated_credits"] == 0
     assert fm["autonomy"]["confidence"] == "HIGH"
-    assert fm["autonomy"]["safe_auto_execute"] is True
-    assert fm["autonomy"]["requires_approval"] is False
+    # FIX-K K5: mark-done is a master.xlsx WRITE skill (applied changes:
+    # status DONE + completed_work append) and DURUR #4 can require a manual
+    # Süleyman confirm on suspicious/missing evidence — so it is NOT cron-safe.
+    # Aligned to the write/action-skill autonomy pattern (true/false), matching
+    # its sibling write skills (indexing-ping, new-blog, init-project, …).
+    assert fm["autonomy"]["safe_auto_execute"] is False
+    assert fm["autonomy"]["requires_approval"] is True
 
 
 # ---------------------------------------------------------------------------

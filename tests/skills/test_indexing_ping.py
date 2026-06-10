@@ -494,3 +494,67 @@ def test_report_artifact_json_shape_documented() -> None:
             f"Report contract drift: '{field}' field missing from "
             f"report shape documentation"
         )
+
+
+# ---------------------------------------------------------------------------
+# Test 17 — FIX-K K6: Google Indexing API URL_UPDATED eligibility hard-gate
+# ---------------------------------------------------------------------------
+
+def test_url_updated_eligibility_hard_gate() -> None:
+    """FIX-K K6 (policy-critical): the per-URL Google Indexing API
+    (`URL_UPDATED`) is NOT a generic indexing channel. Per Google's documented
+    restriction it accepts ONLY pages carrying JobPosting or BroadcastEvent
+    structured data; everything else is a spam-policy violation. The skill
+    contract must therefore:
+      (a) name both eligible structured-data types,
+      (b) require a deterministic eligibility hard-gate (JSON-LD @type check)
+          before any future URL_UPDATED,
+      (c) document the ineligible-page REFUSAL path,
+      (d) keep sitemap-submit + IndexNow as the generic channels, and
+      (e) keep the operator-consent gate as necessary-but-NOT-sufficient.
+    The audit#2 F4 semantics guard (no call_type=URL_UPDATED on the wired
+    sitemap path) must survive."""
+    text = _skill_text()
+
+    # (a) Both eligible structured-data types named.
+    assert "JobPosting" in text, "K6: JobPosting eligibility type missing"
+    assert "BroadcastEvent" in text, "K6: BroadcastEvent eligibility type missing"
+
+    # (b) Deterministic eligibility hard-gate tying URL_UPDATED to JSON-LD.
+    assert "eligibility" in text.lower(), "K6: eligibility gate language missing"
+    assert "hard-gate" in text.lower() or "hard gate" in text.lower(), (
+        "K6: the eligibility check must be framed as a hard-gate"
+    )
+    assert (
+        re.search(r"(JobPosting|BroadcastEvent).{0,400}(JSON-LD|@type|structured data)",
+                  text, re.IGNORECASE | re.DOTALL)
+        or re.search(r"(JSON-LD|@type|structured data).{0,400}(JobPosting|BroadcastEvent)",
+                     text, re.IGNORECASE | re.DOTALL)
+    ), "K6: eligibility pre-check must tie JobPosting/BroadcastEvent to JSON-LD"
+
+    # (c) Refusal path for ineligible pages.
+    assert "REFUSE" in text or "refuse" in text.lower(), (
+        "K6: ineligible-page refusal verb missing"
+    )
+    assert re.search(r"(ineligible|uygun değil)", text, re.IGNORECASE), (
+        "K6: ineligible-page refusal path must be documented"
+    )
+
+    # (d) Indexing API is NOT a generic channel; generic = sitemap + IndexNow.
+    assert "NOT a generic channel" in text, (
+        "K6: must state the per-URL Indexing API is NOT a generic channel"
+    )
+    assert "IndexNow" in text and "sitemap" in text.lower(), (
+        "K6: sitemap-submit + IndexNow must remain the generic channels"
+    )
+
+    # (e) Operator-consent gate is necessary but NOT sufficient.
+    assert re.search(r"necessary but NOT sufficient", text), (
+        "K6: consent gate must be documented as necessary-but-not-sufficient"
+    )
+
+    # audit#2 F4 semantics guard preserved: no call_type=URL_UPDATED literal.
+    assert re.search(r"call_type`?\s*=\s*`?URL_UPDATED", text) is None, (
+        "K6 must not regress the audit#2 F4 fix (call_type=URL_UPDATED on "
+        "the wired sitemap path)"
+    )

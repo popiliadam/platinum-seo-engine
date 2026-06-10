@@ -50,15 +50,21 @@ $content_revised_md
 
 $new_content_md
 
-## 8. Rakip Snapshot
+## 8. Düşenler (Gerileyen Sayfa ve İçerikler)
+
+Net GSC tıklama değişimi: **%$net_clicks_delta_pct**
+
+$decliners_md
+
+## 9. Rakip Snapshot
 
 _(Phase 10+ Scrapling S1/S3 entegrasyonu sonrası dolacak.)_
 
-## 9. Backlink Delta
+## 10. Backlink Delta
 
 _(DataForSEO entegrasyonu opsiyonel — bu skill LOCAL aggregation, paid MCP kullanmıyor.)_
 
-## 10. Önümüzdeki Ay Planı (top-10 TODO)
+## 11. Önümüzdeki Ay Planı (top-10 TODO)
 
 $next_plan_md
 

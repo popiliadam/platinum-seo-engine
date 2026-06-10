@@ -223,9 +223,17 @@ def test_assemble_report_validates_10_sections(
         ],
         generated_at="2026-05-01T09:00:00Z",
     )
-    # All 10 required sections present.
-    assert set(report["sections"].keys()) == set(mr.REQUIRED_SECTIONS)
-    assert len(report["sections"]) == 10
+    # All 10 required sections present, plus the optional additive `decliners`
+    # section (FIX-K K1 — always emitted, present in both framings).
+    assert set(mr.REQUIRED_SECTIONS).issubset(report["sections"].keys())
+    assert "decliners" in report["sections"], (
+        "FIX-K K1: optional decliners section must always be emitted"
+    )
+    assert set(report["sections"].keys()) == set(mr.REQUIRED_SECTIONS) | {"decliners"}
+    assert len(report["sections"]) == 11
+    # decliners is additive — NOT a member of the required-sections tuple.
+    assert "decliners" not in mr.REQUIRED_SECTIONS
+    assert len(mr.REQUIRED_SECTIONS) == 10
 
     # exec_summary has narrative.
     assert report["sections"]["exec_summary"]["narrative"]
@@ -544,3 +552,87 @@ def test_idempotent_assembly_and_template_render(
     bad_template = "Hello $missing_key"
     with pytest.raises(mr.TemplateRenderError):
         mr.render_report_markdown(report=a, template_text=bad_template)
+
+
+# --- FIX-K K1 fixtures + tests (report honesty) --------------------------
+
+def _inputs_with_negative_delta() -> mr.ReportInputs:
+    """Inputs whose GSC totals DECLINE period-over-period (recent < previous),
+    plus declining pages and a content_decay row — used to prove framing never
+    hides the negative facts (FIX-K K1)."""
+    return mr.ReportInputs(
+        project_id="demo-project",
+        period_start="2026-04-04", period_end="2026-05-01",
+        gsc_performance=[
+            {"url": "https://example.com/drop-1",
+             "clicks_recent": 40, "clicks_previous": 100,
+             "clicks_delta": -60, "impressions_recent": 800,
+             "impressions_previous": 2000, "impressions_delta": -1200,
+             "position_recent": 18.0, "position_previous": 9.0},
+            {"url": "https://example.com/drop-2",
+             "clicks_recent": 10, "clicks_previous": 30,
+             "clicks_delta": -20, "impressions_recent": 300,
+             "impressions_previous": 700, "impressions_delta": -400,
+             "position_recent": 22.0, "position_previous": 15.0},
+        ],
+        content_decay=[
+            {"url": "https://example.com/decay-1", "clicks_previous": 90,
+             "clicks_recent": 30, "clicks_delta": -60, "delta_pct": -0.66,
+             "trend": "down", "pillar": "guides", "action": "revise"},
+        ],
+    )
+
+
+# --- Test 11: K1(a) — exec narrative ALWAYS states the net delta ----------
+
+def test_exec_narrative_always_states_net_delta_both_framings() -> None:
+    """FIX-K K1(a): a NEGATIVE net clicks delta must appear in the exec
+    narrative under BOTH framings — positive_client may soften the tone but
+    must never omit the number. (Pre-fix, positive_client dropped it entirely:
+    monthly_report.py only surfaced a negative delta when framing=='internal'.)"""
+    inputs = _inputs_with_negative_delta()
+    pinned = "2026-05-01T09:00:00Z"
+    for fp in ("positive_client", "internal"):
+        report = mr.assemble_report(
+            inputs=inputs, framing_policy=fp, output_formats=("html",),
+            generated_at=pinned,
+        )
+        delta_pct = report["sections"]["gsc_positive_trends"]["deltas"][
+            "clicks_delta_pct"
+        ]
+        assert delta_pct < 0, "fixture must produce a negative net delta"
+        narrative = report["sections"]["exec_summary"]["narrative"]
+        assert str(delta_pct) in narrative, (
+            f"framing={fp}: net delta {delta_pct} omitted from exec narrative "
+            f"(K1 honesty violation): {narrative!r}"
+        )
+
+
+# --- Test 12: K1(b) keystone — decliners byte-identical across framings ----
+
+def test_decliners_section_byte_identical_across_framings(
+    monthly_report_schema: dict,
+) -> None:
+    """FIX-K K1(b) keystone: the decliners section's rows/numbers are framing
+    INVARIANT — positive_client and internal produce byte-identical content
+    (only the surrounding narrative tone/order may differ). GAP-M-W2 extends
+    this test to cover measurement_context."""
+    inputs = _inputs_with_negative_delta()
+    pinned = "2026-05-01T09:00:00Z"
+    pc = mr.assemble_report(inputs=inputs, framing_policy="positive_client",
+                            output_formats=("html",), generated_at=pinned)
+    intl = mr.assemble_report(inputs=inputs, framing_policy="internal",
+                              output_formats=("html",), generated_at=pinned)
+    dec_pc = pc["sections"]["decliners"]
+    dec_int = intl["sections"]["decliners"]
+    assert json.dumps(dec_pc, sort_keys=True, ensure_ascii=False) == \
+        json.dumps(dec_int, sort_keys=True, ensure_ascii=False), (
+        "FIX-K K1(b): decliners section must be byte-identical across framings"
+    )
+    # It must actually carry the declines (non-empty for this fixture).
+    assert dec_pc["pages_down"], "declining pages must be listed"
+    assert dec_pc["decaying_content"], "decaying content must be listed"
+    assert dec_pc["net_clicks_delta_pct"] < 0
+    # Schema still validates with the additive section present (both framings).
+    Draft7Validator(monthly_report_schema).validate(pc)
+    Draft7Validator(monthly_report_schema).validate(intl)

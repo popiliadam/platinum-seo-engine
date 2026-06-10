@@ -242,3 +242,32 @@ def test_read_only_contract():
         )
     # Positive READ-ONLY contract assertion documented in body
     assert "READ-ONLY" in text, "READ-ONLY contract assertion missing in body"
+
+
+# --- Test 13: FIX-K K2 / R-124 — YMYL pre-publish expert-review sign-off ---
+def test_ymyl_review_signoff_r124():
+    """FIX-K K2 / R-124: for YMYL profiles revise-content must run a mandatory
+    pre-publish human-review sign-off before the dateModified bump — the
+    operator names the reviewer; the skill emits an events_writer.append_audit
+    row (canonical audit_action, audit_target=content:{slug}:..., notes carrying
+    reviewer + content version + review date); a missing reviewer → DURUR.
+    Pairs with FIX-H2 (R-124 in rules/content-eeat-discipline.md)."""
+    text = _read_skill_text()
+    assert "R-124" in text, "K2: R-124 citation missing"
+    assert "append_audit" in text, "K2: events_writer.append_audit emission missing"
+    assert "audit_target" in text, "K2: audit_target field missing"
+    assert "content:" in text, "K2: audit_target content:{slug} shape missing"
+    assert re.search(r'audit_action\s*=?\s*"?(modified|created)"?', text), (
+        "K2: audit_action must be a canonical events.schema enum value"
+    )
+    assert "reviewer" in text.lower(), "K2: reviewer name field missing"
+    assert "review_date" in text or "review date" in text.lower(), (
+        "K2: review date field missing"
+    )
+    assert "content_version" in text or "content hash" in text.lower() or \
+        "revision id" in text.lower(), "K2: content version/hash field missing"
+    assert re.search(r"reviewer.{0,120}DURUR|DURUR.{0,120}reviewer", text,
+                     re.IGNORECASE | re.DOTALL), (
+        "K2: missing-reviewer DURUR path not documented"
+    )
+    assert "ymyl" in text.lower()

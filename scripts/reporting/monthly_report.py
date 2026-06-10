@@ -356,6 +356,73 @@ def _build_pages_up(gsc_perf: Sequence[Mapping[str, Any]]) -> list[dict]:
     return out[:10]
 
 
+def _build_pages_down(gsc_perf: Sequence[Mapping[str, Any]]) -> list[dict]:
+    """Decliners mirror of `_build_pages_up` — pages with NEGATIVE clicks OR
+    impressions delta. Framing-INVARIANT (FIX-K K1): identical rows/numbers in
+    every framing; only the surrounding narrative tone may differ. Most
+    negative clicks_delta first."""
+    out: list[dict] = []
+    for r in gsc_perf:
+        clicks_delta = _safe_int(r.get("clicks_delta"))
+        impressions_delta = _safe_int(r.get("impressions_delta"))
+        if clicks_delta >= 0 and impressions_delta >= 0:
+            continue
+        out.append({
+            "page": _safe_str(r.get("url")),
+            "clicks_before": _safe_int(r.get("clicks_previous")),
+            "clicks_after": _safe_int(r.get("clicks_recent")),
+            "clicks_delta": clicks_delta,
+            "impressions_delta": impressions_delta,
+        })
+    out.sort(key=lambda x: x["clicks_delta"])
+    return out[:10]
+
+
+def _build_decaying_content(
+    content_decay: Sequence[Mapping[str, Any]],
+) -> list[dict]:
+    """Declining content from the `content_decay` sheet (R-85) — negative
+    clicks_delta only, pillar-tagged. Framing-INVARIANT (FIX-K K1)."""
+    out: list[dict] = []
+    for r in content_decay:
+        clicks_delta = _safe_int(r.get("clicks_delta"))
+        if clicks_delta >= 0:
+            continue
+        item: dict = {
+            "page": _safe_str(r.get("url")),
+            "clicks_before": _safe_int(r.get("clicks_previous")),
+            "clicks_after": _safe_int(r.get("clicks_recent")),
+            "clicks_delta": clicks_delta,
+        }
+        if _safe_str(r.get("pillar")):
+            item["pillar"] = _safe_str(r.get("pillar"))
+        if _safe_str(r.get("trend")):
+            item["trend"] = _safe_str(r.get("trend"))
+        out.append(item)
+    out.sort(key=lambda x: x["clicks_delta"])
+    return out[:10]
+
+
+def _build_decliners(
+    gsc_perf: Sequence[Mapping[str, Any]],
+    content_decay: Sequence[Mapping[str, Any]],
+    gsc_trends: Mapping[str, Any],
+) -> dict:
+    """FIX-K K1(b) — the "Düşenler" (decliners) section.
+
+    Present in BOTH framings with BYTE-IDENTICAL content: this builder takes
+    NO `framing_policy` parameter by design, so framing-invariance is
+    structural (the framing only reorders/softens the narrative around these
+    facts, never the facts themselves). Reports the net signed clicks delta
+    plus declining pages (gsc_performance) and decaying content (content_decay,
+    R-85)."""
+    return {
+        "net_clicks_delta_pct": gsc_trends["deltas"].get("clicks_delta_pct", 0.0),
+        "pages_down": _build_pages_down(gsc_perf),
+        "decaying_content": _build_decaying_content(content_decay),
+    }
+
+
 def _completed_to_section(
     completed_work: Sequence[Mapping[str, Any]], category_filter: str,
 ) -> list[dict]:
@@ -453,17 +520,30 @@ def _build_exec_summary(
         wins.append(f"{len(content_revised)} içerik revize edildi")
     if new_content:
         wins.append(f"{len(new_content)} yeni içerik yayınlandı")
+    wins = wins[:5]
+    # FIX-K K1(a): the net clicks delta is a FACT — stated in the exec
+    # narrative under EVERY framing with the same number. framing_policy only
+    # softens the surrounding tone (positive_client) vs states it plainly
+    # (internal); it never omits the figure, even when negative.
     delta_pct = gsc_trends["deltas"].get("clicks_delta_pct", 0.0)
     if delta_pct > 0:
-        wins.append(f"GSC tıklamaları %{delta_pct} arttı")
-    elif framing_policy == "internal" and delta_pct < 0:
-        wins.append(
-            f"GSC tıklamaları %{delta_pct} (aksiyon next_month_plan)"
-        )
-    wins = wins[:5]
+        delta_clause = f"GSC net tıklama değişimi %{delta_pct} (artış)"
+    elif delta_pct < 0:
+        if framing_policy == "positive_client":
+            delta_clause = (
+                f"GSC net tıklama değişimi %{delta_pct}; "
+                f"toparlanma aksiyonları next_month_plan'da"
+            )
+        else:
+            delta_clause = (
+                f"GSC net tıklama değişimi %{delta_pct} "
+                f"(düşüş; aksiyon next_month_plan)"
+            )
+    else:
+        delta_clause = f"GSC net tıklama değişimi %{delta_pct} (sabit)"
     narrative = (
         f"Bu ay {headline_clicks} tıklama toplandı; "
-        f"{headline_pages_up} sayfa yükselişte. "
+        f"{headline_pages_up} sayfa yükselişte. {delta_clause}. "
     )
     narrative += (" | ".join(wins) + ".") if wins else (
         "Aksiyon planı next_month_plan bölümünde."
@@ -540,6 +620,9 @@ def assemble_report(
     competitor_snapshot = _build_competitor_snapshot()
     backlink_delta = _build_backlink_delta()
     next_month_plan = _build_next_month_plan(inputs.master_task)
+    decliners = _build_decliners(
+        inputs.gsc_performance, inputs.content_decay, gsc_trends,
+    )
     exec_summary = _build_exec_summary(
         gsc_trends, pages_up, tech_done, content_revised, new_content,
         framing_policy,
@@ -556,6 +639,9 @@ def assemble_report(
         "competitor_snapshot": competitor_snapshot,
         "backlink_delta": backlink_delta,
         "next_month_plan": next_month_plan,
+        # FIX-K K1(b): additive optional section — present in BOTH framings
+        # with byte-identical content (NOT a member of REQUIRED_SECTIONS).
+        "decliners": decliners,
     }
     missing = [s for s in REQUIRED_SECTIONS if s not in sections]
     if missing:
@@ -607,7 +693,28 @@ def _flatten_for_template(report: Mapping[str, Any]) -> dict[str, str]:
     cur = gt.get("current_period", {})
     prev = gt.get("previous_period", {})
     deltas = gt.get("deltas", {})
+    # FIX-K K1(b): decliners → bullet lines (framing-invariant facts). Both
+    # pages_down (gsc) and decaying_content (content_decay) render here.
+    dec = sections.get("decliners", {})
+    dec_lines: list[str] = []
+    for it in dec.get("pages_down", []):
+        dec_lines.append(
+            f"- {_safe_str(it.get('page'))} — clicks_delta="
+            f"{it.get('clicks_delta', 0)}, impressions_delta="
+            f"{it.get('impressions_delta', 0)}"
+        )
+    for it in dec.get("decaying_content", []):
+        pillar = f" [{_safe_str(it.get('pillar'))}]" if it.get("pillar") else ""
+        dec_lines.append(
+            f"- (decay){pillar} {_safe_str(it.get('page'))} — clicks_delta="
+            f"{it.get('clicks_delta', 0)}"
+        )
+    decliners_md = "\n".join(dec_lines) if dec_lines else (
+        "_(düşen sayfa/içerik yok)_"
+    )
     return {
+        "net_clicks_delta_pct": str(dec.get("net_clicks_delta_pct", 0.0)),
+        "decliners_md": decliners_md,
         "project_id": _safe_str(report.get("project_id")),
         "report_id": _safe_str(report.get("report_id")),
         "period_start": _safe_str(report.get("period_start")),

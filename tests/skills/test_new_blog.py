@@ -11,7 +11,8 @@ Coverage:
   7. R-118 humanize blocklist consume reference.
   8. JSON-LD @graph 5 entity (Article + Organization + Person +
      BreadcrumbList + FAQPage) named.
-  9. Meta pixel cap (540 / 680) documented.
+  9. Meta title/desc cite R-35 canonical caps (580/990 desktop); stats-density
+     restates R-104 min+max caps (FIX-K K3).
   10. Forbidden tokens (8 slugs + 3 Phase 7-lesson tokens) absent.
   11. events.jsonl event_type=content_new (F-8 enum).
   12. WCAG 2.1 AA referenced.
@@ -220,13 +221,42 @@ def test_schema_markup_graph_5_entities() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test 9 — Meta pixel cap (≤540 title, ≤680 description) documented
+# Test 9 — FIX-K K3: meta title/desc cite R-35 canonical caps (580/990 desktop)
 # ---------------------------------------------------------------------------
 
-def test_meta_pixel_cap_documented() -> None:
+def test_meta_pixel_cap_cites_r35() -> None:
+    """FIX-K K3 / FIX-H4: R-35 is the SINGLE authority for title/description
+    length — title ≤580px desktop, description ≤990px desktop. new-blog must
+    cite those canonical numbers (not its old divergent 540/680 'mobil'
+    variant) and reference R-35. Char counts (~60/160) are only a tech-audit
+    approximation heuristic."""
     text = _skill_text()
-    assert "540" in text, "meta title pixel cap (≤540) not documented"
-    assert "680" in text, "meta description pixel cap (≤680) not documented"
+    assert "580" in text, "meta title pixel cap (≤580px desktop, R-35) not documented"
+    assert "990" in text, "meta description pixel cap (≤990px desktop, R-35) not documented"
+    assert "R-35" in text, "new-blog must cite R-35 as the title/desc authority"
+    # The old divergent caps must be gone (single-source discipline, FIX-H4).
+    assert "540" not in text, "old divergent 540px title cap must be removed (cite R-35)"
+    assert "680" not in text, "old divergent 680px description cap must be removed (cite R-35)"
+
+
+# ---------------------------------------------------------------------------
+# Test 9b — FIX-K K3: stats-density restates R-104 min+MAX caps verbatim
+# ---------------------------------------------------------------------------
+
+def test_stats_density_cites_r104_caps() -> None:
+    """FIX-K K3 / FIX-H5: R-104 is the SINGLE source for stats-density
+    (profile-aware min + MAX caps). new-blog must restate R-104's caps, not its
+    old divergent 'min 3 / 1000 word' (no max cap) variant."""
+    text = _skill_text()
+    # Old divergent value gone.
+    assert "min 3 / 1000 word" not in text and "min 3/1000" not in text, (
+        "old divergent stats-density (min 3/1000w, no cap) must align to R-104"
+    )
+    # R-104 canonical max caps present (the key fix — old variant had none).
+    assert "max 1/200w" in text, "YMYL R-104 max cap (1/200w) missing"
+    assert "max 1/300w" in text, "e-commerce R-104 max cap (1/300w) missing"
+    assert "max 1/250w" in text, "b2b-saas R-104 max cap (1/250w) missing"
+    assert "R-104" in text
 
 
 # ---------------------------------------------------------------------------
@@ -460,3 +490,66 @@ def test_r121_rotation_append_only_not_completed_work_write() -> None:
         "R-121 Step 3 must count usage from events.jsonl content_new events, "
         "not master.xlsx[completed_work]"
     )
+
+
+# ---------------------------------------------------------------------------
+# Test 18 — FIX-K K2 / R-124: YMYL pre-publish expert-review sign-off
+# ---------------------------------------------------------------------------
+
+def test_ymyl_review_signoff_r124() -> None:
+    """FIX-K K2 / R-124: for YMYL profiles new-blog must run a mandatory
+    pre-publish human-review sign-off — the operator names the reviewer; the
+    skill emits an events_writer.append_audit row (canonical audit_action,
+    audit_target=content:{slug}:..., notes carrying reviewer + content version
+    + review date); a missing reviewer → DURUR. Pairs with FIX-H2 (R-124 lives
+    in rules/content-eeat-discipline.md)."""
+    text = _skill_text()
+    assert "R-124" in text, "K2: R-124 citation missing"
+    # append_audit emission (events_writer convenience wrapper, event_kind=audit).
+    assert "append_audit" in text, "K2: events_writer.append_audit emission missing"
+    assert "audit_target" in text, "K2: audit_target field missing"
+    assert "content:" in text, "K2: audit_target content:{slug} shape missing"
+    # Canonical audit_action (events.schema 6-value enum member).
+    assert re.search(r'audit_action\s*=?\s*"?(modified|created)"?', text), (
+        "K2: audit_action must be a canonical events.schema enum value "
+        "(e.g. modified/created)"
+    )
+    # The three R-124 evidence fields.
+    assert "reviewer" in text.lower(), "K2: reviewer name field missing"
+    assert "review_date" in text or "review date" in text.lower(), (
+        "K2: review date field missing"
+    )
+    assert "content_version" in text or "content hash" in text.lower(), (
+        "K2: content version/hash field missing"
+    )
+    # Missing reviewer → DURUR.
+    assert re.search(r"reviewer.{0,120}DURUR|DURUR.{0,120}reviewer", text,
+                     re.IGNORECASE | re.DOTALL), (
+        "K2: missing-reviewer DURUR path not documented"
+    )
+    # Tied to the YMYL profile.
+    assert "ymyl" in text.lower()
+
+
+# ---------------------------------------------------------------------------
+# Test 19 — FIX-K K4 / R-83: new-blog HTML template carries NO microdata
+# ---------------------------------------------------------------------------
+
+def test_new_blog_template_no_microdata_r83() -> None:
+    """FIX-K K4 / R-83: schema markup is JSON-LD ONLY (microdata/RDFa banned).
+    The new-blog HTML template emits a JSON-LD @graph, so it must carry NO
+    microdata attributes (itemscope/itemtype/itemprop) — those duplicated the
+    JSON-LD and violated R-83, the engine's OWN rule."""
+    template_path = REPO_ROOT / "templates" / "content" / "new-blog.template.html"
+    html = template_path.read_text(encoding="utf-8")
+    for attr in ("itemscope", "itemtype", "itemprop"):
+        assert attr not in html, (
+            f"R-83 violation: microdata attribute '{attr}' present in "
+            f"new-blog.template.html (schema must be JSON-LD @graph only)"
+        )
+    # The JSON-LD @graph (the sanctioned mechanism) must remain intact.
+    assert "application/ld+json" in html, "JSON-LD script must remain"
+    assert '"@graph"' in html, "JSON-LD @graph array must remain"
+    # Semantic HTML preserved (the elements that carried microdata stay).
+    assert '<article class="pse-blog-post"' in html
+    assert "<h1" in html and "</h1>" in html

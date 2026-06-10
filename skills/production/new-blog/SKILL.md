@@ -91,9 +91,9 @@ deepening, then renders four artifacts:
 2. `outputs/blog/{slug}/schema.jsonld` — JSON-LD `@graph` with 5
    entities (Article + Organization + Person + BreadcrumbList +
    FAQPage; R-78..R-83).
-3. `outputs/blog/{slug}/meta-tags.json` — meta title (≤540 mobil
-   pixel) + meta description (≤680 mobil pixel) + OpenGraph + Twitter
-   card pack.
+3. `outputs/blog/{slug}/meta-tags.json` — meta title (≤580px desktop)
+   + meta description (≤990px desktop) per R-35 (single authority) +
+   OpenGraph + Twitter card pack.
 4. `outputs/blog/{slug}/upload-instructions.md` — Section A new-blog
    manuel WordPress upload workflow (R-74); skill itself does NOT
    publish.
@@ -119,8 +119,8 @@ with `event_type=content_new`.
   compliant, BEM `pse-` CSS class prefix HTML article fragment.
 - `outputs/blog/{slug}/schema.jsonld` — JSON-LD `@graph` 5 entity
   (Article + Organization + Person + BreadcrumbList + FAQPage).
-- `outputs/blog/{slug}/meta-tags.json` — meta title (≤540 px) + meta
-  description (≤680 px) + OG + Twitter pack.
+- `outputs/blog/{slug}/meta-tags.json` — meta title (≤580px) + meta
+  description (≤990px) per R-35 + OG + Twitter pack.
 - `outputs/blog/{slug}/upload-instructions.md` — Section A new-blog
   WordPress manual upload steps (R-74).
 - `_state/events.jsonl` — audit append, `event_type=content_new`,
@@ -170,7 +170,7 @@ is unset, fall back to `profiles[]` priority merge per
 | Counter-argument (R-50)    | Zorunlu                    | Skip              | Opsiyonel         | Skip                | Skip       |
 | Disclaimer (R-51)          | medical/legal/financial    | Skip              | Opsiyonel         | Skip                | Skip       |
 | Image style                | clean-illustration         | product-photo     | diagram-screenshot| location-photo      | esnek      |
-| Stats density (R-104)      | min 3 / 1000 word          | min 1 / 800 word  | min 2 / 600 word  | esnek               | esnek      |
+| Stats density (R-104)      | min 1/500w, max 1/200w     | min 1/800w, max 1/300w | min 1/600w, max 1/250w | min 1/1000w, max esnek | esnek |
 
 **Failure mode:** AMBER — wrong profile resolution worker raporlar; RED
 ancak `profile` enum dışı (DURUR #2).
@@ -185,7 +185,9 @@ ancak `profile` enum dışı (DURUR #2).
   count (hard cap, R-30 stuffing önleme).
 - Citation density per 500 word 1-2 (R-106).
 - FAQ count 10 sabit / 3000+ word 15 cap (R-09).
-- Stats density profile-aware min/max (R-104, tablo yukarıda).
+- Stats density profile-aware min/max (R-104 **tek kaynak / single
+  source**; yukarıdaki tablo R-104'ün min+max cap'lerini birebir taşır,
+  new-blog kendi sayısını uydurmaz — FIX-H5 hizalaması).
 - Per-H2 list cap 1 (R-07; multi-list AI padding önleme).
 - AI signature humanize — `brand_identity.tone_phrases_blocklist`
   consume + replace pattern ("Aslında", "Sonuç olarak", "Özetle",
@@ -245,6 +247,39 @@ populates these via R-44 evidence-gated atomic write.
 section is the spec lock; `scripts/production/new_blog.py` does not yet
 exist. When Wave 2 lands the runtime, the 3-step filter implements as a
 pre-`render_5_templates` helper consumed by Step 7.
+
+## R-124 — YMYL Uzman İnceleme İmzası (Pre-Publish Expert-Review Sign-Off)
+
+YMYL profillerinde (`profile == "ymyl"`), R-124 gereği yazar künyesi
+(R-28) yalnızca **kayıtlı bir insan incelemesi** ile geçerlidir. Bu
+skill, YMYL içeriğini yayınlamadan ÖNCE zorunlu bir inceleme-imzası
+adımı çalıştırır (Step 11.5 `ymyl_review_signoff`, Step 11 ile Step 12
+arasında):
+
+1. **Operatör inceleyiciyi adlandırır.** Yayın öncesi, operatör (Süleyman
+   ya da atanmış uzman) insan **reviewer** (inceleyenin) adını verir.
+   Reviewer adı yoksa → **DURUR #9** (RED, yayın bloklu — R-124).
+2. **Audit kaydı (events.jsonl, append-only).** Skill, inceleme kanıtını
+   `scripts/state/events_writer.append_audit(...)` ile bir
+   `event_kind=audit` satırına yazar:
+   - `audit_action="modified"` (events.schema 6-değer canonical enum
+     `{created, modified, deleted, accessed, permission_changed,
+     config_changed}` — içeriğin yayın-öncesi inceleme kapısı
+     onaylandı/değiştirildi).
+   - `audit_target="content:{project_slug}:{post-slug}"`.
+   - `actor="skill:new-blog"`.
+   - `notes` payload üç zorunlu alan taşır (R-124): **reviewer**
+     (inceleyen adı) + **review_date** (ISO 8601) + **content_version**
+     (content hash veya R-103 revision id).
+3. **Eşleştirme.** Bu audit satırı, R-28 künyesinin arkasındaki gerçek
+   insan inceleme kanıtıdır (Principle 1 Truth-Verifiable + EEAT
+   Trustworthiness). İnceleme kaydı olmadan adlı yazar künyesi =
+   uydurulmuş yazarlık sinyali (Google rater-guideline "Lowest"). R-28
+   künyeyi görünür kılar; R-124 künyenin arkasında belgelenmiş bir insan
+   inceleme olmasını zorunlu kılar.
+
+Non-YMYL profillerde bu adım atlanır (R-28 künye opsiyonel/yok), audit
+satırı yazılmaz.
 
 ## Routing — 12-Step Workflow
 
@@ -394,10 +429,12 @@ actual API call optional). DURUR #8 trigger: REJECT → schema fix önce.
 
 ### Step 10 — `meta_pixel_wcag_validate`
 
-Meta title pixel calc: ≤540 mobil (Türkçe karakter ağırlıklı, ~60–65
-char ortalama). Meta description pixel calc: ≤680 mobil (~155–160 char
-ortalama). DURUR #7 trigger: cap aşımı → auto-correct attempt; fail
-ise manuel revise.
+Meta title pixel calc: ≤580px desktop (R-35 single authority; ~60 char
+is only a tech-audit approximation heuristic — Türkçe glyph widths
+vary, so the pixel cap is authoritative, not the char count). Meta
+description pixel calc: ≤990px desktop (R-35; ~160 char heuristic
+only). DURUR #7 trigger: cap aşımı → auto-correct attempt; fail ise
+manuel revise.
 
 WCAG 2.1 AA axe-core simulate: violations=0 hedef. Color contrast
 (`primary_color` vs background) ≥ 4.5:1. Image alt text required
@@ -430,7 +467,7 @@ Principle 1).
 | `timestamp`      | UTC ISO 8601                                   |
 | `mode`           | `input.mode` (`draft` / `publish`)             |
 
-## DURUR Conditions (8)
+## DURUR Conditions (9)
 
 | #  | Trigger                                               | Resolution                                           |
 |----|-------------------------------------------------------|------------------------------------------------------|
@@ -442,6 +479,7 @@ Principle 1).
 | 6  | P1 fact-check fail                                    | RED — çıktı discard, claim revize                    |
 | 7  | meta pixel cap aşımı                                  | auto-correct fail ise manuel revise                  |
 | 8  | Schema Rich Results Test REJECT                       | JSON-LD `@graph` fix önce                            |
+| 9  | YMYL profili + reviewer adı yok (R-124 imza eksik)    | RED yayın bloklu; operatör reviewer adlandır + append_audit kaydı (reviewer+review_date+content_version) |
 
 ## Cascade Fix W-F1 (Phase 10 EKSİĞİ Closure — Atomic Commit Içinde)
 
@@ -503,7 +541,7 @@ Expected: schema_version `"1.2"`, profile.enum array of 5 strings.
 | Tier-1 Scrapling 403 / blocked   | AMBER | tier-0 SERP description fallback                                      |
 | P1 citation missing              | RED   | DURUR #6, claim revize                                                |
 | P3 7-pattern AMBER 2x same pass  | RED   | manuel revise                                                         |
-| meta pixel cap > 540 / 680       | AMBER | auto-correct → fail RED                                               |
+| meta pixel cap > 580 / 990 (R-35)| AMBER | auto-correct → fail RED                                               |
 | Schema Rich Results REJECT       | RED   | DURUR #8, `@graph` fix                                                |
 
 ## References
@@ -513,7 +551,8 @@ Expected: schema_version `"1.2"`, profile.enum array of 5 strings.
   R-43 statik FAQ, R-77 fallback hero).
 - `rules/content-seo-discipline.md` (R-08 SERP, R-78..R-83 schema).
 - `rules/content-eeat-discipline.md` (R-28 byline, R-44 source verify,
-  R-105 expert quote, R-114/R-119 research bank).
+  R-104 stats-density single-source, R-105 expert quote, R-114/R-119
+  research bank, R-124 YMYL pre-publish review sign-off).
 - `rules/content-llm-discipline.md` (R-109..R-111 AIO citation, R-118
   humanize).
 - `rules/content-update-discipline.md` (R-50 counter-argument).
