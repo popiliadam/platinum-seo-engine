@@ -92,6 +92,15 @@ PATTERNS=(
   "xox[baprs]-[0-9a-zA-Z-]{10,}"
   # DataForSEO common leak pattern (hardcoded login+password)
   "DATAFORSEO_(LOGIN|USERNAME|PASSWORD)\\s*=\\s*[\"'][^\"']+[\"']"
+  # Generic high-entropy base64 secret (codex-C ext / FIX-S S2): a secret-ish key
+  # (key|token|secret|password|credential) assigned a QUOTED, PADDED base64 value
+  # (>=24 base64 chars ending in '='/'=='). The '=' padding is the precision
+  # anchor — hex hashes, git SHAs, identifiers and quoted paths never carry '=',
+  # so this avoids the false-positive surface a bare [A-Za-z0-9+/]{24,} run hits
+  # (a loose variant matched 195 benign repo paths). KNOWN recall gap: an UNPADDED
+  # all-alphanumeric base64 value is regex-indistinguishable from an identifier and
+  # is intentionally NOT flagged — see the base64 note in rules/secrets-management.md.
+  "([Kk][Ee][Yy]|[Tt][Oo][Kk][Ee][Nn]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Cc][Rr][Ee][Dd][Ee][Nn][Tt][Ii][Aa][Ll])[\"']?[[:space:]]*[:=][[:space:]]*[\"'][A-Za-z0-9+/]{24,}={1,2}[\"']"
 )
 
 # Parallel array: human-readable labels for each PATTERNS entry (same index).
@@ -114,6 +123,7 @@ PATTERN_NAMES=(
   "aws_akia_key_literal"
   "slack_token_xox"
   "dataforseo_env_hardcoded_literal"
+  "base64_high_entropy_secret_assignment"
 )
 
 # ----------------------------------------------------------------------------

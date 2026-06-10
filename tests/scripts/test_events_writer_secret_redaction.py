@@ -8,7 +8,7 @@ GCP service-account fields, PEM/RSA/OPENSSH private-key headers, ``gho/ghs/ghu``
 An audit/provenance event could therefore store a secret the repo claims to
 detect.
 
-Single source of truth: the canonical inventory is the 16-label ``PATTERN_NAMES``
+Single source of truth: the canonical inventory is the 17-label ``PATTERN_NAMES``
 array in ``scripts/security/check_secrets.sh``. Python redaction cannot shell out
 per event, so it MIRRORS that inventory; this test is the anti-drift tripwire:
 
@@ -74,6 +74,11 @@ def _secrets() -> dict[str, str]:
         "slack_token_xox": "xox" + "b-" + "D" * 22,
         "dataforseo_env_hardcoded_literal": (
             "DATAFORSEO_" + "PASSWORD" + "=" + chr(34) + "p" * 10 + chr(34)
+        ),
+        # FIX-S S2: secret-ish key + quoted, '='-padded base64 value (>=24 b64
+        # chars). Built from fragments so no contiguous token lands on disk.
+        "base64_high_entropy_secret_assignment": (
+            "secret = " + chr(34) + "QUJDREVGR0hJSktMTU5P" + "UFFSU1RVVldYWVo=" + chr(34)
         ),
     }
 

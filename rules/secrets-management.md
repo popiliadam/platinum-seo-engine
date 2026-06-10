@@ -57,3 +57,11 @@ logger.info(f"Calling API with key={api_key}")
 - **CI check:** PR pipeline aynı taramayı host'lanmış runner'da koşar; FAIL → merge bloklu.
 - **Manuel review:** Code review checklist'inde "secret leak?" maddesi var.
 - **Cross-link:** `→ rules/single-source-of-truth.md` (secret tek kaynağı `.env`'dir, ikinci yere yazılmaz).
+
+## Base64 Yüksek-Entropi Sezgisi (kapsam + sınır)
+
+Spesifik prefix'li 16 secret sınıfının (AIza, `sk-`, `ghp_`, AKIA, `xox`, PEM, DataForSEO, …) yanında, kanonik tarayıcı (`scripts/security/check_secrets.sh`, etiket `base64_high_entropy_secret_assignment`) **jenerik bir base64 sezgisi** de taşır. Tetikleyici: secret-ish bir anahtar adı (`key|token|secret|password|credential`) + atama + **tırnaklı, padding'li** bir base64 değer (≥24 base64 karakter + `=`/`==`). Örn. `api_key = "QUJDREVG…WVo="`.
+
+**Neden padding şart (kesinlik çıpası):** base64 `=` dolgusunu yalnız gerçek base64 (uzunluğu 3'e bölünmeyen) taşır; hex hash'ler (md5/sha), git SHA'ları, uzun tanımlayıcılar ve tırnaklı dosya yolları **asla** `=` içermez. Bu repo hash-zincirli defterlerle dolu olduğundan, çıplak `[A-Za-z0-9+/]{24,}` deseni 195 zararsız yolu yanlış-pozitif yakalardı; `=` çıpası bunları yapısal olarak eler (tüm-repo taraması 0 FP).
+
+**Bilinçli recall sınırı (limitasyon):** Padding'siz, tamamı harf-rakam (alfanümerik) bir base64 değeri regex açısından bir tanımlayıcıdan/hash'ten **ayırt edilemez**. grep ERE Shannon-entropisi hesaplayamaz (büyük/küçük harf + rakam karışımı tek bir ERE'de güvenle ifade edilemez), bu yüzden bu durum **kasıtlı olarak işaretlenmez** — işaretlemek hash/yol yanlış-pozitiflerini geri getirir. Bu amaçta gerçek araç bir entropi tabanlı tarayıcıdır (ör. `gitleaks` / `trufflehog` / `detect-secrets`); jenerik base64 tespiti gerekirse opsiyonel defense-in-depth olarak önerilir. Tek-kaynak: desen yalnız `check_secrets.sh` PATTERNS'tedir; CI wrapper, PreToolUse `--scan-stdin` geçidi ve event redaktörü onu aynalar.
