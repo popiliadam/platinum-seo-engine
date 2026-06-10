@@ -471,3 +471,95 @@ def test_resolve_slug_raises_without_marker_and_without_active_json(
     monkeypatch.delenv("CLAUDE_CODE_SESSION_ID", raising=False)
     with pytest.raises(FileNotFoundError, match=r"active\.json|bound"):
         dump_module._resolve_slug(tmp_path, None)
+
+
+# ---------- 17. graceful-read contract: unreadable / garbage-encoded files ----
+# (unified-FIX-N #1) The module docstring promises "all data sources are
+# graceful" but the read_text call sites only caught json.JSONDecodeError —
+# an unreadable file (OSError/PermissionError) or a garbage-encoded one
+# (UnicodeDecodeError, which is a ValueError subclass, NOT an OSError)
+# crashed the whole summary. Graceful shapes: _events_tail -> [],
+# _pending_approvals -> skip entry, _drift_verdict -> fall through/None,
+# _resolve_slug -> FileNotFoundError (its documented conversion, caught by
+# main() -> exit 1 + message — returning None would crash downstream).
+
+_GARBAGE_BYTES = b"\x80\x81\xfe\xff not utf-8 \x9c"
+
+_skip_if_root = pytest.mark.skipif(
+    hasattr(os, "geteuid") and os.geteuid() == 0,
+    reason="chmod-000 unreadable-file fixtures are meaningless as root",
+)
+
+
+def test_events_tail_garbage_encoded_returns_empty(dump_module, tmp_path):
+    project = _make_workspace(tmp_path, slug="demo")
+    (project / "_state" / "events.jsonl").write_bytes(_GARBAGE_BYTES)
+
+    result = dump_module.dump_workspace(workspace_root=tmp_path, project_slug="demo")
+
+    assert result["events_tail"] == []
+
+
+@_skip_if_root
+def test_events_tail_unreadable_returns_empty(dump_module, tmp_path):
+    project = _make_workspace(tmp_path, slug="demo")
+    events = project / "_state" / "events.jsonl"
+    _write_events(project, [{"event_id": "evt-01"}])
+    events.chmod(0o000)
+    try:
+        result = dump_module.dump_workspace(
+            workspace_root=tmp_path, project_slug="demo"
+        )
+    finally:
+        events.chmod(0o644)
+
+    assert result["events_tail"] == []
+
+
+def test_active_json_garbage_encoded_raises_filenotfound(
+    dump_module, tmp_path, monkeypatch
+):
+    monkeypatch.delenv("CLAUDE_CODE_SESSION_ID", raising=False)
+    _make_workspace(tmp_path, slug="demo")
+    shared = tmp_path / "shared"
+    shared.mkdir(parents=True, exist_ok=True)
+    (shared / "active.json").write_bytes(_GARBAGE_BYTES)
+
+    with pytest.raises(FileNotFoundError, match=r"active\.json"):
+        dump_module.dump_workspace(workspace_root=tmp_path, project_slug=None)
+
+
+@_skip_if_root
+def test_active_json_unreadable_raises_filenotfound(
+    dump_module, tmp_path, monkeypatch
+):
+    monkeypatch.delenv("CLAUDE_CODE_SESSION_ID", raising=False)
+    _make_workspace(tmp_path, slug="demo")
+    _write_active_json(tmp_path, "demo")
+    active = tmp_path / "shared" / "active.json"
+    active.chmod(0o000)
+    try:
+        with pytest.raises(FileNotFoundError, match=r"active\.json"):
+            dump_module.dump_workspace(workspace_root=tmp_path, project_slug=None)
+    finally:
+        active.chmod(0o644)
+
+
+def test_pending_approvals_skips_garbage_encoded_workflow(dump_module, tmp_path):
+    project = _make_workspace(tmp_path, slug="demo")
+    _write_workflow(project, "wf-ok", "awaiting_approval")
+    (project / "_state" / "workflows" / "wf-bad.json").write_bytes(_GARBAGE_BYTES)
+
+    result = dump_module.dump_workspace(workspace_root=tmp_path, project_slug="demo")
+
+    assert result["workflow_pending_approvals"] == ["wf-ok"]
+
+
+def test_drift_verdict_garbage_encoded_report_returns_none(dump_module, tmp_path):
+    project = _make_workspace(tmp_path, slug="demo")
+    (project / "_state" / "consistency-report.json").write_bytes(_GARBAGE_BYTES)
+    # no master.xlsx either -> live-eval fallback unavailable -> None
+
+    result = dump_module.dump_workspace(workspace_root=tmp_path, project_slug="demo")
+
+    assert result["drift_verdict"] is None

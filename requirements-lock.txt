@@ -13,7 +13,7 @@
 #     /tmp/pseo-lock/bin/pip freeze   # paste the output below this header
 #
 # 3.10 TRAP (2026-06-04, codex-audit P0-02): a full 3.14 `pip freeze` over-pins
-# deep transitive deps — notably `rpds-py` (Requires-Python>=3.11) — which then
+# deep transitive deps whose newer wheels require Python >=3.11, which then
 # break the 3.10 CI leg at install. So pins are kept to direct deps + only the
 # 3.10-safe transitive subset; deep transitives stay unpinned so pip resolves a
 # 3.10-compatible set per runner. Regenerate the full closure on python3.10 (the

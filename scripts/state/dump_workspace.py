@@ -21,8 +21,11 @@ CLI semantics:
   - --workspace-root  PSEO_WORKSPACE_ROOT environment variable'ından default
     alınır; --workspace-root flag explicit override.
 
-All data sources are graceful: missing path -> None / empty list (manager
-session use case'i için raise YERINE — partial state'te de iş görür).
+All data sources are graceful: missing, unreadable (OSError) veya garbage-
+encoded (UnicodeDecodeError) path -> None / empty list (manager session use
+case'i için raise YERINE — partial state'te de iş görür). shared/active.json
+okuma hataları bu fonksiyonun belgeli dönüşümüyle FileNotFoundError olarak
+yüzeye çıkar (main() -> exit 1 + mesaj).
 
 Usage::
 
@@ -79,9 +82,9 @@ def _resolve_slug(workspace_root: Path, project_slug: str | None) -> str:
         )
     try:
         data = json.loads(active.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise FileNotFoundError(
-            f"shared/active.json is not valid JSON: {exc}"
+            f"shared/active.json unreadable or not valid JSON: {exc}"
         ) from exc
     slug = data.get("active_project") or data.get("slug")
     if not slug:
@@ -101,7 +104,13 @@ def _events_tail(events_path: Path, n: int) -> List[dict]:
     if not events_path.exists():
         return []
     out: List[dict] = []
-    text = events_path.read_text(encoding="utf-8")
+    try:
+        text = events_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        # UnicodeDecodeError is a ValueError, not an OSError — it must be
+        # named explicitly or a garbage-encoded events.jsonl crashes the
+        # whole summary instead of degrading to the graceful [] shape.
+        return []
     for line in text.splitlines():
         line = line.strip()
         if not line:
@@ -165,7 +174,7 @@ def _pending_approvals(workflows_dir: Path) -> List[str]:
     for path in sorted(workflows_dir.glob("*.json")):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
+        except (json.JSONDecodeError, OSError, UnicodeDecodeError):
             continue
         if data.get("status") == "awaiting_approval":
             pending.append(path.stem)
@@ -204,7 +213,7 @@ def _drift_verdict(
             verdict = data.get("verdict")
             if isinstance(verdict, str):
                 return verdict
-        except (json.JSONDecodeError, OSError):
+        except (json.JSONDecodeError, OSError, UnicodeDecodeError):
             pass
     if workbook_path and workbook_path.exists() and slug:
         try:
