@@ -4,7 +4,7 @@
 
 ## Summary
 
-v1.9.5 closes a full cross-repo audit (`AUDIT_FINDINGS_FOR_CLAUDE_CODE.md`, Codex, 2026-06-03):
+v1.9.5 closes a full cross-repo audit (`AUDIT_FINDINGS_FOR_CLAUDE_CODE.md`, Codex, 2026-06-03; archived 2026-06-10 at `docs/audits/2026-06-03_codex_cross_repo_audit_handoff.md`):
 **30 of 31 findings fixed, 1 refuted (P2-08)**. The release is a governance/correctness hardening
 pass — it makes validators, registries, commands, hooks, schemas, docs, and workspace state agree on
 the same contracts, and locks each contract with a regression test so the same drift cannot silently

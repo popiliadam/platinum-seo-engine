@@ -100,3 +100,22 @@ def test_lock_documents_generation_command_and_python_target() -> None:
     assert "requirements.txt" in header, (
         "lock <- requirements.txt relationship not documented"
     )
+
+
+def test_lock_header_keeps_310_guidance_without_stale_package_example() -> None:
+    """unified-FIX-N #4: the 3.10 over-pin trap guidance is generic — naming a
+    specific third-party package (with a point-in-time Requires-Python claim)
+    dates the header and rots. Keep the regenerate-on-python3.10 (CI floor)
+    instruction; drop the package example."""
+    header = "\n".join(
+        line for line in _LOCK.read_text(encoding="utf-8").splitlines()
+        if line.startswith("#")
+    )
+    assert "python3.10" in header, (
+        "the regenerate-on-python3.10 (CI floor) guidance must stay in the "
+        "lock header"
+    )
+    assert "rpds-py" not in header, (
+        "drop the stale rpds-py example from the lock header — keep the "
+        "guidance generic (package-specific Requires-Python claims rot)"
+    )

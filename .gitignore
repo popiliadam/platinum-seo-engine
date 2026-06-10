@@ -123,4 +123,7 @@ state/runs/
 
 # ─── External tool configs (out-of-scope, F-16 plugin agnostik) ───
 .codex/
-.claude/settings.local.json
+# Claude Code runtime cache (worktrees, plugin state, settings.local.json) —
+# operator-local, never shipped; conftest.py keeps pytest out of it, this
+# keeps git out. Tracked plugin manifests live in .claude-plugin/ (unaffected).
+.claude/
