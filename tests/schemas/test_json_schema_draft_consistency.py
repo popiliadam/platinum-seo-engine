@@ -42,17 +42,17 @@ def test_every_schema_declares_draft07(schema_path: Path) -> None:
         assert wrong not in declared, f"{schema_path.name} declares a non-Draft-7 $schema: {declared!r}"
 
 
-def test_schemas_count_is_twenty_six() -> None:
-    """Sanity: the parametrized lock actually covers the full schema set (26 files).
+def test_schemas_count_matches_lock_set() -> None:
+    """Sanity: the parametrized lock actually covers the full schema set.
 
-    Bumped 21 -> 22 by AMO batch 1a (schemas/coverage.schema.json); bumped
-    22 -> 23 by AMO batch 1c, which adds schemas/intent-marker.schema.json;
-    bumped 23 -> 24 by AMO batch 2a, which adds schemas/consent.schema.json;
-    bumped 24 -> 25 by AMO batch 4a, which adds schemas/cost-ledger.schema.json;
-    bumped 25 -> 26 by AMO batch 4d, which adds schemas/schedule.schema.json
-    (D10 count-guard)."""
+    History: 26 by AMO batch 4d (schemas/schedule.schema.json, D10 count-guard);
+    bumped 26 -> 28 by the 2026-06-10 unified remediation — GAP-M-1a adds
+    schemas/google-update-calendar.schema.json and GAP-A-B2 adds
+    schemas/local-nap.schema.json. (Number-free name: FIX-MFIN consolidates the
+    expected value into tests/_count_pins.py at W6; until then this tracks the
+    live filesystem count.)"""
     count = len(list(SCHEMAS_DIR.glob("*.schema.json")))
-    assert count == 26, f"expected 26 *.schema.json files, found {count}"
+    assert count == 28, f"expected 28 *.schema.json files, found {count}"
 
 
 def test_validator_pins_draft7() -> None:
