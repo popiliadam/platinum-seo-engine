@@ -168,6 +168,16 @@ The 12-finding audit#2 (F1–F12) also shipped: `b7fe35c` (DOCS) + `648ed73` (CO
 
 ---
 
+## §FIX-H-tail — Renumber-completion + rule↔skill alignment (after FIX-H `93a9384`) — Wave 2/3
+
+**Why:** FIX-H (`93a9384`) renumbered the IPTC rule R-78→**R-123** and tightened R-09 (FAQ 10→3-6) — but per scope-lock left the cross-subsystem references dangling. This tail completes them. Disjoint from all other live batches.
+**Scope (ONLY):** `skills/production/generate-images/SKILL.md`, `scripts/util/iptc_metadata.py`, `skills/production/faq-optimization/SKILL.md`, `tests/skills/test_generate_images.py`, `tests/util/test_iptc_metadata.py`, `tests/ci/test_pillow_declared.py`, `tests/validation/test_content_validator.py`, `tests/skills/test_faq_optimization.py`.
+
+1. **T1 — IPTC R-78 → R-123 references.** Every reference that means the **AI-Image IPTC disclosure** rule must become R-123: `generate-images/SKILL.md` References section, `iptc_metadata.py:~15` comment, docstrings in `test_iptc_metadata.py`, `test_pillow_declared.py`, `test_content_validator.py`, and **flip** `tests/skills/test_generate_images.py`'s `assert "R-78" in text` → `assert "R-123" in text` (RED-first: it currently passes on the SKILL's stale R-78; change SKILL + assert together). ⚠️ **DO NOT touch Article-Schema R-78 refs** — ranges like `R-78..R-83` / `R-78..R-84` (e.g. `test_new_blog.py`) refer to the Article-Schema R-78 which legitimately KEEPS its id. Only change refs whose surrounding context is IPTC / image-disclosure / `TrainedAlgorithmicMedia` / IPTC DigitalSourceType.
+2. **T2 — faq-optimization rule↔skill alignment (H7 completion).** `faq-optimization/SKILL.md` (~lines 9/66/141/331) says "10 standart / 15 cap / 3000+" — now contradicts corrected R-09 ("3-6 demand-driven, hard cap 10"). Align the SKILL to R-09 (3-6 where PAA/evidence exists, cap 10) and **flip** its pin `tests/skills/test_faq_optimization.py:~88` RED-first. Keep FAQPage schema guidance (R-79) intact.
+
+**DONE-when:** suite ≥ start-N/0; `grep -rn 'R-78' skills/ scripts/ tests/` shows only Article-Schema/range contexts; no IPTC ref says R-78. **DURUR-if:** an R-78 reference's context is genuinely ambiguous (Article vs IPTC) — report it, don't guess.
+
 ## §FIX-S — Command arg-parsing residual + secret leftovers — Wave 2
 
 **Scope (ONLY):** `commands/pseo-approve.md`, `commands/pseo-bind.md` (+ any other command file using the `eval "set -- $(python3 -c 'import shlex...' "$ARGUMENTS")"` idiom — grep for it), optionally a NEW tiny helper `scripts/state/parse_command_args.py`, `scripts/hooks/scan_pending_secret.py`, `scripts/security/check_secrets.sh`, `rules/secrets-management.md`, their tests.
