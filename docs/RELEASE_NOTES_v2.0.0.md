@@ -82,7 +82,7 @@ Live `monthly` on Vento reached **verdict = pass** end-to-end, and the consent g
 
 ## 9. New Commands & Hooks
 
-**Commands** (`/pseo-run`, `/pseo-run-portfolio`, `/pseo-status-portfolio`, `/pseo-schedule`, `/pseo-approve`, `/pseo-bind`) drive the orchestrator, the portfolio sweep, the triage, the scheduler, consent, and session binding. Slash-command count **→ 27**. **Hooks**: the PreToolUse outward-action gate, the PostToolUse AI-disclosure rescan + audit, the Stop-hook denetçi — all classified RUNTIME, READ-ONLY except their sanctioned writes.
+**Commands** (`/pseo-run`, `/pseo-run-portfolio`, `/pseo-status-portfolio`, `/pseo-schedule`, `/pseo-approve`, `/pseo-bind`) drive the orchestrator, the portfolio sweep, the triage, the scheduler, consent, and session binding. Slash-command count **→ 29**. **Hooks**: the PreToolUse outward-action gate, the PostToolUse AI-disclosure rescan + audit, the Stop-hook denetçi — all classified RUNTIME, READ-ONLY except their sanctioned writes.
 
 ## 10. Tests
 

@@ -68,7 +68,7 @@ Her biri `rules/*.md`'de tanımlı; drift-check ve CI otomatik denetler.
 | 13 | Governance Final | tamamlandı ✅ | 3 |
 | 14 | Workspace + CI + Pilot End-to-End | devam ediyor 🚧 | — |
 
-**Toplam ~47 skill** (47 SKILL.md filesystem SoT), 9 batch phase'e yayılmış (v1.7'de +1 gbp-audit; v1.8'de +1 sf-crawl-orchestrator). **Güncel durum (engine v2.0.0): foundation (Phase 0–4) + Phase 5–10 + 13 tamamlandı; Phase 11 (production) + Phase 12 (publishing) skill'leri `wip` — SKILL.md + paired test ile kontrat/spec kilitli, runtime ertelendi; Phase 14 (workspace + CI + pilot E2E) devam ediyor.** Foundation (Phase 0–4) skill phase'lerinden önce tamamlandı; Phase 5 **GO/NO-GO gateway** geçildi.
+**Toplam ~49 skill** (49 SKILL.md filesystem SoT), 9 batch phase'e yayılmış (v1.7'de +1 gbp-audit; v1.8'de +1 sf-crawl-orchestrator). **Güncel durum (engine v2.0.0): foundation (Phase 0–4) + Phase 5–10 + 13 tamamlandı; Phase 11 (production) + Phase 12 (publishing) skill'leri `wip` — SKILL.md + paired test ile kontrat/spec kilitli, runtime ertelendi; Phase 14 (workspace + CI + pilot E2E) devam ediyor.** Foundation (Phase 0–4) skill phase'lerinden önce tamamlandı; Phase 5 **GO/NO-GO gateway** geçildi.
 
 ---
 
@@ -77,8 +77,8 @@ Her biri `rules/*.md`'de tanımlı; drift-check ve CI otomatik denetler.
 v1 release için TÜM şunlar geçmeli:
 
 1. Plugin Claude Code'da yükleniyor.
-2. ~47 skill çalışıyor (her kategori için en az 1 happy-path test).
-3. 27 command (`/pseo-*`) çalışıyor.
+2. ~49 skill çalışıyor (her kategori için en az 1 happy-path test).
+3. 29 command (`/pseo-*`) çalışıyor.
 4. 6 hook (session-start, pre/post-tool-use, user-prompt-submit, stop, subagent-stop) tetikleniyor.
 5. 31 schema validation PASS (schemas/*.json).
 6. Content rules input doc tamamen işlenmiş (Phase 10).
@@ -156,6 +156,6 @@ sf-import projects to 6 sheets (`crawl_sitemap`, `inlinks`, `outlinks`, `redirec
 ### Plugin manifest counts (v1.8+)
 
 - 45 SKILL.md files (was 44 pre-v1.8; +1 sf-crawl-orchestrator)
-- 27 commands/*.md files (16 pre-v1.8 → 18 with +2 pseo-sf-crawl/pseo-sf-status → 25 at v2.0 with the AMO command suite: pseo-run/-run-portfolio/-status-portfolio/-schedule/-approve/-bind + pseo-coverage → 27 with GAP-T pseo-facet-audit/pseo-robots-policy)
+- 29 commands/*.md files (16 pre-v1.8 → 18 with +2 pseo-sf-crawl/pseo-sf-status → 25 at v2.0 with the AMO command suite: pseo-run/-run-portfolio/-status-portfolio/-schedule/-approve/-bind + pseo-coverage → 27 with GAP-T pseo-facet-audit/pseo-robots-policy → 29 with GAP-T2 pseo-hreflang-audit/pseo-migration-map)
 - 6 hooks (UNCHANGED; Q-SF-MCP-08 RESOLVED → NO; stop_validation.py perf budget intact)
 - 4 MCP servers (was 3; +sf HTTP)
