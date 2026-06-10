@@ -13,6 +13,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import jsonschema
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -219,7 +220,6 @@ def test_workspace_root_no_engine_repo_path(env_with_ws_root: str) -> None:
 
 def test_schema_validate_roundtrip(env_with_ws_root: str) -> None:
     """Bootstrap output project-config.schema.json v1.3 ile valid."""
-    jsonschema = pytest.importorskip("jsonschema")
     cfg = build_project_config(_make_args(project="schema-test-slug"))
     schema = json.loads(
         (REPO_ROOT / "schemas" / "project-config.schema.json").read_text("utf-8")

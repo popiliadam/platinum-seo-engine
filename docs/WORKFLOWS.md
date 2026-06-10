@@ -1,6 +1,6 @@
 # Workflow Catalog (v1 Skills)
 
-> v2.0.0 — **49 skill** kataloğu (Phase 5–13 baseline 43 + v1.7 gbp-audit + v1.8 sf-crawl-orchestrator). Çoğu skill **active**; **production** (5: new-blog / revise-content / generate-images / content-remediation / faq-optimization), **publishing** (2: indexing-ping / verify-indexing), **mark-done** ve **monitoring-weekly** skill'leri **wip** — SKILL.md + paired test ile kontrat/spec kilitli, runtime ertelendi. Doğruluk kaynağı: her skill'in frontmatter `status`'u.
+> v2.0.0 — **49 skill** kataloğu (Phase 5–13 baseline 43 + v1.7 gbp-audit + v1.8 sf-crawl-orchestrator + GAP-T 4 tech-seo skill: facet-nav-audit / robots-policy-audit / hreflang-audit / migration-map). Çoğu skill **active**; **production** (5: new-blog / revise-content / generate-images / content-remediation / faq-optimization), **publishing** (2: indexing-ping / verify-indexing), **mark-done** ve **monitoring-weekly** skill'leri **wip** — SKILL.md + paired test ile kontrat/spec kilitli, runtime ertelendi. Doğruluk kaynağı: her skill'in frontmatter `status`'u.
 
 > **SF MCP call shapes — canonical contract (P3-01).** The inline `mcp__sf__*`
 > tool-call shapes in the SF crawl flow below are illustrative and have evolved.
@@ -39,7 +39,7 @@ Phase 5–13 boyunca parallel worker batch'lerle inşa edildi; pilot dentnotion 
 
 ---
 
-## Discovery — Phase 7 (11 skill)
+## Discovery — Phase 7 (12 skill)
 
 | Skill | Trigger | Status |
 |---|---|---|
@@ -51,6 +51,7 @@ Phase 5–13 boyunca parallel worker batch'lerle inşa edildi; pilot dentnotion 
 | `schema-audit` | "schema audit" | active |
 | `competitive-analysis` | "rakip analizi" | active |
 | `geo-analysis` | "GEO analiz" | active |
+| `gbp-audit` (v1.7 NEW) | "GBP audit", `/pseo-gbp-audit` | active |
 | `facet-nav-audit` (GAP-T2 NEW) | "facet audit", `/pseo-facet-audit` | wip |
 | `robots-policy-audit` (GAP-T3 NEW) | "robots policy", `/pseo-robots-policy` | wip |
 | `hreflang-audit` (GAP-T1 NEW) | "hreflang audit", `/pseo-hreflang-audit` | wip |
@@ -137,13 +138,13 @@ Phase 5–13 boyunca parallel worker batch'lerle inşa edildi; pilot dentnotion 
 |---|---|---|
 | Critical Path | 5 | 5 |
 | Ingestion | 4 | 6 + v1.8 SF MCP |
-| Discovery | 9 | 7 (+gbp-audit v1.7) |
-| Planning | 5 | 8 |
+| Discovery | 12 | 7 (+gbp-audit v1.7, +3 GAP-T) |
+| Planning | 6 | 8 (+migration-map GAP-T) |
 | Reporting | 8 | 9 |
 | Production | 5 | 11 |
 | Publishing + Specialized | 6 | 12 |
 | Governance Final | 3 | 13 |
-| **Toplam** | **45** | **8 batch** |
+| **Toplam** | **49** | **8 batch** |
 
 > Pattern: tüm skill'ler frontmatter `skill-frontmatter.schema.json`'a uyar; multi-step'lerde `workflow-run.schema.json` state'i tutulur; Excel write `transaction.py` üzerinden; MCP çağrıları §16.5 pattern'ine uyar; her aktivite `events.jsonl`'e log düşer.
 

@@ -14,7 +14,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+import jsonschema
 import pytest
+
+from tests._live_fixtures import live_project_dir
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "scripts" / "state" / "bootstrap_project.py"
@@ -93,10 +96,7 @@ def test_eykom_rerun_obsolete_workaround() -> None:
     """Eykom workaround obsolete kanıt: bootstrap çıktısı mevcut eykom
     canonical paths ile bire-bir uyum (post-fix manuel post-process patch
     artık gerekli değil; rerun idempotent = workaround obsolete)."""
-    eykom_actual_path = (
-        Path.home() / "Documents" / "platinum-seo-workspace"
-        / "projects" / "eykom" / "project.config.json"
-    )
+    eykom_actual_path = live_project_dir("eykom") / "project.config.json"
     if not eykom_actual_path.exists():
         pytest.skip(f"Eykom config not found at {eykom_actual_path}")
     eykom_actual = json.loads(eykom_actual_path.read_text("utf-8"))
@@ -145,7 +145,6 @@ def test_force_flag_required_for_overwrite(tmp_path: Path) -> None:
 def test_schema_validate_e2e_roundtrip(tmp_path: Path) -> None:
     """End-to-end: bootstrap output file project-config.schema.json v1.3
     valid (file write + schema load + jsonschema.validate cycle)."""
-    jsonschema = pytest.importorskip("jsonschema")
     out = _bootstrap("test-schema-e2e", tmp_path)
     cfg = json.loads(out.read_text("utf-8"))
     schema = json.loads(

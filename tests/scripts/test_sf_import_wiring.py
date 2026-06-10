@@ -34,12 +34,13 @@ from openpyxl import load_workbook
 
 from scripts.excel import transaction
 from scripts.ingestion import sf_import
+from tests._live_fixtures import live_project_dir
 
-# Real staged SF crawl + real workspace workbook (live fixtures).
+# Real staged SF crawl + real workspace workbook (live fixtures under
+# $PSEO_WORKSPACE_ROOT; gitignored — absent on CI / fresh clones, where the
+# live-fixture tests skip cleanly). The real workbook is never mutated.
 _PROJECT_SLUG = "aluminumstation-ca"
-_WS_PROJECT = Path(
-    "/Users/apple/Documents/platinum-seo-workspace/projects/aluminumstation-ca"
-)
+_WS_PROJECT = live_project_dir(_PROJECT_SLUG)
 _RAW_DIR = _WS_PROJECT / "sf-exports" / "2026-06-02" / "raw"
 _REAL_MASTER = _WS_PROJECT / "master.xlsx"
 

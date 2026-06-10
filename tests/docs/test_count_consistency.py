@@ -18,20 +18,35 @@ import re
 from pathlib import Path
 
 from scripts.validation import validate_invariants
+from tests._count_pins import (
+    COMMAND_COUNT,
+    CSR_DECLARED,
+    CSR_IMPLEMENTED,
+    SCHEMA_FILE_COUNT,
+    SCHEMA_JSON_COUNT,
+    SKILL_COUNT,
+    TIER_COUNTS,
+    count_commands,
+    count_declared_invariants,
+    count_implemented_invariants,
+    count_schema_files,
+    count_schema_json,
+    count_skills,
+)
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 # ---------------------------------------------------------------------------
-# Ground-truth counters
+# Ground-truth counters (delegate to the single source — tests/_count_pins.py)
 # ---------------------------------------------------------------------------
 
 def _count_skills() -> int:
-    return len(list((_REPO_ROOT / "skills").rglob("SKILL.md")))
+    return count_skills(_REPO_ROOT)
 
 
 def _count_commands() -> int:
-    return len(list((_REPO_ROOT / "commands").glob("*.md")))
+    return count_commands(_REPO_ROOT)
 
 
 def _count_mcp_servers() -> int:
@@ -40,9 +55,9 @@ def _count_mcp_servers() -> int:
 
 
 def _count_schemas() -> int:
-    # README's canonical definition (line 243): all *.json in schemas/ =
-    # 20 *.schema.json + cross-sheet-invariants.json = 21.
-    return len(list((_REPO_ROOT / "schemas").glob("*.json")))
+    # README's canonical definition: all *.json in schemas/ =
+    # 31 *.schema.json + cross-sheet-invariants.json = 32.
+    return count_schema_json(_REPO_ROOT)
 
 
 def _plugin_desc() -> str:
@@ -93,25 +108,40 @@ def test_marketplace_json_has_no_stale_v17_counts() -> None:
 # ---------------------------------------------------------------------------
 
 def _declared_count() -> int:
-    data = json.loads(_read("schemas/cross-sheet-invariants.json"))
-    return len(data["rules"])
+    return count_declared_invariants(_REPO_ROOT)
 
 
 def _implemented_count() -> int:
-    return len(validate_invariants._RULE_FUNCTIONS)
+    return count_implemented_invariants()
 
 
-def test_declared_invariant_count_is_31_and_cited() -> None:
+# ---------------------------------------------------------------------------
+# Keystone — the pins in tests/_count_pins.py must equal live ground truth.
+# This is what lets the other pin sites cite the constants safely: a 50th
+# skill (etc.) on disk fails HERE until tests/_count_pins.py is reconciled.
+# ---------------------------------------------------------------------------
+
+def test_count_pins_reconcile_with_filesystem() -> None:
+    assert SKILL_COUNT == count_skills(_REPO_ROOT)
+    assert COMMAND_COUNT == count_commands(_REPO_ROOT)
+    assert SCHEMA_FILE_COUNT == count_schema_files(_REPO_ROOT)
+    assert SCHEMA_JSON_COUNT == count_schema_json(_REPO_ROOT)
+    assert CSR_DECLARED == count_declared_invariants(_REPO_ROOT)
+    assert CSR_IMPLEMENTED == count_implemented_invariants()
+    assert sum(TIER_COUNTS.values()) == CSR_IMPLEMENTED
+
+
+def test_declared_invariant_count_matches_pin_and_cited() -> None:
     declared = _declared_count()
-    assert declared == 32
+    assert declared == CSR_DECLARED
     schema = json.loads(_read("schemas/cross-sheet-invariants.json"))
     assert f"{declared} CSR Registry" in schema["title"]
     assert f"{declared} Cross-Sheet Rules" in schema["description"]
 
 
-def test_implemented_invariant_count_is_24_and_cited() -> None:
+def test_implemented_invariant_count_matches_pin_and_cited() -> None:
     implemented = _implemented_count()
-    assert implemented == 25
+    assert implemented == CSR_IMPLEMENTED
     src = _read("scripts/validation/validate_invariants.py")
     assert f"{implemented} hand-coded invariant rules" in src
     assert f"evaluates the {implemented}" in src
@@ -126,7 +156,7 @@ def test_invariant_tier_counts_sum_to_implemented() -> None:
     src = _read("scripts/validation/validate_invariants.py")
     tiers = {m.group(1): int(m.group(2))
              for m in re.finditer(r"# (CRITICAL|HIGH|MEDIUM) \((\d+)\)", src)}
-    assert tiers == {"CRITICAL": 5, "HIGH": 14, "MEDIUM": 6}
+    assert tiers == TIER_COUNTS
     assert sum(tiers.values()) == _implemented_count()
 
 
@@ -168,15 +198,15 @@ def test_drift_check_test_count_cite_matches_actual() -> None:
 # skill/invariant/MCP-server change can never leave a stale literal behind.
 # ---------------------------------------------------------------------------
 
-def test_skills_count_is_45() -> None:
-    """Mechanical lock: 49 SKILL.md on disk. Every doc/comment cite that
-    names the skill count must track this number."""
-    assert _count_skills() == 49
+def test_skill_count_matches_pin() -> None:
+    """Mechanical lock: the SKILL_COUNT pin must equal the live SKILL.md count
+    on disk. Every doc/comment cite that names the skill count tracks this."""
+    assert SKILL_COUNT == _count_skills()
 
 
 def test_glossary_cites_current_invariant_count() -> None:
     """docs/GLOSSARY.md Invariant definition must cite the live CSR rule
-    count (31, len(cross-sheet-invariants.rules)), never the stale pre-SF
+    count (32, len(cross-sheet-invariants.rules)), never the stale pre-SF
     '28'."""
     glossary = _read("docs/GLOSSARY.md")
     assert f"{_declared_count()} CSR rule" in glossary
@@ -194,7 +224,7 @@ def test_generate_images_cites_current_mcp_server_count() -> None:
 
 def test_skill_count_comments_track_filesystem() -> None:
     """Test/CI comments that cite the SKILL.md count must track the live
-    number (45), never the stale '43'."""
+    number (49), never the stale '43'."""
     skills = _count_skills()
     for rel in (
         "tests/ci/test_ci_yaml.py",

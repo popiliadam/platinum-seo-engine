@@ -24,27 +24,20 @@ import json
 import re
 from pathlib import Path
 
+from tests._count_pins import (
+    count_commands as _n_commands,
+    count_schema_files as _n_schema_files,
+    count_schema_json as _n_schemas,
+    count_skills as _n_skills,
+)
+
 _ROOT = Path(__file__).resolve().parents[2]
 _README = (_ROOT / "README.md").read_text(encoding="utf-8")
 
 
-# --- ground-truth counters (same convention as test_count_consistency.py) ----
-
-def _n_commands() -> int:
-    return len(list((_ROOT / "commands").glob("*.md")))
-
-
-def _n_skills() -> int:
-    return len(list((_ROOT / "skills").rglob("SKILL.md")))
-
-
-def _n_schemas() -> int:
-    return len(list((_ROOT / "schemas").glob("*.json")))
-
-
-def _n_schema_files() -> int:
-    return len(list((_ROOT / "schemas").glob("*.schema.json")))
-
+# --- ground-truth counters: shared with test_count_consistency.py via the
+# single source tests/_count_pins.py (defaults to the same repo root). Only
+# the README-specific hook counter stays local. ----------------------------
 
 def _n_hooks() -> int:
     return len(list((_ROOT / "hooks").glob("*.json")))

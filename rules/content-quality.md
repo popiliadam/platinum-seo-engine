@@ -17,7 +17,7 @@ R-XX numbering integrity: R-01..R-26 input doc'tan korundu (content-rules-input.
 
 ## Foundational Principles
 
-Bu 3 prensip Phase 10 content rules setinin **üst-prensibidir**. Hiçbir alt-rule (R-01..R-122) bu prensipleri override edemez. Phase 11+ skill'leri (new-blog, revise-content, faq-optimization, content-remediation, generate-images) bu 3 prensibe tabidir.
+Bu 3 prensip Phase 10 content rules setinin **üst-prensibidir**. Hiçbir alt-rule (R-01..R-148) bu prensipleri override edemez. Phase 11+ skill'leri (new-blog, revise-content, faq-optimization, content-remediation, generate-images) bu 3 prensibe tabidir.
 
 ### Principle 1 — Truth-Verifiable Content (Süleyman 5x vurgu)
 

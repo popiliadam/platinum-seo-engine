@@ -130,7 +130,7 @@ with `event_type=content_new`.
 ## Foundational Principles Enforcement (3-Layer)
 
 The 3 üst-prensip (Phase 10 `rules/content-quality.md#foundational-principles`)
-gate this skill end-to-end. No alt-rule (R-01..R-122) overrides them.
+gate this skill end-to-end. No alt-rule (R-01..R-148) overrides them.
 
 ### Principle 1 — Truth-Verifiable Content (R-27, Süleyman 5x vurgu)
 
@@ -546,7 +546,7 @@ Expected: schema_version `"1.2"`, profile.enum array of 5 strings.
 
 ## References
 
-- `rules/content-quality.md` (Foundational Principles, R-01..R-122).
+- `rules/content-quality.md` (Foundational Principles, R-01..R-148).
 - `rules/content-html-discipline.md` (R-22 fragment, R-23 inline CSS,
   R-43 statik FAQ, R-77 fallback hero).
 - `rules/content-seo-discipline.md` (R-08 SERP, R-78..R-83 schema).

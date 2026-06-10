@@ -15,28 +15,23 @@ Covers:
 from __future__ import annotations
 
 import csv
-from pathlib import Path
 
 import pytest
 
 from scripts.util import sf_issue_taxonomy as tax
+from tests._live_fixtures import live_project_dir, requires_live
 
-# Real staged SF crawl (live fixtures).
-_RAW_DIR = Path(
-    "/Users/apple/Documents/platinum-seo-workspace/projects/"
-    "aluminumstation-ca/sf-exports/2026-06-02/raw"
-)
+# Real staged SF crawl (live fixtures under $PSEO_WORKSPACE_ROOT; gitignored
+# ~1GB raw crawls, never committed — present on the operator's machine, absent
+# on CI / fresh clones). The hermetic routing tests above already give full
+# logic coverage; the three "real-CSV" tests below guard cleanly when the
+# fixture is absent (engine stays plugin-agnostic — no project data committed
+# here). Matches the repo's skip-when-fixture-absent pattern (cf. SF MCP smoke).
+_RAW_DIR = live_project_dir("aluminumstation-ca") / "sf-exports" / "2026-06-02" / "raw"
 _ISSUES_CSV = _RAW_DIR / "issues_overview_report.csv"
 
-# The three "real-CSV" tests below read a staged SF crawl that lives under the
-# workspace repo's gitignored sf-exports/ (~1GB raw crawls, never committed). It
-# is present on the operator's machine but absent on CI and fresh clones, so
-# guard them — the hermetic routing tests above already give full logic coverage,
-# and the engine stays plugin-agnostic (no project data committed here). Matches
-# the repo's skip-when-fixture-absent pattern (cf. the SF MCP smoke test).
-_requires_real_csv = pytest.mark.skipif(
-    not _ISSUES_CSV.exists(),
-    reason=f"staged SF fixture absent (gitignored workspace data): {_ISSUES_CSV}",
+_requires_real_csv = requires_live(
+    _ISSUES_CSV, "staged aluminumstation-ca SF issues_overview_report.csv"
 )
 
 

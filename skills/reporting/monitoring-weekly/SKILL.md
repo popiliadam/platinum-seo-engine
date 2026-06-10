@@ -580,7 +580,7 @@ print(f"audit event appended: project={project_slug} severity={severity}")
 ## Foundational Principles Enforcement (3-Layer)
 
 The 3 üst-prensip (Phase 10 `rules/content-quality.md#foundational-
-principles`) gate this skill end-to-end. No alt-rule (R-01..R-122)
+principles`) gate this skill end-to-end. No alt-rule (R-01..R-148)
 overrides them.
 
 ### Principle 1 — Truth-Verifiable Health Report
