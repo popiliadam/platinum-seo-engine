@@ -7,7 +7,7 @@ Covers ``scripts/util/iptc_metadata.write_ai_image_disclosure``:
   4. WebP support: EXIF survives the format-specific save path.
 
 AVIF is intentionally out of scope — piexif cannot parse AVIF, so the
-``generate-images`` pipeline skips AVIF outputs (documented in R-78
+``generate-images`` pipeline skips AVIF outputs (documented in R-123
 failure_mode).
 """
 

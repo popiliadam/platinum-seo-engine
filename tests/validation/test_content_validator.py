@@ -87,7 +87,7 @@ def test_ai_topic_blog_without_disclosure_passes_disclosure_rule() -> None:
 
 def test_disclosure_inside_jsonld_script_is_ignored() -> None:
     """A disclosure phrase that lives only in a JSON-LD <script> (not visible
-    text) must not trip the ban — schema/IPTC disclosure (R-78) is required."""
+    text) must not trip the ban — schema/IPTC disclosure (R-123) is required."""
     html = (
         '<article class="pse-blog-post"><p>Kaliteli ve özgün içerik.</p>'
         '<script type="application/ld+json">'

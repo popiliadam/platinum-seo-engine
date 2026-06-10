@@ -6,7 +6,7 @@ description: |
   `/pseo-faq-optimization` çağırır. master.xlsx[content_decay] action
   trigger ya da master.xlsx[content_improve] optimization trigger;
   existing blog FAQ section enhance (mode=enhance) veya yeni blog FAQ
-  add (mode=add). R-09 cap (10 standart / 15 cap 3000+ word) +
+  add (mode=add). R-09 talep-güdümlü FAQ (kanıt varsa 3-6, hard cap 10) +
   R-43 statik (accordion YASAK) + R-29 pasaj alıntılanabilirlik gate +
   R-79 FAQPage @graph schema + R-109/R-110/R-111 AIO citation
   pattern enforce.
@@ -23,7 +23,7 @@ description: |
   Wave 2 domain); image generation için (generate-images kullan);
   decay action="revise" full section için (revise-content kullan,
   R-87 section-targeted); existing HTML diskte yok mode=enhance
-  (DURUR #1, FAQ section parse edilemez); R-09 cap aşımı 16+ FAQ
+  (DURUR #1, FAQ section parse edilemez); R-09 cap aşımı 11+ FAQ
   attempt (DURUR #2, AI suistimal Principle 3 enforce).
 version: "1.0"
 status: wip
@@ -63,7 +63,7 @@ triggers:
   manual: ["/pseo-faq-optimization"]
   natural_language: |
     "FAQ optimize et ve AIO citation density per 500 word ayarla",
-    "FAQ ekle ve R-09 cap 10 sabit / 15 cap 3000+ word zorla",
+    "FAQ ekle ve R-09 talep-güdümlü 3-6 band hard cap 10 zorla",
     "FAQ enhance et ve R-29 pasaj cevap-önce TL;DR garantile",
     "FAQ schema yenile ve R-79 FAQPage @graph Question entity refresh",
     "AIO citation pattern uygula ve R-109/R-110/R-111 enforce et"
@@ -138,8 +138,9 @@ Enum 5-value: `e-commerce` | `ymyl` | `local-service` | `b2b-saas` |
 AI'ın doğal cheap content padding davranışını preempt et. FAQ
 context'inde (R-09 + R-29 + R-118):
 
-- **R-09 FAQ count cap:** 10 standart, 3000+ word blog 15 hard cap;
-  16+ FAQ attempt → DURUR #2 REJECT.
+- **R-09 FAQ count cap (talep-güdümlü):** kanıt varsa (PAA varlığı,
+  gerçek kullanıcı soruları) 3-6 FAQ; kanıt yoksa daha az veya hiç;
+  hard cap 10; 11+ FAQ attempt → DURUR #2 REJECT.
 - **Heading keyword density per FAQ %40-60:** primary_keyword vs FAQ
   Q heading; aşırı stuff (>%60) AMBER, eksik (<%40) AMBER.
 - **R-29 pasaj alıntılanabilirlik gate:** H3 cevap-önce + 50-150
@@ -322,17 +323,20 @@ Profile-aware FAQ taxonomy switch:
 - `profile == "portfolio"` → minimal FAQ 3-5 soft cap (R-09 10 hard
   cap profile-driven downgrade).
 
-### Step 3: R-09 FAQ Count Cap Enforce
+### Step 3: R-09 FAQ Count Cap Enforce (Talep-Güdümlü)
 
 - `mode == "enhance"`: existing FAQ count read (Step 1 parse).
 - `mode == "add"`: target FAQ count plan (skill internal compose).
-- `target_word_count` read (`master.xlsx[new_content_plan]` row).
-- R-09 cap apply:
-  - `target_word_count < 3000` → max 10 FAQ standart.
-  - `target_word_count >= 3000` → max 15 FAQ hard cap.
+- R-09 talep-güdümlü band apply:
+  - Kanıt varsa (PAA varlığı — `serp_organic_live_advanced` optional
+    MCP; gerçek kullanıcı soruları — `gsc__search_analytics` query
+    read) → 3-6 FAQ hedef.
+  - Kanıt yoksa → daha az FAQ veya hiç (sıfır kabul; mekanik FAQ
+    şişirme yasak — Principle 3).
+  - Hard cap 10 (word count'tan bağımsız).
   - `profile == "portfolio"` → 5 soft cap (downgrade).
 
-DURUR #2 trigger: `mode == "add" AND faq_count >= 16` → REJECT
+DURUR #2 trigger: `mode == "add" AND faq_count > 10` → REJECT
 (R-09 violation, Principle 3 anti-cheap-content enforce; AI
 suistimal önlemi).
 
@@ -448,7 +452,7 @@ strip), retry once; persistent fail → RED.
   regex strip).
 - Heading keyword density per FAQ %40-60 enforce (primary_keyword
   vs FAQ Q heading; over-stuff >%60 AMBER, under <%40 AMBER).
-- R-09 cap final check (10 standart / 15 cap 3000+ word /
+- R-09 cap final check (talep-güdümlü 3-6 / hard cap 10 /
   5 portfolio soft).
 
 **events.jsonl append (events.schema enum compliance):**
@@ -474,7 +478,7 @@ strip), retry once; persistent fail → RED.
    FAQ section parse edilemez (mode=enhance kaynak yok); kullanıcıyı
    new-blog skill'e yönlendir.
 2. **DURUR #2 — R-09 Cap Aşımı (mode=add).** `mode == "add" AND
-   faq_count >= 16` → REJECT (R-09 violation; AI suistimal Principle
+   faq_count > 10` → REJECT (R-09 violation; AI suistimal Principle
    3 anti-cheap-content enforce).
 3. **DURUR #3 — R-43 Accordion Detect.** Rendered HTML'de
    `<details>` veya `<summary>` element detect → forbidden token
