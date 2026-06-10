@@ -29,13 +29,13 @@ Bu komut aksiyonu **çalıştırmaz** — sadece izni KAYDEDER. Gate (batch 2b) 
 
 `$1` run_id, `$2` action, `$3` target ZORUNLU. Eksikse DURDUR ve kullanımı göster:
 
-!`eval "set -- $(python3 -c 'import shlex,sys;print(" ".join(shlex.quote(a) for a in shlex.split(sys.argv[1])))' "$ARGUMENTS")"; if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then echo "MISSING_ARGS: usage /pseo-approve <run_id> <action> <target>"; echo "action ∈ {git_push, fs_delete, net_post, mcp_submit, index_update, dfs_oversized}"; echo "örnek: /pseo-approve vento-2026-06-06-ab12 index_update https://vento.example/sitemap.xml"; fi`
+!`set -- $ARGUMENTS; if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then echo "MISSING_ARGS: usage /pseo-approve <run_id> <action> <target>"; echo "action ∈ {git_push, fs_delete, net_post, mcp_submit, index_update, dfs_oversized}"; echo "örnek: /pseo-approve vento-2026-06-06-ab12 index_update https://vento.example/sitemap.xml"; fi`
 
 ## 3. Onay komutunu çalıştır
 
 Üç argüman da verildiyse recorder CLI'yi çağır. CLI sırasıyla: action'ı doğrular, workspace root'u çözer (config → `$PSEO_WORKSPACE_ROOT`), session UUID'sini `$CLAUDE_CODE_SESSION_ID`'den alır, bu session'a bağlı projeyi çözer (`shared/sessions/<uuid>.json` → `shared/active.json`), sonra deftere atomik (O_APPEND + flock + fsync) bir satır ekler.
 
-!`eval "set -- $(python3 -c 'import shlex,sys;print(" ".join(shlex.quote(a) for a in shlex.split(sys.argv[1])))' "$ARGUMENTS")"; cd "$CLAUDE_PLUGIN_ROOT" && python3 -m scripts.state.consent_ledger approve "$1" "$2" "$3" 2>&1`
+!`cd "$CLAUDE_PLUGIN_ROOT" && python3 -m scripts.state.consent_ledger approve $ARGUMENTS 2>&1`
 
 Başarılı çıktı tek satırlık banner'dır, örn:
 
@@ -54,4 +54,5 @@ Hata durumları (non-zero exit) ve anlamı:
 - Defter shape: `schemas/consent.schema.json` (seq + run_id + action + target_hash + granted_at + granted_by + prev_hash + entry_hash, additionalProperties:false).
 - Append-only LOG: O_APPEND + flock + fsync (events.jsonl disiplini); `os.replace` KULLANILMAZ — marker değil, defter.
 - Engine root `$CLAUDE_PLUGIN_ROOT`'tan alınır; cwd'den TÜRETME (batch 0a: güvenilmez).
+- Argüman aktarımı: `$ARGUMENTS` **tırnaksız** argparse'a verilir (`approve $ARGUMENTS`). Claude Code `$ARGUMENTS`'ı blok kaynağına metin-ikamesi (text substitution) yapar, böylece kullanıcının tırnakları gerçek shell tırnağı olur ve boşluklu bir hedef tek argüman kalır; argparse (run_id/action/target) parser'dır. `"$ARGUMENTS"` (çift tırnak) ya da `eval`+`shlex` `set --` reparse KULLANMA — bunlar yalnız env-var aktarımında doğrudur, text-sub altında tırnakları bozar (finding #13: üretimde `"origin main"` → "unknown action").
 - Kayıt yazıldıktan SONRA gate (batch 2b) aksiyona izin verir; bu komut tek başına aksiyonu çalıştırmaz.
