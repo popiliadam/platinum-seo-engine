@@ -696,3 +696,45 @@ def test_new_content_plan_smoke_e2e_cli_output(
     assert first_bytes == second_bytes, (
         "transform is not byte-idempotent under re-run"
     )
+
+
+# ---------------------------------------------------------------------------
+# Test 14 — FIX-L L4: word-count clamp (profile floor) + R-08 override
+# ---------------------------------------------------------------------------
+
+def test_word_count_clamp_profile_floor_and_r08_override() -> None:
+    """FIX-L L4: the TIVL word-count targets (T=1200/L=1000/V=800/I=1500)
+    are an intent-based BASE that must be clamped UP to the project's
+    profile word-count floor — ``target = max(TIVL_base, profile_floor)`` —
+    so YMYL / b2b-saas content never falls below its Principle-2 minimum
+    (YMYL floor 1500). When R-08 SERP-analysis data exists it OVERRIDES the
+    TIVL/clamp entirely. Canonical floor source: rules/content-quality.md;
+    resolution via scripts/util/profile_aware_defaults.cascade_default.
+    """
+    body = SKILL_PATH.read_text("utf-8").split("---", 2)[2]
+    bl = body.lower()
+
+    # (a) Clamp expression + profile-floor concept documented.
+    assert "max(" in body, (
+        "word-count section must document the max(base, profile_floor) clamp"
+    )
+    assert "profile floor" in bl, "profile floor concept must be named"
+
+    # (b) YMYL floor 1500 (Principle-2) cited as the binding case.
+    assert "1500" in body
+    assert "principle" in bl and "ymyl" in bl
+
+    # (c) Canonical floor source + resolution mechanism cited (no re-stated
+    #     divergent numbers — single source of truth).
+    assert "content-quality.md" in body
+    assert "profile_aware_defaults" in body
+
+    # (d) R-08 SERP analysis OVERRIDES the TIVL/clamp entirely.
+    assert "R-08" in body
+    assert "override" in bl
+
+    # (e) A worked example shows the clamp actually binding (b2b-saas floor
+    #     1800 lifts every TIVL base; or YMYL 1500 lifts the T=1200 base).
+    assert ("max(1200, 1500)" in body) or ("1800" in body), (
+        "worked example must demonstrate the floor binding above a TIVL base"
+    )

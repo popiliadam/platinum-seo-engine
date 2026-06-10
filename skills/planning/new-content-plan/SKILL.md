@@ -237,6 +237,9 @@ subset (DoS guard: max_rows keywords). Drop the raw response into
 `inbox/dfs/`.
 
 ```python
+# location_code / language_code resolved config-first from
+# project.config.dataforseo (no engine-level country default) — same
+# contract as skills/ingestion/dfs-pull/SKILL.md "Locale resolution".
 raw_overview = mcp__dataforseo__dataforseo_labs_google_keyword_overview(
     keywords=projected_keywords,           # ≤ max_rows
     location_code=location_code,
@@ -401,7 +404,10 @@ otherwise           → P3
 Falls back to monthly_volume when gap_score is 0 (search_intent-only
 fixtures): volume >= 1000 → P1, >= 100 → P2, else P3.
 
-## Target word count heuristic (transform domain)
+## Target word count heuristic (intent BASE → profile-floor clamp → R-08 override)
+
+The transform emits an **intent-based BASE** from the TIVL tag
+(`new_content_plan_transform` is profile-agnostic — it returns this base):
 
 ```
 tivl_tag == "T"  → 1200  (transactional landing pages — concise + CTA-heavy)
@@ -409,6 +415,44 @@ tivl_tag == "L"  → 1000  (local listings — short, scannable)
 tivl_tag == "V"  →  800  (video page — supporting copy only)
 tivl_tag == "I"  → target_word_count input (default 1500)
 ```
+
+The skill then applies two corrections on top of that base, in order:
+
+1. **Profile-floor clamp (mandatory).** A fixed TIVL base can fall BELOW a
+   profile's minimum word count (Principle 2). The published target is
+   clamped UP to the **profile floor**:
+
+   ```
+   target = max(TIVL_base, profile_floor)
+   ```
+
+   `profile_floor` is the lower bound of the project's profile word-count
+   band — **single source of truth: `rules/content-quality.md`** (the
+   per-profile word-count row). It is resolved at the skill layer via
+   `scripts/util/profile_aware_defaults.cascade_default` over
+   `project.config.json[profiles]` — do NOT restate divergent numbers here.
+   Floors per `content-quality.md`: **YMYL 1500**, b2b-saas 1800,
+   e-commerce 800, local-service 1000, portfolio 800. (Example: a YMYL
+   transactional page → `max(1200, 1500) = 1500` — the floor binds.)
+
+2. **R-08 SERP override (when present).** R-08 (mandatory pre-write SERP
+   analysis, `rules/content-seo-discipline.md`) yields a competitive
+   word-count target from the top-ranking pages. When that data exists it
+   **overrides** the TIVL base + profile-floor clamp entirely — the
+   SERP-derived target wins (it reflects what actually ranks for the query).
+
+**Worked examples** (base → clamp → final):
+
+| profile        | tivl_tag | TIVL base | profile_floor | `max(base, floor)`     | with R-08 SERP data        |
+|----------------|----------|-----------|---------------|------------------------|----------------------------|
+| YMYL           | T        | 1200      | 1500          | **1500** (floor binds) | R-08 target overrides      |
+| b2b-saas       | V        |  800      | 1800          | **1800** (floor binds) | R-08 target overrides      |
+| e-commerce     | I        | 1500      |  800          | **1500** (base wins)   | R-08 target overrides      |
+| local-service  | T        | 1200      | 1000          | **1200** (base wins)   | R-08 target overrides      |
+
+> The transform's `target_word_count` is the BASE (covered by the transform
+> tests); the profile-floor clamp + R-08 override are applied by the skill
+> (which reads `project.config.json[profiles]`), not the pure transform.
 
 ## URL slug generation (idempotent + plugin-agnostik)
 

@@ -693,3 +693,50 @@ def test_topical_map_smoke_e2e_deterministic() -> None:
         )
     # Unrelated noise topic must NOT be in the rows.
     assert not any(r["primary_keyword"] == "unrelated noise topic" for r in rows)
+
+
+# ---------------------------------------------------------------------------
+# Test 14 — FIX-L L3: locale resolution is CONFIG-FIRST, no engine default
+# ---------------------------------------------------------------------------
+
+def test_locale_resolution_is_config_first_no_engine_default(
+    skill_frontmatter: dict,
+) -> None:
+    """FIX-L L3: topical-map must NOT hardcode an engine-level country
+    default for location_code / language_code. The locale resolves
+    CONFIG-FIRST from ``project.config.dataforseo.{location_code,
+    language_code}``; a per-market reference table documents the codes
+    VERIFIED from live project configs (TR=2792, CA=20120 "Ontario,Canada",
+    NG=2566 — NOT the dispatch doc's unverified CA=2124 / NG=2434). Missing
+    config locale → DURUR; never silently default to any country.
+    """
+    fm = skill_frontmatter
+    body = SKILL_PATH.read_text("utf-8").split("---", 2)[2]
+    bl = body.lower()
+
+    # (a) Frontmatter: NO engine-level country default; prose claim removed.
+    assert "default" not in fm["inputs"]["location_code"], (
+        "location_code must NOT carry an engine-level default (was 2792)"
+    )
+    assert "default" not in fm["inputs"]["language_code"], (
+        "language_code must NOT carry an engine-level default (was 'tr')"
+    )
+    assert "2792" not in fm["description"], (
+        "auto-trigger description must not claim a TR (2792) default"
+    )
+    assert "2792" not in fm["inputs"]["location_code"].get("description", "")
+    assert "2792" not in fm["inputs"]["language_code"].get("description", "")
+
+    # (b) Body documents config-first resolution from the dataforseo block.
+    assert "## Locale resolution" in body
+    assert "project.config.dataforseo.location_code" in body
+    assert "project.config.dataforseo.language_code" in body
+    assert "config-first" in bl
+    assert "no engine-level country default" in bl
+
+    # (c) Reference table carries the VERIFIED codes only.
+    for code in ("2792", "20120", "2566"):
+        assert code in body, f"reference table missing verified code {code}"
+    assert "2124" not in body and "2434" not in body, (
+        "must NOT write the dispatch doc's unverified CA=2124 / NG=2434 codes"
+    )

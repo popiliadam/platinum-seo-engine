@@ -684,3 +684,55 @@ def test_smoke_e2e_with_mock(
             "emitted dataforseo_mcp provenance event invalid: "
             f"{[(list(err.absolute_path), err.message) for err in errs]}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Test (i) — FIX-L L1: locale resolution is CONFIG-FIRST, no engine default
+# ---------------------------------------------------------------------------
+
+def test_locale_resolution_is_config_first_no_engine_default() -> None:
+    """FIX-L L1: dfs-pull must NOT hardcode an engine-level country default
+    for location_code / language_code. The locale resolves CONFIG-FIRST from
+    ``project.config.dataforseo.{location_code,language_code}`` — the
+    schema-required authoritative per-project fields. A per-market reference
+    table documents the codes VERIFIED from live project configs
+    (TR=2792, CA=20120 "Ontario,Canada", NG=2566 — NOT the unverified
+    CA=2124 / NG=2434 the dispatch doc guessed). Missing config locale →
+    DURUR; the skill never silently defaults to any country.
+    """
+    text = SKILL_MD.read_text("utf-8")
+    parts = text.split("---", 2)
+    assert len(parts) >= 3
+    fm = yaml.safe_load(parts[1])
+    body = parts[2]
+    bl = body.lower()
+
+    # (a) Frontmatter: NO engine-level country default on either input.
+    assert "default" not in fm["inputs"]["location_code"], (
+        "location_code must NOT carry an engine-level default (was 2792)"
+    )
+    assert "default" not in fm["inputs"]["language_code"], (
+        "language_code must NOT carry an engine-level default (was 'tr')"
+    )
+    # The old "varsayılan 2792" country-default claims are gone from prose.
+    assert "2792" not in fm["description"], (
+        "auto-trigger description must not claim a TR (2792) default"
+    )
+    assert "2792" not in fm["inputs"]["location_code"].get("description", "")
+    assert "2792" not in fm["inputs"]["language_code"].get("description", "")
+
+    # (b) Body documents config-first resolution from the dataforseo block.
+    assert "## Locale resolution" in body, (
+        "SKILL body must add a '## Locale resolution' section"
+    )
+    assert "project.config.dataforseo.location_code" in body
+    assert "project.config.dataforseo.language_code" in body
+    assert "config-first" in bl
+    assert "no engine-level country default" in bl
+
+    # (c) Reference table carries the VERIFIED codes only.
+    for code in ("2792", "20120", "2566"):
+        assert code in body, f"reference table missing verified code {code}"
+    assert "2124" not in body and "2434" not in body, (
+        "must NOT write the dispatch doc's unverified CA=2124 / NG=2434 codes"
+    )

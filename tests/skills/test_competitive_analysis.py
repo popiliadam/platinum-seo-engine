@@ -604,3 +604,43 @@ def test_default_snapshot_date_is_utc_z_and_validates_strict() -> None:
     assert snap.endswith("Z") and "+00:00" not in snap
     ca.validate_s1_row(out["rows"][0])           # strict gate accepts it
     assert out["meta"]["snapshot_date"].endswith("Z")
+
+
+# ---------------------------------------------------------------------------
+# FIX-L L2: locale resolution is CONFIG-FIRST, no engine default
+# ---------------------------------------------------------------------------
+
+def test_locale_resolution_is_config_first_no_engine_default() -> None:
+    """FIX-L L2: competitive-analysis Step 2 must NOT hardcode the DFS
+    locale (was ``location_code=2792, # TR; reuse dfs_pull DEFAULTS``).
+    The locale resolves CONFIG-FIRST from project.config.dataforseo; a
+    per-market reference table documents the codes VERIFIED from live
+    project configs (TR=2792, CA=20120 "Ontario,Canada", NG=2566 — NOT the
+    dispatch doc's unverified CA=2124 / NG=2434).
+    """
+    body = SKILL_PATH.read_text("utf-8").split("---", 2)[2]
+    bl = body.lower()
+
+    # (a) The old hardcoded engine-default pattern is gone.
+    assert "reuse dfs_pull defaults" not in bl, (
+        "Step 2 must not 'reuse dfs_pull DEFAULTS' — resolve from config"
+    )
+    assert "location_code=2792" not in body, (
+        "body must not hardcode location_code=2792"
+    )
+    assert 'language_code="tr"' not in body, (
+        "body must not hardcode language_code=\"tr\""
+    )
+
+    # (b) Config-first resolution documented.
+    assert "## Locale resolution" in body
+    assert "project.config.dataforseo.location_code" in body
+    assert "config-first" in bl
+    assert "no engine-level country default" in bl
+
+    # (c) Reference table carries the VERIFIED codes only.
+    for code in ("2792", "20120", "2566"):
+        assert code in body, f"reference table missing verified code {code}"
+    assert "2124" not in body and "2434" not in body, (
+        "must NOT write the dispatch doc's unverified CA=2124 / NG=2434 codes"
+    )
