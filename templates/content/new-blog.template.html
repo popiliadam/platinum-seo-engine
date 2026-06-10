@@ -7,32 +7,32 @@
   - R-23 inline CSS + brand_identity slots, R-60 css_strategy profile-aware
   - R-61 pse- prefix BEM, R-62 image dimensions + lazy, R-63 mobile parity
   - R-39 WCAG 2.1 AA (contrast, alt, heading linear)
-  - R-78..R-84 schema markup JSON-LD @graph
+  - R-78..R-84 schema markup JSON-LD @graph ONLY (R-83 — microdata/RDFa YASAK)
   - R-29 H2 cevap-önce, R-101 self-contained intro, R-102 AI summary footer
   - R-09 FAQ 10 statik visible (R-43 accordion yasak), R-79 FAQPage @graph
   - R-26 CTA doğal akış, R-05 "Sonuç" başlığı yasak
   - Principle 1 truth-verifiable + Principle 2 profile-aware + Principle 3 anti-cheap-content
 -->
 
-<article class="pse-blog-post" lang="{{CONTENT_LOCALE}}" itemscope itemtype="https://schema.org/Article">
+<article class="pse-blog-post" lang="{{CONTENT_LOCALE}}">
 
   <!-- ========================================================================
        HEADER (article-scope, R-22 site header'a dokunmaz)
        ======================================================================== -->
   <header class="pse-post-header">
-    <h1 itemprop="headline">{{TITLE}}</h1>
+    <h1>{{TITLE}}</h1>
 
     <!-- R-01 AEO friendly intro (40-60 word, self-contained R-101, cevap-önce ilk 1-2 cümle) -->
-    <p class="pse-intro" itemprop="description">{{INTRO_PARAGRAPH_AEO_FRIENDLY}}</p>
+    <p class="pse-intro">{{INTRO_PARAGRAPH_AEO_FRIENDLY}}</p>
 
     <!-- R-28 EEAT updated date (zorunlu, tüm profile'larda) -->
     <p class="pse-meta">
-      <time class="pse-date-modified" itemprop="dateModified" datetime="{{DATE_MODIFIED_ISO_8601}}">{{DATE_MODIFIED_HUMAN_TR}}</time>
+      <time class="pse-date-modified" datetime="{{DATE_MODIFIED_ISO_8601}}">{{DATE_MODIFIED_HUMAN_TR}}</time>
       <!-- {{!-- R-28 + R-82 author byline conditional: profiles ⊇ {ymyl} → render; else skip --}} -->
       {{#IF_PROFILE_YMYL}}
-      <address class="pse-author" itemprop="author" itemscope itemtype="https://schema.org/Person">
-        <span itemprop="name">{{AUTHOR_NAME}}</span>,
-        <span itemprop="jobTitle">{{AUTHOR_TITLE}}</span>
+      <address class="pse-author">
+        <span class="pse-author__name">{{AUTHOR_NAME}}</span>,
+        <span class="pse-author__title">{{AUTHOR_TITLE}}</span>
       </address>
       {{/IF_PROFILE_YMYL}}
     </p>

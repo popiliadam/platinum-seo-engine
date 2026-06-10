@@ -29,7 +29,7 @@ inputs:
   submission_type:
     type: string
     required: true
-    description: "Enum: indexnow, google_indexing_api, both. Invalid değer DURUR #2 ABORT. 'indexnow' sadece IndexNow REST POST; 'google_indexing_api' şu an sitemap-submit path (mcp__gsc__submit_sitemap = sitemap.xml submit, per-URL DEĞİL); per-URL Google Indexing API URL_UPDATED ayrı consent-gated mekanizma, Wave 2 sonrası wire edilecek; 'both' iki path paralel çalışır."
+    description: "Enum: indexnow, google_indexing_api, both. Invalid değer DURUR #2 ABORT. 'indexnow' sadece IndexNow REST POST; 'google_indexing_api' şu an sitemap-submit path (mcp__gsc__submit_sitemap = sitemap.xml submit, per-URL DEĞİL); per-URL Google Indexing API URL_UPDATED GENEL bir kanal DEĞİL — yalnızca JobPosting/BroadcastEvent sayfaları için uygundur (eligibility hard-gate + consent gate, Wave 2 sonrası wire); 'both' iki path paralel çalışır."
 outputs:
   - "_state/events.jsonl"
   - "outputs/indexing/{date}-submission-report.json"
@@ -72,16 +72,21 @@ surviving URL set via two parallel paths:
        "keyLocation": "https://<domain>/<key>.txt",
        "urlList": [...] }`. Reads `INDEXNOW_KEY` from `.env`; absent →
    AMBER skip indexnow path (DURUR #3).
-2. **Sitemap submission (current Google-side path)** —
+2. **Sitemap submission (current Google-side path, GENERIC channel)** —
    `mcp__gsc__submit_sitemap` submits the project `sitemap.xml` document
    (NOT per-URL); Google then crawls the URLs it lists. This is the only
-   Google-side path wired in Wave 1. The **per-URL Google Indexing API
-   `URL_UPDATED`** mechanism (`indexing.googleapis.com/v3/
-   urlNotifications:publish`) is a **separate, consent-gated integration
-   NOT yet wired** — to be added post-Wave-2. **Never autonomous** — a
-   `URL_UPDATED` submit requires explicit operator approval before each
-   run (frontmatter `requires_approval: true`, `safe_auto_execute:
-   false`); autonomous submission is forbidden.
+   Google-side path wired in Wave 1. Together with IndexNow it is one of the
+   two **generic** indexing channels (works for any valid URL on the domain).
+
+   The **per-URL Google Indexing API** (`indexing.googleapis.com/v3/
+   urlNotifications:publish`, notification types `URL_UPDATED` /
+   `URL_DELETED`) is **NOT a generic channel**: per Google's documented
+   restriction it is eligible ONLY for **JobPosting** or **BroadcastEvent**
+   pages — submitting any other page type violates Google's spam policies.
+   It is **not yet wired** (reserved for post-Wave-2) and, when wired, is
+   governed by the two-gate contract in Step 5 (an eligibility hard-gate AND
+   the operator-consent gate). **Never autonomous** — autonomous submission
+   is forbidden (`requires_approval: true`, `safe_auto_execute: false`).
 
 The skill is **READ-ONLY** with respect to `master.xlsx`. F-1 schema
 authority: `redirect_404` and `robots_txt` sheets allowed_writers=null
@@ -265,11 +270,35 @@ Sadece `submission_type in [google_indexing_api, both]` ise çalışır.
 
 `mcp__gsc__submit_sitemap` submits the project `sitemap.xml` document
 (sitemap-level submission, NOT per-URL). Per GSC sitemap API: 200/204
-success, 429 quota, 5xx server. The per-URL Google Indexing API
-`URL_UPDATED` path (`indexing.googleapis.com/v3/urlNotifications:publish`)
-is a separate, consent-gated integration **not yet wired** — wiring is
-deferred to post-Wave-2 and stays gated behind explicit per-run operator
-approval (`requires_approval: true`); autonomous submission is forbidden.
+success, 429 quota, 5xx server.
+
+**Per-URL Google Indexing API — eligibility hard-gate (NOT a generic channel).**
+The per-URL Indexing API (`indexing.googleapis.com/v3/
+urlNotifications:publish`) is **not a generic URL-indexing channel**: per
+Google's documented restriction it accepts ONLY pages whose primary content
+is a **JobPosting** posting or a **BroadcastEvent** (live-stream) — any other
+page type is a spam-policy violation. Generic indexing therefore stays on the
+two generic channels (sitemap submission + IndexNow). This per-URL path is
+**not yet wired** (reserved for post-Wave-2). When it IS wired, BOTH of the
+following gates must pass before any per-URL notification fires:
+
+1. **Eligibility pre-check (deterministic hard-gate, policy).** Parse the
+   target page's JSON-LD and confirm the `@type` is `JobPosting` or
+   `BroadcastEvent` structured data. **Ineligible page → REFUSE** with an
+   explanation (`"Indexing API yalnızca JobPosting / BroadcastEvent sayfaları
+   için uygundur; bu sayfa uygun değil — sitemap submission + IndexNow
+   kullan"`). This gate is Google's documented eligibility restriction and is
+   **independent of consent** — an ineligible page is refused even WITH
+   operator approval.
+2. **Operator-consent gate.** Explicit per-run Süleyman approval
+   (`requires_approval: true`, `safe_auto_execute: false`); autonomous
+   submission is forbidden. Consent is **necessary but NOT sufficient**: it
+   gates an *eligible* page's notification but cannot make an ineligible page
+   eligible.
+
+The `URL_UPDATED` / `URL_DELETED` notification types stay RESERVED for this
+unbuilt per-URL path and are never emitted on the wired sitemap path (which
+records `sitemap_submission` semantics — see Step 7).
 
 **DURUR #4 trigger.** GSC API 5xx / timeout → AMBER + retry-once
 exponential backoff (1s base, 2x). Retry fail → mark URL failed,

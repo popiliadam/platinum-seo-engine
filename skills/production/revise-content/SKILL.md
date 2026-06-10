@@ -219,6 +219,36 @@ not yet exist. When Wave 2 lands the runtime, the pre-revise
 extraction lives in Step 4; the 3-step filter runs between Step 5
 (section-targeted detect) and Step 6 (revise generate).
 
+## R-124 — YMYL Uzman İnceleme İmzası (Pre-Publish Expert-Review Sign-Off)
+
+YMYL profillerinde (`profile == "ymyl"`), R-124 gereği yazar künyesi
+(R-28) yalnızca **kayıtlı bir insan incelemesi** ile geçerlidir. Revize
+edilmiş YMYL içeriği yayınlanmadan (Step 7 dateModified bump'tan) ÖNCE
+zorunlu bir inceleme-imzası adımı çalışır:
+
+1. **Operatör inceleyiciyi adlandırır.** Yayın öncesi, operatör insan
+   **reviewer** (inceleyenin) adını verir. Reviewer adı yoksa →
+   **DURUR #8** (RED, yayın + dateModified bump bloklu — R-124).
+2. **Audit kaydı (events.jsonl, append-only).** Skill, inceleme kanıtını
+   `scripts/state/events_writer.append_audit(...)` ile bir
+   `event_kind=audit` satırına yazar:
+   - `audit_action="modified"` (events.schema 6-değer canonical enum
+     `{created, modified, deleted, accessed, permission_changed,
+     config_changed}`).
+   - `audit_target="content:{project_slug}:{post-slug}"` (post-slug
+     `input.url`'den türetilir).
+   - `actor="skill:revise-content"`.
+   - `notes` payload üç zorunlu alan taşır (R-124): **reviewer**
+     (inceleyen adı) + **review_date** (ISO 8601) + **content_version**
+     (R-103 revision id veya content hash).
+3. Bu kayıt R-28 künyesinin arkasındaki insan inceleme kanıtıdır
+   (Principle 1 Truth-Verifiable + EEAT Trustworthiness). İnceleme kaydı
+   olmadan revize edilmiş YMYL içeriği yayınlanamaz; künye + belgesiz
+   inceleme = uydurulmuş yazarlık sinyali (rater-guideline "Lowest").
+
+READ-ONLY contract korunur: bu audit satırı `_state/events.jsonl`
+append'idir (master.xlsx WRITE değil). Non-YMYL profillerde adım atlanır.
+
 ## Schema Authority Compliance
 
 - **F-2:** `master.xlsx[content_decay].action` schema'da type/enum/
@@ -415,7 +445,7 @@ rename).
   trail)
 - `canonical_preserved` = `true` (R-89 invariant)
 
-## DURUR Conditions (7 koşul)
+## DURUR Conditions (8 koşul)
 
 1. **DURUR #1 — Existing Blog Yok.** `outputs/blog/{slug}/article.
    html` filesystem'de bulunamıyor → R-89 canonical preserve enforce
@@ -439,6 +469,11 @@ rename).
 7. **DURUR #7 — P1 Fact-Check Fail.** Principle 1 Layer 2 post-
    revise fact-check fail (yeni claim'lerin kaynak verify fail) →
    RED, revize iptal, çıktı discard.
+8. **DURUR #8 — YMYL İnceleme İmzası Eksik (R-124).** `profile ==
+   "ymyl"` ve **reviewer** adı verilmemiş → RED (yayın + dateModified
+   bump bloklu). Operatör inceleyeni adlandırmalı; skill
+   `append_audit` ile reviewer + review_date + content_version kaydını
+   yazar (Principle 1 Truth-Verifiable; uydurulmuş yazarlık yasak).
 
 ## READ-ONLY Contract (F-6 Enforcement)
 

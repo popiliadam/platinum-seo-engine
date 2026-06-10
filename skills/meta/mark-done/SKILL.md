@@ -60,8 +60,8 @@ budget:
   estimated_credits: 0
 autonomy:
   confidence: HIGH
-  requires_approval: false
-  safe_auto_execute: true
+  requires_approval: true
+  safe_auto_execute: false
 ---
 
 # mark-done — meta skill (Phase 12 Wave 2, W-G5)
@@ -479,5 +479,16 @@ exists precisely for this skill's role — schema authority binds the
   + master_task atomic 2-write batch contract).
 - `autonomy.confidence: HIGH` (deterministic state-machine close +
   schema-enforced gates; no LLM creative content).
-- `safe_auto_execute: true` (atomic transaction discipline +
-  idempotency hash + DURUR 5-koşul defensive gating).
+- `requires_approval: true` + `safe_auto_execute: false` (FIX-K K5
+  reconciliation). mark-done **APPLIES** changes to master.xlsx
+  (`status` → DONE + `completed_work` append) and DURUR #4 can require a
+  manual Süleyman confirm on suspicious/missing `completion_evidence` —
+  so a scheduled run must stop at a report rather than auto-apply
+  (`safe_auto_execute: false`), and the applied write is an
+  approval-gated destructive output (`requires_approval: true`). This
+  matches every other master.xlsx-writing skill (indexing-ping /
+  new-blog / init-project … are all `true`/`false`). The atomic
+  transaction discipline + idempotency hash + DURUR 5-koşul gating still
+  hold — they make the write **safe-when-approved**, not cron-autonomous.
+  Earlier `false`/`true` (cron-ready) wrongly grouped this WRITE skill
+  with the READ-ONLY reporting skills and contradicted DURUR #4.
