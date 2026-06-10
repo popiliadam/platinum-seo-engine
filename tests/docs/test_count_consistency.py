@@ -169,9 +169,9 @@ def test_drift_check_test_count_cite_matches_actual() -> None:
 # ---------------------------------------------------------------------------
 
 def test_skills_count_is_45() -> None:
-    """Mechanical lock: 45 SKILL.md on disk. Every doc/comment cite that
+    """Mechanical lock: 47 SKILL.md on disk. Every doc/comment cite that
     names the skill count must track this number."""
-    assert _count_skills() == 45
+    assert _count_skills() == 47
 
 
 def test_glossary_cites_current_invariant_count() -> None:

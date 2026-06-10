@@ -1,6 +1,6 @@
 # Workflow Catalog (v1 Skills)
 
-> v2.0.0 — **45 skill** kataloğu (Phase 5–13 baseline 43 + v1.7 gbp-audit + v1.8 sf-crawl-orchestrator). Çoğu skill **active**; **production** (5: new-blog / revise-content / generate-images / content-remediation / faq-optimization), **publishing** (2: indexing-ping / verify-indexing), **mark-done** ve **monitoring-weekly** skill'leri **wip** — SKILL.md + paired test ile kontrat/spec kilitli, runtime ertelendi. Doğruluk kaynağı: her skill'in frontmatter `status`'u.
+> v2.0.0 — **47 skill** kataloğu (Phase 5–13 baseline 43 + v1.7 gbp-audit + v1.8 sf-crawl-orchestrator). Çoğu skill **active**; **production** (5: new-blog / revise-content / generate-images / content-remediation / faq-optimization), **publishing** (2: indexing-ping / verify-indexing), **mark-done** ve **monitoring-weekly** skill'leri **wip** — SKILL.md + paired test ile kontrat/spec kilitli, runtime ertelendi. Doğruluk kaynağı: her skill'in frontmatter `status`'u.
 
 > **SF MCP call shapes — canonical contract (P3-01).** The inline `mcp__sf__*`
 > tool-call shapes in the SF crawl flow below are illustrative and have evolved.
@@ -39,7 +39,7 @@ Phase 5–13 boyunca parallel worker batch'lerle inşa edildi; pilot demo-dental
 
 ---
 
-## Discovery — Phase 7 (8 skill)
+## Discovery — Phase 7 (10 skill)
 
 | Skill | Trigger | Status |
 |---|---|---|
@@ -51,6 +51,8 @@ Phase 5–13 boyunca parallel worker batch'lerle inşa edildi; pilot demo-dental
 | `schema-audit` | "schema audit" | active |
 | `competitive-analysis` | "rakip analizi" | active |
 | `geo-analysis` | "GEO analiz" | active |
+| `facet-nav-audit` (GAP-T2 NEW) | "facet audit", `/pseo-facet-audit` | wip |
+| `robots-policy-audit` (GAP-T3 NEW) | "robots policy", `/pseo-robots-policy` | wip |
 
 > Not: `aio-competitor-map` discovery doğasında olmasına rağmen Phase 12'de ele alınır.
 

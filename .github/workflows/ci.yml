@@ -95,7 +95,7 @@ jobs:
         run: bash scripts/ci/check_secrets.sh
         continue-on-error: false
 
-      # Step 7 — frontmatter-compile (skill-frontmatter.schema.json Draft7 validate her SKILL.md frontmatter, 45 SKILL.md compliance)
+      # Step 7 — frontmatter-compile (skill-frontmatter.schema.json Draft7 validate her SKILL.md frontmatter, 47 SKILL.md compliance)
       - name: 7. frontmatter-compile
         run: |
           python3 -c "
