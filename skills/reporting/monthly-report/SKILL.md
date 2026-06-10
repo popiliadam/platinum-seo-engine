@@ -151,10 +151,66 @@ enrichment; never written.
 9. `backlink_delta` — paid DFS MCP (zero shape; this skill = LOCAL only)
 10. `next_month_plan` — top-10 TODO rows from master_task by priority
 
-`framing_policy` defaults to `positive_client` (§22.3): wins
-foregrounded; declining metrics routed into `next_month_plan` action
-list rather than broken out as a negative section. The `internal`
-framing surfaces both sides (used by manager / engineering review).
+`framing_policy` defaults to `positive_client` (§22.3) and affects **TONE
+only, never facts** (FIX-K K1). The `internal` framing may foreground declines;
+both framings carry the SAME numbers in the additive sections below.
+
+## Additive optional sections (11–12)
+
+Beyond the 10 required sections the report carries two **additive, OPTIONAL**
+sections — NOT in `schemas/monthly-report.schema.json` `sections.required`, so
+older reports stay schema-valid. Both are **framing-INVARIANT** (byte-identical
+under `positive_client` and `internal`; their builders take no `framing_policy`):
+
+11. `decliners` (FIX-K K1) — declining pages/content + the net signed clicks
+    delta. The facts survive framing; only the surrounding tone may differ.
+12. `measurement_context` (GAP-M-W2) — a measurement-honesty annotation, per
+    `rules/measurement-discipline.md` (core-update overlap + intervention
+    cohorts):
+    - `core_updates_overlap` + `measurement_quality` ∈ {`clean`,
+      `update_overlap`, `post_update_settling`, `insufficient_history`}: does the
+      window overlap a Google Search **Ranking** update (incl. the 7-day settling
+      buffer)? Deltas in an overlapping window MUST NOT be attributed to engine
+      work without this annotation.
+    - `intervention_outcomes`: treated-vs-control quick-win verdicts (difference
+      in pp; `n<30 — directional only`; no p-values), never a raw treated delta.
+
+### Calendar source (overlap read)
+
+The overlap read uses `scripts/reporting/update_calendar.py`. By DEFAULT the
+bundled engine seed `google-update-calendar.json` is the source (no network,
+cron-ready) — `--calendar-path` overrides it. An OPTIONAL fresher workspace
+overlay (`shared/cache/google-update-calendar.json`, maintained out-of-band by
+`scripts/maintenance/refresh_update_calendar.py`) is supplied via
+`--overlay-calendar-path` (overlay wins by id). A missing calendar ⇒
+`measurement_quality = insufficient_history` (overlap undeterminable — NEVER
+fabricated as `clean`). This keeps the skill LOCAL / no-MCP.
+
+### Intervention outcomes wiring
+
+Before rendering, locate quick-wins cohort snapshots
+(`_state/metrics/quickwin-cohorts/{date}-cohort.json`) at least **21 days** old,
+pair each with the newest GSC inbox payload
+(`inbox/gsc/{date}-search_analytics-{slug}.json`), compute treated-vs-control
+outcomes, and pass the JSON array to `monthly_report.py --cohort-results`:
+
+```bash
+python3 scripts/reporting/intervention_outcome.py \
+    --cohort-dir projects/{slug}/_state/metrics/quickwin-cohorts/ \
+    --post projects/{slug}/inbox/gsc/{date}-search_analytics-{slug}.json \
+    --today {date} --min-age-days 21 \
+    --output projects/{slug}/_state/metrics/{date}-cohort-results.json
+
+python3 scripts/reporting/monthly_report.py \
+    --project-slug {slug} --workspace-root "$PSEO_WORKSPACE_ROOT" \
+    --period-end {date} \
+    --cohort-results projects/{slug}/_state/metrics/{date}-cohort-results.json \
+    --output-dir projects/{slug}/outputs/reports/
+```
+
+Absent cohort files ⇒ `intervention_outcomes = []` (the section says "kohort
+verisi yok"); never invent an outcome. This wiring writes NOTHING to
+`master.xlsx` and emits NO `events.jsonl` row — the skill stays READ-ONLY.
 
 ## DURUR conditions (8 + base)
 
@@ -194,8 +250,14 @@ operator review — never as an inline skill block.
   `schemas/master-excel.schema.json` (sheet shapes for the 9 consumed
   sheets), `schemas/skill-frontmatter.schema.json` (this frontmatter),
   `schemas/events.schema.json` (events.jsonl shape; READ-ONLY contract).
+- Rules: `rules/measurement-discipline.md` R-137 (core-update overlap
+  annotation — `measurement_context.core_updates_overlap`), R-138 (intervention
+  cohort tagging — `measurement_context.intervention_outcomes`, treated-vs-control).
 - Cross-modules (IMPORT-only): `scripts/reporting/render_template.py`
-  (Phase 1 mirası, `string.Template` substitution).
+  (Phase 1 mirası, `string.Template` substitution),
+  `scripts/reporting/update_calendar.py` (R-137 overlap read; engine seed ∪
+  overlay), `scripts/reporting/intervention_outcome.py` (R-138 treated-vs-control
+  outcome; run before this skill, fed via `--cohort-results`).
 - Transform: `scripts/reporting/monthly_report.py`.
 - Template: `templates/reports/monthly-report.template.md`.
 - Tests: `tests/skills/test_monthly_report.py` (8-10 tests; schema

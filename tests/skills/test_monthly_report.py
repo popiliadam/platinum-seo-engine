@@ -223,16 +223,23 @@ def test_assemble_report_validates_10_sections(
         ],
         generated_at="2026-05-01T09:00:00Z",
     )
-    # All 10 required sections present, plus the optional additive `decliners`
-    # section (FIX-K K1 — always emitted, present in both framings).
+    # All 10 required sections present, plus two optional additive sections —
+    # `decliners` (FIX-K K1) and `measurement_context` (GAP-M-W2) — both always
+    # emitted and present in both framings.
     assert set(mr.REQUIRED_SECTIONS).issubset(report["sections"].keys())
     assert "decliners" in report["sections"], (
         "FIX-K K1: optional decliners section must always be emitted"
     )
-    assert set(report["sections"].keys()) == set(mr.REQUIRED_SECTIONS) | {"decliners"}
-    assert len(report["sections"]) == 11
-    # decliners is additive — NOT a member of the required-sections tuple.
+    assert "measurement_context" in report["sections"], (
+        "GAP-M-W2: optional measurement_context section must always be emitted"
+    )
+    assert set(report["sections"].keys()) == (
+        set(mr.REQUIRED_SECTIONS) | {"decliners", "measurement_context"}
+    )
+    assert len(report["sections"]) == 12
+    # Both are additive — NOT members of the required-sections tuple.
     assert "decliners" not in mr.REQUIRED_SECTIONS
+    assert "measurement_context" not in mr.REQUIRED_SECTIONS
     assert len(mr.REQUIRED_SECTIONS) == 10
 
     # exec_summary has narrative.
@@ -583,6 +590,37 @@ def _inputs_with_negative_delta() -> mr.ReportInputs:
     )
 
 
+def _fixture_calendar_overlapping() -> list[dict]:
+    """A Ranking update whose rollout sits inside the 2026-04-04..05-01 test
+    window — overlaps() returns rollout_in_period ⇒ measurement_quality
+    'update_overlap'. (update_calendar.overlaps shape: id/name/begin/end/
+    service_name.)"""
+    return [{
+        "id": "apr-2026-core", "name": "April 2026 core update",
+        "begin": "2026-04-15T00:00:00Z", "end": "2026-04-28T00:00:00Z",
+        "service_name": "Ranking", "severity": "low",
+        "source": "google_status_dashboard",
+    }]
+
+
+def _fixture_cohort_results() -> list[dict]:
+    """An intervention_outcome.compute_outcome-shaped result list (R-138) —
+    embedded verbatim into measurement_context.intervention_outcomes."""
+    return [{
+        "cohort_date": "2026-04-04", "score_version": "2.0",
+        "post_date": "2026-05-01",
+        "treated": {"n": 3, "median_position_delta": -4.0,
+                    "clicks_before": 30, "clicks_after": 120,
+                    "clicks_delta_pct": 300.0},
+        "control": {"n": 3, "median_position_delta": 0.0,
+                    "clicks_before": 30, "clicks_after": 31,
+                    "clicks_delta_pct": 3.33},
+        "difference_pp": 296.67, "verdict": "engine_positive",
+        "caveat": "n<30 — directional evidence only",
+        "attrition": {"treated_missing": 0, "control_missing": 0},
+    }]
+
+
 # --- Test 11: K1(a) — exec narrative ALWAYS states the net delta ----------
 
 def test_exec_narrative_always_states_net_delta_both_framings() -> None:
@@ -613,16 +651,22 @@ def test_exec_narrative_always_states_net_delta_both_framings() -> None:
 def test_decliners_section_byte_identical_across_framings(
     monthly_report_schema: dict,
 ) -> None:
-    """FIX-K K1(b) keystone: the decliners section's rows/numbers are framing
-    INVARIANT — positive_client and internal produce byte-identical content
-    (only the surrounding narrative tone/order may differ). GAP-M-W2 extends
-    this test to cover measurement_context."""
+    """FIX-K K1(b) keystone, GAP-M-W2 EXTENDED: BOTH the decliners section AND
+    the new measurement_context section are framing INVARIANT — positive_client
+    and internal produce byte-identical content (only the surrounding narrative
+    tone/order may differ). Facts (declines, core-update overlap, intervention
+    outcomes) survive framing (R-137/R-138)."""
     inputs = _inputs_with_negative_delta()
     pinned = "2026-05-01T09:00:00Z"
+    cal = _fixture_calendar_overlapping()
+    cohort = _fixture_cohort_results()
     pc = mr.assemble_report(inputs=inputs, framing_policy="positive_client",
-                            output_formats=("html",), generated_at=pinned)
+                            output_formats=("html",), generated_at=pinned,
+                            calendar_updates=cal, cohort_results=cohort)
     intl = mr.assemble_report(inputs=inputs, framing_policy="internal",
-                              output_formats=("html",), generated_at=pinned)
+                              output_formats=("html",), generated_at=pinned,
+                              calendar_updates=cal, cohort_results=cohort)
+    # --- decliners (FIX-K K1b) byte-identical ---
     dec_pc = pc["sections"]["decliners"]
     dec_int = intl["sections"]["decliners"]
     assert json.dumps(dec_pc, sort_keys=True, ensure_ascii=False) == \
@@ -633,6 +677,248 @@ def test_decliners_section_byte_identical_across_framings(
     assert dec_pc["pages_down"], "declining pages must be listed"
     assert dec_pc["decaying_content"], "decaying content must be listed"
     assert dec_pc["net_clicks_delta_pct"] < 0
-    # Schema still validates with the additive section present (both framings).
+    # --- measurement_context (GAP-M-W2 R-137/R-138) byte-identical ---
+    mc_pc = pc["sections"]["measurement_context"]
+    mc_int = intl["sections"]["measurement_context"]
+    assert json.dumps(mc_pc, sort_keys=True, ensure_ascii=False) == \
+        json.dumps(mc_int, sort_keys=True, ensure_ascii=False), (
+        "GAP-M-W2: measurement_context section must be byte-identical across framings"
+    )
+    assert mc_pc["measurement_quality"] == "update_overlap"
+    assert mc_pc["core_updates_overlap"], "the overlapping update must be annotated"
+    assert mc_pc["intervention_outcomes"] == cohort, (
+        "intervention outcomes embedded verbatim (framing-invariant)"
+    )
+    # Schema still validates with BOTH additive sections present (both framings).
     Draft7Validator(monthly_report_schema).validate(pc)
     Draft7Validator(monthly_report_schema).validate(intl)
+
+
+# --- GAP-M-W2: keywords_up position_before fabrication retirement ---------
+
+def test_keywords_up_no_position_before_fabrication(
+    monthly_report_schema: dict,
+) -> None:
+    """GAP-M-W2 (measurement honesty): retire the
+    `position_before = position_after + 3` fabrication in _build_keywords_up.
+
+    With no longitudinal source wired, position_before MUST be null (honest
+    "unknown"), never a synthetic pos_after+3 approximation. position_after
+    stays the real current_position. Schema accepts the nullable field."""
+    inputs = mr.ReportInputs(
+        project_id="demo-project",
+        period_start="2026-04-04", period_end="2026-05-01",
+        opportunity=[
+            {"query": "seo nedir", "current_position": 8.5,
+             "impressions_30d": 1200, "clicks_30d": 50},
+            {"query": "title tag", "current_position": 12.0,
+             "impressions_30d": 800, "clicks_30d": 20},
+        ],
+    )
+    report = mr.assemble_report(
+        inputs=inputs, framing_policy="positive_client",
+        output_formats=("html",), generated_at="2026-05-01T09:00:00Z",
+    )
+    kw = report["sections"]["keywords_up"]
+    assert kw, "keywords_up must still list the opportunity rows"
+    by_q = {i["query"]: i for i in kw}
+    # The retired fabrication produced 8.5+3=11.5 / 12.0+3=15.0.
+    assert by_q["seo nedir"]["position_before"] is None, (
+        "GAP-M-W2: position_before must be null, not the retired pos_after+3 "
+        f"fabrication: {by_q['seo nedir']!r}"
+    )
+    assert by_q["seo nedir"]["position_after"] == 8.5
+    assert by_q["title tag"]["position_before"] is None
+    assert by_q["title tag"]["position_after"] == 12.0
+    for item in kw:
+        assert item["position_before"] is None
+    # Schema validates the nullable position_before (additive widening).
+    Draft7Validator(monthly_report_schema).validate(report)
+
+
+def test_keywords_up_passes_through_stored_position_before(
+    monthly_report_schema: dict,
+) -> None:
+    """When a longitudinal source DOES store a prior position on the opportunity
+    row, _build_keywords_up passes it through verbatim (no fabrication, but no
+    discarding real data either)."""
+    inputs = mr.ReportInputs(
+        project_id="demo-project",
+        period_start="2026-04-04", period_end="2026-05-01",
+        opportunity=[
+            {"query": "seo nedir", "current_position": 8.5,
+             "position_before": 20.0,  # real stored prior position
+             "impressions_30d": 1200, "clicks_30d": 50},
+        ],
+    )
+    report = mr.assemble_report(
+        inputs=inputs, framing_policy="positive_client",
+        output_formats=("html",), generated_at="2026-05-01T09:00:00Z",
+    )
+    kw = report["sections"]["keywords_up"][0]
+    assert kw["position_before"] == 20.0  # passed through, NOT fabricated 11.5
+    assert kw["position_after"] == 8.5
+    Draft7Validator(monthly_report_schema).validate(report)
+
+
+def test_keywords_up_renders_unknown_before_honestly() -> None:
+    """The retired fabrication must not leak a literal 'None' into the rendered
+    markdown — an unknown before-position renders as '?' (honest unknown)."""
+    inputs = mr.ReportInputs(
+        project_id="demo-project",
+        period_start="2026-04-04", period_end="2026-05-01",
+        opportunity=[
+            {"query": "seo nedir", "current_position": 8.5,
+             "impressions_30d": 1200, "clicks_30d": 50},
+        ],
+    )
+    report = mr.assemble_report(
+        inputs=inputs, framing_policy="positive_client",
+        output_formats=("html",), generated_at="2026-05-01T09:00:00Z",
+    )
+    template = (
+        TEMPLATE_PATH.read_text(encoding="utf-8")
+    )
+    rendered = mr.render_report_markdown(report=report, template_text=template)
+    assert "pozisyon ?→8.5" in rendered, (
+        "unknown position_before must render as '?', not 'None': "
+        f"{[ln for ln in rendered.splitlines() if 'seo nedir' in ln]}"
+    )
+    assert "None→" not in rendered, "literal 'None' leaked into rendered report"
+
+
+# --- GAP-M-W2: measurement_context section (R-137 core-update overlap) -----
+
+def _may_2026_calendar() -> list[dict]:
+    return [{
+        "id": "wdAXJk6LRRihEjpzEeWE", "name": "May 2026 core update",
+        "begin": "2026-05-21T15:40:00Z", "end": "2026-06-02T12:40:00Z",
+        "service_name": "Ranking", "severity": "low",
+        "source": "google_status_dashboard",
+    }]
+
+
+def test_measurement_context_update_overlap_straddling_may_2026(
+    monthly_report_schema: dict,
+) -> None:
+    """R-137: a report window straddling the 2026-05-21..06-02 May core update
+    is flagged measurement_quality='update_overlap' and names the update — so
+    deltas in this window are not silently attributed to engine work."""
+    inputs = mr.ReportInputs(
+        project_id="demo-project",
+        period_start="2026-05-20", period_end="2026-06-16",
+    )
+    report = mr.assemble_report(
+        inputs=inputs, framing_policy="positive_client",
+        output_formats=("html",), generated_at="2026-06-16T09:00:00Z",
+        calendar_updates=_may_2026_calendar(),
+    )
+    mc = report["sections"]["measurement_context"]
+    assert mc["measurement_quality"] == "update_overlap"
+    assert "May 2026 core update" in [
+        o["name"] for o in mc["core_updates_overlap"]
+    ]
+    assert mc["intervention_outcomes"] == []  # no cohort passed → empty
+    assert mc["notes"], "a one-line attribution verdict must be present"
+    Draft7Validator(monthly_report_schema).validate(report)
+
+
+def test_measurement_context_clean_vs_insufficient_history(
+    monthly_report_schema: dict,
+) -> None:
+    """A non-overlapping window with a populated calendar → 'clean'; an empty
+    calendar (none loaded) → 'insufficient_history' (overlap undeterminable —
+    NEVER fabricated as clean)."""
+    inputs = mr.ReportInputs(
+        project_id="demo-project",
+        period_start="2026-01-01", period_end="2026-01-28",
+    )
+    clean = mr.assemble_report(
+        inputs=inputs, framing_policy="positive_client",
+        output_formats=("html",), generated_at="2026-01-28T09:00:00Z",
+        calendar_updates=_may_2026_calendar(),
+    )
+    assert clean["sections"]["measurement_context"]["measurement_quality"] == "clean"
+
+    insufficient = mr.assemble_report(
+        inputs=inputs, framing_policy="positive_client",
+        output_formats=("html",), generated_at="2026-01-28T09:00:00Z",
+    )
+    assert insufficient["sections"]["measurement_context"][
+        "measurement_quality"
+    ] == "insufficient_history"
+    Draft7Validator(monthly_report_schema).validate(clean)
+    Draft7Validator(monthly_report_schema).validate(insufficient)
+
+
+def test_measurement_context_post_update_settling() -> None:
+    """A window starting within the 7-day settle buffer after an update ends
+    → 'post_update_settling' (R-137 — Google: assess only after rollout)."""
+    inputs = mr.ReportInputs(
+        project_id="demo-project",
+        period_start="2026-06-05", period_end="2026-07-02",
+    )
+    report = mr.assemble_report(
+        inputs=inputs, framing_policy="positive_client",
+        output_formats=("html",), generated_at="2026-07-02T09:00:00Z",
+        calendar_updates=_may_2026_calendar(),
+    )
+    assert report["sections"]["measurement_context"][
+        "measurement_quality"
+    ] == "post_update_settling"
+
+
+def test_measurement_context_is_additive_optional(
+    monthly_report_schema: dict,
+) -> None:
+    """An old-shape report WITHOUT the additive sections still validates —
+    measurement_context is NOT in sections.required (additive precedent)."""
+    inputs = _inputs_with_negative_delta()
+    report = mr.assemble_report(
+        inputs=inputs, framing_policy="positive_client",
+        output_formats=("html",), generated_at="2026-05-01T09:00:00Z",
+    )
+    del report["sections"]["measurement_context"]
+    del report["sections"]["decliners"]
+    Draft7Validator(monthly_report_schema).validate(report)
+    required = monthly_report_schema["properties"]["sections"]["required"]
+    assert "measurement_context" not in required
+    assert "decliners" not in required
+
+
+def test_measurement_context_renders_in_template() -> None:
+    """The rendered markdown carries the Ölçüm Bağlamı section + the overlap
+    verdict line (template var wired; no unsubstituted $token)."""
+    inputs = mr.ReportInputs(
+        project_id="demo-project",
+        period_start="2026-05-20", period_end="2026-06-16",
+    )
+    report = mr.assemble_report(
+        inputs=inputs, framing_policy="positive_client",
+        output_formats=("html",), generated_at="2026-06-16T09:00:00Z",
+        calendar_updates=_may_2026_calendar(),
+        cohort_results=_fixture_cohort_results(),
+    )
+    rendered = mr.render_report_markdown(
+        report=report, template_text=TEMPLATE_PATH.read_text(encoding="utf-8"),
+    )
+    assert "Ölçüm Bağlamı" in rendered
+    assert "May 2026 core update" in rendered
+    assert "$measurement_context_md" not in rendered  # var substituted
+
+
+def test_monthly_skill_documents_measurement_context() -> None:
+    """GAP-M-W2 contract lock: the monthly-report SKILL documents the
+    measurement_context section (R-137/R-138) + the intervention_outcome wiring
+    (--cohort-results), and stays READ-ONLY (no runnable python block — the
+    wiring is shown as bash)."""
+    body = SKILL_PATH.read_text(encoding="utf-8")
+    assert "measurement_context" in body
+    assert "R-137" in body and "R-138" in body
+    assert "--cohort-results" in body
+    assert "intervention_outcome.py" in body
+    assert "update_calendar.py" in body
+    assert "```python" not in body, (
+        "monthly-report SKILL must stay READ-ONLY — wiring shown as bash, "
+        "not a runnable python block (B2-01 contract)"
+    )

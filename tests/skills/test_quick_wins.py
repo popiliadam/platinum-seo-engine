@@ -537,3 +537,95 @@ def test_quickwin_template_uplift_labels() -> None:
     assert "Beklenen tıklama kazanımı" in t
     # the old standalone "Opportunity score:" headline label is renamed
     assert "Opportunity score:" not in t
+
+
+# ---------------------------------------------------------------------------
+# GAP-M-W2 — control_cohort (R-138 intervention cohort tagging)
+# ---------------------------------------------------------------------------
+
+def _cohort_raw() -> dict:
+    """6 distinct rows: 3 high-impression treated (pos 12, imp 1000) outrank 3
+    candidates by uplift; two candidates are same-band (matchable), one is far
+    out of position tolerance (must NOT be matched)."""
+    return {
+        "quickWins": [
+            # treated — uplift 20 each (pos 12 → target 7 → ctr .030; 30-10)
+            {"query": "t-alpha", "page": "https://example.com/t1",
+             "currentPosition": 12.0, "impressions": 1000, "currentClicks": 10},
+            {"query": "t-bravo", "page": "https://example.com/t2",
+             "currentPosition": 12.0, "impressions": 1000, "currentClicks": 10},
+            {"query": "t-charlie", "page": "https://example.com/t3",
+             "currentPosition": 12.0, "impressions": 1000, "currentClicks": 10},
+            # in-tolerance controls (pos diff ≤ 2, imp ratio 0.7/0.8 ∈ [0.5,2])
+            {"query": "c-near1", "page": "https://example.com/c1",
+             "currentPosition": 12.0, "impressions": 700, "currentClicks": 7},
+            {"query": "c-near2", "page": "https://example.com/c2",
+             "currentPosition": 13.0, "impressions": 800, "currentClicks": 8},
+            # OUT of position tolerance (|13.. vs 19| = 7 > 2) — never matched
+            {"query": "c-far", "page": "https://example.com/c3",
+             "currentPosition": 19.0, "impressions": 700, "currentClicks": 7},
+        ],
+    }
+
+
+def test_control_cohort_matched_within_tolerance() -> None:
+    """transform() emits a third `control_cohort` array (R-138): matched
+    same-band controls from the scored-but-not-selected tail; an out-of-
+    tolerance candidate is excluded; meta.controls_matched is reported."""
+    out = quickwins_transform.transform(_cohort_raw(), top_n=3, dedup_by_url=True)
+    assert "control_cohort" in out, "transform must emit a control_cohort array"
+
+    treated_q = {r["query"] for r in out["quick_wins"]}
+    assert treated_q == {"t-alpha", "t-bravo", "t-charlie"}
+
+    controls = out["control_cohort"]
+    control_q = {r["query"] for r in controls}
+    assert control_q == {"c-near1", "c-near2"}, (
+        "in-tolerance controls only; c-far must be excluded"
+    )
+    assert "c-far" not in control_q
+    assert out["meta"]["controls_matched"] == 2
+
+    # Cohort row shape (matches the Step 7b cohort-file shape consumed by
+    # intervention_outcome.py): query, url, position, impressions_30d, clicks_30d.
+    for c in controls:
+        assert set(c.keys()) == {
+            "query", "url", "position", "impressions_30d", "clicks_30d"
+        }
+
+    # Disjoint from treated (no query/url overlap) — R-138 control discipline.
+    treated_url = {r["url"] for r in out["quick_wins"]}
+    assert control_q.isdisjoint(treated_q)
+    assert {c["url"] for c in controls}.isdisjoint(treated_url)
+
+    # Each matched control is within position tolerance ±2 of SOME treated row
+    # and within the 0.5×–2× impressions band.
+    treated_rows = out["quick_wins"]
+    for c in controls:
+        near = [
+            t for t in treated_rows
+            if abs(t["current_position"] - c["position"]) <= 2.0
+            and 0.5 <= (c["impressions_30d"] / t["impressions_30d"]) <= 2.0
+        ]
+        assert near, f"control {c['query']} matched no treated row in-band"
+
+
+def test_control_cohort_deterministic() -> None:
+    """Same input → byte-identical control_cohort (greedy match is
+    deterministic; candidate rank order breaks distance ties)."""
+    a = quickwins_transform.transform(_cohort_raw(), top_n=3)
+    b = quickwins_transform.transform(_cohort_raw(), top_n=3)
+    assert json.dumps(a["control_cohort"], sort_keys=True) == \
+        json.dumps(b["control_cohort"], sort_keys=True)
+
+
+def test_qw_skill_documents_cohort_step_r138() -> None:
+    """GAP-M-W2 contract lock: the quick-wins SKILL documents Step 7b
+    (R-138 treated+control cohort snapshot), the cohort step name in
+    create_run, the cohort output path, and cites R-138."""
+    body = _qw_text()
+    assert "cohort_snapshot" in body, "Step 7b step name must be in create_run"
+    assert "Step 7b" in body
+    assert "quickwin-cohorts" in body and "-cohort.json" in body
+    assert "control_cohort" in body
+    assert "R-138" in body
