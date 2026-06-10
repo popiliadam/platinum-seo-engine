@@ -151,7 +151,7 @@ required-but-not-plugin-installed tool without tripping the
 ## Foundational Principles Enforcement (3-Layer)
 
 The 3 üst-prensip (Phase 10 `rules/content-quality.md#foundational-principles`)
-gate this skill end-to-end. No alt-rule (R-01..R-122) overrides them.
+gate this skill end-to-end. No alt-rule (R-01..R-148) overrides them.
 
 ### Principle 1 — Truth-Verifiable Content (R-27, Süleyman 5x vurgu)
 
@@ -537,7 +537,7 @@ schema authority + intent preservation = doğru fit.
 ## References
 
 - `rules/content-quality.md` (Foundational Principles 1+2+3,
-  R-01..R-122).
+  R-01..R-148).
 - `rules/content-html-discipline.md` (R-71 8K ultra realistic,
   R-72 nano-banana default, R-73 manual upload, R-74 multi-skill
   collaborative output, R-75 LCP optimization, R-76 format fallback,

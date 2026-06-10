@@ -2,10 +2,12 @@
 tests/skills/test_sf_import.py — sf-import ingestion skill end-to-end tests.
 
 Six cases mirroring the 6-criterion acceptance gate from the W-R worker
-brief (Phase 5 Wave 2). The pilot SF batch lives at
-projects/demo-dental/sf-exports/2026-04-27/raw/ in workspace-staging
-(26 CSV files, Tier 1 14/14 + Tier 2 9/10 — search_console_all is the
-canonical AMBER exemption).
+brief (Phase 5 Wave 2). The pilot SF batch was captured at
+projects/demo-dental/sf-exports/2026-04-27/raw/ (26 CSV files, Tier 1 14/14 +
+Tier 2 9/10 — search_console_all is the canonical AMBER exemption). That
+dated capture lived in the now-deleted workspace-staging tree (ADR-031) and
+is absent from the current workspace, so the two live-pilot tests below skip
+cleanly; the hermetic Tier/projection coverage in this file is unaffected.
 
 Cross-module IMPORT-only discipline (sf_import.py is a plain CLI — no
 workflow_runner run shell):
@@ -37,14 +39,13 @@ import json
 import re
 from pathlib import Path
 
-import os
-
 import pytest
 import yaml
 from jsonschema import Draft7Validator
 
 from scripts.excel import transaction
 from scripts.state import events_writer
+from tests._live_fixtures import live_project_dir, requires_live
 
 
 # ---------------------------------------------------------------------------
@@ -55,19 +56,15 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SCHEMAS = REPO_ROOT / "schemas"
 SKILL_MD = REPO_ROOT / "skills" / "ingestion" / "sf-import" / "SKILL.md"
 
-WORKSPACE_STAGING = Path(
-    os.environ.get(
-        "PSEO_WORKSPACE_STAGING",
-        str(Path.home() / "Documents" / "platinum-seo-workspace-staging"),
-    )
-)
+# Live pilot fixtures under $PSEO_WORKSPACE_ROOT. The demo-dental 2026-04-27
+# pilot SF crawl lived in the now-deleted workspace-staging tree (ADR-031) and
+# is absent from the current workspace, so the two live-pilot tests skip
+# cleanly (honest reason via requires_live).
 PILOT_SLUG = "demo-dental"
 PILOT_SF_DATE = "2026-04-27"
-PILOT_RAW_DIR = (
-    WORKSPACE_STAGING / "projects" / PILOT_SLUG
-    / "sf-exports" / PILOT_SF_DATE / "raw"
-)
-PILOT_MASTER_XLSX = WORKSPACE_STAGING / "projects" / PILOT_SLUG / "master.xlsx"
+PILOT_PROJECT = live_project_dir(PILOT_SLUG)
+PILOT_RAW_DIR = PILOT_PROJECT / "sf-exports" / PILOT_SF_DATE / "raw"
+PILOT_MASTER_XLSX = PILOT_PROJECT / "master.xlsx"
 
 
 # ---------------------------------------------------------------------------
@@ -187,11 +184,7 @@ def match_tiers(
 # Test 1 — Tier 1 14/14 PASS path (live pilot SF batch)
 # ---------------------------------------------------------------------------
 
-@pytest.mark.skipif(
-    not WORKSPACE_STAGING.exists(),
-    reason="local-only fixture: WORKSPACE_STAGING path missing on CI runner "
-           "(Q-CI-W3-04 Phase 15 audit Wave 1 kategori #5 codify aday)"
-)
+@requires_live(PILOT_RAW_DIR, "demo-dental pilot SF crawl (sf-exports/2026-04-27/raw)")
 def test_tier1_14_validates(tier_canonical_names: tuple[set[str], set[str]]) -> None:
     """All 14 §7.1 REQUIRED reports must resolve from the pilot raw dir.
 
@@ -216,11 +209,7 @@ def test_tier1_14_validates(tier_canonical_names: tuple[set[str], set[str]]) -> 
 # Test 2 — Tier 2 search_console_all is AMBER (warn, NOT fail)
 # ---------------------------------------------------------------------------
 
-@pytest.mark.skipif(
-    not WORKSPACE_STAGING.exists(),
-    reason="local-only fixture: WORKSPACE_STAGING path missing on CI runner "
-           "(Q-CI-W3-04 Phase 15 audit Wave 1 kategori #5 codify aday)"
-)
+@requires_live(PILOT_RAW_DIR, "demo-dental pilot SF crawl (sf-exports/2026-04-27/raw)")
 def test_tier2_search_console_all_amber(
     tier_canonical_names: tuple[set[str], set[str]],
 ) -> None:

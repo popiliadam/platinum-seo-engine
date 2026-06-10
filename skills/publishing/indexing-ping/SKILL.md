@@ -130,7 +130,7 @@ worker never invokes `transaction.append`, `transaction.update`, or
 ## Foundational Principles Enforcement (3-Layer)
 
 The 3 üst-prensip (Phase 10 `rules/content-quality.md#foundational-
-principles`) gate this skill end-to-end. No alt-rule (R-01..R-122)
+principles`) gate this skill end-to-end. No alt-rule (R-01..R-148)
 overrides them.
 
 ### Principle 1 — Truth-Verifiable URL Submission (R-58, R-91)
@@ -441,7 +441,7 @@ fixes per Phase 11 lesson 28 matrix).
 
 ## References
 
-- `rules/content-quality.md` (Foundational Principles, R-01..R-122).
+- `rules/content-quality.md` (Foundational Principles, R-01..R-148).
 - `schemas/skill-frontmatter.schema.json` (8 required fields, category
   enum 8 values, status enum 3 values).
 - `schemas/events.schema.json` (event_kind enum 4 values, event_type

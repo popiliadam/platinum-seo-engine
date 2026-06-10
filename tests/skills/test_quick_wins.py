@@ -27,7 +27,6 @@ Schemas referenced:
 from __future__ import annotations
 
 import json
-import os
 import re
 from pathlib import Path
 
@@ -37,6 +36,7 @@ from jsonschema import Draft7Validator
 from scripts.discovery import quickwins_transform
 from scripts.excel import transaction
 from scripts.state import events_writer, workflow_runner
+from tests._live_fixtures import live_project_dir, requires_live
 
 
 # ---------------------------------------------------------------------------
@@ -45,16 +45,15 @@ from scripts.state import events_writer, workflow_runner
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-WORKSPACE_STAGING = Path(
-    os.environ.get(
-        "PSEO_WORKSPACE_STAGING",
-        str(Path.home() / "Documents" / "platinum-seo-workspace-staging"),
-    )
-)
+# Live pilot fixture under $PSEO_WORKSPACE_ROOT. The demo-dental 2026-04-30
+# detect_quick_wins capture lived in the now-deleted workspace-staging tree
+# (ADR-031) and is absent from the current workspace, so the two live-capture
+# tests skip cleanly (honest reason via requires_live). The hermetic transform
+# coverage (tests 2-8) is unaffected.
 PILOT_SLUG = "demo-dental"
 PILOT_DATE = "2026-04-30"
 LIVE_RAW_PATH = (
-    WORKSPACE_STAGING / "projects" / PILOT_SLUG / "inbox" / "gsc"
+    live_project_dir(PILOT_SLUG) / "inbox" / "gsc"
     / f"{PILOT_DATE}-detect_quick_wins-{PILOT_SLUG}.json"
 )
 
@@ -122,11 +121,7 @@ def synthetic_raw() -> dict:
 # Test 1 — live MCP smoke (validates the captured raw payload)
 # ---------------------------------------------------------------------------
 
-@pytest.mark.skipif(
-    not WORKSPACE_STAGING.exists(),
-    reason="local-only fixture: WORKSPACE_STAGING path missing on CI runner "
-           "(Q-CI-W3-04 Phase 15 audit Wave 1 kategori #5 codify aday)"
-)
+@requires_live(LIVE_RAW_PATH, "demo-dental live quick-wins capture (inbox/gsc/2026-04-30)")
 def test_happy_path_gsc_live() -> None:
     """
     The W-P worker performed an at-rest live `mcp__gsc__detect_quick_wins`
@@ -172,11 +167,7 @@ def test_happy_path_gsc_live() -> None:
 # Test 2 — §16.5 step-3 raw JSON inbox path discipline
 # ---------------------------------------------------------------------------
 
-@pytest.mark.skipif(
-    not WORKSPACE_STAGING.exists(),
-    reason="local-only fixture: WORKSPACE_STAGING path missing on CI runner "
-           "(Q-CI-W3-04 Phase 15 audit Wave 1 kategori #5 codify aday)"
-)
+@requires_live(LIVE_RAW_PATH, "demo-dental live quick-wins capture (inbox/gsc/2026-04-30)")
 def test_inbox_raw_json_saved() -> None:
     """The raw payload must live at the canonical inbox path: every
     Phase 6+ MCP-ingestion skill copies this naming scheme verbatim."""

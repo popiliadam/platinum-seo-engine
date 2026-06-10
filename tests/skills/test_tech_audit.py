@@ -51,6 +51,7 @@ import yaml
 from jsonschema import Draft7Validator
 
 from scripts.discovery import tech_audit_transform
+from tests._live_fixtures import live_project_dir
 
 
 # ---------------------------------------------------------------------------
@@ -1196,10 +1197,12 @@ _TECH_SEO_ENUM = frozenset({
 
 #: Real SF "Issues Overview" export captured from a live demo-aluminum-ca
 #: crawl (2026-06-02). 42 issues spanning every routing branch — the canonical
-#: regression fixture for the out-of-enum bug.
-_REAL_ISSUES_CSV = Path(
-    "/Users/apple/Documents/platinum-seo-workspace/projects/"
-    "demo-aluminum-ca/sf-exports/2026-06-02/raw/issues_overview_report.csv"
+#: regression fixture for the out-of-enum bug. Lives under
+#: $PSEO_WORKSPACE_ROOT (gitignored; absent on CI / fresh clones, where the
+#: live-CSV tests skip cleanly).
+_REAL_ISSUES_CSV = (
+    live_project_dir("demo-aluminum-ca")
+    / "sf-exports" / "2026-06-02" / "raw" / "issues_overview_report.csv"
 )
 
 

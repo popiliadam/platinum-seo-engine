@@ -11,10 +11,9 @@ by invoking the existing cross-module APIs the skill body documents:
   - scripts/state/events_writer.py      (provenance event append)
 
 Discipline:
-  - tmp_path fixtures only; the live workspace
-    (`~/Documents/platinum-seo-workspace-staging` or `$PSEO_WORKSPACE_STAGING`)
-    is read AT-REST in test 5 (live execution evidence) but never mutated
-    by pytest.
+  - tmp_path fixtures only; the live workspace (`$PSEO_WORKSPACE_ROOT`) is
+    read AT-REST in test 5 (live demo-dental config evidence) but never mutated
+    by pytest — skips cleanly when the workspace/project is absent.
   - Schema-first: every artifact validated with Draft7Validator.
   - F1 invariant: master.xlsx is COPIED from templates/master-excel.xlsx;
     re-run preserves SHA-256.
@@ -44,6 +43,7 @@ from jsonschema import Draft7Validator
 
 from scripts.state import events_writer, workflow_runner
 from scripts.state.portfolio_writer import register_project
+from tests._live_fixtures import live_project_dir
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCHEMAS = REPO_ROOT / "schemas"
@@ -51,14 +51,8 @@ TEMPLATES = REPO_ROOT / "templates"
 SKILL_MD = REPO_ROOT / "skills" / "meta" / "init-project" / "SKILL.md"
 TEMPLATE_XLSX = TEMPLATES / "master-excel.xlsx"
 
-# Live workspace path (read-only in this suite; the brief mandates a
-# rerun against demo-dental to prove idempotency — that lives in test 5).
-WORKSPACE_STAGING = Path(
-    os.environ.get(
-        "PSEO_WORKSPACE_STAGING",
-        str(Path.home() / "Documents" / "platinum-seo-workspace-staging"),
-    )
-)
+# Live workspace (read-only here; test 5 reads the demo-dental config AT-REST
+# under $PSEO_WORKSPACE_ROOT to prove the bootstrap output matches reality).
 PILOT_SLUG = "demo-dental"
 
 # Deterministic timestamp for portfolio registration in tests. register_project
@@ -520,8 +514,8 @@ def test_gsc_list_sites_optional_verify() -> None:
           property disappears, this test fires the DURUR signal).
 
     The check at (b) is gated on the live workspace existing — it
-    skips cleanly in CI / fresh checkouts where the operator has not
-    pulled workspace-staging."""
+    skips cleanly in CI / fresh checkouts where PSEO_WORKSPACE_ROOT is
+    unset or the demo-dental project is absent."""
     text = SKILL_MD.read_text(encoding="utf-8")
     m = re.match(r"^---\n(.*?)\n---\n", text, re.S)
     fm = yaml.safe_load(m.group(1))
@@ -532,10 +526,13 @@ def test_gsc_list_sites_optional_verify() -> None:
     )
 
     # Live evidence: the demo-dental project.config.json carries
-    # gsc.site_url. If workspace-staging is absent (CI), skip cleanly.
-    pilot_cfg = WORKSPACE_STAGING / "projects" / PILOT_SLUG / "project.config.json"
+    # gsc.site_url. If the live workspace/project is absent, skip cleanly.
+    pilot_cfg = live_project_dir(PILOT_SLUG) / "project.config.json"
     if not pilot_cfg.exists():
-        pytest.skip("workspace-staging not present; live GSC evidence skipped")
+        pytest.skip(
+            f"demo-dental live config absent: {pilot_cfg} "
+            "(set PSEO_WORKSPACE_ROOT to a workspace containing it)"
+        )
     cfg = json.loads(pilot_cfg.read_text("utf-8"))
     assert cfg["gsc"]["site_url"], "demo-dental gsc.site_url missing"
     # The site_url must be a fully-qualified https URI per project-config schema.

@@ -160,7 +160,7 @@ elapsed; rerun ≥24h after called_at".
 ## Foundational Principles Enforcement (3-Layer)
 
 The 3 üst-prensip (Phase 10 `rules/content-quality.md#foundational-
-principles`) gate this skill end-to-end. No alt-rule (R-01..R-122)
+principles`) gate this skill end-to-end. No alt-rule (R-01..R-148)
 overrides them. Audit event_kind already ENFORCES Principle 1
 provenance because every recorded line has actor + audit_target +
 audit_action triple — schema-level proof that the verification
@@ -479,7 +479,7 @@ application strengthens lesson 31 paterni production-ready signal.
 
 ## References
 
-- `rules/content-quality.md` (Foundational Principles, R-01..R-122).
+- `rules/content-quality.md` (Foundational Principles, R-01..R-148).
 - `schemas/skill-frontmatter.schema.json` (8 required fields, category
   enum 8 values, status enum 3 values).
 - `schemas/events.schema.json` (event_kind enum 4 values, audit

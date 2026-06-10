@@ -10,8 +10,14 @@ from __future__ import annotations
 
 import io
 
-import piexif
-from PIL import Image
+import pytest
+
+# Optional imaging deps: importorskip so a minimal environment without the
+# image stack skips this smoke instead of erroring at COLLECTION time. (Core
+# deps like jsonschema are hard-imported elsewhere; only the imaging stack is
+# optional here — it is consumed solely by the IPTC/generate-images feature.)
+piexif = pytest.importorskip("piexif")
+Image = pytest.importorskip("PIL.Image")
 
 
 def test_piexif_round_trip_jpeg() -> None:

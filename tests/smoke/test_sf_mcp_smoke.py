@@ -17,12 +17,20 @@ Refs:
 
 from __future__ import annotations
 
+import os
+
 import pytest
 
 from scripts.util.sf_mcp_client import SfMcpClient
 
 
 SF_MCP_BASE_URL = "http://127.0.0.1:11435/mcp"
+
+# Opt-in gate: the live smoke probes a local SF MCP server (port 11435) over
+# HTTP. Set PSEO_SF_SMOKE=1 to enable. Default-off keeps collection network-
+# free — the probe used to run at COLLECTION time on every `pytest` invocation
+# (the skipif condition is evaluated when the decorator is applied).
+_SMOKE_ENABLED = os.environ.get("PSEO_SF_SMOKE") == "1"
 
 
 def _is_sf_mcp_running() -> bool:
@@ -42,8 +50,10 @@ def _is_sf_mcp_running() -> bool:
 
 
 @pytest.mark.skipif(
-    not _is_sf_mcp_running(),
-    reason="SF MCP not connected (port 11435 unreachable or httpx missing)",
+    not (_SMOKE_ENABLED and _is_sf_mcp_running()),
+    reason="SF MCP smoke is opt-in: set PSEO_SF_SMOKE=1 with the local SF MCP "
+           "server live on port 11435 (skipped by default — no network probe "
+           "at collection time; short-circuits before _is_sf_mcp_running())",
 )
 def test_sf_mcp_live_list_allowed_base_directory() -> None:
     """Round-trip a real JSON-RPC call to SF 24 MCP.
