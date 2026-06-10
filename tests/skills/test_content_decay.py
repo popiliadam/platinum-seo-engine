@@ -423,3 +423,117 @@ def test_smoke_e2e_cli_idempotent(tmp_path: Path,
     assert first_bytes == second_bytes, (
         "transform is not byte-idempotent under re-run"
     )
+
+
+# ---------------------------------------------------------------------------
+# Test 11 (I1) — R-85 multi-signal: clicks-only drop WITHOUT corroboration is
+# STABLE (the explicit old→new verdict difference).
+# ---------------------------------------------------------------------------
+
+def test_r85_clicks_drop_without_corroboration_is_stable() -> None:
+    """OLD logic (clicks-only, -20% threshold) → DECAY.
+    NEW R-85 (clicks < -30% AND position worse) OR (impr < -40% AND rank
+    worse): a -25% clicks drop is NOT < -30%, impressions are flat, and the
+    position IMPROVED — no corroboration → STABLE. This is the headline
+    old-vs-new verdict difference R-85 was designed to produce (single-signal
+    click volatility ≠ decay)."""
+    recent = {"rows": [{"keys": ["https://x.tld/page"], "clicks": 75,
+                        "impressions": 1000, "position": 6.0}]}
+    previous = {"rows": [{"keys": ["https://x.tld/page"], "clicks": 100,
+                          "impressions": 1000, "position": 8.0}]}
+    out = cdt.transform(recent, previous)
+    row = next(r for r in out["content_decay"] if r["url"].endswith("/page"))
+    assert row["delta_pct"] == -25.0          # clicks DID drop 25% (old=DECAY)
+    assert row["trend"] == "STABLE"           # new=STABLE: no R-85 corroboration
+    assert row["action"] == "monitor"
+
+
+def test_r85_impressions_collapse_with_rank_drop_is_decay() -> None:
+    """R-85 branch 2: clicks only -10% (NOT a clicks-branch decay) but
+    impressions -45% AND ranking trend negative (position worse) → DECAY."""
+    recent = {"rows": [{"keys": ["https://x.tld/imp"], "clicks": 90,
+                        "impressions": 550, "position": 14.0}]}
+    previous = {"rows": [{"keys": ["https://x.tld/imp"], "clicks": 100,
+                          "impressions": 1000, "position": 9.0}]}
+    out = cdt.transform(recent, previous)
+    row = next(r for r in out["content_decay"] if r["url"].endswith("/imp"))
+    assert row["trend"] == "DECAY"
+    assert out["meta"]["decay_branch_counts"]["impressions+rank"] >= 1
+
+
+def test_r85_clicks_and_position_drop_is_decay() -> None:
+    """R-85 branch 1: clicks < -30% AND position worsened > +5 → DECAY."""
+    recent = {"rows": [{"keys": ["https://x.tld/cp"], "clicks": 60,
+                        "impressions": 1000, "position": 16.0}]}
+    previous = {"rows": [{"keys": ["https://x.tld/cp"], "clicks": 100,
+                          "impressions": 1000, "position": 9.0}]}
+    out = cdt.transform(recent, previous)
+    row = next(r for r in out["content_decay"] if r["url"].endswith("/cp"))
+    assert row["trend"] == "DECAY"
+    assert out["meta"]["decay_branch_counts"]["clicks+position"] >= 1
+
+
+def test_r85_profile_aware_ymyl_flags_what_default_does_not() -> None:
+    """Profile-aware thresholds (via cascade_default): same signals —
+    clicks -22%, position +4, impressions flat.
+      - default/other profile (-30%/+5): STABLE (neither threshold crossed).
+      - YMYL profile (-20%/+3, stricter): DECAY (both crossed).
+    Demonstrates the profile changes the verdict on identical data."""
+    recent = {"rows": [{"keys": ["https://x.tld/ymyl"], "clicks": 78,
+                        "impressions": 1000, "position": 11.0}]}
+    previous = {"rows": [{"keys": ["https://x.tld/ymyl"], "clicks": 100,
+                          "impressions": 1000, "position": 7.0}]}
+    r_default = next(
+        r for r in cdt.transform(recent, previous)["content_decay"]
+        if r["url"].endswith("/ymyl")
+    )
+    r_ymyl = next(
+        r for r in cdt.transform(
+            recent, previous, profile_config={"profile": "ymyl-high"},
+        )["content_decay"]
+        if r["url"].endswith("/ymyl")
+    )
+    assert r_default["trend"] == "STABLE"
+    assert r_ymyl["trend"] == "DECAY"
+
+
+def test_meta_records_comparison_mode_and_thresholds(
+    synthetic_recent: dict, synthetic_previous: dict,
+) -> None:
+    """meta records which R-85 branch fired + the resolved thresholds +
+    the comparison mode (default = prior_window)."""
+    out = cdt.transform(synthetic_recent, synthetic_previous)
+    meta = out["meta"]
+    assert meta["comparison_mode"] == "prior_window"
+    assert meta["clicks_threshold"] == -30.0
+    assert meta["position_threshold"] == 5.0
+    assert meta["impressions_threshold"] == -40.0
+    assert "decay_branch_counts" in meta
+    assert set(meta["decay_branch_counts"]) == {"clicks+position", "impressions+rank"}
+
+
+def test_yoy_mode_with_baseline_computes_decay() -> None:
+    """--yoy comparison_mode: when the year-ago window carries data, decay is
+    computed against it and meta records the mode."""
+    recent = {"rows": [{"keys": ["https://x.tld/y"], "clicks": 50,
+                        "impressions": 600, "position": 15.0}]}
+    year_ago = {"rows": [{"keys": ["https://x.tld/y"], "clicks": 100,
+                          "impressions": 1200, "position": 8.0}]}
+    out = cdt.transform(recent, year_ago, comparison_mode="yoy")
+    assert out["meta"]["comparison_mode"] == "yoy"
+    assert out["meta"]["yoy_unavailable"] is False
+    row = next(r for r in out["content_decay"] if r["url"].endswith("/y"))
+    assert row["trend"] == "DECAY"   # clicks -50%, impr -50%, position +7
+
+
+def test_yoy_mode_without_baseline_reports_unavailable_not_fake() -> None:
+    """--yoy with NO year-ago data must NOT fabricate verdicts: emit a
+    yoy_unavailable note + zero rows (recent-only data has no valid YoY
+    baseline). 'never fake it.'"""
+    recent = {"rows": [{"keys": ["https://x.tld/a"], "clicks": 50,
+                        "impressions": 100, "position": 5.0}]}
+    out = cdt.transform(recent, {"rows": []}, comparison_mode="yoy")
+    assert out["meta"]["comparison_mode"] == "yoy"
+    assert out["meta"]["yoy_unavailable"] is True
+    assert out["content_decay"] == []
+    assert "yoy" in out["meta"]["yoy_note"].lower()

@@ -91,11 +91,14 @@ def _lighthouse_item(
     lcp_s: float | None = None,
     cls: float | None = None,
     fcp_s: float | None = None,
+    tbt_ms: float | None = None,
 ) -> dict:
     """Build a single DFS lighthouse item with optional canonical signals.
 
     Score is stored as 0-1 float upstream; we drop perf/100 here so the
-    extractor's score normalisation is exercised.
+    extractor's score normalisation is exercised. ``tbt_ms`` is the
+    Total-Blocking-Time numericValue (already in ms — the lab proxy for
+    field INP per the I3 responsiveness rule).
     """
     audits: dict = {}
     if lcp_s is not None:
@@ -104,6 +107,8 @@ def _lighthouse_item(
         audits["first-contentful-paint"] = {"numericValue": fcp_s * 1000.0}
     if cls is not None:
         audits["cumulative-layout-shift"] = {"numericValue": cls}
+    if tbt_ms is not None:
+        audits["total-blocking-time"] = {"numericValue": tbt_ms}
 
     categories: dict = {}
     if perf is not None:
@@ -358,7 +363,9 @@ def test_missing_h1_emits_headings_medium() -> None:
     assert "H1 missing" in head_rows[0]["detail"]
 
 
-def test_multiple_h1_emits_headings_medium() -> None:
+def test_multiple_h1_emits_low_house_style() -> None:
+    """I6: multiple-H1 is a house-style/structure-hygiene issue, NOT a Google
+    ranking defect — downgraded MEDIUM → LOW. (H1-missing stays MEDIUM.)"""
     cp = {"items": [_content_item(
         "https://example.com/two-h1", h1_count=2,
     )]}
@@ -367,7 +374,63 @@ def test_multiple_h1_emits_headings_medium() -> None:
     )
     head_rows = [r for r in out["tech_seo"] if r["issue_category"] == "Meta Tags"]
     assert head_rows
-    assert head_rows[0]["impact"] == tech_audit_transform.SEVERITY_MEDIUM
+    assert head_rows[0]["impact"] == tech_audit_transform.SEVERITY_LOW
+    assert head_rows[0]["priority"] == "P2"
+    assert "house-style" in head_rows[0]["resolution"].lower()
+
+
+# ---------------------------------------------------------------------------
+# Test 7c (I3) — TBT responsiveness rule (lab proxy for INP; CrUX not collected)
+# ---------------------------------------------------------------------------
+
+def test_tbt_over_600_emits_high_responsiveness() -> None:
+    """I3: TBT > 600ms → HIGH 'poor responsiveness' Performance finding. The
+    detail must name TBT as a LAB PROXY for INP and must NOT claim field INP."""
+    lh = {"items": [_lighthouse_item(
+        "https://example.com/janky", tbt_ms=800.0,
+    )]}
+    out = tech_audit_transform.transform(
+        lighthouse_raw=lh, content_parsing_raw=None,
+    )
+    perf_rows = [r for r in out["tech_seo"] if r["issue_category"] == "Performance"]
+    assert perf_rows, "TBT > 600 must fire a Performance finding"
+    row = perf_rows[0]
+    assert row["impact"] == tech_audit_transform.SEVERITY_HIGH
+    assert row["priority"] == "P0"
+    detail = row["detail"].lower()
+    assert "responsiveness" in detail
+    assert "tbt" in detail
+    assert "inp" in detail  # honesty: states INP is the field metric this proxies
+
+
+def test_tbt_200_to_600_emits_medium_responsiveness() -> None:
+    """I3: 200 < TBT ≤ 600ms → MEDIUM responsiveness finding."""
+    lh = {"items": [_lighthouse_item(
+        "https://example.com/slowish", tbt_ms=400.0,
+    )]}
+    out = tech_audit_transform.transform(
+        lighthouse_raw=lh, content_parsing_raw=None,
+    )
+    perf_rows = [r for r in out["tech_seo"] if r["issue_category"] == "Performance"]
+    assert perf_rows, "200 < TBT ≤ 600 must fire a Performance finding"
+    assert perf_rows[0]["impact"] == tech_audit_transform.SEVERITY_MEDIUM
+    assert "tbt" in perf_rows[0]["detail"].lower()
+
+
+def test_tbt_at_or_below_200_no_finding() -> None:
+    """I3: TBT ≤ 200ms (good responsiveness) → no TBT finding."""
+    lh = {"items": [_lighthouse_item(
+        "https://example.com/snappy", tbt_ms=150.0,
+    )]}
+    out = tech_audit_transform.transform(
+        lighthouse_raw=lh, content_parsing_raw=None,
+    )
+    # No Performance row should mention TBT (nothing else fired either).
+    tbt_rows = [
+        r for r in out["tech_seo"]
+        if r["issue_category"] == "Performance" and "tbt" in r["detail"].lower()
+    ]
+    assert not tbt_rows, "TBT ≤ 200 must NOT fire a responsiveness finding"
 
 
 # ---------------------------------------------------------------------------

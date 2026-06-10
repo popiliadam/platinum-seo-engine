@@ -57,6 +57,9 @@ from scripts.util.url_normalize import (  # noqa: E402  (sys.path mutation)
     URLNormalizeError as _URLNormalizeError,
     normalize_url as _canonical_normalize_url,
 )
+from scripts.util.profile_aware_defaults import (  # noqa: E402
+    cascade_default,
+)
 
 # ---------------------------------------------------------------------------
 # Constants — schema-aligned column names (master-excel.schema.json#content_decay)
@@ -73,9 +76,34 @@ CONTENT_DECAY_COLUMNS = (
     "action",
 )
 
-# Trend thresholds (delta_pct boundaries).
-_DECAY_THRESHOLD = -20.0
+# Trend thresholds.
+# R-85 (rules/content-update-discipline.md) — single source for decay:
+#   DECAY when  (clicks Δ% < clicks_threshold AND position Δ > position_threshold)
+#           OR  (impressions Δ% < impressions_threshold AND ranking trend negative)
+# Profile-aware (clicks/position branch only; the impressions branch is fixed):
+#   YMYL        : -20% clicks, +3 position (stricter)
+#   e-commerce  : -30% clicks, +5 position
+#   other/default: -30% clicks, +5 position
+# These are the inline DEFAULTS; cascade_default lets a project.config tuning
+# key (decay_clicks_threshold / decay_position_threshold) or a CLI override
+# win over the profile-derived value.
+_DEFAULT_CLICKS_THRESHOLD = -30.0
+_DEFAULT_POSITION_THRESHOLD = 5.0
+_YMYL_CLICKS_THRESHOLD = -20.0
+_YMYL_POSITION_THRESHOLD = 3.0
+# Impressions branch is NOT profile-varied per R-85 ("Impressions delta < -40%
+# AND ranking trend negative").
+_IMPRESSIONS_THRESHOLD = -40.0
 _GROWTH_THRESHOLD = 20.0
+
+# Decay-rule branch labels (recorded in meta so the operator sees WHY a row
+# was flagged — R-85 is a two-branch OR).
+_BRANCH_CLICKS_POSITION = "clicks+position"
+_BRANCH_IMPRESSIONS_RANK = "impressions+rank"
+
+# Comparison modes for the two-window delta.
+_MODE_PRIOR_WINDOW = "prior_window"   # recent 90d vs prior 90d (default)
+_MODE_YOY = "yoy"                     # recent window vs same window one year ago
 
 # Per-trend deterministic action prescriptions (sheet-template friendly).
 _TREND_ACTIONS = {
@@ -166,26 +194,82 @@ def _delta_pct(recent: int, previous: int) -> float:
     return round((recent - previous) / float(previous) * 100.0, 2)
 
 
+def _resolve_thresholds(
+    profile_config: Any,
+    *,
+    clicks_override: float | None = None,
+    position_override: float | None = None,
+) -> tuple[float, float]:
+    """Resolve R-85 (clicks_threshold, position_threshold), profile-aware.
+
+    Profile name comes from ``profile_config["profile"]`` (a project.config
+    dict, or None). A name containing ``ymyl`` selects the stricter YMYL
+    pair; ``commerce`` selects the e-commerce pair (same as default today);
+    anything else falls to the default pair. The Y-06 ``cascade_default``
+    SSOT then lets an explicit override (CLI / call-site) OR a project.config
+    tuning key (``decay_clicks_threshold`` / ``decay_position_threshold``)
+    win over the profile-derived value.
+    """
+    cfg = profile_config if isinstance(profile_config, dict) else {}
+    pname = str(cfg.get("profile") or "").strip().lower()
+    if "ymyl" in pname:
+        base_clicks, base_pos = _YMYL_CLICKS_THRESHOLD, _YMYL_POSITION_THRESHOLD
+    elif "commerce" in pname:           # "e-commerce" / "ecommerce"
+        base_clicks, base_pos = _DEFAULT_CLICKS_THRESHOLD, _DEFAULT_POSITION_THRESHOLD
+    else:
+        base_clicks, base_pos = _DEFAULT_CLICKS_THRESHOLD, _DEFAULT_POSITION_THRESHOLD
+    clicks_thr = float(cascade_default(
+        cfg, "decay_clicks_threshold", base_clicks, override=clicks_override,
+    ))
+    position_thr = float(cascade_default(
+        cfg, "decay_position_threshold", base_pos, override=position_override,
+    ))
+    return clicks_thr, position_thr
+
+
 def _trend_label(
     *,
-    delta_pct: float,
+    clicks_delta_pct: float,
     clicks_recent: int,
     clicks_previous: int,
-) -> str:
+    impressions_delta_pct: float | None,
+    position_delta: float | None,
+    clicks_threshold: float,
+    position_threshold: float,
+) -> tuple[str, str | None]:
     """
-    Label a row's trend deterministically. NEW / RETIRED take precedence
-    over delta_pct buckets because they describe presence/absence, not
-    magnitude of change.
+    Label a row's trend per R-85's multi-signal contract. Returns
+    ``(trend, decay_branch)`` where ``decay_branch`` names which R-85 branch
+    fired (``clicks+position`` / ``impressions+rank``) or ``None``.
+
+    Precedence:
+      1. NEW / RETIRED — presence/absence, not magnitude.
+      2. GROWTH — clicks rose ≥ +20% (unchanged taxonomy; not an R-85 signal).
+      3. DECAY — R-85 multi-signal:
+           (clicks Δ% < clicks_threshold AND position worsened > position_threshold)
+        OR (impressions Δ% < impressions_threshold AND ranking trend negative)
+         A clicks-only drop with no position/impression corroboration is
+         STABLE — single-signal volatility is NOT decay (R-85 rationale).
+      4. STABLE — everything else.
     """
     if clicks_previous == 0 and clicks_recent > 0:
-        return "NEW"
+        return "NEW", None
     if clicks_recent == 0 and clicks_previous > 0:
-        return "RETIRED"
-    if delta_pct <= _DECAY_THRESHOLD:
-        return "DECAY"
-    if delta_pct >= _GROWTH_THRESHOLD:
-        return "GROWTH"
-    return "STABLE"
+        return "RETIRED", None
+    if clicks_delta_pct >= _GROWTH_THRESHOLD:
+        return "GROWTH", None
+    # R-85 branch 1 — clicks AND position both deteriorate.
+    if (position_delta is not None
+            and clicks_delta_pct < clicks_threshold
+            and position_delta > position_threshold):
+        return "DECAY", _BRANCH_CLICKS_POSITION
+    # R-85 branch 2 — impressions collapse AND ranking trend negative (the
+    # position got worse; flat/improved rank is NOT a negative trend).
+    if (impressions_delta_pct is not None and position_delta is not None
+            and impressions_delta_pct < _IMPRESSIONS_THRESHOLD
+            and position_delta > 0):
+        return "DECAY", _BRANCH_IMPRESSIONS_RANK
+    return "STABLE", None
 
 
 # ---------------------------------------------------------------------------
@@ -194,8 +278,15 @@ def _trend_label(
 
 @dataclass(frozen=True)
 class _PageMetrics:
-    """Aggregated metrics for one normalized URL across one window."""
+    """Aggregated metrics for one normalized URL across one window.
+
+    ``position`` is the impression-weighted average position, or ``None``
+    when the window carried no position signal for this URL (so R-85's
+    position-dependent branches can stay honest and not invent a rank).
+    """
     clicks: int
+    impressions: int
+    position: float | None
 
 
 def _safe_int(v: Any) -> int | None:
@@ -207,17 +298,30 @@ def _safe_int(v: Any) -> int | None:
         return None
 
 
+def _safe_float(v: Any) -> float | None:
+    if v is None:
+        return None
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
 def _aggregate_window(payload: dict | None) -> dict[str, _PageMetrics]:
     """
     Aggregate an enhanced_search_analytics-shaped MCP payload to per-URL
-    click totals.
+    clicks + impressions + impression-weighted position.
 
     Accepts payloads of the shape:
-      {"rows": [{"keys": [<page>, ...], "clicks": N, ...}, ...]}
+      {"rows": [{"keys": [<page>, ...], "clicks": N, "impressions": M,
+                 "position": P}, ...]}
     or {"data": [...]} (alternate envelope).
 
     URL is taken from the first http(s) entry in `keys` (defensive:
-    dimension order is caller-controlled).
+    dimension order is caller-controlled). Position is weighted by
+    impressions (weight = max(impressions, 1)) so a high-traffic row
+    dominates the blended rank; a URL with no position field in any of its
+    rows yields position=None.
 
     Empty / None payload -> empty dict (caller decides if fatal).
     """
@@ -233,7 +337,10 @@ def _aggregate_window(payload: dict | None) -> dict[str, _PageMetrics]:
             f"payload 'rows' must be a list, got {type(rows).__name__}"
         )
 
-    bucket: dict[str, int] = {}
+    # Per-URL accumulators: clicks, impressions, position-weight numerator,
+    # position-weight denominator, and whether any position was seen.
+    bucket: dict[str, dict[str, float]] = {}
+    has_pos: dict[str, bool] = {}
     for entry in rows:
         if not isinstance(entry, dict):
             continue
@@ -256,9 +363,35 @@ def _aggregate_window(payload: dict | None) -> dict[str, _PageMetrics]:
             continue
 
         clicks = _safe_int(entry.get("clicks")) or 0
-        bucket[url_n] = bucket.get(url_n, 0) + clicks
+        impressions = _safe_int(entry.get("impressions")) or 0
+        position = _safe_float(entry.get("position"))
 
-    return {url_n: _PageMetrics(clicks=int(c)) for url_n, c in bucket.items()}
+        slot = bucket.setdefault(
+            url_n, {"clicks": 0.0, "impressions": 0.0,
+                    "pos_w_sum": 0.0, "weight_sum": 0.0},
+        )
+        slot["clicks"] += clicks
+        slot["impressions"] += impressions
+        if position is not None:
+            weight = float(max(impressions, 1))
+            slot["pos_w_sum"] += position * weight
+            slot["weight_sum"] += weight
+            has_pos[url_n] = True
+        else:
+            has_pos.setdefault(url_n, False)
+
+    out: dict[str, _PageMetrics] = {}
+    for url_n, slot in bucket.items():
+        if has_pos.get(url_n) and slot["weight_sum"] > 0:
+            pos: float | None = round(slot["pos_w_sum"] / slot["weight_sum"], 4)
+        else:
+            pos = None
+        out[url_n] = _PageMetrics(
+            clicks=int(round(slot["clicks"])),
+            impressions=int(round(slot["impressions"])),
+            position=pos,
+        )
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -268,30 +401,50 @@ def _aggregate_window(payload: dict | None) -> dict[str, _PageMetrics]:
 def transform(
     recent: dict | None,
     previous: dict | None,
+    *,
+    profile_config: Any = None,
+    comparison_mode: str = _MODE_PRIOR_WINDOW,
+    clicks_threshold: float | None = None,
+    position_threshold: float | None = None,
 ) -> dict:
     """
     Transform two GSC enhanced_search_analytics raw payloads (recent +
-    previous, equal-length 90-day windows) into a schema-shaped
-    content_decay row list.
+    comparison window) into a schema-shaped content_decay row list, applying
+    R-85's multi-signal decay contract.
 
     Args:
-        recent:   Parsed JSON from the recent-window MCP call. Required;
-                  None is acceptable (treated as empty window) so the
-                  transform unit can still run, but the skill orchestrator
-                  must STOP before calling transform if either fetch
-                  failed (DURUR #1).
-        previous: Parsed JSON from the previous-window MCP call.
+        recent:   Parsed JSON from the recent-window MCP call. None is
+                  acceptable (treated as empty window) for unit testing, but
+                  the skill orchestrator STOPs before calling transform if a
+                  fetch failed (DURUR #1).
+        previous: Parsed JSON from the comparison-window MCP call. In
+                  ``prior_window`` mode this is the immediately-preceding
+                  equal-length window; in ``yoy`` mode it is the same window
+                  one year earlier.
+        profile_config: optional project.config dict. Its ``profile`` field
+                  selects R-85's profile-aware (clicks, position) thresholds
+                  (YMYL stricter at -20%/+3); cascade_default lets a config
+                  tuning key or an explicit override win.
+        comparison_mode: ``prior_window`` (default) or ``yoy``. In ``yoy``
+                  mode, if the year-ago window carries NO data the transform
+                  refuses to fabricate verdicts — it returns zero rows with a
+                  ``yoy_unavailable`` note (never fakes a YoY baseline).
+        clicks_threshold / position_threshold: explicit R-85 overrides
+                  (CLI / call-site) — win over profile + config per Y-06.
 
     Returns:
-        {"content_decay": [<row>, ...], "meta": {...}} where each row
-        contains the 8 master-excel content_decay columns. Sorted by
-        clicks_delta ascending (most decayed first), then url asc for
-        determinism.
+        {"content_decay": [<row>, ...], "meta": {...}} where each row carries
+        the 8 master-excel content_decay columns (delta_pct is the CLICKS
+        delta — position/impressions feed the DECISION only, never new
+        columns). Sorted by clicks_delta ascending (most decayed first), then
+        url asc. meta records the resolved thresholds, comparison_mode, and a
+        per-branch decay count so the operator sees WHICH R-85 branch fired.
 
     DURUR triggers (raises ContentDecayError; do NOT silently fallback):
       - either payload is the wrong type (string, int, list, ...)
       - either payload's `rows` is the wrong type
       - both windows yield zero rows after aggregation (decay-specific)
+      - comparison_mode is not a recognised value
     """
     if recent is not None and not isinstance(recent, dict):
         raise ContentDecayError(
@@ -301,6 +454,17 @@ def transform(
         raise ContentDecayError(
             f"previous must be a dict or None, got {type(previous).__name__}"
         )
+    if comparison_mode not in (_MODE_PRIOR_WINDOW, _MODE_YOY):
+        raise ContentDecayError(
+            f"comparison_mode must be one of "
+            f"{(_MODE_PRIOR_WINDOW, _MODE_YOY)!r}, got {comparison_mode!r}"
+        )
+
+    clicks_thr, position_thr = _resolve_thresholds(
+        profile_config,
+        clicks_override=clicks_threshold,
+        position_override=position_threshold,
+    )
 
     recent_metrics = _aggregate_window(recent)
     previous_metrics = _aggregate_window(previous)
@@ -312,7 +476,39 @@ def transform(
             "aggregate to zero rows"
         )
 
+    base_meta = {
+        "comparison_mode": comparison_mode,
+        "clicks_threshold": clicks_thr,
+        "position_threshold": position_thr,
+        "impressions_threshold": _IMPRESSIONS_THRESHOLD,
+        "recent_url_count": len(recent_metrics),
+        "previous_url_count": len(previous_metrics),
+    }
+
+    # YoY honesty gate: a year-ago comparison needs the year-ago window. If
+    # it carries no data we refuse to fabricate decay/NEW verdicts off a
+    # missing baseline — report yoy_unavailable + zero rows (never fake it).
+    if comparison_mode == _MODE_YOY and not previous_metrics:
+        return {
+            "content_decay": [],
+            "meta": {
+                **base_meta,
+                "merged_url_count": 0,
+                "trend_counts": _count_trends([]),
+                "decay_branch_counts": {
+                    _BRANCH_CLICKS_POSITION: 0, _BRANCH_IMPRESSIONS_RANK: 0,
+                },
+                "yoy_unavailable": True,
+                "yoy_note": (
+                    "YoY comparison requested but the same-window-one-year-"
+                    "earlier payload carried no data; decay not computed "
+                    "(no fabricated YoY baseline)."
+                ),
+            },
+        }
+
     rows: list[dict] = []
+    branch_counts = {_BRANCH_CLICKS_POSITION: 0, _BRANCH_IMPRESSIONS_RANK: 0}
     all_urls = sorted(set(recent_metrics.keys()) | set(previous_metrics.keys()))
     for url_n in all_urls:
         # D-03 idempotency self-check (defensive).
@@ -330,11 +526,29 @@ def transform(
         clicks_delta = clicks_recent - clicks_previous
         delta_pct = _delta_pct(clicks_recent, clicks_previous)
 
-        trend = _trend_label(
-            delta_pct=delta_pct,
+        imp_recent = rcur.impressions if rcur else 0
+        imp_previous = rprev.impressions if rprev else 0
+        impressions_delta_pct = _delta_pct(imp_recent, imp_previous)
+
+        pos_recent = rcur.position if rcur else None
+        pos_previous = rprev.position if rprev else None
+        position_delta = (
+            round(pos_recent - pos_previous, 4)
+            if (pos_recent is not None and pos_previous is not None)
+            else None
+        )
+
+        trend, branch = _trend_label(
+            clicks_delta_pct=delta_pct,
             clicks_recent=clicks_recent,
             clicks_previous=clicks_previous,
+            impressions_delta_pct=impressions_delta_pct,
+            position_delta=position_delta,
+            clicks_threshold=clicks_thr,
+            position_threshold=position_thr,
         )
+        if branch is not None:
+            branch_counts[branch] += 1
 
         rows.append({
             "url": url_n,
@@ -358,14 +572,17 @@ def transform(
         for r in rows
     ]
 
+    meta = {
+        **base_meta,
+        "merged_url_count": len(content_decay_rows),
+        "trend_counts": _count_trends(content_decay_rows),
+        "decay_branch_counts": branch_counts,
+    }
+    if comparison_mode == _MODE_YOY:
+        meta["yoy_unavailable"] = False
     return {
         "content_decay": content_decay_rows,
-        "meta": {
-            "recent_url_count": len(recent_metrics),
-            "previous_url_count": len(previous_metrics),
-            "merged_url_count": len(content_decay_rows),
-            "trend_counts": _count_trends(content_decay_rows),
-        },
+        "meta": meta,
     }
 
 
@@ -399,7 +616,19 @@ def _parse_args(argv: Iterable[str]) -> argparse.Namespace:
     )
     p.add_argument(
         "--previous", required=True,
-        help="Path to raw enhanced_search_analytics JSON for previous window.",
+        help="Path to raw enhanced_search_analytics JSON for the comparison "
+             "window (prior 90d, or same window one year earlier with --yoy).",
+    )
+    p.add_argument(
+        "--profile", default=None,
+        help="Profile name (e.g. ymyl-high, e-commerce) selecting R-85 "
+             "decay thresholds; YMYL is stricter (-20%%/+3).",
+    )
+    p.add_argument(
+        "--yoy", action="store_true",
+        help="Year-over-year mode: --previous is the same window one year "
+             "earlier. If it carries no data, emit a yoy_unavailable note "
+             "(never fabricates a YoY baseline).",
     )
     p.add_argument(
         "--output-dir", default=None,
@@ -428,8 +657,15 @@ def main(argv: list[str]) -> int:
     recent = _read_json(recent_path)
     previous = _read_json(previous_path)
 
+    profile_config = {"profile": args.profile} if args.profile else None
+    comparison_mode = _MODE_YOY if args.yoy else _MODE_PRIOR_WINDOW
+
     try:
-        result = transform(recent, previous)
+        result = transform(
+            recent, previous,
+            profile_config=profile_config,
+            comparison_mode=comparison_mode,
+        )
     except ContentDecayError as exc:
         print(f"transform failed: {exc}", file=sys.stderr)
         return 1

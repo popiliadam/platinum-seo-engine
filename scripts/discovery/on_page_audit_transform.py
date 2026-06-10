@@ -38,10 +38,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Sequence
 # scripts is a namespace package; ensure repo root on sys.path so absolute
 # imports resolve when invoked as a CLI module.
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -305,18 +306,72 @@ def _parse_gsc_rows(raw: dict | None) -> dict[str, GscRow]:
 # Audit detection
 # ---------------------------------------------------------------------------
 
-def _detect_presence(target_query: str, haystack: str) -> bool:
-    """Case-insensitive substring presence; empty target → False."""
-    if not target_query:
-        return False
-    return target_query.lower() in (haystack or "").lower()
+def _fold(text: str, locale: str | None) -> str:
+    """I5 locale-aware case fold. For Turkish (``tr*``) locales, map the
+    dotted/dotless I correctly BEFORE casefold (İ→i, I→ı) so a query like
+    "iletişim" matches a title "İletişim" (plain casefold would desync on the
+    combining dot). Non-tr locales use a plain casefold.
+    """
+    s = text or ""
+    if locale and str(locale).lower().startswith("tr"):
+        s = s.replace("İ", "i").replace("I", "ı")
+    return s.casefold()
 
 
-def _detect_in_h1(target_query: str, h1_list: Iterable[str]) -> bool:
+def _tokens(text: str, locale: str | None) -> set[str]:
+    """Unicode-aware word tokens of locale-folded text (excludes underscore)."""
+    return set(re.findall(r"[^\W_]+", _fold(text, locale), flags=re.UNICODE))
+
+
+def _detect_presence(
+    target_query: str, haystack: str, *, locale: str | None = None,
+) -> bool:
+    """I5: token-based presence — ALL query tokens present in the haystack
+    (any order), locale-folded. NOT raw substring (so 'cat' is not matched
+    inside 'category', and reordered phrases still match). Empty target →
+    False.
+    """
     if not target_query:
         return False
-    needle = target_query.lower()
-    return any(needle in (h or "").lower() for h in h1_list)
+    q = _tokens(target_query, locale)
+    if not q:
+        return False
+    return q <= _tokens(haystack, locale)
+
+
+def _detect_in_h1(
+    target_query: str, h1_list: Iterable[str], *, locale: str | None = None,
+) -> bool:
+    """Token-based presence within ANY single H1 (locale-folded)."""
+    if not target_query:
+        return False
+    q = _tokens(target_query, locale)
+    if not q:
+        return False
+    return any(q <= _tokens(h or "", locale) for h in h1_list)
+
+
+def _is_brand_query(target_query: str, brand_tokens: Sequence[str] | None) -> bool:
+    """I5 (a): is this query brand-dominated? A single-word brand token must
+    appear as a whole token; a multi-word brand token matches as a contiguous
+    (casefolded) substring. Brand tokens are derived from project.config
+    brand/domain by the caller — the engine stays project-agnostic.
+    """
+    if not target_query or not brand_tokens:
+        return False
+    q_lower = target_query.casefold()
+    q_tokens = set(re.findall(r"[^\W_]+", q_lower, flags=re.UNICODE))
+    for bt in brand_tokens:
+        bt = str(bt).strip().casefold()
+        if not bt:
+            continue
+        bt_words = re.findall(r"[^\W_]+", bt, flags=re.UNICODE)
+        if len(bt_words) == 1:
+            if bt_words[0] in q_tokens:
+                return True
+        elif bt in q_lower:
+            return True
+    return False
 
 
 def _action_for(
@@ -325,10 +380,19 @@ def _action_for(
     in_meta: bool,
     in_h1: bool,
     clicks_30d: int,
+    *,
+    is_brand: bool = False,
 ) -> str:
-    """Heuristic action recommendation per the brief."""
+    """Heuristic action recommendation per the brief.
+
+    I5: a brand-dominated query never gets a 'rewrite meta cluster' action —
+    chasing a brand term in the meta is pointless (the page already owns its
+    brand), so brand queries are monitored, not rewritten.
+    """
     if not target_query:
         return "no GSC data — investigate target intent"
+    if is_brand:
+        return "brand query — monitor (no meta rewrite)"
     if in_title and in_meta and in_h1 and clicks_30d > 0:
         return "monitor"
     if in_title and not in_meta and not in_h1:
@@ -434,6 +498,8 @@ def transform(
     raw_gsc: dict | None = None,
     strict_cross_ref: bool = False,
     live_findings: list[dict] | None = None,
+    locale: str | None = None,
+    brand_tokens: Sequence[str] | None = None,
 ) -> dict:
     """
     Build master.xlsx#on_page_audit rows from a DFS content_parsing
@@ -447,6 +513,13 @@ def transform(
                           disjoint after normalization → CrossRefMismatchError.
                           If False (default), fall back to no-cross-ref
                           mode (documented design choice — DURUR #4).
+        locale: OPTIONAL content locale (e.g. "tr-TR"). For tr* locales the
+                presence match folds İ→i / I→ı before casefold (I5). None →
+                plain casefold. Comes from project.config language.content_locale.
+        brand_tokens: OPTIONAL brand tokens (from project.config brand/domain).
+                Brand-dominated target_queries are NOT given a 'rewrite meta'
+                action (I5); meta.skipped_brand counts them. Engine stays
+                project-agnostic — no literals baked in.
         live_findings: OPTIONAL list of CSV-row dicts from SF's "Page Titles"
                        seo-element export (columns: ``Address``, ``Title 1``,
                        ``Title 1 Length``, ``Meta Description 1``, ``H1-1``,
@@ -493,6 +566,7 @@ def transform(
             cross_ref_used = False
 
     out_rows: list[dict] = []
+    skipped_brand = 0
     for cp in cp_rows:
         gsc = gsc_index.get(cp.url_normalized)
         if gsc:
@@ -504,9 +578,13 @@ def transform(
             impressions_30d = 0
             clicks_30d = 0
 
-        in_title = _detect_presence(target_query, cp.title)
-        in_meta = _detect_presence(target_query, cp.meta_description)
-        in_h1 = _detect_in_h1(target_query, cp.h1)
+        in_title = _detect_presence(target_query, cp.title, locale=locale)
+        in_meta = _detect_presence(target_query, cp.meta_description, locale=locale)
+        in_h1 = _detect_in_h1(target_query, cp.h1, locale=locale)
+
+        is_brand = _is_brand_query(target_query, brand_tokens)
+        if is_brand:
+            skipped_brand += 1
 
         # If cross-ref was attempted but no GSC for this URL, mark the
         # action accordingly so the operator can disambiguate "no data
@@ -516,6 +594,7 @@ def transform(
         else:
             action = _action_for(
                 target_query, in_title, in_meta, in_h1, clicks_30d,
+                is_brand=is_brand,
             )
 
         out_rows.append({
@@ -552,6 +631,7 @@ def transform(
             "cross_ref_mismatch": cross_ref_mismatch,
             "gsc_url_count": len(gsc_index),
             "live_findings_count": live_findings_count,
+            "skipped_brand": skipped_brand,
         },
     }
 
@@ -652,6 +732,17 @@ def _parse_args(argv: Iterable[str]) -> argparse.Namespace:
         help="Raise CrossRefMismatchError when DFS/GSC URL sets disjoint.",
     )
     p.add_argument(
+        "--locale", default=None,
+        help="Content locale (e.g. tr-TR). For tr* locales the keyword match "
+             "folds İ→i / I→ı before casefold. From project.config "
+             "language.content_locale.",
+    )
+    p.add_argument(
+        "--brand-token", action="append", default=None, dest="brand_tokens",
+        help="Brand token (repeatable) — brand-dominated queries skip the "
+             "'rewrite meta' action. From project.config brand/domain.",
+    )
+    p.add_argument(
         "--output-dir", default=None,
         help="If set, write on_page_audit.json here.",
     )
@@ -686,6 +777,8 @@ def main(argv: list[str]) -> int:
             raw_cp,
             raw_gsc=raw_gsc,
             strict_cross_ref=args.strict_cross_ref,
+            locale=args.locale,
+            brand_tokens=args.brand_tokens,
         )
     except OnPageAuditError as exc:
         print(f"transform failed: {exc}", file=sys.stderr)

@@ -801,3 +801,25 @@ def test_skill_md_documents_sf_mcp_live_pattern() -> None:
         "SKILL.md must NOT read a non-existent `rows` key — the real result "
         "is the MCP content envelope, parsed from the written CSV instead"
     )
+
+
+# ---------------------------------------------------------------------------
+# I7 — the "redirect-chain" finding is really a SINGLE-HOP redirected internal
+# link, not a multi-hop chain. The SKILL body must label it honestly and point
+# to SF redirect_chains for true multi-hop chains (consumed by GAP-T4 later).
+# ---------------------------------------------------------------------------
+
+def test_redirect_chain_finding_clarified_as_single_hop() -> None:
+    """I7: the redirect-chain detection kind flags a single redirected
+    internal link (one 3xx hop), so the SKILL must (a) describe it as a
+    'redirected internal link (single hop)' and (b) note that real multi-hop
+    chains come from SF `redirect_chains`."""
+    text = SKILL_PATH.read_text(encoding="utf-8")
+    assert "redirected internal link (single hop)" in text, (
+        "SKILL.md must label the redirect-chain finding as a single-hop "
+        "redirected internal link (it detects one 3xx hop, not a chain)"
+    )
+    assert "redirect_chains" in text, (
+        "SKILL.md must note that real multi-hop chains come from SF "
+        "redirect_chains (consumed by GAP-T4)"
+    )
