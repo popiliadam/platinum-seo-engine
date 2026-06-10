@@ -136,7 +136,7 @@ The plugin enforces a **two-repo separation** between logic and data:
 │  • skills/        (49 SKILL.md)  │        │  • projects/{slug}/              │
 │  • commands/      (29 slash cmds)│        │     ├ project.config.json        │
 │  • hooks/         (6 hooks)      │ writes │     ├ master.xlsx                │
-│  • schemas/       (31 JSON       │ ─────► │     ├ events.jsonl  (append-only)│
+│  • schemas/       (32 JSON       │ ─────► │     ├ events.jsonl  (append-only)│
 │  • scripts/        Schemas)      │        │     └ workflows/{run_id}.json    │
 │  • rules/         (10 disciplines│        │  • shared/                       │
 │  • templates/     enforced by CI)│        │  • _archive/                     │
@@ -245,7 +245,7 @@ Browse the full catalog: [`skills/`](skills/). Slash commands map 1:1 to commonl
   - `dataforseo-mcp-server` (DataForSEO, stdio)
   - `Scrapling` (stealthy site fetching, antibot fallback, stdio)
   - `sf` (Screaming Frog 24 native MCP, **HTTP** `http://127.0.0.1:11435/mcp` — v1.8 ADR-039; `type:http` ADR-040)
-- **JSON Schema** (Draft 7) — 31 schemas in `schemas/` (30 `*.schema.json` + `cross-sheet-invariants.json`).
+- **JSON Schema** (Draft 7) — 32 schemas in `schemas/` (31 `*.schema.json` + `cross-sheet-invariants.json`).
 - **Excel** as the operational data plane (`master.xlsx`), **JSONL** for the append-only event log.
 - **GitHub Actions** — CI runs schema validation, drift-check, lint, and the full pytest suite on every push.
 
