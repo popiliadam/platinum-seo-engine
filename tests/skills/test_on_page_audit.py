@@ -313,6 +313,99 @@ def test_action_no_gsc_when_target_query_empty() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Test 6b (I5) — token-based matching (order-independent), NOT substring.
+# ---------------------------------------------------------------------------
+
+def test_token_based_presence_matches_reordered_query() -> None:
+    """I5: presence is token-based (all query tokens present, any order), not
+    raw substring. 'blue suede shoes' is present in 'Shoes in Blue Suede'
+    even though the substring does not appear in that order."""
+    cp = _cp_envelope([_cp_item(
+        url="https://example.com/p",
+        title="Shoes in Blue Suede",
+        meta="Generic copy.",
+        h1=["Welcome"],
+    )])
+    gsc = _gsc_payload([("https://example.com/p", "blue suede shoes", 10, 100)])
+    r = opa.transform(cp, raw_gsc=gsc)["on_page_audit"][0]
+    assert r["in_title"] is True            # token-based; old substring → False
+    assert r["in_meta"] is False
+
+
+def test_token_based_presence_no_partial_word_match() -> None:
+    """I5: token matching does NOT partial-match inside a word — 'cat' must
+    not be 'found' inside 'category' (old substring matching would)."""
+    cp = _cp_envelope([_cp_item(
+        url="https://example.com/c",
+        title="Category landing page",
+        meta="All categories here.",
+        h1=["Categories"],
+    )])
+    gsc = _gsc_payload([("https://example.com/c", "cat", 10, 100)])
+    r = opa.transform(cp, raw_gsc=gsc)["on_page_audit"][0]
+    assert r["in_title"] is False           # 'cat' is not a token of 'category'
+
+
+# ---------------------------------------------------------------------------
+# Test 6c (I5) — Turkish locale fold (İ→i, I→ı) before casefold.
+# ---------------------------------------------------------------------------
+
+def test_turkish_locale_fold_matches_dotted_i() -> None:
+    """I5: for tr* locales, fold İ→i and I→ı before casefold so the Turkish
+    dotted/dotless-I does not desync the match. Default (non-tr) casefold of
+    'İletişim' does not match 'iletişim'."""
+    cp = _cp_envelope([_cp_item(
+        url="https://example.com/i",
+        title="İletişim ve Destek",
+        meta="İletişim formu burada.",
+        h1=["İletişim"],
+    )])
+    gsc = _gsc_payload([("https://example.com/i", "iletişim", 10, 100)])
+
+    r_tr = opa.transform(cp, raw_gsc=gsc, locale="tr-TR")["on_page_audit"][0]
+    assert r_tr["in_title"] is True
+    assert r_tr["in_h1"] is True
+
+    r_default = opa.transform(cp, raw_gsc=gsc)["on_page_audit"][0]
+    assert r_default["in_title"] is False   # plain casefold desyncs on İ
+
+
+# ---------------------------------------------------------------------------
+# Test 6d (I5) — brand-query exclusion: no 'rewrite meta' action for a
+# brand-dominated query; skipped_brand counted in meta.
+# ---------------------------------------------------------------------------
+
+def test_brand_query_skips_meta_rewrite() -> None:
+    """I5: a brand-dominated target_query must NOT trigger a 'rewrite meta
+    cluster' action (chasing a brand term in meta is pointless); the action
+    is a brand-skip and meta.skipped_brand counts it. Brand tokens come from
+    config — the engine stays project-agnostic."""
+    cp = _cp_envelope([_cp_item(
+        url="https://example.com/b",
+        title="Welcome",
+        meta="Our store.",
+        h1=["Home"],
+    )])
+    gsc = _gsc_payload([("https://example.com/b", "acme", 50, 500)])
+    out = opa.transform(cp, raw_gsc=gsc, brand_tokens=["acme"])
+    r = out["on_page_audit"][0]
+    assert r["action"] != "rewrite meta cluster"
+    assert "brand" in r["action"].lower()
+    assert out["meta"]["skipped_brand"] >= 1
+
+
+def test_skipped_brand_meta_zero_without_brand_tokens() -> None:
+    """meta.skipped_brand is present and 0 when no brand tokens are given."""
+    cp = _cp_envelope([_cp_item(
+        url="https://example.com/n", title="A title",
+        meta="A description.", h1=["A heading"],
+    )])
+    gsc = _gsc_payload([("https://example.com/n", "some query", 5, 100)])
+    out = opa.transform(cp, raw_gsc=gsc)
+    assert out["meta"]["skipped_brand"] == 0
+
+
+# ---------------------------------------------------------------------------
 # Test 7 — D-03 join: HTTPS + trailing slash matches lowercase-no-slash
 # ---------------------------------------------------------------------------
 

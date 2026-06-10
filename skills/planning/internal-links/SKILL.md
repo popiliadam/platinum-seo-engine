@@ -575,8 +575,17 @@ as `RowSchemaError` rather than silently masked.
 |------------------|-----------------------------------------------------------------|----------|----------|
 | orphan-page      | status=200 + indexable + 0 inlinks                              | HIGH     | 30 min   |
 | broken-link      | inlink edge destination status_code 4xx/5xx (per-dest agg)      | HIGH/CRITICAL/MEDIUM | 15 min |
-| redirect-chain   | inlink edge destination status_code 3xx (per-dest agg)          | LOW/MEDIUM | 20 min |
+| redirect-chain   | **redirected internal link (single hop)** — inlink edge destination status_code 3xx (per-dest agg) | LOW/MEDIUM | 20 min |
 | anchor-diversity | dest URL ≥5 inbound non-empty anchors + only 1 distinct anchor | LOW      | 25 min   |
+
+> **`redirect-chain` is a misnomer — it detects a single hop (I7).** The
+> `redirect-chain` kind fires when an internal link points to a URL that
+> returns a 3xx, i.e. a **redirected internal link (single hop)** — it does
+> NOT trace a multi-hop chain. Real multi-hop redirect chains come from
+> Screaming Frog's `redirect_chains` report (the `Number of Redirects` /
+> `Redirect Chain` columns), which is consumed by GAP-T4 later. The machine
+> `kind` id stays `redirect-chain` (stable `task_id` contract); only the
+> human-facing description is corrected here.
 
 `task_id` format: `{slug}-{run_date}-il-{kind}-{idx:03d}` —
 deterministic + slug-agnostic; same input produces the same task_id

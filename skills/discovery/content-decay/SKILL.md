@@ -327,27 +327,51 @@ recent   window:  [today - days_back, today]            (default 90d)
 previous window:  [today - 2*days_back, today - days_back]
 ```
 
-Both windows must have **equal length**. The transform aggregates clicks
-per normalized URL across each window, then computes:
+Both windows must have **equal length**. The transform aggregates clicks +
+impressions + impression-weighted position per normalized URL across each
+window, then labels the trend per **R-85 (single source —
+`rules/content-update-discipline.md`)**. The clicks `delta_pct` is still the
+emitted column; position/impressions feed the DECISION only (the 8-column
+schema is unchanged).
 
 ```
 clicks_delta = clicks_recent - clicks_previous
 delta_pct    = (clicks_recent - clicks_previous) / clicks_previous * 100,
                rounded 2dp; clamped to ±100 when previous=0
                (mirrors gsc-pull's _delta_pct, Phase 6 paterni)
-trend        = NEW       if previous=0 and recent>0
-               RETIRED   if recent=0  and previous>0
-               DECAY     if delta_pct ≤ -20
-               GROWTH    if delta_pct ≥ +20
-               STABLE    otherwise
-pillar       = first non-empty path segment (e.g. /blog/x → "blog")
-action       = trend → deterministic prescription
-                 DECAY   → "investigate + refresh"
-                 STABLE  → "monitor"
-                 GROWTH  → "double-down"
-                 NEW     → "new content tracking"
-                 RETIRED → "redirect or revive review"
+
+trend  (R-85 multi-signal — see rules/content-update-discipline.md §R-85):
+   NEW      if previous clicks=0 and recent>0
+   RETIRED  if recent clicks=0  and previous>0
+   GROWTH   if clicks delta_pct ≥ +20
+   DECAY    if  (clicks Δ% < clicks_threshold  AND position worsened > position_threshold)
+            OR  (impressions Δ% < -40%          AND ranking trend negative)
+   STABLE   otherwise  ← a clicks-only drop with NO position/impression
+                          corroboration is STABLE, not DECAY (single-signal
+                          volatility ≠ decay — R-85 rationale)
+
+profile-aware thresholds (clicks/position branch; impressions branch fixed):
+   YMYL        : clicks_threshold -20%, position_threshold +3  (stricter)
+   e-commerce  : -30% / +5
+   other/default: -30% / +5
+   (resolved via scripts/util/profile_aware_defaults.cascade_default — a
+    project.config tuning key or an explicit override wins over the profile
+    default; meta records the resolved thresholds + which R-85 branch fired.)
+
+pillar  = first non-empty path segment (e.g. /blog/x → "blog")
+action  = trend → deterministic prescription
+            DECAY   → "investigate + refresh"
+            STABLE  → "monitor"
+            GROWTH  → "double-down"
+            NEW     → "new content tracking"
+            RETIRED → "redirect or revive review"
 ```
+
+**YoY mode (`--yoy`):** compares the recent window against the *same window
+one year earlier* (the `--previous` payload is that year-ago window). When
+the year-ago data is present it is used as the decay baseline; when it is
+absent the transform refuses to fabricate verdicts — it emits a
+`meta.yoy_unavailable=true` note and zero rows (never fakes a YoY baseline).
 
 ## DURUR conditions (9)
 

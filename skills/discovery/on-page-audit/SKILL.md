@@ -216,6 +216,8 @@ Pure compute via `scripts/discovery/on_page_audit_transform.py`:
 python3 scripts/discovery/on_page_audit_transform.py \
     --raw-content-parsing inbox/dfs/{date}-content_parsing-onpage-{slug}.json \
     --raw-gsc             inbox/gsc/{date}-search_analytics-onpage-{slug}.json \
+    --locale              {project.config.language.content_locale} \
+    --brand-token         {brand}    # repeatable; from project.config brand/domain \
     --output-dir          _state/transform/{run_id}/
 ```
 
@@ -226,16 +228,34 @@ copies are byte-faithful to the upstream payloads. The transform is
 idempotent: same inputs → byte-identical output. Output sorted by
 `impressions_30d` desc (stable url asc tie-break).
 
+**Keyword presence matching (I5).** Presence (`in_title` / `in_meta` /
+`in_h1`) is **token-based** — ALL query tokens must be present (in any order),
+NOT a raw substring (so "cat" is not falsely matched inside "category", and a
+reordered phrase still matches). Matching is **locale-aware**: for `tr*`
+locales the fold maps `İ→i` and `I→ı` BEFORE casefold so the Turkish
+dotted/dotless-I does not desync the match (e.g. query "iletişim" matches a
+title "İletişim"). `--locale` is resolved from
+`project.config.json language.content_locale`.
+
 Action heuristic:
 
 | Condition                                              | action                                  |
 |--------------------------------------------------------|-----------------------------------------|
 | target_query empty (no GSC for URL)                    | "no GSC data — investigate target intent" |
+| **brand-dominated query** (brand token match)          | **"brand query — monitor (no meta rewrite)"** |
 | in_title + in_meta + in_h1, clicks_30d > 0             | "monitor"                               |
 | in_title only                                          | "add to meta + H1"                      |
 | missing all three                                      | "rewrite meta cluster"                  |
 | mixed (some present, some missing)                     | "patch missing slots"                   |
 | cross-ref attempted but URL unmatched                  | "no GSC available for this URL"         |
+
+**Brand-query exclusion (I5).** A brand-dominated `target_query` (matched
+against the `--brand-token` list derived from project.config brand/domain)
+never triggers a "rewrite meta cluster" action — chasing a brand term in the
+meta is pointless (the page already owns its brand). Such rows are surfaced
+as "brand query — monitor (no meta rewrite)" and counted in `meta.skipped_brand`.
+The engine stays project-agnostic: no brand literals are baked into the
+transform.
 
 ### Step 5 — `request_approval` (skill EXIT awaiting_approval)
 

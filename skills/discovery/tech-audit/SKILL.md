@@ -252,22 +252,36 @@ envelope OR flat wrapper — same pattern as `dfs_pull.py`), validates
 each item against the upstream schema (DURUR #4 / #5 on drift), then
 runs the per-URL findings rules:
 
-| Signal                     | Threshold        | Severity | Category           |
-|----------------------------|------------------|----------|--------------------|
-| Performance score          | < 50             | HIGH     | Performance        |
-| LCP                        | > 2.5s           | MEDIUM   | Performance        |
-| FCP                        | > 1.8s           | LOW      | Performance        |
-| CLS                        | > 0.1            | MEDIUM   | Layout Stability   |
-| Title length               | > 60 chars       | LOW      | Meta Tags          |
-| Meta description missing   | empty            | MEDIUM   | Meta Tags          |
-| Meta description length    | > 160 chars      | MEDIUM   | Meta Tags          |
-| H1 count                   | != 1             | MEDIUM   | Headings           |
-| Structured data absent     | commercial page  | LOW      | Structured Data    |
+| Signal                          | Threshold        | Severity | Category           |
+|---------------------------------|------------------|----------|--------------------|
+| Performance score               | < 50             | HIGH     | Performance        |
+| LCP                             | > 2.5s           | MEDIUM   | Performance        |
+| FCP                             | > 1.8s           | LOW      | Performance        |
+| TBT (responsiveness, INP proxy) | > 600ms          | HIGH     | Performance        |
+| TBT (responsiveness, INP proxy) | 200–600ms        | MEDIUM   | Performance        |
+| CLS                             | > 0.1            | MEDIUM   | Layout Stability   |
+| Title length                    | > 60 chars       | LOW      | Meta Tags          |
+| Meta description missing        | empty            | MEDIUM   | Meta Tags          |
+| Meta description length         | > 160 chars      | MEDIUM   | Meta Tags          |
+| H1 missing                      | count == 0       | MEDIUM   | Meta Tags          |
+| Multiple H1 (house-style)       | count > 1        | LOW      | Meta Tags          |
+| Structured data absent          | commercial page  | LOW      | Structured Data    |
 
 Findings are aggregated per `issue_category`; `impact` = max severity
 across that category's findings; `priority` = P0/P1/P2 mapping.
 `affected_urls` is comma-joined (capped at ~480 chars; collapses to
 "N URLs (sample: ...)" past the cap).
+
+**Responsiveness — TBT is a lab proxy for INP, not field data (I3).** Web
+Vitals 2024 retired FID in favour of **INP** (Interaction to Next Paint).
+This audit reads Lighthouse **Total Blocking Time (TBT)** from
+`on_page_lighthouse`, which is a *lab* proxy for INP — it is NOT the field
+INP number (which requires real-user CrUX data). Finding text says so
+explicitly and never reports a fabricated INP value. **CrUX field-data
+integration is deferred** (out of scope here): wiring `on_page_lighthouse`
+field-data or the CrUX API to surface real-user INP/LCP/CLS percentiles is
+a follow-up enhancement, tracked separately. Multiple-H1 findings are LOW
+(house-style/structure hygiene), not a Google ranking defect.
 
 ### Step 6 — `request_approval` (skill EXIT awaiting_approval)
 

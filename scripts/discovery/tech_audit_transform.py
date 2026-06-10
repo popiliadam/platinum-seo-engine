@@ -608,6 +608,36 @@ def _performance_findings(sig: LighthouseSignal) -> list[_Finding]:
             resolution="Reduce render-blocking resources, inline critical CSS",
             url=sig.url,
         ))
+    # I3 — responsiveness via Total Blocking Time. TBT is the Lighthouse LAB
+    # proxy for field INP (Web Vitals 2024: INP supersedes FID). We do NOT
+    # collect field INP here (that needs CrUX — out of scope; see SKILL.md
+    # deferred note), so the finding text is explicit that TBT is a lab proxy
+    # and never claims a real field-INP number. Thresholds: >600ms HIGH,
+    # 200<tbt<=600 MEDIUM (Lighthouse scoring guidance, desktop).
+    if sig.tbt_ms is not None and sig.tbt_ms > 600:
+        out.append(_Finding(
+            category=CATEGORY_PERFORMANCE,
+            label=f"Poor responsiveness (TBT {sig.tbt_ms:.0f}ms — "
+                  "lab proxy for INP)",
+            severity=SEVERITY_HIGH,
+            resolution="Reduce main-thread blocking: break up long JS tasks, "
+                      "defer/remove unused JS, trim third-party scripts. TBT "
+                      "is a LAB proxy; field INP (CrUX) is not collected by "
+                      "this audit.",
+            url=sig.url,
+        ))
+    elif sig.tbt_ms is not None and sig.tbt_ms > 200:
+        out.append(_Finding(
+            category=CATEGORY_PERFORMANCE,
+            label=f"Elevated responsiveness cost (TBT {sig.tbt_ms:.0f}ms — "
+                  "lab proxy for INP)",
+            severity=SEVERITY_MEDIUM,
+            resolution="Reduce main-thread blocking: break up long JS tasks, "
+                      "defer/remove unused JS, trim third-party scripts. TBT "
+                      "is a LAB proxy; field INP (CrUX) is not collected by "
+                      "this audit.",
+            url=sig.url,
+        ))
     return out
 
 
@@ -656,21 +686,31 @@ def _meta_findings(sig: ContentSignal) -> list[_Finding]:
 
 
 def _heading_findings(sig: ContentSignal) -> list[_Finding]:
+    # Headings route under "Meta Tags": "Headings" is NOT in the schema-locked
+    # tech_seo.issue_category enum, and H1/H2 issues live under "Meta Tags" in
+    # both the human-curated master.xlsx AND scripts/util/sf_issue_taxonomy.py.
     if sig.h1_count == 1:
         return []
     if sig.h1_count == 0:
-        label = "H1 missing"
-    else:
-        label = f"H1 anomaly ({sig.h1_count} H1 tags)"
+        # Missing H1 is a real on-page gap (no primary heading signal) → MEDIUM.
+        return [_Finding(
+            category=CATEGORY_META,
+            label="H1 missing",
+            severity=SEVERITY_MEDIUM,
+            resolution="Add exactly one descriptive H1 carrying the primary "
+                      "topic; demote any extra headings to H2.",
+            url=sig.url,
+        )]
+    # I6 — multiple H1 is house-style/structure hygiene, NOT a Google ranking
+    # defect (HTML5 permits multiple H1; Google's documented behavior parses
+    # the page regardless). Downgraded MEDIUM → LOW.
     return [_Finding(
-        # Headings route under "Meta Tags": "Headings" is NOT in the
-        # schema-locked tech_seo.issue_category enum, and H1/H2 issues live
-        # under "Meta Tags" in both the human-curated master.xlsx AND
-        # scripts/util/sf_issue_taxonomy.py routing.
         category=CATEGORY_META,
-        label=label,
-        severity=SEVERITY_MEDIUM,
-        resolution="Use exactly one H1 per page, demote extras to H2",
+        label=f"Multiple H1 ({sig.h1_count} H1 tags)",
+        severity=SEVERITY_LOW,
+        resolution="House-style/structure hygiene — not a Google ranking "
+                  "defect. Prefer one H1 per page for clarity; demote extras "
+                  "to H2.",
         url=sig.url,
     )]
 

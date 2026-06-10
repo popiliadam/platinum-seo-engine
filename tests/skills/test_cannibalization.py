@@ -86,7 +86,10 @@ def single_url_payload() -> dict:
 
 @pytest.fixture
 def two_url_conflict_payload() -> dict:
-    """One query, two URLs both above K → exactly 1 cannibalization row."""
+    """One query, two URLs that QUALIFY under the new I2 contract: clicks are
+    diluted (neither URL holds >70% — 30/50=60%) AND both rank in positions
+    1-20 with spread ≤5 (4.0 & 7.0 → spread 3) → exactly 1 conflict row.
+    (Under the OLD detector ANY two URLs ≥10 impressions were a conflict.)"""
     return {
         "rows": [
             {
@@ -98,10 +101,10 @@ def two_url_conflict_payload() -> dict:
             },
             {
                 "keys": ["white sneakers", "https://example.com/categories/white-sneakers"],
-                "clicks": 12,
+                "clicks": 20,
                 "impressions": 200,
-                "ctr": 0.06,
-                "position": 11.5,
+                "ctr": 0.10,
+                "position": 7.0,
             },
         ]
     }
@@ -320,11 +323,12 @@ def test_two_url_conflict_emits_one_row(two_url_conflict_payload: dict,
     assert "white sneakers" in row["conflict_pair"]
     assert "https://example.com/sneakers/white" in row["conflict_pair"]
     assert "https://example.com/categories/white-sneakers" in row["conflict_pair"]
-    # Total impact = 30 + 12 = 42 clicks → "42 clicks", priority=P2 (>=20).
-    assert row["total_impact"] == "42 clicks"
+    # Total impact = 30 + 20 = 50 clicks → "50 clicks", priority=P2 (>=20).
+    assert row["total_impact"] == "50 clicks"
     assert row["priority"] == "P2"
-    # Position spread 4.0 → 11.5 = 7.5 > 5 → consolidate.
-    assert row["resolution"] == "consolidate to top URL"
+    # New contract: default recommendation is differentiate-intent, NOT an
+    # auto 301-consolidate (which is operator-reviewed only).
+    assert row["resolution"] == "differentiate intent / adjust internal-link hierarchy"
     # Default status must be a valid statusEnum value.
     assert row["status"] == "TODO"
     # Note carries primary URL hint (the higher-clicks URL).
@@ -340,51 +344,57 @@ def test_two_url_conflict_emits_one_row(two_url_conflict_payload: dict,
 
 def test_multi_query_sorted_by_impact(multi_query_payload: dict) -> None:
     """
-    Multi-query input emits multiple rows ordered by total_impact desc.
-    Singletons + sub-K rows must NOT appear.
+    Multi-query input emits conflict rows ordered by total_impact desc.
+    Under the NEW I2 contract:
+      - q1 'sofa set': URL1 holds 150/200 = 75% of clicks (> 70%) → NO
+        click-share dilution → NOT a conflict (filtered).
+      - q2 'dental clinic': 25/43 = 58% diluted + positions 5.5/8.2 (both
+        1-20, spread 2.7 ≤ 5) → conflict.
+      - q3 'coffee table': 7/12 = 58% diluted + positions 13/16 (both 1-20,
+        spread 3 ≤ 5) → conflict.
+      - q4 singleton / q5 sub-K → filtered.
+    So exactly 2 conflicts, NOT the old 3.
     """
     out = cnz.transform(multi_query_payload)
     rows = out["cannibalization"]
 
-    # 3 conflicts: q1 (200 clicks), q2 (43 clicks), q3 (12 clicks).
-    assert len(rows) == 3
+    assert len(rows) == 2
 
-    # Sorted by total_impact desc.
-    assert rows[0]["conflict_pair"].startswith("sofa set ::")
-    assert rows[0]["total_impact"] == "200 clicks"
-    assert rows[0]["priority"] == "P1"
+    # Sorted by total_impact desc: dental clinic (43) before coffee table (12).
+    assert rows[0]["conflict_pair"].startswith("dental clinic ::")
+    assert rows[0]["total_impact"] == "43 clicks"
+    assert rows[0]["priority"] == "P2"
 
-    assert rows[1]["conflict_pair"].startswith("dental clinic ::")
-    assert rows[1]["total_impact"] == "43 clicks"
-    assert rows[1]["priority"] == "P2"
+    assert rows[1]["conflict_pair"].startswith("coffee table ::")
+    assert rows[1]["total_impact"] == "12 clicks"
+    assert rows[1]["priority"] == "P3"
 
-    assert rows[2]["conflict_pair"].startswith("coffee table ::")
-    assert rows[2]["total_impact"] == "12 clicks"
-    assert rows[2]["priority"] == "P3"
-
-    # q4 (singleton) and q5 (one URL above K) must not appear.
+    # q1 (click-share dominated), q4 (singleton), q5 (one URL above K) absent.
     pairs = " ".join(r["conflict_pair"] for r in rows)
+    assert "sofa set" not in pairs
     assert "unique-keyword" not in pairs
     assert "below-threshold-kw" not in pairs
+    # meta records WHY sofa set was dropped (click-share dilution failed).
+    assert out["meta"]["share_excluded"] >= 1
 
 
 # ---------------------------------------------------------------------------
-# Test 7 — Resolution heuristic branches (consolidate / intent split / merge)
+# Test 7 — Default resolution is differentiate-intent; 301-consolidate is
+# never auto-recommended (operator-reviewed only).
 # ---------------------------------------------------------------------------
 
-def test_resolution_heuristics(multi_query_payload: dict) -> None:
-    """
-    Each resolution branch is exercised by the multi_query_payload:
-      q1 spread 4 → 17 = 13 (>5)         → 'consolidate to top URL'
-      q2 both <10 (5.5 + 8.2)            → 'intent split investigation'
-      q3 spread 13 → 16 = 3 (<=5, both >=10) → 'topical merge candidate'
-    """
+def test_default_resolution_is_differentiate_intent(multi_query_payload: dict) -> None:
+    """The new contract drops the old spread-based 'consolidate to top URL'
+    auto-recommendation. Every auto-emitted conflict carries the differentiate-
+    intent recommendation; consolidation (301) is only ever surfaced as an
+    operator-reviewed caveat in the note, never as the resolution value."""
     out = cnz.transform(multi_query_payload)
-    by_q = {r["conflict_pair"].split(" :: ")[0]: r for r in out["cannibalization"]}
-
-    assert by_q["sofa set"]["resolution"] == "consolidate to top URL"
-    assert by_q["dental clinic"]["resolution"] == "intent split investigation"
-    assert by_q["coffee table"]["resolution"] == "topical merge candidate"
+    for row in out["cannibalization"]:
+        assert row["resolution"] == "differentiate intent / adjust internal-link hierarchy"
+        # consolidate is never the auto resolution.
+        assert "consolidate to top url" not in row["resolution"].lower()
+        # the operator-review caveat lives in the note.
+        assert "operator" in row["note"].lower()
 
 
 # ---------------------------------------------------------------------------
@@ -441,7 +451,7 @@ def test_plugin_agnostik_no_slug_dependency() -> None:
             {"keys": ["kw", "https://site-a.example/page-1"],
              "clicks": 30, "impressions": 200, "position": 4.0},
             {"keys": ["kw", "https://site-a.example/page-2"],
-             "clicks": 20, "impressions": 150, "position": 12.0},
+             "clicks": 20, "impressions": 150, "position": 8.0},
         ]
     }
     payload_b = {
@@ -449,7 +459,7 @@ def test_plugin_agnostik_no_slug_dependency() -> None:
             {"keys": ["kw", "https://site-b.example/page-1"],
              "clicks": 30, "impressions": 200, "position": 4.0},
             {"keys": ["kw", "https://site-b.example/page-2"],
-             "clicks": 20, "impressions": 150, "position": 12.0},
+             "clicks": 20, "impressions": 150, "position": 8.0},
         ]
     }
     out_a = cnz.transform(payload_a)
@@ -508,3 +518,100 @@ def test_smoke_e2e_cli_output(tmp_path: Path,
     assert first_bytes == second_bytes, (
         "transform is not byte-idempotent under re-run"
     )
+
+
+# ---------------------------------------------------------------------------
+# Test 11 (I2) — click-share dominance: one URL holding >70% of clicks is NOT
+# cannibalization (the explicit old→new verdict difference).
+# ---------------------------------------------------------------------------
+
+def test_click_share_dominant_url_not_conflict() -> None:
+    """OLD detector: any 2 URLs ≥10 impressions on a query = conflict.
+    NEW I2 (b): no conflict unless click-share is DILUTED (no single URL >70%
+    of the query's clicks). 80/95 = 84% → dominant → NOT a conflict."""
+    payload = {"rows": [
+        {"keys": ["running shoes", "https://example.com/shoes/running"],
+         "clicks": 80, "impressions": 1000, "position": 4.0},
+        {"keys": ["running shoes", "https://example.com/blog/running-shoes"],
+         "clicks": 15, "impressions": 400, "position": 6.0},
+    ]}
+    out = cnz.transform(payload)
+    assert out["cannibalization"] == []           # old=1 conflict, new=0
+    assert out["meta"]["conflict_count"] == 0
+    assert out["meta"]["share_excluded"] >= 1
+
+
+def test_position_spread_gt5_single_window_not_conflict() -> None:
+    """NEW I2 (c): diluted clicks but the two URLs are NOT a tight position
+    cluster (spread > 5) and there is no second window for flip-flop → no
+    competition signal → NOT a conflict."""
+    payload = {"rows": [
+        {"keys": ["office chair", "https://example.com/chairs/office"],
+         "clicks": 30, "impressions": 500, "position": 3.0},
+        {"keys": ["office chair", "https://example.com/blog/office-chairs"],
+         "clicks": 25, "impressions": 400, "position": 15.0},
+    ]}
+    out = cnz.transform(payload)
+    assert out["cannibalization"] == []
+    assert out["meta"]["signal_excluded"] >= 1
+
+
+def test_brand_query_excluded() -> None:
+    """NEW I2 (a): brand-dominated queries are excluded (brand tokens derived
+    from project.config brand/domain, passed in — engine stays agnostic). A
+    non-brand query in the same payload still emits."""
+    payload = {"rows": [
+        # brand query — would otherwise qualify (diluted + tight cluster).
+        {"keys": ["acme sneakers", "https://example.com/sneakers/acme-a"],
+         "clicks": 30, "impressions": 400, "position": 4.0},
+        {"keys": ["acme sneakers", "https://example.com/sneakers/acme-b"],
+         "clicks": 25, "impressions": 350, "position": 6.0},
+        # non-brand query — qualifies and must still emit.
+        {"keys": ["leather boots", "https://example.com/boots/leather-a"],
+         "clicks": 30, "impressions": 400, "position": 4.0},
+        {"keys": ["leather boots", "https://example.com/boots/leather-b"],
+         "clicks": 25, "impressions": 350, "position": 6.0},
+    ]}
+    out = cnz.transform(payload, brand_tokens=["acme"])
+    pairs = " ".join(r["conflict_pair"] for r in out["cannibalization"])
+    assert "acme sneakers" not in pairs
+    assert "leather boots" in pairs
+    assert out["meta"]["brand_excluded"] >= 1
+
+
+def test_flipflop_across_windows_is_conflict() -> None:
+    """NEW I2 (c) flip-flop branch: even with a WIDE position spread (no tight
+    cluster), a top-URL flip-flop between the two most recent windows is a
+    competition signal → conflict (only when the previous window is given)."""
+    recent = {"rows": [
+        {"keys": ["garden hose", "https://example.com/hose/a"],
+         "clicks": 30, "impressions": 500, "position": 4.0},
+        {"keys": ["garden hose", "https://example.com/hose/b"],
+         "clicks": 25, "impressions": 450, "position": 18.0},   # spread 14 > 5
+    ]}
+    previous = {"rows": [
+        {"keys": ["garden hose", "https://example.com/hose/a"],
+         "clicks": 10, "impressions": 400, "position": 18.0},
+        {"keys": ["garden hose", "https://example.com/hose/b"],
+         "clicks": 40, "impressions": 600, "position": 4.0},    # was the top URL
+    ]}
+    # Single window: spread > 5, no flip-flop data → NOT a conflict.
+    assert cnz.transform(recent)["cannibalization"] == []
+    # Two windows: top URL flipped (b→a) → conflict.
+    out = cnz.transform(recent, previous=previous)
+    assert len(out["cannibalization"]) == 1
+    assert "garden hose" in out["cannibalization"][0]["conflict_pair"]
+    assert "flip" in out["cannibalization"][0]["note"].lower()
+
+
+def test_zero_click_query_not_conflict() -> None:
+    """Edge: a query whose URLs have impressions but zero clicks has no
+    traffic to dilute → not an active cannibalization conflict."""
+    payload = {"rows": [
+        {"keys": ["niche term", "https://example.com/a"],
+         "clicks": 0, "impressions": 50, "position": 4.0},
+        {"keys": ["niche term", "https://example.com/b"],
+         "clicks": 0, "impressions": 40, "position": 6.0},
+    ]}
+    out = cnz.transform(payload)
+    assert out["cannibalization"] == []

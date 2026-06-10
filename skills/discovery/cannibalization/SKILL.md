@@ -272,33 +272,67 @@ The transform self-checks idempotency on every emitted URL — a drift
 between transform and downstream consumers is escalated as DURUR rather
 than silently masked.
 
-## Cannibalization detection logic
+## Cannibalization detection logic (I2 contract)
+
+A query with ≥2 distinct URLs above K is only a **candidate**; it becomes a
+**conflict** only when **ALL THREE** signals hold (so single-keyword
+volatility and brand SERPs are not mislabelled as cannibalization):
 
 ```
 1. Parse rows: each entry contributes (query_lower, url_normalized,
    clicks, impressions, position).
 2. Drop rows with impressions < min_impressions (default 10).
-3. Group by query_lower; collapse same (query, url) pairs by summing.
-4. Keep only queries with ≥2 distinct URLs after the K filter.
-5. For each conflict group emit one row:
+3. Group by query_lower; collapse same (query, url) pairs by summing;
+   position is impression-weighted.
+4. Candidate = query with ≥2 distinct URLs after the K filter.
+5. Candidate → CONFLICT only when ALL hold:
+     (a) NON-BRAND query — brand tokens (from project.config brand/domain,
+         passed as --brand-token / brand_tokens) exclude brand-dominated
+         queries.
+     (b) CLICK-SHARE DILUTION — no single URL holds > 70% of the query's
+         clicks (a query with zero clicks has no traffic to dilute → not a
+         conflict).
+     (c) COMPETITION SIGNAL — top-URL flip-flop between the two most recent
+         windows (needs the optional --previous window) OR ≥2 URLs
+         simultaneously in positions 1-20 with spread ≤ 5.
+6. For each conflict emit one row:
      conflict_pair             "{query} :: {url1} | {url2} | ..."  (sorted)
-     overlapping_queries_est   #queries with same URL set on this site
+     overlapping_queries_est   #conflict queries with the same URL set
      total_impact              "{sum_clicks} clicks"
-     resolution                heuristic (see below)
-     note                      "primary URL: {top}, position spread:
-                                {min}-{max}"
+     resolution                ALWAYS "differentiate intent / adjust
+                               internal-link hierarchy" (default)
+     note                      "primary URL: {top}; signal: {...};
+                               consolidate (301) only if intent overlap
+                               confirmed — operator review"
      status                    statusEnum (default "TODO")
      priority                  P1 (>=100) / P2 (>=20) / P3 otherwise
-6. Sort rows by total_impact desc, then by conflict_pair for determinism.
+7. Sort rows by total_impact desc, then by conflict_pair for determinism.
+   meta records brand_excluded / share_excluded / signal_excluded so a
+   non-empty input that yields zero conflicts is explainable.
 ```
 
-### Resolution heuristic
+### Resolution policy (no auto-consolidate)
 
-```
-position spread (max-min) > 5      → "consolidate to top URL"
-all positions strictly < 10        → "intent split investigation"
-otherwise                          → "topical merge candidate"
-```
+The default recommendation is **"differentiate intent / adjust internal-link
+hierarchy"**. A **301-consolidate is NEVER auto-recommended** — duplicate
+intent must be explicitly confirmed by a human, and consolidation is ALWAYS
+operator-reviewed (the note carries this caveat). This replaces the old
+position-spread heuristic ("consolidate to top URL" / "intent split
+investigation" / "topical merge candidate"), which over-flagged
+consolidation off rank spread alone.
+
+### F-15 stays AMBER-by-design
+
+A non-empty `cannibalization` sheet correctly drives the F-15 drift check to
+**AMBER** (not GREEN, not RED) — cannibalization conflicts are
+production-ready findings that require operator triage, so AMBER is the
+intended terminal state. Do NOT delete rows or force GREEN to clear F-15
+(see `feedback_f15_amber_terminal`).
+
+Optional CLI flags wiring the new signals (Step 3 transform):
+`--previous inbox/gsc/{prior-date}-search_analytics-cannibalization-{slug}.json`
+(top-URL flip-flop) and `--brand-token <token>` (repeatable; from
+project.config brand/domain — engine stays agnostic).
 
 ## DURUR conditions (8)
 
@@ -319,10 +353,12 @@ Stop and flag the manager — do not patch, do not fall back.
 6. `PSEO_WORKSPACE_ROOT` env var unset and no explicit `workspace_root`
    arg passed to `workflow_runner` / `events_writer`. STOP, surface to
    manager.
-7. Transform reports `meta.conflict_count == 0` (no query had ≥2 URLs
-   above K). NOT an error — clean exit with a "no cannibalization
-   detected" notice; skill skips write_excel + render_report and goes
-   straight to `complete` with `conflict_count="0"`.
+7. Transform reports `meta.conflict_count == 0` (no candidate query
+   survived the (a)/(b)/(c) predicate — either none had ≥2 URLs above K,
+   or all were brand/share/signal-excluded; see meta.*_excluded). NOT an
+   error — clean exit with a "no cannibalization detected" notice; skill
+   skips write_excel + render_report and goes straight to `complete` with
+   `conflict_count="0"`.
 8. URL normalization output drifts (idempotency check fails inside
    `cannibalization_transform.transform`). STOP, D-03 invariant broken.
 
