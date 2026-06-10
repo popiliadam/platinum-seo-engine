@@ -28,7 +28,9 @@ SCHEMA_PATH = REPO / "schemas" / "master-excel.schema.json"
 TEMPLATE_PATH = REPO / "templates" / "master-excel.xlsx"
 
 # Schema sheets not yet present in the shipped template. See module docstring.
-KNOWN_SCHEMA_ONLY_SHEETS = {"gbp_audit"}
+# gbp_audit added to the template 2026-06-10 (manager cascade after FIX-J
+# flagged the gap) — the tripwire set is now empty by design.
+KNOWN_SCHEMA_ONLY_SHEETS: set = set()
 
 
 def _schema_sheets() -> dict:

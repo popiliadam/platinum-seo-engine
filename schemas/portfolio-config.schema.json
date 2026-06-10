@@ -125,8 +125,8 @@
         "priority": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 10,
-          "description": "Portfolio-level priority. 1 = highest. Drives surfacing order in portfolio-overview + weekly-brief."
+          "maximum": 50,
+          "description": "Portfolio-level priority. 1 = highest. Drives surfacing order in portfolio-overview + weekly-brief. (maximum raised 10→50 2026-06-10: live portfolio reached priority 12 with 12 projects — mirrors the 8→12 maxItems precedent.)"
         },
         "last_sync_at": {
           "type": ["string", "null"],
