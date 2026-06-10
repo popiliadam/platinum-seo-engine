@@ -85,14 +85,36 @@ def test_natural_language_phrase_quality():
         )
 
 
-# --- Test 3: R-09 FAQ count cap (10 standart + 15 cap 3000+ word) ---
+# --- Test 3: R-09 FAQ count cap (talep-güdümlü 3-6, hard cap 10) ---
 def test_r09_faq_count_cap():
+    """R-09 corrected 2026-06-10 (FIX-H H7): FAQ is demand-driven
+    (talep-güdümlü) — 3-6 where evidence exists (PAA presence, real
+    user questions), hard cap 10 independent of word count. The old
+    '10 standart / 15 cap 3000+ word' contract is retired and must
+    not resurface in the SKILL body."""
     text = _read_skill_text()
     assert "R-09" in text, "R-09 rule reference missing"
-    assert "10" in text, "R-09 standart cap (10) missing"
-    assert "15" in text, "R-09 hard cap (15) missing"
-    assert "3000" in text, "R-09 word threshold (3000) missing"
+    assert "talep-güdümlü" in text, (
+        "R-09 demand-driven (talep-güdümlü) framing missing"
+    )
+    assert "3-6" in text, "R-09 demand band (3-6 FAQ) missing"
+    assert "hard cap 10" in text, "R-09 hard cap 10 missing"
+    assert "PAA" in text, "R-09 evidence source (PAA) missing"
     assert "DURUR #2" in text, "DURUR #2 (R-09 cap aşımı) gate missing"
+    assert "faq_count > 10" in text, (
+        "DURUR #2 must reject above the hard cap (faq_count > 10)"
+    )
+    # Retired pre-2026-06-10 contract tokens must be gone:
+    assert "3000" not in text, (
+        "old 3000+ word threshold must be retired — R-09 cap is "
+        "word-count independent"
+    )
+    assert "max 15" not in text and "15 cap" not in text, (
+        "old 15-FAQ cap must be retired (hard cap is 10)"
+    )
+    assert "faq_count >= 16" not in text, (
+        "old 16+ REJECT threshold must be retired (DURUR #2 fires > 10)"
+    )
 
 
 # --- Test 4: R-43 accordion forbidden (`<details>`, `<summary>` YASAK) ---

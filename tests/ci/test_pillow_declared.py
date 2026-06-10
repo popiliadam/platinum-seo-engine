@@ -1,7 +1,7 @@
 """Guard: Pillow must be declared in the dependency manifests.
 
 Root-cause regression guard for the 2026-06-04 Codex P0-02 finding. PIL is
-imported unconditionally by scripts/util/iptc_metadata.py (R-78 AI-image
+imported unconditionally by scripts/util/iptc_metadata.py (R-123 AI-image
 disclosure) and skills/production/generate-images (R-76 format cascade), but
 piexif — though declared — does NOT pull Pillow transitively, so a clean
 `pip install -r requirements-lock.txt` previously crashed pytest collection

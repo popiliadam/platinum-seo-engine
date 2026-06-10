@@ -12,7 +12,7 @@ Encoding strategy: EXIF UserComment + TIFF ImageDescription. Formats
 without a native IPTC chunk (JPEG/WebP via PIL) carry the disclosure
 through EXIF instead — IPTC parsers and EXIF text readers both surface
 it. AVIF lacks piexif support; the ``generate-images`` skill skips it
-(see ``rules/content-html-discipline.md`` R-78 failure_mode).
+(see ``rules/content-html-discipline.md`` R-123 failure_mode).
 """
 
 from __future__ import annotations

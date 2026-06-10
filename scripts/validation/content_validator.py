@@ -17,7 +17,7 @@ Severity:
 
 Visible-text rules (AI-disclosure, …) run on text with <script>/<style>/
 <template>/<noscript> and comments stripped, so JSON-LD and image IPTC
-disclosure (R-78, *required*) are never flagged.
+disclosure (R-123, *required*) are never flagged.
 """
 
 from __future__ import annotations

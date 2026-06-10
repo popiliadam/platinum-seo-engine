@@ -343,7 +343,7 @@ def test_consumes_contract():
     )
 
 
-# --- Test 17: R-78 IPTC disclosure runtime contract (Phase 11 Wave 2 deliverable) ---
+# --- Test 17: R-123 IPTC disclosure runtime contract (Phase 11 Wave 2 deliverable) ---
 @pytest.mark.skip(
     reason=(
         "generate-images runtime — Phase 11 Wave 2 deliverable; "
@@ -351,13 +351,13 @@ def test_consumes_contract():
         "This test activates when scripts/production/generate_images.run lands."
     )
 )
-def test_r78_iptc_disclosure_writes_to_non_avif_outputs(tmp_path):
+def test_r123_iptc_disclosure_writes_to_non_avif_outputs(tmp_path):
     """Every WebP/JPG output carries IPTC DigitalSourceType=TrainedAlgorithmicMedia.
 
     Phase 2 Task 2.3 (G-AI-01) contract: when ``scripts/production/generate_images.run``
     delivers in Phase 11 Wave 2, each non-AVIF output is patched with the IPTC
     disclosure via ``write_ai_image_disclosure``. AVIF is skipped — piexif does
-    not support the format (R-78 failure_mode AMBER, R-76 cascade guarantees
+    not support the format (R-123 failure_mode AMBER, R-76 cascade guarantees
     WebP + JPG carry the tag).
     """
     import piexif
@@ -376,13 +376,13 @@ def test_r78_iptc_disclosure_writes_to_non_avif_outputs(tmp_path):
         )
 
 
-# --- Test 18: R-78 SKILL.md contract lock (active today, no runtime needed) ---
-def test_r78_iptc_step_5b_present_in_skill_body():
+# --- Test 18: R-123 SKILL.md contract lock (active today, no runtime needed) ---
+def test_r123_iptc_step_5b_present_in_skill_body():
     """SKILL.md body declares Step 5b IPTC disclosure write protocol.
 
     Regression guard: if Step 5b is removed before Phase 11 Wave 2 runtime
     activates the live writer call, the contract lock disappears and the
-    runtime delivery would silently drift away from the R-78 enforcement
+    runtime delivery would silently drift away from the R-123 enforcement
     requirement. This test fires immediately (no runtime needed).
     """
     text = _read_skill_text()
@@ -396,5 +396,9 @@ def test_r78_iptc_step_5b_present_in_skill_body():
     assert "AVIF" in text and "skip" in text.lower(), (
         "AVIF exclusion guidance (piexif unsupported) missing"
     )
-    # References section must list R-78 alongside R-71..R-77
-    assert "R-78" in text, "R-78 reference missing from SKILL.md References"
+    # References section must list R-123 alongside R-71..R-77
+    assert "R-123" in text, "R-123 reference missing from SKILL.md References"
+    assert "R-78" not in text, (
+        "stale R-78 reference found — the IPTC rule was renumbered "
+        "R-78→R-123 (2026-06-10, ADR-038); generate-images must cite R-123"
+    )
