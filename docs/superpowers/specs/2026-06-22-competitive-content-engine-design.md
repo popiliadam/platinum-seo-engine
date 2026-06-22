@@ -200,9 +200,9 @@ rakip verisi riski). DFS/Scrapling/GSC çağrıları kalite için serbest.
 - **Yeni:** `scripts/production/` runtime (4 modül + quality_gates +
   orkestratör), `rules/content-craft-discipline.md` (pozitif yazım rehberi),
   Özgünlük + Görsel/Şema kapıları.
-- **R-token disiplini:** yeni craft kuralları R-125+ aralığında (mevcut
-  R-09/R-43/R-79 vb. content-rule token'larına dokunulmaz —
-  `project_template_r_token_resolution` dersi).
+- **R-token disiplini:** yeni craft kuralları **mevcut max R-token'dan sonra**
+  başlar (şu an R-148 → **R-149+**; worker `grep` ile doğrular). Mevcut
+  R-01..R-148'e dokunulmaz (`project_template_r_token_resolution` dersi).
 
 ## 12. Kapsam + aşamalar (batch temeli)
 
