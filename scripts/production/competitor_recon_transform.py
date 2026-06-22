@@ -79,6 +79,16 @@ if str(_REPO_ROOT) not in sys.path:
 # SERP payloads when extracting the organic URL ordering.
 from scripts.ingestion.dfs_pull import _normalize_dfs_response  # noqa: E402
 
+# IMPORT discipline (NOT copy) — the meaningful-structure thresholds are owned
+# by scripts.production.structure_metrics (B4 single source of truth), so this
+# arming engine (B1) and the gate engine (B2) measure tables/lists on the SAME
+# ruler. See that module's header for the asymmetry it fixes.
+from scripts.production.structure_metrics import (  # noqa: E402
+    MIN_LIST_ITEMS,
+    MIN_TABLE_COLS,
+    MIN_TABLE_ROWS,
+)
+
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -104,11 +114,9 @@ _LIST_TAGS: frozenset[str] = frozenset({"ul", "ol"})
 #: separately for FAQ extraction before being skipped.
 _SKIP_TAGS: frozenset[str] = frozenset({"script", "style", "template", "noscript"})
 
-#: A table is "meaningful" iff it has at least this many rows AND columns.
-_MIN_TABLE_ROWS = 2
-_MIN_TABLE_COLS = 2
-#: A list is "meaningful" iff it has at least this many <li>.
-_MIN_LIST_ITEMS = 3
+# The meaningful-table (MIN_TABLE_ROWS × MIN_TABLE_COLS) and meaningful-list
+# (MIN_LIST_ITEMS) thresholds are imported from structure_metrics above —
+# single source of truth shared with the B2 gate engine (B4 alignment).
 
 
 # ---------------------------------------------------------------------------
@@ -301,11 +309,11 @@ class _ReconParser(HTMLParser):
                 self._finish_list(self._list_stack.pop())
 
     def _finish_table(self, table: dict[str, int]) -> None:
-        if table["rows"] >= _MIN_TABLE_ROWS and table["max_cols"] >= _MIN_TABLE_COLS:
+        if table["rows"] >= MIN_TABLE_ROWS and table["max_cols"] >= MIN_TABLE_COLS:
             self.tables_meaningful += 1
 
     def _finish_list(self, li_count: int) -> None:
-        if li_count >= _MIN_LIST_ITEMS:
+        if li_count >= MIN_LIST_ITEMS:
             self.lists_meaningful += 1
 
     def _consume_ldjson(self) -> None:
