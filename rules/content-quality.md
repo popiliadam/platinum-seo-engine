@@ -285,6 +285,7 @@ Bu 3 prensip Phase 10 content rules setinin **üst-prensibidir**. Hiçbir alt-ru
 - → [content-html-discipline](content-html-discipline.md) — HTML format, semantic, image, performance
 - → [content-seo-discipline](content-seo-discipline.md) — heading, internal link, FAQ, schema markup
 - → [content-eeat-discipline](content-eeat-discipline.md) — author byline, otorite domain, brand entity
+- → [content-craft-discipline](content-craft-discipline.md) — pozitif yazım/ruh katmanı (R-149+): empati girişi, somut örnek, marka sesi, özgünlük, derinlik
 - → [content-llm-discipline](content-llm-discipline.md) — LLMs.txt, AIO, summary footer
 - → [content-update-discipline](content-update-discipline.md) — decay, revise, sunset/prune
 - → [schema-first](schema-first.md) — schema önce yazılır
