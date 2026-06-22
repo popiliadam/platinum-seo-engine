@@ -148,11 +148,21 @@ def test_gap_pass_when_all_categories_covered():
 # Gate 2 — Structure (count vs ceiling+1, and >200-word H2 needs >=2 H3)
 # ---------------------------------------------------------------------------
 
+def test_meaningful_list_threshold_aligned_to_three():
+    """B4 cross-batch fix: a 2-item list is NOT meaningful in the gate engine
+    (B2's old ≥2 bug); ≥3 <li> is required, matching B1's competitor count so
+    the structure gate measures both sides on the same ruler."""
+    assert qg._count_meaningful_lists(qg._parse("<ul><li>a</li><li>b</li></ul>")) == 0
+    assert qg._count_meaningful_lists(
+        qg._parse("<ul><li>a</li><li>b</li><li>c</li></ul>")
+    ) == 1
+
+
 def test_structure_red_below_ceiling_plus_one():
     # ceiling tables+lists = 2 → required 3 meaningful structures; supply only 1.
     html = (
         "<article><h2>Bölüm</h2><p>" + BODY + "</p>"
-        "<ul><li>bir</li><li>iki</li></ul></article>"
+        "<ul><li>bir</li><li>iki</li><li>üç</li></ul></article>"
     )
     g = _gate(qg.run_all(html, _brief()), "structure")
     assert g["status"] == "RED"
@@ -164,7 +174,7 @@ def test_structure_long_h2_requires_two_h3():
     long_body = "kelime " * 220  # > 200 words
     html = (
         "<article><h2>Uzun bölüm</h2><p>" + long_body + "</p>"
-        "<ul><li>bir</li><li>iki</li></ul></article>"
+        "<ul><li>bir</li><li>iki</li><li>üç</li></ul></article>"
     )
     g = _gate(qg.run_all(html, brief), "structure")
     assert g["status"] == "RED"

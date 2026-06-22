@@ -51,6 +51,23 @@ from html.parser import HTMLParser
 from pathlib import Path
 from typing import Iterable
 
+# scripts/ is a namespace package; ensure repo root on sys.path so the absolute
+# import of the shared structure thresholds resolves when invoked as a script.
+# ScriptDir = scripts/production → repo_root = parents[2].
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+# IMPORT discipline (NOT copy) — meaningful-table/list thresholds are owned by
+# scripts.production.structure_metrics (B4 single source of truth), so this gate
+# engine (B2) and the arming engine (B1) measure structure on the SAME ruler.
+# This pulls B2's former list threshold (≥2) up to the canonical ≥3.
+from scripts.production.structure_metrics import (  # noqa: E402
+    MIN_LIST_ITEMS,
+    MIN_TABLE_COLS,
+    MIN_TABLE_ROWS,
+)
+
 # --------------------------------------------------------------------------- #
 # Contract                                                                     #
 # --------------------------------------------------------------------------- #
@@ -313,7 +330,8 @@ def _h2_sections(toks: list[tuple]) -> list[dict]:
 
 
 def _count_meaningful_tables(toks: list[tuple]) -> int:
-    """Anlamlı tablo = ≥2 satır VE ≥2 sütun (doldurma/tek-satır sayılmaz)."""
+    """Anlamlı tablo = ≥MIN_TABLE_ROWS satır VE ≥MIN_TABLE_COLS sütun
+    (doldurma/tek-satır sayılmaz). Eşik structure_metrics'ten (B1↔B2 hizalı)."""
     count = 0
     stack: list[dict] = []
     for t in toks:
@@ -327,13 +345,16 @@ def _count_meaningful_tables(toks: list[tuple]) -> int:
             stack[-1]["maxcols"] = max(stack[-1]["maxcols"], stack[-1]["cur"])
         elif t[0] == "end" and t[1] == "table" and stack:
             tb = stack.pop()
-            if tb["rows"] >= 2 and tb["maxcols"] >= 2:
+            if tb["rows"] >= MIN_TABLE_ROWS and tb["maxcols"] >= MIN_TABLE_COLS:
                 count += 1
     return count
 
 
 def _count_meaningful_lists(toks: list[tuple]) -> int:
-    """Anlamlı liste = ≥2 <li>."""
+    """Anlamlı liste = ≥MIN_LIST_ITEMS <li> (structure_metrics; B1↔B2 hizalı).
+
+    B4 düzeltmesi: eski ≥2 eşiği B1'in rakip-sayımıyla (≥3) hizalandı; yapı
+    kapısı artık iki tarafı aynı cetvelle ölçer (spec §9)."""
     count = 0
     stack: list[int] = []
     for t in toks:
@@ -342,7 +363,7 @@ def _count_meaningful_lists(toks: list[tuple]) -> int:
         elif t[0] == "start" and t[1] == "li" and stack:
             stack[-1] += 1
         elif t[0] == "end" and t[1] in ("ul", "ol") and stack:
-            if stack.pop() >= 2:
+            if stack.pop() >= MIN_LIST_ITEMS:
                 count += 1
     return count
 
