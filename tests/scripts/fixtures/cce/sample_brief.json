@@ -1,0 +1,49 @@
+{
+  "schema_version": "1.0",
+  "topic": {
+    "primary_keyword": "diş implantı tedavisi",
+    "content_type": "guide",
+    "locale": "tr-TR",
+    "market": "TR"
+  },
+  "keyword_set": [
+    { "kw": "diş implantı tedavisi", "volume": 1900, "intent": "Informational", "source": "dfs_suggestions" },
+    { "kw": "implant fiyatları", "volume": 880, "intent": "Commercial", "source": "gsc" }
+  ],
+  "aio": {
+    "present": true,
+    "answer_points": [
+      "implant tedavisi süreci kaç aşamada tamamlanır",
+      "implant sonrası iyileşme süresi ne kadar sürer"
+    ],
+    "cited_sources": ["https://example.org/saglik-kaynagi"]
+  },
+  "competitors": [
+    {
+      "url": "https://rakip-bir.example/implant",
+      "h2_h3": ["İmplant nedir", "İmplant çeşitleri", "Tedavi adımları"],
+      "questions": ["implant ağrılı mı", "implant kaç yıl dayanır"],
+      "entities": ["titanyum vida", "kemik grefti", "panoramik röntgen"],
+      "tables": 1,
+      "lists": 1,
+      "word_count": 1400
+    },
+    {
+      "url": "https://rakip-iki.example/implant",
+      "h2_h3": ["Fiyatlandırma", "Bakım"],
+      "questions": ["implant bakımı nasıl yapılır"],
+      "entities": ["sinüs lifting", "geçici protez"],
+      "tables": 1,
+      "lists": 1,
+      "word_count": 1600
+    }
+  ],
+  "gap": {
+    "must_cover_headings": ["İmplant tedavi adımları", "İyileşme süreci"],
+    "must_answer_questions": [],
+    "must_mention_entities": []
+  },
+  "structure_ceiling": { "tables": 1, "lists": 1, "h2": 3, "best_competitor_word_count": 1600 },
+  "gsc": { "real_queries": ["diş implantı fiyatı", "implant tedavisi süresi"], "current_position": 14.2 },
+  "generated_at": "2026-06-22T10:00:00Z"
+}
