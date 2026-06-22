@@ -213,7 +213,7 @@ rakip verisi riski). DFS/Scrapling/GSC çağrıları kalite için serbest.
 |-----|--------|-------|
 | F1 | Silahlanma motoru (`competitor_recon`, `keyword_aio_intel`, `build_brief`) + testler | Brief Paketi üretimi |
 | F2 | Kapı motoru (`quality_gates.py`, 8 kapı) + testler | PASS/RED ölçüm |
-| F3 | Craft rehberi (`content-craft-discipline.md` R-125+) + testler | Pozitif yazım katmanı |
+| F3 | Craft rehberi (`content-craft-discipline.md` R-149+) + testler | Pozitif yazım katmanı |
 | F4 | Orkestratör (`new_blog.py` silahlan→yaz→kapı döngüsü) + new-blog SKILL.md güncelle + testler | Çalışan new-blog |
 | F5 | Gerçek konu kanıt testi (rakibi geçtik mi ölç) | Kabul kanıtı |
 
