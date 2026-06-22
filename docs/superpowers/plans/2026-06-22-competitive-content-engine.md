@@ -6,7 +6,7 @@
 
 **Architecture:** 3 aşamalı döngü — (1) SİLAHLANMA: Claude MCP çağırır (Scrapling×10 + DFS + GSC) → ham JSON `inbox/`'a → saf Python transform'lar Brief Paketi üretir; (2) YAZIM: Claude Brief + craft rehberiyle içeriği yazar; (3) KAPI: saf Python `quality_gates` 8 kapı ölçer, geçmezse re-write. Spec: `docs/superpowers/specs/2026-06-22-competitive-content-engine-design.md`.
 
-**Tech Stack:** Python 3.10+ (saf transform, openpyxl read-only, stdlib json), pytest (hermetik fixture testleri), BeautifulSoup (HTML parse — mevcut dependency), markdown content rules.
+**Tech Stack:** Python 3.10+ (saf transform, openpyxl read-only, stdlib json), pytest (hermetik fixture testleri), **stdlib `html.parser`** (HTML parse — ⚠️ bs4 KURULU DEĞİL/declared değil; emsal `scripts/validation/content_validator.py`), markdown content rules.
 
 ## Global Constraints (her batch'e uygulanır — spec'ten verbatim)
 
