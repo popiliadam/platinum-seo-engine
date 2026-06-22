@@ -44,10 +44,13 @@ consumes:
   - "rules/content-eeat-discipline.md"
   - "rules/content-llm-discipline.md"
   - "rules/content-update-discipline.md"
+  - "rules/content-craft-discipline.md"
   - "templates/content/new-blog.template.md"
   - "templates/content/new-blog.template.html"
   - "templates/content/faq-block.template.html"
   - "templates/content/upload-instructions.template.md"
+  - "scripts/production/new_blog.py"
+  - "scripts/production/quality_gates.py"
 produces:
   - "content-remediation"
   - "faq-optimization"
@@ -65,8 +68,8 @@ mcp_tools:
   required:
     - "mcp__gsc__search_analytics"
     - "mcp__dataforseo__serp_organic_live_advanced"
-  optional:
     - "mcp__ScraplingServer__stealthy_fetch"
+  optional:
     - "mcp__dataforseo__dataforseo_labs_google_keyword_overview"
 budget:
   uses_paid_mcp: true
@@ -83,8 +86,9 @@ Plan-driven full-article generator. Reads a single
 `master.xlsx[new_content_plan]` row, joins it against
 `master.xlsx[cluster_keywords]` (keyword set + intent + forbidden filters)
 and `master.xlsx[topical_map]` (pillar/cluster/supporting page_type +
-internal-link plan), runs SERP top-10 + optional Tier-1 Scrapling
-deepening, then renders four artifacts:
+internal-link plan), runs SERP top-10 + **mandatory** Tier-1 Scrapling
+competitor recon (×10 organic, CCE arming) and gates the draft against the
+Brief Paketi, then renders four artifacts:
 
 1. `outputs/blog/{slug}/article.html` — `<article class="pse-blog-post">`
    fragment (R-22 fragment boundary; no `<html>` / `<body>` wrap).
@@ -244,9 +248,11 @@ mark-done skill owns that append.
 populates these via R-44 evidence-gated atomic write.
 
 **Runtime integration deferred to Phase 11 Wave 2.** This SKILL.md
-section is the spec lock; `scripts/production/new_blog.py` does not yet
-exist. When Wave 2 lands the runtime, the 3-step filter implements as a
-pre-`render_5_templates` helper consumed by Step 7.
+section is the spec lock. `scripts/production/new_blog.py` now exists (CCE
+B4 orchestrator helpers `assemble_brief` / `evaluate`) but does NOT yet
+implement the R-121 3-step bank filter. When Wave 2 lands that runtime,
+the 3-step filter implements as a pre-`render_5_templates` helper consumed
+by Step 7.
 
 ## R-124 — YMYL Uzman İnceleme İmzası (Pre-Publish Expert-Review Sign-Off)
 
@@ -280,6 +286,63 @@ arasında):
 
 Non-YMYL profillerde bu adım atlanır (R-28 künye opsiyonel/yok), audit
 satırı yazılmaz.
+
+## CCE Döngüsü (Competitive Content Engine — Silahlan → Yaz → Kapı → Re-write)
+
+new-blog artık CCE motorunu çalıştırır: rakipten **ölçülebilir biçimde daha
+iyi** içerik üretmek için bir **silahlan → yaz → kapı → re-write** döngüsü.
+Mimari kural (spec §3): döngüyü **Claude (bu skill) sürer** çünkü
+`scripts/production/new_blog.py` SAF Python'dur — MCP'yi/Claude'u ÇAĞIRMAZ;
+döngüye yalnızca iki saf yardımcı verir (`assemble_brief`, `evaluate`). MCP
+sınırı skill'e (Claude'a) aittir; deterministik tutkal koda.
+
+### 1. Silahlan (Arming) — ham MCP JSON → Brief Paketi
+
+Claude ham veriyi MCP ile toplar (kod değil), diske yazar, sonra
+`new_blog.assemble_brief(...)`'i çağırır:
+
+| Sinyal              | MCP tool (Claude çağırır)                                          | Not                                  |
+|---------------------|-------------------------------------------------------------------|--------------------------------------|
+| SERP top-10 organic | `mcp__dataforseo__serp_organic_live_advanced` depth=10            | rakip sıralaması + URL listesi       |
+| Rakip DOM ×10       | `mcp__ScraplingServer__stealthy_fetch`                            | **ZORUNLU** her organic URL (Step 4) |
+| Keyword genişleme   | `mcp__dataforseo__dataforseo_labs_google_keyword_suggestions` + `…_keyword_overview` | reliable substring + volume/intent   |
+| AI Overview         | `serp_organic_live_advanced` `ai_overview` bloğu                  | gerçek `answer_points` (Step 5)      |
+| GSC sinyali         | `mcp__gsc__search_analytics`                                      | `{real_queries, current_position}`   |
+
+`assemble_brief` 3 B1 transform'u sırayla çalıştırır (`competitor_recon_transform`
++ `keyword_aio_intel_transform` + `build_brief`) → tam **Brief Paketi**
+(`gap` + `structure_ceiling` + `keyword_set` + `aio` + `gsc`). GSC sinyali
+`gsc=` parametresiyle `build_brief`'in boş default'unu override eder.
+
+### 2. Yaz (Craft) — Claude, R-149+ rehberiyle
+
+Claude makaleyi yazar; `rules/content-craft-discipline.md` (R-149..R-153)
+**pozitif yazım katmanını** uygular: pain-mirror empati girişi (R-149), somut
+örnek/senaryo (R-150), aktif marka sesi (R-151), rakip-üstü özgün değer
+`data-original="true"` (R-152), H2 derinliği + mantıksal akış (R-153). Brief'in
+`gap` maddeleri kapsanır; `structure_ceiling`+1 anlamlı tablo/liste hedeflenir.
+Foundational Principles 3-katman + R-121 bank seçimi yine geçerlidir (üstte).
+
+### 3. Kapı (Gate) — `new_blog.evaluate(...)`
+
+Üretilen HTML `new_blog.evaluate(content_html, brief, round_num=..., max_rounds=3)`
+ile ölçülür; bu `scripts/production/quality_gates.py`'nin `run_all`'ini **IMPORT
+ile** çağırır (subprocess değil) — 8 kapı sırasıyla: p0_truthfulness > gap >
+structure > depth > aeo > voice > originality > schema_visual. Döner:
+`{gate_result, action, feedback}`.
+
+### 4. Re-write / Terminal — döngü kararı
+
+| `action`         | Anlam                       | Sonraki adım                                                       |
+|------------------|-----------------------------|-------------------------------------------------------------------|
+| `PASS`           | overall PASS                | yayın akışına devam (Step 9+)                                     |
+| `REWRITE`        | overall RED, round < 3      | `feedback` (= `rewrite_feedback`) ile YENİDEN yaz (adım 2)        |
+| `AMBER_TERMINAL` | overall RED, round ≥ 3       | **3-tur cap** — sonsuz döngü YOK; eksik kapılar operatöre raporlanır (spec §8) |
+
+`AMBER` yalnız orkestratör kararıdır; kapıların kendisi PASS/RED kalır. Döngü
+`PASS`'e ya da `AMBER_TERMINAL`'e ulaşana kadar adım 2 ↔ 3 tekrar eder. Craft
+kuralı ↔ kapı eşlemesi: R-149 → voice+aeo, R-150 → depth, R-151 → voice,
+R-152 → originality, R-153 → depth (`content-craft-discipline.md`).
 
 ## Routing — 12-Step Workflow
 
@@ -350,18 +413,32 @@ entity extract (organic results `dom_url`, `title`, `description`).
 **DURUR #5.** SERP analiz fail (boş response, API error, mode enum dışı)
 → manuel input gerekli, skill `awaiting_approval`.
 
-### Step 4 — `scrapling_tier1_optional` (R-08 derinleştirme)
+### Step 4 — `scrapling_competitor_recon` (CCE silahlanma, R-08 derinleştirme)
 
-Top-3 SERP page için `mcp__ScraplingServer__stealthy_fetch` çağrı. DOM
-parse → H1/H2/H3 + first 200 word + author byline + dateModified
-extract. AMBER warning: tier-1 fail ise tier-0 fallback (basic SERP
-description).
+**ZORUNLU (artık optional değil; top-3 değil top-10).** SERP top-10 organic
+sonucun HER BİRİ için `mcp__ScraplingServer__stealthy_fetch` ile DOM çekilir —
+CCE silahlanma motoru rakip kapsamasının TAMAMINI görmeli (spec §4a), yarısını
+değil. Her sayfa `{"url": ..., "html": ...}` olarak biriktirilir; bu liste +
+ham SERP `assemble_brief`'e verilir → `competitor_recon_transform` heading tree
++ answered questions + candidate entities + structure ceiling (anlamlı
+tablo/liste) + word_count çıkarır.
 
-### Step 5 — `aio_citation_check` (R-109/R-110/R-111)
+Tier-0 fallback (basic SERP description) yalnızca tek bir URL kalıcı 403/blok
+verirse o URL'e özgüdür; Scrapling **required** MCP bağımlılığı olduğundan
+adım topluca atlanamaz. Eksik/bloklu sayfalar AMBER warning raporlanır,
+silahlanma toplanan sayfalarla devam eder.
+
+### Step 5 — `aio_citation_check` (R-109/R-110/R-111 + CCE AEO)
 
 Pasaj alıntılanabilirlik: SERP top-10 page'lerde featured snippet detect
-(R-109), people_also_ask (R-110), ai_overview citation (R-111). Skill
-internal state: `aio_citation_targets[]`.
+(R-109), people_also_ask (R-110), ai_overview citation (R-111).
+
+**CCE AEO bağı.** Ham `serp_organic_live_advanced` payload'undaki `ai_overview`
+bloğu boş heuristik DEĞİL, `assemble_brief` → `keyword_aio_intel_transform` ile
+gerçek `aio.answer_points` (+ `aio.cited_sources`) listesine dönüştürülür ve
+Brief Paketi'nin `aio` alanına yazılır. Bu `answer_points` B2 kapı motorunun
+**aeo** kapısı tarafından ölçülür: içerik bu noktaların HER BİRİNİ kapsamalı
+(`aio.present=False` ise yalnız "intro cevap-önce" şartı — R-149 / spec §6 R2).
 
 ### Step 6 — `content_gap`
 
@@ -556,6 +633,11 @@ Expected: schema_version `"1.2"`, profile.enum array of 5 strings.
 - `rules/content-llm-discipline.md` (R-109..R-111 AIO citation, R-118
   humanize).
 - `rules/content-update-discipline.md` (R-50 counter-argument).
+- `rules/content-craft-discipline.md` (R-149..R-153 — CCE pozitif yazım
+  katmanı: pain-mirror giriş, somut örnek, marka sesi, özgünlük, derinlik).
+- `scripts/production/new_blog.py` (CCE B4 orkestratör yardımcıları —
+  `assemble_brief` + `evaluate`; saf Python, MCP/Claude çağırmaz).
+- `scripts/production/quality_gates.py` (CCE B2 8-kapı motoru — `run_all`).
 - `schemas/project-config.schema.json` v1.4 (Phase 3.1 bank entry
   schema bump — `applicable_topics`, `phrasings`,
   `last_used_in_content_id`, `max_usage_per_month` fields R-121 reads;
