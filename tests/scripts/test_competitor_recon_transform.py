@@ -191,6 +191,70 @@ def test_malformed_serp_falls_back_to_input_order():
 
 
 # ---------------------------------------------------------------------------
+# Content-scoping (B6) — site chrome must not inflate the structure ceiling
+# ---------------------------------------------------------------------------
+
+def test_recon_ignores_site_chrome():
+    """B6 proof finding #1: a menu-heavy competitor page must have its
+    structure measured on the ARTICLE only. The nav/aside/footer subtrees and
+    a bare link-only menu (5 chrome lists total) collapse, leaving exactly the
+    one real content list; chrome headings/anchors are not counted as
+    competitor entities."""
+    html = (
+        # nav menu — link-only ul (4 li)
+        "<nav><ul>"
+        '<li><a href="/">Ana Sayfa</a></li>'
+        '<li><a href="/kedi">Kedi</a></li>'
+        '<li><a href="/kopek">Köpek</a></li>'
+        '<li><a href="/iletisim">İletişim</a></li>'
+        "</ul></nav>"
+        # aside related-posts — heading + link-only ul (3 li)
+        "<aside><h2>İlgili Yazılar</h2><ul>"
+        '<li><a href="/a">Hamster sesleri</a></li>'
+        '<li><a href="/b">Köpek pati yalama</a></li>'
+        '<li><a href="/c">Bernese dağ köpeği</a></li>'
+        "</ul></aside>"
+        # bare link-only tag menu (3 li, NOT inside a chrome tag → Rule 2)
+        "<ul>"
+        '<li><a href="/x">Etiket1</a></li>'
+        '<li><a href="/y">Etiket2</a></li>'
+        '<li><a href="/z">Etiket3</a></li>'
+        "</ul>"
+        # real article content — heading + prose content list (3 li)
+        "<h2>Maine Coon Bakımı</h2>"
+        "<ul><li>Haftada birkaç kez tarama keçeleşmeyi önler</li>"
+        "<li>Tüy dökme döneminde günlük tarama gerekir</li>"
+        "<li>Düzenli tırnak bakımı yapılmalıdır</li></ul>"
+        # footer menu — link-only ul (3 li)
+        "<footer><ul>"
+        '<li><a href="/gizlilik">Gizlilik</a></li>'
+        '<li><a href="/kvkk">KVKK</a></li>'
+        '<li><a href="/sss">SSS</a></li>'
+        "</ul></footer>"
+    )
+    out = cr.transform(EMPTY_SERP, [{"url": "u", "html": html}], market="TR")
+    # Only the article's content list survives the 5 chrome menus.
+    assert out[0]["lists"] == 1
+    # Chrome headings are not mistaken for competitor entities.
+    assert "İlgili Yazılar" not in out[0]["h2_h3"]
+    assert "Maine Coon Bakımı" in out[0]["h2_h3"]
+
+
+def test_clean_html_unaffected_by_content_scoping():
+    """The strip must be a no-op on chrome-free markup — a genuine content
+    list and table still count exactly as before B6."""
+    html = (
+        "<h2>Karşılaştırma</h2>"
+        "<table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table>"
+        "<ul><li>birinci madde</li><li>ikinci madde</li><li>üçüncü madde</li></ul>"
+    )
+    out = cr.transform(EMPTY_SERP, [{"url": "u", "html": html}], market="TR")
+    assert out[0]["tables"] == 1
+    assert out[0]["lists"] == 1
+    assert out[0]["h2_h3"] == ["Karşılaştırma"]
+
+
+# ---------------------------------------------------------------------------
 # Output shape / edge cases / purity
 # ---------------------------------------------------------------------------
 

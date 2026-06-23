@@ -145,7 +145,13 @@ _NUM_UNIT = re.compile(
 )
 _CURRENCY = re.compile(r"\d[\d.,]*\s*[₺$€]|[₺$€]\s*\d")
 _YEAR = re.compile(r"(?<!\d)(?:19|20)\d{2}(?!\d)")
-_QUOTE = re.compile(r'["“«][^"”»]{12,}["”»]')
+# Gerçek alıntı tespiti (B6 bulgu #3): terim-vurgusunu alıntıdan ayır.
+#   • «…» — açık tırnak işareti (TR'de terim-vurgusu için nadir) → her zaman alıntı.
+#   • "…" / “…” — yalnız ≥QUOTE_MIN_WORDS kelimelik blok alıntıdır; kısa
+#     (≤5 kelime) çift-tırnaklı ifade terim-vurgusudur, kaynak istemez.
+_QUOTE_GUILLEMET = re.compile(r"«[^»]+»")
+_QUOTE_DOUBLE = re.compile(r'["“]([^"”]+)["”]')
+QUOTE_MIN_WORDS = 6
 _PAREN = re.compile(r"\([^)]{3,}\)")
 _WORD = re.compile(r"\w+", re.UNICODE)
 _SENT_SPLIT = re.compile(r"[.!?]")
@@ -190,6 +196,25 @@ def _covered(phrase: str, haystack_norm: str) -> bool:
         return _norm(phrase) in haystack_norm
     present = sum(1 for t in sig if _stem(t) in haystack_norm)
     return (present / len(sig)) >= COVER_THRESHOLD or _norm(phrase) in haystack_norm
+
+
+def _dedup_norm(items: Iterable[str]) -> list[str]:
+    """Case-insensitive, edge-trimmed dedup; first-seen order + casing kept.
+
+    Gap maddeleri üç kategoriye (heading/question/entity) dağılır ve aynı madde
+    birden fazla kategoride listelenebilir. Dürüst-atlama sayımı bu ham
+    çoğaltmayı değil, BENZERSIZ kapsanmamış maddeyi karşılaştırmalı (B6 bulgu
+    #2): tek bir gap-skipped yorumu o maddeyi temizlemeye yetmeli.
+    """
+    out: list[str] = []
+    seen: set[str] = set()
+    for it in items:
+        key = _norm(it).strip()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        out.append(it)
+    return out
 
 
 # --------------------------------------------------------------------------- #
@@ -416,14 +441,24 @@ def _has_hero_image(toks: list[tuple]) -> bool:
     return any(t[0] in ("start", "startend") and t[1] in _VOID_IMG_TAGS for t in toks)
 
 
+def _has_quote_claim(text: str) -> bool:
+    """Gerçek alıntı = «…» bloğu VEYA ≥QUOTE_MIN_WORDS kelimelik çift-tırnaklı
+    blok. Kısa (≤5 kelime) terim-vurgusu alıntı değildir (B6 bulgu #3)."""
+    if _QUOTE_GUILLEMET.search(text):
+        return True
+    return any(
+        len(m.group(1).split()) >= QUOTE_MIN_WORDS
+        for m in _QUOTE_DOUBLE.finditer(text)
+    )
+
+
 def _is_claim(text: str) -> bool:
     return bool(
         _PERCENT.search(text)
         or _NUM_UNIT.search(text)
         or _CURRENCY.search(text)
         or _YEAR.search(text)
-        or _QUOTE.search(text)
-    )
+    ) or _has_quote_claim(text)
 
 
 def _has_citation(block: dict) -> bool:
@@ -458,7 +493,9 @@ def gate_gap(toks, text_norm, brief) -> GateResult:
     items: list[str] = []
     for cat in ("must_cover_headings", "must_answer_questions", "must_mention_entities"):
         items.extend(gap.get(cat, []) or [])
-    uncovered = [it for it in items if not _covered(it, text_norm)]
+    # Dedup the uncovered set: an item listed under two categories is ONE gap,
+    # so one honest gap-skipped comment clears it (B6 finding #2).
+    uncovered = _dedup_norm(it for it in items if not _covered(it, text_norm))
     skip_comments = sum(
         1 for t in toks if t[0] == "comment" and "gap-skipped" in t[1].lower()
     )

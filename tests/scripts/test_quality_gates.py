@@ -120,6 +120,50 @@ def test_p0_red_forces_overall_red():
     assert res["overall"] == "RED"
 
 
+def test_p0_short_quoted_term_emphasis_not_claim():
+    """B6 finding #3: a short (≤5-word) double-quoted phrase is term emphasis,
+    NOT a quote claim — it needs no source. The raw (pre-B6) ≥12-char rule
+    falsely demanded a citation for it."""
+    html = '<article><p>Maine Coon "köpek karakterli kedi" olarak bilinir.</p></article>'
+    g = _gate(qg.run_all(html, _brief()), "p0_truthfulness")
+    assert g["status"] == "PASS"
+
+
+def test_p0_five_word_quote_is_boundary_not_claim():
+    """Boundary: exactly 5 quoted words is still emphasis (threshold is ≥6)."""
+    html = '<article><p>Bu ırk "sakin uysal zeki sevecen güçlü" diye anılır.</p></article>'
+    g = _gate(qg.run_all(html, _brief()), "p0_truthfulness")
+    assert g["status"] == "PASS"
+
+
+def test_p0_six_word_uncited_quote_is_claim():
+    """A ≥6-word quoted block is a genuine quote claim and still needs a
+    source (regression guard — the citation requirement survives the fix)."""
+    html = '<article><p>Uzman "bu kedi çok uzun tüylü olur" dedi.</p></article>'
+    g = _gate(qg.run_all(html, _brief()), "p0_truthfulness")
+    assert g["status"] == "RED"
+    assert g["missing"]
+
+
+def test_p0_six_word_quote_with_citation_passes():
+    """A real long quote WITH a parenthetical source clears P0."""
+    html = (
+        '<article><p>Uzman "bu kedi çok uzun tüylü olur" dedi '
+        "(Veteriner Derneği, 2023).</p></article>"
+    )
+    g = _gate(qg.run_all(html, _brief()), "p0_truthfulness")
+    assert g["status"] == "PASS"
+
+
+def test_p0_guillemet_quote_is_claim_regardless_of_length():
+    """Guillemets «…» are an explicit quotation mark (rare for term emphasis),
+    so any «…» block is a quote claim even when short — the raw ≥12-char rule
+    missed short ones."""
+    html = "<article><p>Uzman görüşü «çok etkili» yönündedir.</p></article>"
+    g = _gate(qg.run_all(html, _brief()), "p0_truthfulness")
+    assert g["status"] == "RED"
+
+
 # ---------------------------------------------------------------------------
 # Gate 1 — Gap
 # ---------------------------------------------------------------------------
@@ -131,6 +175,43 @@ def test_gap_red_on_uncovered_sourced_item():
     g = _gate(qg.run_all(html, brief), "gap")
     assert g["status"] == "RED"
     assert "Tamamen kapsanmamış benzersiz konu" in g["missing"]
+
+
+def test_gap_dedup_same_item_across_categories_counts_once():
+    """B6 finding #2: a gap item listed under two categories
+    (must_cover_headings + must_mention_entities) must be counted ONCE, so a
+    single honest gap-skipped comment is enough to clear it. The raw (pre-B6)
+    code double-counted it and demanded two skip comments → false RED."""
+    brief = _brief()
+    item = "Kaynaksız-benzersiz-konu-başlığı"
+    brief["gap"] = {
+        "must_cover_headings": [item],
+        "must_answer_questions": [],
+        "must_mention_entities": [item],  # SAME item, second category
+    }
+    html = (
+        "<article><!-- gap-skipped: bu maddenin kaynağı yok -->"
+        "<h2>Alakasız ama dolu bölüm</h2><p>" + BODY + "</p></article>"
+    )
+    g = _gate(qg.run_all(html, brief), "gap")
+    assert g["status"] == "PASS"
+
+
+def test_gap_case_insensitive_dedup():
+    """Case/whitespace-variant duplicates collapse to one unique uncovered
+    item — one skip comment clears both spellings."""
+    brief = _brief()
+    brief["gap"] = {
+        "must_cover_headings": ["Titanyum Vida"],
+        "must_answer_questions": [],
+        "must_mention_entities": ["  titanyum vida  "],  # same, different case/ws
+    }
+    html = (
+        "<article><!-- gap-skipped: kaynak yok -->"
+        "<h2>Başka bir konu</h2><p>" + BODY + "</p></article>"
+    )
+    g = _gate(qg.run_all(html, brief), "gap")
+    assert g["status"] == "PASS"
 
 
 def test_gap_pass_when_all_categories_covered():

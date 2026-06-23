@@ -89,6 +89,13 @@ from scripts.production.structure_metrics import (  # noqa: E402
     MIN_TABLE_ROWS,
 )
 
+# IMPORT discipline (NOT copy) — site-chrome stripping is owned by
+# scripts.production.content_scope (B6). Applied to each page's HTML BEFORE the
+# structural parse so the ceiling/gap measure the competitor's ARTICLE, not its
+# navigation/footer menus (spec §4a; B5 proof finding #1: raw fetch inflated
+# structure_ceiling.lists to 87 with pure chrome).
+from scripts.production import content_scope  # noqa: E402
+
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -473,6 +480,11 @@ def transform(serp_json: dict, scraped_pages: list[dict], *, market: str) -> lis
         url = url if isinstance(url, str) else ""
         html = page.get("html")
         html = html if isinstance(html, str) else ""
+        # B6: strip site chrome (nav/header/footer/aside subtrees + link-only
+        # menus) before measuring — so the record reflects the article, not the
+        # page's navigation. No-op on chrome-free markup; output schema is
+        # unchanged (only a cleaner DOM is measured).
+        html = content_scope.strip(html)
         record = _parse_page(url, html)
         position = rank.get(_norm_url(url), unranked)
         indexed.append((position, idx, record))
