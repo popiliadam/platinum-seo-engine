@@ -19,7 +19,7 @@ import csv
 import pytest
 
 from scripts.util import sf_issue_taxonomy as tax
-from tests._live_fixtures import live_project_dir, requires_live
+from tests._live_fixtures import live_project_dir, live_slug, requires_live
 
 # Real staged SF crawl (live fixtures under $PSEO_WORKSPACE_ROOT; gitignored
 # ~1GB raw crawls, never committed — present on the operator's machine, absent
@@ -27,7 +27,7 @@ from tests._live_fixtures import live_project_dir, requires_live
 # logic coverage; the three "real-CSV" tests below guard cleanly when the
 # fixture is absent (engine stays plugin-agnostic — no project data committed
 # here). Matches the repo's skip-when-fixture-absent pattern (cf. SF MCP smoke).
-_RAW_DIR = live_project_dir("demo-aluminum-ca") / "sf-exports" / "2026-06-02" / "raw"
+_RAW_DIR = live_project_dir(live_slug("demo-aluminum-ca")) / "sf-exports" / "2026-06-02" / "raw"
 _ISSUES_CSV = _RAW_DIR / "issues_overview_report.csv"
 
 _requires_real_csv = requires_live(

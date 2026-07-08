@@ -43,7 +43,7 @@ from jsonschema import Draft7Validator
 
 from scripts.state import events_writer, workflow_runner
 from scripts.state.portfolio_writer import register_project
-from tests._live_fixtures import live_project_dir
+from tests._live_fixtures import live_project_dir, live_slug
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCHEMAS = REPO_ROOT / "schemas"
@@ -53,7 +53,7 @@ TEMPLATE_XLSX = TEMPLATES / "master-excel.xlsx"
 
 # Live workspace (read-only here; test 5 reads the demo-dental config AT-REST
 # under $PSEO_WORKSPACE_ROOT to prove the bootstrap output matches reality).
-PILOT_SLUG = "demo-dental"
+PILOT_SLUG = live_slug("demo-dental")
 
 # Deterministic timestamp for portfolio registration in tests. register_project
 # takes created_at as a parameter (pure/testable), so tests pin it rather than

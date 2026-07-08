@@ -45,7 +45,7 @@ from jsonschema import Draft7Validator
 
 from scripts.excel import transaction
 from scripts.state import events_writer
-from tests._live_fixtures import live_project_dir, requires_live
+from tests._live_fixtures import live_project_dir, live_slug, requires_live
 
 
 # ---------------------------------------------------------------------------
@@ -60,7 +60,7 @@ SKILL_MD = REPO_ROOT / "skills" / "ingestion" / "sf-import" / "SKILL.md"
 # pilot SF crawl lived in the now-deleted workspace-staging tree (ADR-031) and
 # is absent from the current workspace, so the two live-pilot tests skip
 # cleanly (honest reason via requires_live).
-PILOT_SLUG = "demo-dental"
+PILOT_SLUG = live_slug("demo-dental")
 PILOT_SF_DATE = "2026-04-27"
 PILOT_PROJECT = live_project_dir(PILOT_SLUG)
 PILOT_RAW_DIR = PILOT_PROJECT / "sf-exports" / PILOT_SF_DATE / "raw"

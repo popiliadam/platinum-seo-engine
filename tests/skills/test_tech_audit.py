@@ -51,7 +51,7 @@ import yaml
 from jsonschema import Draft7Validator
 
 from scripts.discovery import tech_audit_transform
-from tests._live_fixtures import live_project_dir
+from tests._live_fixtures import live_project_dir, live_slug
 
 
 # ---------------------------------------------------------------------------
@@ -1201,7 +1201,7 @@ _TECH_SEO_ENUM = frozenset({
 #: $PSEO_WORKSPACE_ROOT (gitignored; absent on CI / fresh clones, where the
 #: live-CSV tests skip cleanly).
 _REAL_ISSUES_CSV = (
-    live_project_dir("demo-aluminum-ca")
+    live_project_dir(live_slug("demo-aluminum-ca"))
     / "sf-exports" / "2026-06-02" / "raw" / "issues_overview_report.csv"
 )
 

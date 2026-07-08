@@ -140,19 +140,26 @@ def test_fetch_depth_full_history_for_secret_grep():
     assert checkout_step["with"]["fetch-depth"] == 0
 
 
-def test_plugin_agnostik_grep_word_boundary_and_disclaimer_exclude():
-    """Lesson 28 6'inci uygulama: \\b word-boundary substring eliminate
-    (inventory -> demo-furniture match yok) + F-16 disclaimer exclude intentional
-    policy preserve (Q-CI-W2-02 mop-up Phase 14 W2 manager <5dk fix).
+def test_plugin_agnostik_grep_pattern_from_secret():
+    """2026-07-08 client-name scrub: the forbidden-slug list moved out of the
+    repo into the CLIENT_SLUG_PATTERN secret — a public repo's own guard must
+    not advertise the names it forbids. Contract: step 5 wires the secret via
+    env and greps repo-wide with it. Hardcoded-slug absence is self-enforcing:
+    the secret-driven grep scans ci.yml itself, so a re-leaked literal fails
+    the build without this test naming any slug.
+
+    Supersedes the Lesson-28 word-boundary + F-16 disclaimer-exclude contract
+    (both existed only because the slug list lived in this file).
     """
     body = CI_YAML.read_text()
     step5 = next(
         s for s in yaml.safe_load(body)["jobs"]["ci"]["steps"]
         if s.get("name", "") == "5. plugin-agnostik-grep"
     )
-    assert "\\b(demo-dental|" in step5["run"]
-    assert "No project slug hardcoded" in step5["run"]
-    assert "F-16 disclaimer" in step5["run"]
+    assert step5["env"]["CLIENT_SLUG_PATTERN"] == "${{ secrets.CLIENT_SLUG_PATTERN }}"
+    assert 'grep -rIEn "$CLIENT_SLUG_PATTERN"' in step5["run"]
+    # jq .mcp.json invariant must survive the rewrite
+    assert "mcpServers | keys | length" in step5["run"]
 
 
 def test_plugin_agnostik_step5_no_or_true_mask():
@@ -242,27 +249,14 @@ def test_coverage_gate_deferral_documented():
     assert "deferred" in body, "coverage-gate comment must state it is deferred"
 
 
-def test_plugin_agnostik_step5_adjacent_pair_filter_present():
-    """Wave 2 fix codification: adjacent-slug-pair patterns in grep -vE
-    catch F-16 disclaimer multi-line continuation lines without false
-    positives on real hardcodes (which would mention 1 slug only).
-
-    7 adjacent pairs cover the 8-slug enumeration:
-    demo-dental-demo-furniture, demo-furniture-demo-hvac, demo-hvac-demo-petcare, demo-petcare-demo-shop,
-    demo-shop-demo-tires, demo-tires-demo-construction, demo-construction-demo-agency.
-    """
+def test_plugin_agnostik_step5_secret_absent_safe():
+    """The slug grep must be gated on a non-empty CLIENT_SLUG_PATTERN so that
+    forks and Dependabot runs (no repo secrets) do not grep with an empty
+    pattern — an empty-pattern grep matches every line and would hard-fail
+    every external contribution."""
     body = CI_YAML.read_text()
     step5 = next(
         s for s in yaml.safe_load(body)["jobs"]["ci"]["steps"]
         if s.get("name", "") == "5. plugin-agnostik-grep"
     )
-    pairs = [
-        "demo-dental.*demo-furniture",
-        "demo-hvac.*demo-petcare",
-        "demo-shop.*demo-tires",
-        "demo-construction.*demo-agency",
-    ]
-    for pair in pairs:
-        assert pair in step5["run"], (
-            f"Wave 2 adjacent-pair filter missing: {pair} (disclaimer false positive risk)"
-        )
+    assert '[ -n "$CLIENT_SLUG_PATTERN" ]' in step5["run"]

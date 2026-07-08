@@ -36,7 +36,7 @@ from jsonschema import Draft7Validator
 from scripts.discovery import quickwins_transform
 from scripts.excel import transaction
 from scripts.state import events_writer, workflow_runner
-from tests._live_fixtures import live_project_dir, requires_live
+from tests._live_fixtures import live_project_dir, live_slug, requires_live
 
 
 # ---------------------------------------------------------------------------
@@ -50,7 +50,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 # (ADR-031) and is absent from the current workspace, so the two live-capture
 # tests skip cleanly (honest reason via requires_live). The hermetic transform
 # coverage (tests 2-8) is unaffected.
-PILOT_SLUG = "demo-dental"
+PILOT_SLUG = live_slug("demo-dental")
 PILOT_DATE = "2026-04-30"
 LIVE_RAW_PATH = (
     live_project_dir(PILOT_SLUG) / "inbox" / "gsc"

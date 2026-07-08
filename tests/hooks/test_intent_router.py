@@ -417,10 +417,10 @@ def test_main_malformed_active_json_does_not_crash(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 # Genuine-request voice that MUST stay byte-identical to pre-pb0 (demo-furniture, bound).
-_DECLARED_VOICE_furniture = "➤ Niyet: aylık bakım algılandı → çalıştır: /pseo-run monthly demo-furniture"
+_DECLARED_VOICE_FURNITURE = "➤ Niyet: aylık bakım algılandı → çalıştır: /pseo-run monthly demo-furniture"
 # Soft "mentioned, not requested" hint (demo-furniture, bound) — surfaces the command but
 # does NOT arm the denetçi.
-_SOFT_VOICE_furniture = "ℹ️ 'aylık bakım' geçti — çalıştırmak istersen: /pseo-run monthly demo-furniture"
+_SOFT_VOICE_FURNITURE = "ℹ️ 'aylık bakım' geçti — çalıştırmak istersen: /pseo-run monthly demo-furniture"
 
 
 @pytest.mark.parametrize("prompt, expected", [
@@ -512,7 +512,7 @@ def test_route_mention_research_prompt_is_soft_superseded(tmp_path: Path) -> Non
     m = result["marker"]
     assert m["status"] == "superseded"            # ← the fix: nothing owed
     assert "workflow" not in m and "command" not in m
-    assert result["voice"] == _SOFT_VOICE_furniture   # helpful surfacing of the command
+    assert result["voice"] == _SOFT_VOICE_FURNITURE   # helpful surfacing of the command
     assert "➤ Niyet" not in result["voice"]       # NOT the declared actionable voice
     _validator().validate(m)
 
@@ -531,7 +531,7 @@ def test_route_question_mentions_are_soft_superseded(tmp_path: Path, prompt: str
     )
     assert result["tier"] == "1-soft"
     assert result["marker"]["status"] == "superseded"
-    assert result["voice"] == _SOFT_VOICE_furniture
+    assert result["voice"] == _SOFT_VOICE_FURNITURE
     _validator().validate(result["marker"])
 
 
@@ -579,7 +579,7 @@ def test_route_declared_voice_is_byte_identical(tmp_path: Path) -> None:
         turn_id="t", intent_id="i", declared_at="2026-06-05T10:00:00",
     )
     assert result["tier"] == 1
-    assert result["voice"] == _DECLARED_VOICE_furniture
+    assert result["voice"] == _DECLARED_VOICE_FURNITURE
 
 
 def test_route_bare_slash_command_is_tier2_advisory(tmp_path: Path) -> None:

@@ -68,3 +68,22 @@ def requires_live(path: Path, label: str):
             "CI / fresh clones)"
         ),
     )
+
+
+def live_slug(alias: str) -> str:
+    """Resolve a synthetic slug alias to the operator's real project slug.
+
+    The public repo carries only synthetic ``demo-*`` slugs (client-name
+    scrub, 2026-07-08). Operators keep live coverage by mapping aliases to
+    real workspace projects via ``PSEO_LIVE_SLUGS``, e.g.::
+
+        export PSEO_LIVE_SLUGS="demo-aluminum-ca=<real>,demo-hvac=<real>"
+
+    Unmapped aliases resolve to themselves, so the dependent tests skip
+    cleanly (a synthetic project dir does not exist in a real workspace).
+    """
+    for pair in os.environ.get("PSEO_LIVE_SLUGS", "").split(","):
+        key, _, value = pair.partition("=")
+        if key.strip() == alias and value.strip():
+            return value.strip()
+    return alias

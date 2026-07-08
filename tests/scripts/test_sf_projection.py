@@ -22,12 +22,12 @@ import pytest
 
 from scripts.excel import transaction
 from scripts.ingestion import sf_projection as P
-from tests._live_fixtures import live_project_dir
+from tests._live_fixtures import live_project_dir, live_slug
 
 # Real staged SF crawl (live fixtures, 22 CSVs, under $PSEO_WORKSPACE_ROOT;
 # gitignored — absent on CI / fresh clones, where the real_dir_available
 # fixture skips the live-CSV tests cleanly).
-_RAW_DIR = live_project_dir("demo-aluminum-ca") / "sf-exports" / "2026-06-02" / "raw"
+_RAW_DIR = live_project_dir(live_slug("demo-aluminum-ca")) / "sf-exports" / "2026-06-02" / "raw"
 
 _SEVERITY_ENUM = {"CRITICAL", "HIGH", "MEDIUM", "LOW"}
 _STATUS_ENUM = {"TODO", "ONGOING", "EXISTS", "DONE", "BLOCKED", "DEFERRED", "CANCELED"}

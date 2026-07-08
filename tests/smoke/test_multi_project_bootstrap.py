@@ -17,7 +17,7 @@ from pathlib import Path
 import jsonschema
 import pytest
 
-from tests._live_fixtures import live_project_dir
+from tests._live_fixtures import live_project_dir, live_slug
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "scripts" / "state" / "bootstrap_project.py"
@@ -92,34 +92,34 @@ def test_idempotent_rerun_unchanged(tmp_path: Path) -> None:
     assert out_rerun.read_bytes() == orig_bytes, "Bootstrap output changed across reruns"
 
 
-def test_demo-hvac_rerun_obsolete_workaround() -> None:
+def test_demo_hvac_rerun_obsolete_workaround() -> None:
     """demo-hvac workaround obsolete kanıt: bootstrap çıktısı mevcut demo-hvac
     canonical paths ile bire-bir uyum (post-fix manuel post-process patch
     artık gerekli değil; rerun idempotent = workaround obsolete)."""
-    demo-hvac_actual_path = live_project_dir("demo-hvac") / "project.config.json"
-    if not demo-hvac_actual_path.exists():
-        pytest.skip(f"demo-hvac config not found at {demo-hvac_actual_path}")
-    demo-hvac_actual = json.loads(demo-hvac_actual_path.read_text("utf-8"))
+    demo_hvac_actual_path = live_project_dir(live_slug("demo-hvac")) / "project.config.json"
+    if not demo_hvac_actual_path.exists():
+        pytest.skip(f"demo-hvac config not found at {demo_hvac_actual_path}")
+    demo_hvac_actual = json.loads(demo_hvac_actual_path.read_text("utf-8"))
     ws_root = "~/Documents/platinum-seo-workspace"
     cmd = [
         sys.executable, str(SCRIPT),
         "--project", "demo-hvac",
-        "--domain", demo-hvac_actual["domain"],
-        "--market", demo-hvac_actual["market"],
-        "--locale", demo-hvac_actual["language"]["content_locale"],
-        "--currency", demo-hvac_actual["currency"],
-        "--platform", demo-hvac_actual["platform"],
-        "--profile", demo-hvac_actual["profiles"][0],
+        "--domain", demo_hvac_actual["domain"],
+        "--market", demo_hvac_actual["market"],
+        "--locale", demo_hvac_actual["language"]["content_locale"],
+        "--currency", demo_hvac_actual["currency"],
+        "--platform", demo_hvac_actual["platform"],
+        "--profile", demo_hvac_actual["profiles"][0],
         "--dry-run",
     ]
     env = {**os.environ, "PSEO_WORKSPACE_ROOT": ws_root}
     res = subprocess.run(cmd, capture_output=True, text=True, env=env, timeout=15)
     assert res.returncode == 0, res.stderr
     bootstrap_out = json.loads(res.stdout)
-    for field, expected in demo-hvac_actual["paths"].items():
+    for field, expected in demo_hvac_actual["paths"].items():
         assert bootstrap_out["paths"][field] == expected, (
             f"paths.{field} drift: bootstrap={bootstrap_out['paths'][field]!r} "
-            f"vs demo-hvac_actual={expected!r}"
+            f"vs demo_hvac_actual={expected!r}"
         )
 
 

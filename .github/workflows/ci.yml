@@ -53,6 +53,9 @@ jobs:
       # Coverage gate deliberately deferred (FIX-R 2026-06-10): a measured
       # coverage baseline must exist before any fail-under threshold is added.
       - name: 4. pytest
+        env:
+          # Feeds tests/ci/test_client_scrub_guard.py; absent on forks → guard skips.
+          CLIENT_SLUG_PATTERN: ${{ secrets.CLIENT_SLUG_PATTERN }}
         run: pytest --tb=short -q
         continue-on-error: false
 
@@ -71,20 +74,23 @@ jobs:
           "
         continue-on-error: false
 
-      # Step 5 — plugin agnostik invariant (.mcp.json 4 server + skill body slug hardcode YOK F-16)
-      # Wave 2 strict: `|| true` mask removed (real exit code visible).
-      # Adjacent-slug-pair patterns filter F-16 disclaimer multi-line lists
-      # (real hardcode = 1 slug; disclaimer enumerates 8 slugs across 2-3 lines).
+      # Step 5 — plugin agnostik invariant (.mcp.json 4 server + repo-wide client-slug grep F-16)
+      # 2026-07-08 client-name scrub: the forbidden-slug list moved into the
+      # CLIENT_SLUG_PATTERN repo secret — a public repo's own guard must not
+      # advertise the very names it forbids. Scope widened from skills/-only to
+      # repo-wide (post-scrub zero matches, so no disclaimer-exclude pipe needed).
+      # Absent/empty secret (forks, Dependabot) → slug grep no-ops; the .mcp.json
+      # invariant still runs. Wave 2 strict: no `|| true` mask.
       - name: 5. plugin-agnostik-grep
+        env:
+          CLIENT_SLUG_PATTERN: ${{ secrets.CLIENT_SLUG_PATTERN }}
         run: |
           # .mcp.json 4 server invariant (gsc + dataforseo + ScraplingServer + sf; v1.8 ADR-039)
           test "$(jq '.mcpServers | keys | length' .mcp.json)" = "4"
-          # Skill body slug grep — word-boundary + F-16 disclaimer exclude.
-          # Filter expansion: adjacent-slug pairs catch multi-line disclaimer
-          # continuation lines (lesson 28 mop-up 6'ıncı uygulama → Wave 2 strict).
-          ! grep -rEn "\b(demo-dental|demo-furniture|demo-hvac|demo-petcare|demo-shop|demo-tires|demo-construction|demo-agency)\b" \
-            skills/ --include=SKILL.md \
-            | grep -vE "No project slug hardcoded|F-16 disclaimer|plugin agnostik|are FORBIDDEN|slug'lar|demo-dental.*demo-furniture|demo-furniture.*demo-hvac|demo-hvac.*demo-petcare|demo-petcare.*demo-shop|demo-shop.*demo-tires|demo-tires.*demo-construction|demo-construction.*demo-agency"
+          # Repo-wide client-slug grep (pattern from repo secret; -I skips binaries)
+          if [ -n "$CLIENT_SLUG_PATTERN" ]; then
+            ! grep -rIEn "$CLIENT_SLUG_PATTERN" . --exclude-dir=.git
+          fi
         continue-on-error: false
 
       # Step 6 — secret-grep (Phase 14+ CI Rule 3 production-ready 11-phase invariant)
