@@ -6,7 +6,7 @@
     "name": "Suleyman Capar",
     "email": "suleymanncapar@gmail.com"
   },
-  "license": "MIT",
+  "license": "AGPL-3.0",
   "skills": "./skills",
   "commands": "./commands",
   "hooks": [

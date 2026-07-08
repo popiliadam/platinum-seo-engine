@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/popiliadam/platinum-seo-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/popiliadam/platinum-seo-engine/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/popiliadam/platinum-seo-engine?label=release)](https://github.com/popiliadam/platinum-seo-engine/releases/latest)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![Claude Code Plugin](https://img.shields.io/badge/Claude_Code-plugin-7C3AED)](https://claude.ai/code)
 
 > Status: **v2.1.0** — production-ready core (production/publishing suites + 4 new tech-SEO skills are `wip`: contracts + tests locked, runtime deferred) · 49 skills · 29 commands · 6 hooks · 4 MCP servers (3 stdio + 1 HTTP)
@@ -314,7 +314,11 @@ For one-off bug reports or questions, open an issue.
 
 ## License
 
-MIT — see [`LICENSE`](LICENSE).
+**AGPL-3.0** — see [`LICENSE`](LICENSE). Free to use, study, modify, and self-host. If you run a modified version as a network service or redistribute it, your changes must be published under the same license — so the engine stays open for everyone.
+
+**Commercial support & agency licensing** (private modifications, white-label, priority help): [suleymanncapar@gmail.com](mailto:suleymanncapar@gmail.com) — or open an issue.
+
+Releases up to and including v2.1.0 were published under MIT and remain so; AGPL-3.0 applies from this point forward.
 
 ---
 
