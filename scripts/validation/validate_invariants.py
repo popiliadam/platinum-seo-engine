@@ -363,19 +363,48 @@ def check_F_01(workbook: Any, project_slug: str, **_) -> dict:
 
 
 def _check_no_excel_formula(workbook: Any, project_slug: str, *,
-                            id_: str, formula_token: str) -> dict:
-    """F-02/F-03/F-04: ensure dashboard sheet has no live Excel formula
-    of the given token. Read-only mode returns None or strings; data_only
-    cached values are not formulas. We sniff for a leading '=' + token."""
+                            id_: str, formula_token: str,
+                            formula_workbook: Any = None) -> dict:
+    """F-02/F-03/F-04: dashboard sheet holds no live Excel formula of the token.
+
+    REQUIRES a workbook opened with ``data_only=False``. Every other rule wants
+    the cached VALUES, so the shared handle is opened ``data_only=True`` — and in
+    that mode openpyxl never yields a formula string at all, it yields the cached
+    result (``None`` for a freshly written formula, a number for one Excel has
+    saved). The previous implementation sniffed the shared handle for a leading
+    ``'=' + token`` and so could not match anything: it reported PASS over a live
+    formula for as long as it existed, and fired only on a harmless TEXT cell that
+    merely looked like a formula — the inverse of the rule it states.
+
+    Measured directly on one file::
+
+        data_only=True  -> dashboard!A3 = None
+        data_only=False -> dashboard!A3 = '=AVERAGEIF(A1:A2,1)'
+
+    Without the formula view this reports SKIP, never PASS. A check that cannot
+    see its subject has not measured it, and calling that a pass is precisely the
+    failure this rule exists to prevent.
+    """
     rule = f"dashboard sheet contains no live `={formula_token}(...)` formulas"
-    if not _has_sheet(workbook, "dashboard"):
+    if formula_workbook is None:
+        return _make_result(
+            id_=id_, severity="CRITICAL", verdict="SKIP",
+            evidence=(
+                "no data_only=False workbook view supplied — a formula is "
+                "INVISIBLE to the shared data_only=True handle, so this rule was "
+                "NOT MEASURED (this is not a pass)"
+            ),
+            rule=rule, category="csr_foundation",
+            affected_sheets=["dashboard"],
+        )
+    if not _has_sheet(formula_workbook, "dashboard"):
         return _make_result(
             id_=id_, severity="CRITICAL", verdict="SKIP",
             evidence="dashboard sheet missing — pilot wb may be sparse",
             rule=rule, category="csr_foundation",
             affected_sheets=["dashboard"],
         )
-    ws = workbook["dashboard"]
+    ws = formula_workbook["dashboard"]
     bad: list[str] = []
     for row in ws.iter_rows(values_only=True):
         if row is None:
@@ -404,19 +433,25 @@ def _check_no_excel_formula(workbook: Any, project_slug: str, *,
     )
 
 
-def check_F_02(workbook: Any, project_slug: str, **_) -> dict:
+def check_F_02(workbook: Any, project_slug: str, *,
+               formula_workbook: Any = None, **_) -> dict:
     return _check_no_excel_formula(workbook, project_slug,
-                                    id_="F-02", formula_token="COUNTIF")
+                                    id_="F-02", formula_token="COUNTIF",
+                                    formula_workbook=formula_workbook)
 
 
-def check_F_03(workbook: Any, project_slug: str, **_) -> dict:
+def check_F_03(workbook: Any, project_slug: str, *,
+               formula_workbook: Any = None, **_) -> dict:
     return _check_no_excel_formula(workbook, project_slug,
-                                    id_="F-03", formula_token="SUMIF")
+                                    id_="F-03", formula_token="SUMIF",
+                                    formula_workbook=formula_workbook)
 
 
-def check_F_04(workbook: Any, project_slug: str, **_) -> dict:
+def check_F_04(workbook: Any, project_slug: str, *,
+               formula_workbook: Any = None, **_) -> dict:
     return _check_no_excel_formula(workbook, project_slug,
-                                    id_="F-04", formula_token="AVERAGEIF")
+                                    id_="F-04", formula_token="AVERAGEIF",
+                                    formula_workbook=formula_workbook)
 
 
 def check_F_05(workbook: Any, project_slug: str, **_) -> dict:
@@ -1907,12 +1942,20 @@ _RULE_FUNCTIONS = (
 
 
 def evaluate_all(workbook: Any, project_slug: str, *,
-                 workspace_root: Path | None = None) -> list[dict]:
+                 workspace_root: Path | None = None,
+                 formula_workbook: Any = None) -> list[dict]:
     """Run every rule function, return list of result dicts in
-    declaration order. Each function may raise; caller handles DURUR-3."""
+    declaration order. Each function may raise; caller handles DURUR-3.
+
+    ``formula_workbook`` is the same file opened ``data_only=False``. Only
+    F-02/F-03/F-04 use it, and without it those three report SKIP rather than a
+    PASS they cannot justify — see _check_no_excel_formula. Every other rule
+    absorbs the kwarg through **_.
+    """
     out: list[dict] = []
     for fn in _RULE_FUNCTIONS:
-        result = fn(workbook, project_slug, workspace_root=workspace_root)
+        result = fn(workbook, project_slug, workspace_root=workspace_root,
+                    formula_workbook=formula_workbook)
         out.append(result)
     return out
 
@@ -2248,12 +2291,17 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     wb = load_workbook(filename=str(wb_path), read_only=True, data_only=True)
+    # Second view of the SAME file, formulas visible. F-02/F-03/F-04 cannot see
+    # their subject without it and correctly report SKIP when it is absent.
+    fwb = load_workbook(filename=str(wb_path), read_only=True, data_only=False)
     try:
-        results = evaluate_all(wb, args.project, workspace_root=ws_root)
+        results = evaluate_all(wb, args.project, workspace_root=ws_root,
+                               formula_workbook=fwb)
         rows = {r["id"]: _sheet_row_counts(wb, r.get("affected_sheets"))
                 for r in results}
     finally:
         wb.close()
+        fwb.close()
 
     results = results + unimplemented_results()
     agg = aggregate_verdicts(results)
