@@ -172,6 +172,11 @@
           "type": "number",
           "minimum": 0,
           "description": "Best-effort upper-bound credit estimate per run. 0 when free."
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Free-text rationale for this block. PROSE ONLY — nothing reads it at runtime, so a rule that must be ENFORCED does not belong here. Added because refresh-audit carries real policy on both blocks (audit completeness beats budget; phase 7 writes stay propose-only) and the alternative was deleting documented policy to satisfy additionalProperties:false."
         }
       }
     },
@@ -193,6 +198,11 @@
         "safe_auto_execute": {
           "type": "boolean",
           "description": "True allows scheduled cron triggers to run end-to-end without a human session; false means scheduled runs must stop at a report."
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Free-text rationale for this block. PROSE ONLY — nothing reads it at runtime, so a rule that must be ENFORCED does not belong here. Added because refresh-audit carries real policy on both blocks (audit completeness beats budget; phase 7 writes stay propose-only) and the alternative was deleting documented policy to satisfy additionalProperties:false."
         }
       }
     }

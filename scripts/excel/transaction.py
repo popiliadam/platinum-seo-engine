@@ -125,6 +125,13 @@ WRITER_REGISTRY: dict[str, frozenset[str]] = {
     "robots_txt":       frozenset({"tech-audit"}),
     "redirect_404":     frozenset({"sf-import"}),
     "completed_work":   frozenset({"done-protocol"}),
+    # DataForSEO projections. The identity is the one the code actually passes
+    # (transaction.replace(..., writer="dfs-project") in dfs_project_transform),
+    # NOT the orchestrating skill name in the schema prose — a registry that
+    # named the skill would flag every legitimate write as unexpected.
+    "dfs_ranked_keywords": frozenset({"dfs-project"}),
+    "dfs_relevant_pages":  frozenset({"dfs-project"}),
+    "backlinks":           frozenset({"dfs-project"}),
 }
 
 # ---------------------------------------------------------------------------
