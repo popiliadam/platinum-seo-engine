@@ -345,8 +345,28 @@ def _state_dir(state_root: Path | None, workbook_path: Path, project_slug: str) 
     """
     if state_root is not None:
         sd = Path(state_root)
-        sd.mkdir(parents=True, exist_ok=True)
-        return sd
+        if not sd.is_absolute():
+            # Hardening (v2.1): anchor a relative state_root to the workbook's
+            # own tree, NOT the process CWD — a bare "projects/{slug}/_state"
+            # resolved against the wrong CWD mislocates writes.
+            sd = workbook_path.parent / sd
+        try:
+            sd.mkdir(parents=True, exist_ok=True)
+            return sd
+        except (PermissionError, OSError) as exc:
+            # Hardening (v2.1 — bigcat-tr): an implausible/unwritable explicit
+            # state_root (observed: /Users/projects from a mis-resolved GSC
+            # driver passing workspace_root as state_root) must NOT propagate
+            # and mislocate the provenance/anomaly sidecar into the workspace
+            # root. Fall back to the workbook-derived _state and warn instead.
+            fallback = workbook_path.parent / "_state"
+            print(
+                f"[transaction._state_dir] WARN: state_root={state_root!r} "
+                f"unusable ({exc}); falling back to {fallback}",
+                file=sys.stderr,
+            )
+            fallback.mkdir(parents=True, exist_ok=True)
+            return fallback
     # Default: workbook_path is .../projects/{slug}/{filename}.xlsx
     sd = workbook_path.parent / "_state"
     sd.mkdir(parents=True, exist_ok=True)
