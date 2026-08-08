@@ -31,7 +31,7 @@
         ]
       },
       {
-        "matcher": "Bash|mcp__gsc__submit_sitemap",
+        "matcher": "Bash|mcp__.*gsc__submit_sitemap",
         "hooks": [
           {
             "type": "command",

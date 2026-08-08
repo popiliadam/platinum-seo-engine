@@ -38,7 +38,8 @@ consent_ledger.target_hash (writer/gate parity):
     BLOCKED: {action} → {target}  (bu oturumda onay yok)
     İzin vermek için çalıştır:  /pseo-approve sess-{first8 of session_id} {action} "{target}"
 
-Wired as a SECOND PreToolUse block (matcher ``Bash|mcp__gsc__submit_sitemap``);
+Wired as a SECOND PreToolUse block (matcher ``Bash|mcp__.*gsc__submit_sitemap``,
+which covers both the direct and the plugin-namespaced tool name);
 the existing block is untouched. Hooks compose — a Bash call fires both blocks and
 either can deny. READ-ONLY: the gate writes no state.
 """
@@ -75,6 +76,28 @@ from scripts.state.session_binding import (  # noqa: E402
 # ---------------------------------------------------------------------------
 
 _MCP_SUBMIT_TOOL = "mcp__gsc__submit_sitemap"
+
+# The SAME server is exposed under two different tool names depending on how it
+# resolves: `mcp__gsc__submit_sitemap` directly, and
+# `mcp__plugin_platinum-seo-engine_gsc__submit_sitemap` through the plugin. Both
+# have been observed live, in different sessions, from this one .mcp.json entry —
+# the naming is not under this project's control.
+#
+# An exact-literal match therefore gates the submission in some sessions and not
+# in others, and the ungated session is the silent one: a hook that never matches
+# and a hook that always allows look identical from outside. Matching the suffix
+# covers both forms and cannot drift again when namespacing changes.
+_MCP_SUBMIT_SUFFIX = "gsc__submit_sitemap"
+
+
+def _is_mcp_submit_tool(tool_name) -> bool:
+    """True for every naming form of the gated sitemap-submit tool."""
+    return (
+        isinstance(tool_name, str)
+        and tool_name.startswith("mcp__")
+        and tool_name.endswith(_MCP_SUBMIT_SUFFIX)
+    )
+
 
 # Leading bash tokens that delete irreversibly (mirror events_writer._BASH_DELETE_TOKENS).
 _DELETE_TOKENS = frozenset({"rm", "rmdir", "unlink", "shred"})
@@ -442,7 +465,7 @@ def classify(tool_name: str, tool_input: dict) -> tuple[str, str] | None:
     outward submission to Google); its target is the feedpath (the sitemap being
     submitted), falling back to siteUrl.
     """
-    if tool_name == _MCP_SUBMIT_TOOL:
+    if _is_mcp_submit_tool(tool_name):
         ti = tool_input if isinstance(tool_input, dict) else {}
         return ("mcp_submit", ti.get("feedpath") or ti.get("siteUrl") or "")
     if tool_name == "Bash":
