@@ -305,6 +305,37 @@ workflow_runner.finish_step(handle.run_id, 2, project_slug=project_slug,
                             output_ref=f"urls_crawled={final_state.urls_crawled}")
 ```
 
+### Step 4b — Crawl Analysis (post-crawl, ZORUNLU for dup/hash — v1.7)
+
+`near_duplicates` + `exact_duplicates` reports and the `internal_all` near-dup/hash
+columns are populated ONLY by SF's post-crawl **Crawl Analysis** pass — NOT by the
+crawl itself. If Crawl Analysis has not run, those two reports export with correct
+headers but **0 data rows** (present-but-empty), which is NOT the same as
+"missing" — do not silently pass it as 24/24-populated. Run Crawl Analysis after
+poll completes (via MCP if available; otherwise emit an explicit operator
+instruction: "SF GUI'de Crawl Analysis çalıştır → 2 dup raporunu re-export") and
+mark the duplicate dimension **AMBER** until populated. Evidence: a 2026-07-24 run
+had the Duplicates toggle ON yet both reports empty; after operator ran Crawl
+Analysis, 2 real 100%-similarity near-dup clusters surfaced (money-page cannibalization).
+
+**AUTO-ANALYSIS DETECTION (v1.9 — A20):** before flagging AMBER, check
+`sf_crawl_progress` → `postCrawlAnalysisProgress.percentComplete`. If `100`, Crawl
+Analysis ran automatically at crawl-end (a GUI setting) → empty dup/orphan reports are
+a **GENUINE ZERO**, not present-but-unanalyzed → report as "genuine 0", do NOT AMBER.
+Only `<100`/absent means analysis did not run → then AMBER + operator re-export.
+Distinguish three states: toggle-off (no report) ≠ analysis-not-run (report present,
+empty) ≠ genuine-0 (analysis ran, empty). Evidence rkturizm-tr: `postCrawlAnalysisProgress=100`,
+both bulk + seo-element paths returned 0 clusters → genuine zero, no re-export needed.
+
+**CRAWL CONFIG — USER-AGENT + RENDERING (v1.9 — A19):** before the crawl, ensure SF
+Configuration → User-Agent = **`Googlebot (Smartphone)`** (mobile-first indexing → you
+see what Google actually indexes + catches cloaking/differential-serving; the default
+"Screaming Frog SEO Spider" UA is served visitor content → misleading audit) and
+Rendering = **Text-Only** for server-side stacks (WordPress/RankMath prints schema+H1
+server-side → fast + sufficient for element existence; escalate to JS Rendering only if
+a live-vs-crawl "missing H1/schema" contradiction appears). If an operator asks which UA,
+recommend Googlebot-Smartphone directly.
+
 ### Step 5 — `export_24_reports` (24 raporu × SF-export-tool dispatch loop)
 
 Iterate the export PLAN returned by

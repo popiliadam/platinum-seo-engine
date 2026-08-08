@@ -97,6 +97,43 @@ def normalize_filename(name: str) -> str:
     return n
 
 
+def _sniff_is_ndjson(path: Path) -> bool:
+    """Peek the first non-blank line of ``path``; True when it starts with '{'.
+
+    An SF ``raw/`` entry named ``*.csv`` whose first content line opens with '{'
+    is really an NDJSON object-per-line export (the seo-element dispatch the
+    orchestrator normally converts via :func:`ndjson_to_csv` before the atomic
+    move). A CSV header row never opens with '{', so this sniff is unambiguous.
+    """
+    with path.open("r", encoding="utf-8-sig") as fh:
+        for line in fh:
+            stripped = line.strip()
+            if stripped:
+                return stripped.startswith("{")
+    return False
+
+
+def _normalize_ndjson_csv_in_place(path: Path) -> bool:
+    """Defensive guard: if a ``raw/`` .csv is actually NDJSON, convert it to CSV
+    in place so the header-matched CSV path (row count here + downstream
+    ``sf_projection.read_csv_rows``) never mis-parses a ``{...}`` line as a
+    single-column header. Idempotent — a genuine CSV is left byte-for-byte
+    untouched. Returns True only when a conversion happened.
+
+    The ``ndjson_to_csv`` import is DEFERRED to call time on purpose:
+    ``scripts.ingestion.sf_crawl_orchestrator`` imports THIS module at import
+    time (``TIER1_REQUIRED`` / ``TIER2_RECOMMENDED`` SSoT), so a module-level
+    import back would be circular. A function-level import runs after both
+    modules are loaded and is cycle-free.
+    """
+    if not _sniff_is_ndjson(path):
+        return False
+    from scripts.ingestion.sf_crawl_orchestrator import ndjson_to_csv  # deferred: avoid import cycle
+    csv_text = ndjson_to_csv(path.read_text(encoding="utf-8-sig"))
+    path.write_text(csv_text, encoding="utf-8")
+    return True
+
+
 def match_tiers(raw_dir: Path) -> tuple[list[FileMatch], set[str], set[str]]:
     """Walk raw/, normalize names, match canonical names.
 
@@ -111,6 +148,9 @@ def match_tiers(raw_dir: Path) -> tuple[list[FileMatch], set[str], set[str]]:
     for path in sorted(raw_dir.iterdir()):
         if not path.is_file() or not path.name.endswith(".csv"):
             continue
+        # Defensive: normalize a mis-dispatched NDJSON-as-.csv to real CSV before
+        # hashing / row-counting so both this pass and sf_projection see CSV.
+        _normalize_ndjson_csv_in_place(path)
         canonical = normalize_filename(path.name)
         if canonical in seen_canonicals:
             raise SFImportError(
