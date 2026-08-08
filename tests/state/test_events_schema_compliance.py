@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import os
+import warnings
 from pathlib import Path
 
 import pytest
@@ -21,6 +22,18 @@ from jsonschema import Draft7Validator
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_PATH = REPO_ROOT / "schemas" / "events.schema.json"
+
+
+def _validator() -> Draft7Validator:
+    """The validator this gate judges rows with — ONE definition, so the
+    strictness of the gate and of the fixture can never drift apart.
+
+    Routed through ``build_validator`` (NOT a bare ``Draft7Validator``) so this
+    gate is exactly as strict as ``events_writer``: ``format: date-time`` is
+    ENFORCED as the UTC ``…Z`` form rather than treated as a bare annotation.
+    """
+    from scripts.validation.validate_schema import build_validator
+    return build_validator(json.loads(SCHEMA_PATH.read_text(encoding="utf-8")))
 
 
 def _workspace_root() -> Path | None:
@@ -49,7 +62,7 @@ def _events_files() -> list[Path]:
 
 @pytest.fixture(scope="module")
 def schema() -> Draft7Validator:
-    return Draft7Validator(json.loads(SCHEMA_PATH.read_text(encoding="utf-8")))
+    return _validator()
 
 
 @pytest.mark.parametrize("events_path", _events_files(), ids=lambda p: str(p.relative_to(p.parents[3])) if p else "<none>")
@@ -93,9 +106,51 @@ def test_legacy_archive_is_optional(schema: Draft7Validator) -> None:
         assert isinstance(text, str)
 
 
-def test_skip_when_workspace_unbound() -> None:
-    """Sentinel test: when PSEO_WORKSPACE_ROOT is unset, the parametrized
-    suite contributes zero cases (graceful no-op for engine-only CI)."""
-    if _workspace_root() is None:
-        files = _events_files()
-        assert files == [], f"events_files() should be empty when unbound, got {files}"
+def test_compliance_validator_is_as_strict_as_the_writer() -> None:
+    """The gate must reject what events_writer would have refused to write.
+
+    A plain ``Draft7Validator`` treats ``format`` as an annotation, so a
+    ``+00:00`` timestamp validates — while events_writer, which builds its
+    validator through ``validate_schema.build_validator``, enforces the UTC
+    ``…Z`` form (rules/time-discipline.md §8.10) and raises. A gate weaker than
+    the writer it guards cannot detect a row the writer would never have
+    produced: 22 of the 93 rows in the 2026-07 drift carried exactly this shape.
+    """
+    naive = {
+        "schema_version": "1.0",
+        "event_kind": "audit",
+        "event_id": "drift-probe-0001",
+        "timestamp": "2026-07-09T10:50:57.551803+00:00",   # NOT the '…Z' form
+        "project_id": "demo-dental",
+        "audit_action": "modified",
+        "audit_target": "master.xlsx",
+        "actor": "probe",
+    }
+    validator = _validator()
+    assert list(validator.iter_errors(naive)), (
+        "the compliance validator accepted a non-'Z' timestamp — it is weaker "
+        "than events_writer, so it cannot catch a row the writer would reject"
+    )
+    # Sanity: the same event with the canonical suffix IS accepted, so the
+    # assertion above is about the timestamp FORM and nothing else.
+    assert not list(validator.iter_errors({**naive, "timestamp": "2026-07-09T10:50:57.551803Z"}))
+
+
+def test_unbound_workspace_is_reported_as_zero_coverage() -> None:
+    """When the workspace is unbound this suite checks NOTHING — say so.
+
+    The previous version of this test asserted the file list was empty and
+    passed, which recorded 'no coverage' as a green result. That is how 93
+    drifted rows accumulated for a month while the suite reported success.
+    """
+    if _workspace_root() is not None:
+        return
+    files = _events_files()
+    assert files == [], f"events_files() should be empty when unbound, got {files}"
+    warnings.warn(
+        "events.jsonl schema compliance NOT CHECKED — PSEO_WORKSPACE_ROOT is "
+        "unbound, so this suite contributed zero cases. This is a coverage gap, "
+        "not a pass. Bind the workspace to actually measure.",
+        UserWarning,
+        stacklevel=2,
+    )

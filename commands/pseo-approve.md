@@ -35,7 +35,7 @@ Bu komut aksiyonu **çalıştırmaz** — sadece izni KAYDEDER. Gate (batch 2b) 
 
 Üç argüman da verildiyse recorder CLI'yi çağır. CLI sırasıyla: action'ı doğrular, workspace root'u çözer (config → `$PSEO_WORKSPACE_ROOT`), session UUID'sini `$CLAUDE_CODE_SESSION_ID`'den alır, bu session'a bağlı projeyi çözer (`shared/sessions/<uuid>.json` → `shared/active.json`), sonra deftere atomik (O_APPEND + flock + fsync) bir satır ekler.
 
-!`cd "$CLAUDE_PLUGIN_ROOT" && python3 -m scripts.state.consent_ledger approve $ARGUMENTS 2>&1`
+!`R=""; for c in "$CLAUDE_PLUGIN_ROOT" "$CLAUDE_PROJECT_DIR" "$PWD" "$HOME"/.claude/plugins/*/*/*/* "$HOME"/.claude/plugins/*/*/*; do [ -n "$c" ] && [ -f "$c/scripts/state/__init__.py" ] && { R="$c"; break; }; done; [ -n "$R" ] || { echo "PLUGIN_ROOT_UNRESOLVED: scripts/state bulunamadı — CLAUDE_PLUGIN_ROOT ayarlayın ya da plugin kökünden çağırın"; exit 2; }; PYTHONPATH="$R" python3 -m scripts.state.consent_ledger approve $ARGUMENTS 2>&1`
 
 Başarılı çıktı tek satırlık banner'dır, örn:
 
