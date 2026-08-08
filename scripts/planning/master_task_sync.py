@@ -47,7 +47,15 @@ Idempotency contract:
   D-only MERGE for existing task_ids (auto_generated=true). Manuel
   entries (auto_generated=false) are NEVER touched.
 
-  task_id = sha256("{primary_source}|{url}|{task_signature}")[:16]
+  content_signature = sha256("{primary_source}|{url}|{task_signature}")[:16]
+  task_id           = canonical "T-NNNNN" allocated once per content_signature
+                      and recorded in the persistent registry
+                      projects/{slug}/_state/master_task_id_map.json.
+
+  The sha256 hex is the IDEMPOTENCY key (stable), NOT the visible task_id —
+  the visible id must satisfy master-excel.schema.json#/definitions/taskIdPattern
+  (^T-[0-9]{4,}$). The registry maps signature → T-id so a re-run re-uses the
+  same T-id (0 new appends) instead of writing an un-schema-valid hex id.
 
   task_signature is per-source (see SOURCE_DEFS below): for cluster_keywords
   it is "{cluster}|{keyword}"; for tech_seo it is "{issue_category}";
@@ -77,6 +85,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sys
 from dataclasses import dataclass, field
 from datetime import date as _date, datetime
@@ -170,24 +179,60 @@ WRITER_SCOPE_SEMANTIC = (
     "forbidden to touch protected_columns"
 )
 
-#: task_id sha256 prefix length. >= 8 hex per worker brief; 16 hex
+#: content-signature sha256 prefix length. >= 8 hex per worker brief; 16 hex
 #: gives 64-bit collision space (2^64 ~ 1.8e19) which is comfortable for
 #: the row volumes this skill aggregates (typical run < 5000 rows).
+#:
+#: NOTE (v1.3 canonical-task-id fix): the sha256[:16] hex is the *content
+#: signature* — the IDEMPOTENCY key — NOT the visible task_id. The visible
+#: task_id is a canonical `T-NNNNN` string (see master-task-id.md +
+#: master-excel.schema.json#/definitions/taskIdPattern = `^T-[0-9]{4,}$`).
+#: A persistent registry (projects/{slug}/_state/master_task_id_map.json)
+#: maps content_signature -> canonical task_id so re-runs re-use the same
+#: T-id (idempotent) instead of re-allocating. `TASK_ID_PREFIX_LEN` is kept
+#: as the CONTENT_SIG length; `CONTENT_SIG_PREFIX_LEN` is the explicit alias.
 TASK_ID_PREFIX_LEN = 16
+CONTENT_SIG_PREFIX_LEN = TASK_ID_PREFIX_LEN
+
+#: Canonical task_id allocation. Visible IDs are `T-{n}` with `n` a decimal
+#: integer >= TASK_ID_BASE. Base is 10001 (5-digit series) per worker brief;
+#: `^T-[0-9]{4,}$` accepts it. Allocation floors the counter at
+#: (TASK_ID_BASE - 1) and otherwise continues above the max canonical T-id
+#: already present in master_task OR the registry, so new IDs never collide
+#: with legacy T-NNNN (4-digit) or existing canonical rows.
+TASK_ID_BASE = 10001
+_CANONICAL_TASK_ID_RE = re.compile(r"^T-(\d+)$")
+
+#: Persistent registry file name (under projects/{slug}/_state/).
+ID_MAP_FILENAME = "master_task_id_map.json"
+ID_MAP_VERSION = "1.0"
+
+#: Volume guardrail (SEO-value filter) for the `cluster_keywords` source.
+#: cluster_keywords historically emits 1-task-per-keyword which bloats
+#: master_task (e.g. 972 keyword rows -> ~972 pillar tasks). Only rows that
+#: are genuinely ACTIONABLE become tasks: an UNassigned keyword (no
+#: assigned_url = a content gap) with meaningful demand
+#: (monthly_volume >= CLUSTER_KEYWORDS_MIN_VOLUME). All other pillar/cluster
+#: rows are DROPPED — but never silently: drop counts + reasons are logged
+#: into AggregateBatch.dropped_stats, the snapshot, and the report.
+CLUSTER_KEYWORDS_MIN_VOLUME = 500
 
 #: related_sources separator — use pipe "|" to align with internal-links
 #: convention and avoid CSV/Excel quoting issues. Sorted on rejoin so
 #: re-runs are byte-stable.
 RELATED_SOURCES_SEP = "|"
 
-#: Per-source default duration estimate (minutes) — used ONLY when an
-#: upstream sheet has no duration cue. For most rows this comes through
-#: protected_columns territory, so we leave duration_est_min blank
-#: ("") for new rows and let manuel/done_protocol populate it. (Schema
-#: line 281 marks it as integer, but blank-string is tolerated by the
-#: write layer when paired with auto_generated=true and protected_columns
-#: blank-init.)
-DURATION_EST_BLANK = ""
+#: Blank seed for the protected `duration_est_min` column on new rows. It
+#: is a PROTECTED column (owned by human / done_protocol), so master_task_sync
+#: leaves it empty and lets them populate it later.
+#:
+#: It MUST be None (JSON null), NOT "". The schema types duration_est_min as
+#: `integer`, and the write-layer per-row validator (transaction.py
+#: _build_row_validator) synthesizes `{"type": ["integer", "null"]}` — an
+#: empty string fails validation with RowSchemaError and blocks the whole
+#: append. None is the schema-valid "blank integer" and lands as a truly
+#: empty Excel cell. (`_ensure_no_protected_writes` treats None as blank.)
+DURATION_EST_BLANK = None
 
 
 # ---------------------------------------------------------------------------
@@ -276,6 +321,11 @@ class SourceDef:
     signature_cols: tuple[str, ...]
     related_source_key: str
     skill_name: str
+    #: Optional SEO-value guardrail. Callable(row) -> (keep, drop_reason).
+    #: When it returns (False, reason) the row is DROPPED (not turned into a
+    #: task) and counted under AggregateBatch.dropped_stats[sheet][reason].
+    #: None = keep every non-blank row (default, no guardrail).
+    row_filter: Any = None  # Callable[[Mapping[str,Any]], tuple[bool, str]] | None
 
     def derive_primary_source(self, row: Mapping[str, Any]) -> str:
         """Resolve primary_source for one upstream row.
@@ -307,6 +357,47 @@ def _on_page_audit_primary_source(row: Mapping[str, Any]) -> str:
     # Default: any tech-style issue (Performance / Layout Stability /
     # Meta Tags / unknown) → tech_fix.
     return "tech_fix"
+
+
+def _to_int(v: Any) -> int:
+    """Best-effort integer coercion for volume-style cells. Non-numeric /
+    blank → 0 (treated as below any positive threshold). Handles "5,400",
+    "5400", 5400, 5400.0, "" gracefully."""
+    if v is None:
+        return 0
+    if isinstance(v, bool):
+        return 0
+    if isinstance(v, (int, float)):
+        return int(v)
+    s = str(v).strip().replace(",", "").replace(" ", "")
+    if not s:
+        return 0
+    try:
+        return int(float(s))
+    except ValueError:
+        return 0
+
+
+def _cluster_keywords_actionable(row: Mapping[str, Any]) -> tuple[bool, str]:
+    """SEO-value guardrail for the `cluster_keywords` source.
+
+    KEEP a keyword row only when it is genuinely actionable:
+      - it has NO assigned_url (an unassigned keyword = a content gap), AND
+      - monthly_volume >= CLUSTER_KEYWORDS_MIN_VOLUME (meaningful demand).
+
+    Everything else is DROPPED with a machine-readable reason so the caller
+    can LOG it (no silent truncation):
+      - "already_assigned" — assigned_url is populated (page already exists;
+        not a new-content task; other sources own on-page/tech fixes for it).
+      - "low_volume"       — monthly_volume below the threshold.
+    """
+    assigned = _safe_str(row.get("assigned_url"))
+    if assigned:
+        return False, "already_assigned"
+    vol = _to_int(row.get("monthly_volume"))
+    if vol < CLUSTER_KEYWORDS_MIN_VOLUME:
+        return False, "low_volume"
+    return True, ""
 
 
 #: The 8 upstream master writer sheets aggregated by master-task-sync.
@@ -361,6 +452,10 @@ SOURCE_DEFS: tuple[SourceDef, ...] = (
         signature_cols=("cluster", "keyword"),
         related_source_key="cluster_keywords",
         skill_name="cluster-map",
+        # SEO-value guardrail: only unassigned + high-volume keywords become
+        # tasks. Drops (already_assigned / low_volume) are logged, never
+        # silently truncated. See CLUSTER_KEYWORDS_MIN_VOLUME.
+        row_filter=_cluster_keywords_actionable,
     ),
     SourceDef(
         sheet="topical_map",
@@ -399,15 +494,68 @@ def _row_signature(row: Mapping[str, Any], cols: Sequence[str]) -> str:
     return "|".join(_safe_str(row.get(c)) for c in cols)
 
 
-def _build_task_id(primary_source: str, url: str, signature: str) -> str:
-    """Deterministic task_id per worker brief.
+def _content_signature(primary_source: str, url: str, signature: str) -> str:
+    """Deterministic CONTENT SIGNATURE (idempotency key) for one source row.
 
     Hash inputs are joined by "|" and hashed sha256; the prefix
-    TASK_ID_PREFIX_LEN of the hex digest becomes the task_id. Stable
-    across runs (no salt, no clock dependency, no slug dependency)."""
+    CONTENT_SIG_PREFIX_LEN of the hex digest is the signature. Stable across
+    runs (no salt, no clock dependency, no slug dependency).
+
+    This is NOT the visible task_id. It is the stable key that the persistent
+    registry (`master_task_id_map.json`) maps to a canonical `T-NNNNN`
+    task_id, so a re-run re-uses the same T-id instead of re-allocating.
+    """
     payload = f"{primary_source}|{url}|{signature}"
     digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
-    return digest[:TASK_ID_PREFIX_LEN]
+    return digest[:CONTENT_SIG_PREFIX_LEN]
+
+
+#: Back-compat alias. Historically `_build_task_id` returned the sha256[:16]
+#: hex that was written directly as the task_id (the bug: it failed the
+#: `^T-[0-9]{4,}$` schema pattern). It is now the CONTENT SIGNATURE generator;
+#: callers/tests that only assert determinism + hex + length keep working.
+_build_task_id = _content_signature
+
+
+def _canonical_task_id(counter: int) -> str:
+    """Render a canonical `T-NNNNN` task_id from an integer counter."""
+    if counter < TASK_ID_BASE:
+        counter = TASK_ID_BASE
+    return f"T-{counter}"
+
+
+def _parse_canonical_counter(task_id: Any) -> int | None:
+    """Return the integer suffix of a canonical `T-<int>` task_id, else None.
+
+    Legacy / non-canonical ids (MT-W3W2B-001, T-301-01, T-PIL-PEK-01, blank)
+    are ignored (return None) — they never participate in allocation.
+    """
+    m = _CANONICAL_TASK_ID_RE.match(_safe_str(task_id))
+    if not m:
+        return None
+    return int(m.group(1))
+
+
+def _next_counter(
+    existing_master_task: Iterable[Mapping[str, Any]],
+    id_map: Mapping[str, str],
+) -> int:
+    """First free canonical counter: 1 above the max canonical `T-<int>`
+    already present in master_task OR the registry, floored at TASK_ID_BASE.
+
+    Guarantees new allocations never collide with an existing canonical row
+    (T-9001..T-10004 today) nor with a T-id the registry already handed out.
+    """
+    max_seen = TASK_ID_BASE - 1
+    for r in existing_master_task:
+        n = _parse_canonical_counter(r.get("task_id"))
+        if n is not None and n > max_seen:
+            max_seen = n
+    for tid in id_map.values():
+        n = _parse_canonical_counter(tid)
+        if n is not None and n > max_seen:
+            max_seen = n
+    return max_seen + 1
 
 
 def _ensure_primary_source_enum(value: str) -> None:
@@ -515,28 +663,33 @@ def _build_master_task_row(
 ) -> dict:
     """Assemble a fully-populated 19-col master_task row dict.
 
-    Protected columns (B, F, G, H, I, M, N) are seeded BLANK ("") because
-    the master_task_sync writer is forbidden from touching them. The
-    human / done_protocol writers populate them later.
+    Protected columns (B, F, G, H, I, M, N) are seeded BLANK because the
+    master_task_sync writer is forbidden from touching them. The human /
+    done_protocol writers populate them later.
 
-    duration_est_min (Q is the int counter for actual logged work; I is
-    the protected estimate). I is left blank (DURATION_EST_BLANK).
-    Q is initialized to 0 (an effort_actual_min counter, not protected).
+    The blank VALUE depends on the column's schema type, so the write-layer
+    row validator (integer|null, enum|null, string|null) accepts it:
+      - plain string cols (task/category/impact/assignee/note) → "".
+      - `priority` (ref severityEnum) → None; "" is not a severityEnum member
+        and would fail validation (RowSchemaError) and block the append.
+      - `duration_est_min` (integer) → None (DURATION_EST_BLANK); "" fails
+        the integer|null validator.
+    Q (effort_actual_min) is a non-protected int counter, initialized to 0.
     """
     row = {
         "task_id":            task_id,
-        # PROTECTED — blank seed:
+        # PROTECTED — blank seed (string col → ""):
         "task":               "",
         "primary_source":     primary_source,
         "related_sources":    related_source_key,
         "url":                url,
-        # PROTECTED — blank seed:
+        # PROTECTED — blank seed (string col → ""):
         "category":           "",
-        # PROTECTED — blank seed:
-        "priority":           "",
-        # PROTECTED — blank seed:
+        # PROTECTED — blank seed (severityEnum ref → None, NOT ""):
+        "priority":           None,
+        # PROTECTED — blank seed (string col → ""):
         "impact":             "",
-        # PROTECTED — blank seed:
+        # PROTECTED — blank seed (integer → None, NOT ""):
         "duration_est_min":   DURATION_EST_BLANK,
         "status":             default_status,
         "created_date":       run_date,
@@ -573,21 +726,28 @@ def _build_master_task_row(
 
 @dataclass(frozen=True)
 class _ExtractedSig:
-    """One upstream row reduced to its identity fingerprint."""
+    """One upstream row reduced to its identity fingerprint.
 
-    task_id: str
+    `content_signature` is the stable sha256[:16] idempotency key; the
+    visible canonical `T-NNNNN` task_id is allocated from it in aggregate()
+    via the persistent registry (never stored here — allocation is a
+    stateful, registry-aware step, this dataclass is pure identity).
+    """
+
+    content_signature: str
     primary_source: str
     url: str
     related_source_key: str
-    source_sheet: str  # diagnostic only; not written to row
+    source_sheet: str      # diagnostic only; not written to row
+    raw_signature: str     # the joined signature_cols value (collision guard)
 
 
 def _extract_signature(
     source_def: SourceDef, row: Mapping[str, Any]
 ) -> _ExtractedSig | None:
-    """Reduce one upstream sheet row to its (task_id, primary_source,
-    url, related_source_key) fingerprint. Returns None when the row
-    lacks the minimum payload (signature_cols all blank), which is the
+    """Reduce one upstream sheet row to its (content_signature,
+    primary_source, url, related_source_key) fingerprint. Returns None when
+    the row lacks the minimum payload (signature_cols all blank), the
     convention for "skip this row, it's a header artifact / blank".
     """
     sig = _row_signature(row, source_def.signature_cols)
@@ -597,13 +757,14 @@ def _extract_signature(
     primary_source = source_def.derive_primary_source(row)
     _ensure_primary_source_enum(primary_source)
     url = _safe_str(row.get(source_def.url_col)) if source_def.url_col else ""
-    task_id = _build_task_id(primary_source, url, sig)
+    content_signature = _content_signature(primary_source, url, sig)
     return _ExtractedSig(
-        task_id=task_id,
+        content_signature=content_signature,
         primary_source=primary_source,
         url=url,
         related_source_key=source_def.related_source_key,
         source_sheet=source_def.sheet,
+        raw_signature=sig,
     )
 
 
@@ -625,6 +786,14 @@ class AggregateBatch:
         no_op_count: count of existing auto_generated rows where the new
                      related_source_key was already in D (no actual change).
         per_source_stats: dict[sheet_name → emit_count] for diagnostics.
+        dropped_stats: dict[sheet_name → {drop_reason → count}] — rows a
+                     SEO-value guardrail (row_filter) dropped. NEVER silent:
+                     surfaced in snapshot + report + stderr log.
+        id_map: the FULL content_signature → canonical task_id registry AFTER
+                     this run (input map + any new allocations). Caller
+                     persists it to projects/{slug}/_state/master_task_id_map.json.
+        new_allocations: only the content_signature → task_id pairs allocated
+                     THIS run (diagnostics + delta persistence).
     """
 
     appends: list[dict] = field(default_factory=list)
@@ -632,6 +801,9 @@ class AggregateBatch:
     skipped_manuel: int = 0
     no_op_count: int = 0
     per_source_stats: dict = field(default_factory=dict)
+    dropped_stats: dict = field(default_factory=dict)
+    id_map: dict = field(default_factory=dict)
+    new_allocations: dict = field(default_factory=dict)
 
 
 def _index_existing(
@@ -656,8 +828,9 @@ def aggregate(
     run_date: str,
     default_status: str = "TODO",
     expected_sheets: Sequence[str] | None = None,
+    id_map: Mapping[str, str] | None = None,
 ) -> AggregateBatch:
-    """Pure aggregation: 8 upstream sheets + existing master_task →
+    """Aggregation: 8 upstream sheets + existing master_task + registry →
     AppendBatch describing what should change.
 
     Args:
@@ -666,21 +839,35 @@ def aggregate(
                  keys are tolerated (skill may run before all upstream
                  sheets exist) UNLESS expected_sheets pins them.
         existing_master_task: list-of-row-dicts already in master_task.
-                 Used for task_id collision detection + auto_generated
-                 honoring.
+                 Used for canonical-id floor detection, task_id existence
+                 lookup, and auto_generated honoring.
         run_date: ISO date string (YYYY-MM-DD) for created_date column.
         default_status: statusEnum seed for new appended rows.
         expected_sheets: when provided, raise SheetMissingError if any
                  entry is absent from `sources`. Pass when the skill has
                  verified Phase 7+8 are complete (DURUR #1 vehicle).
+        id_map: persistent registry {content_signature → canonical task_id}.
+                 On a re-run this makes each source row resolve to the SAME
+                 `T-NNNNN` it got before (idempotency). Pass the parsed
+                 contents of projects/{slug}/_state/master_task_id_map.json.
+                 None / {} = fresh allocation from TASK_ID_BASE.
 
     Returns:
-        AggregateBatch — pure data. Caller decides when to apply.
+        AggregateBatch — pure data (incl. updated `id_map` + `new_allocations`
+        + `dropped_stats`). Caller applies writes AND persists id_map.
+
+    Determinism / idempotency:
+        A canonical task_id is allocated ONCE per content_signature and
+        recorded in id_map. Re-running with the returned id_map produces 0
+        appends + 0 merges (each signature resolves to an existing T-id whose
+        related_sources already carry the source key). The allocation order
+        is deterministic (SOURCE_DEFS order × row order), so two FRESH runs
+        (id_map=None) yield identical task_ids.
 
     Raises:
         SheetMissingError              — DURUR #1 (with expected_sheets pin).
         ColumnTupleDriftError          — DURUR #2 (defensive).
-        TaskIdCollisionError           — DURUR #3 (sha256 prefix collision).
+        TaskIdCollisionError           — DURUR #3 (sha256 content-sig collision).
         PrimarySourceEnumViolation     — DURUR #5 (bad enum value).
         ProtectedColumnsWriteAttempt   — DURUR #6 (sentinel guard).
         MasterTaskSyncError            — bad input shape.
@@ -711,15 +898,37 @@ def aggregate(
 
     existing_index = _index_existing(existing_master_task)
 
-    # Track sha256 prefix collisions. If the same task_id appears for
-    # different (primary_source, url, signature) tuples, raise.
-    seen_sigs_by_task_id: dict[str, str] = {}
+    # Working copy of the persistent registry (content_signature → T-id).
+    working_map: dict[str, str] = dict(id_map or {})
+    new_allocations: dict[str, str] = {}
+
+    # Content-signature collision guard: if two DISTINCT payloads ever hash
+    # to the same sha256[:16] signature, raise (DURUR #3).
+    seen_payload_by_sig: dict[str, str] = {}
+
+    # Canonical-id allocator. Floor at 1-above the max canonical T-id already
+    # present in master_task OR the registry so new IDs never collide.
+    counter = _next_counter(existing_master_task, working_map)
+
+    def _allocate(content_sig: str) -> str:
+        """Resolve a canonical task_id for a content_signature. Registry hit
+        → re-use (idempotent). Miss → allocate next T-NNNNN, record it."""
+        nonlocal counter
+        tid = working_map.get(content_sig)
+        if tid is not None:
+            return tid
+        tid = _canonical_task_id(counter)
+        counter += 1
+        working_map[content_sig] = tid
+        new_allocations[content_sig] = tid
+        return tid
 
     appends: list[dict] = []
     merges: list[tuple[str, str]] = []
     skipped_manuel = 0
     no_op_count = 0
     per_source_stats: dict[str, int] = {}
+    dropped_stats: dict[str, dict[str, int]] = {}
 
     # Iterate SOURCE_DEFS in deterministic order so output is stable
     # across runs.
@@ -730,22 +939,34 @@ def aggregate(
             sig = _extract_signature(src, row)
             if sig is None:
                 continue
-            # Collision detection on the sha256[:N] prefix.
-            full_payload = f"{sig.primary_source}|{sig.url}|{_row_signature(row, src.signature_cols)}"
-            prior = seen_sigs_by_task_id.get(sig.task_id)
+
+            # SEO-value guardrail (DROP with logged reason — never silent).
+            if src.row_filter is not None:
+                keep, reason = src.row_filter(row)
+                if not keep:
+                    bucket = dropped_stats.setdefault(src.sheet, {})
+                    bucket[reason] = bucket.get(reason, 0) + 1
+                    continue
+
+            # Content-signature collision detection.
+            full_payload = f"{sig.primary_source}|{sig.url}|{sig.raw_signature}"
+            prior = seen_payload_by_sig.get(sig.content_signature)
             if prior is not None and prior != full_payload:
                 raise TaskIdCollisionError(
-                    f"sha256[:{TASK_ID_PREFIX_LEN}] collision on task_id "
-                    f"{sig.task_id!r}: prior={prior!r}, new={full_payload!r}. "
-                    "Bump TASK_ID_PREFIX_LEN."
+                    f"sha256[:{CONTENT_SIG_PREFIX_LEN}] content-signature "
+                    f"collision on {sig.content_signature!r}: prior={prior!r}, "
+                    f"new={full_payload!r}. Bump CONTENT_SIG_PREFIX_LEN."
                 )
-            seen_sigs_by_task_id[sig.task_id] = full_payload
+            seen_payload_by_sig[sig.content_signature] = full_payload
 
-            existing_row = existing_index.get(sig.task_id)
+            # Resolve the canonical task_id via the registry (allocate if new).
+            task_id = _allocate(sig.content_signature)
+
+            existing_row = existing_index.get(task_id)
             if existing_row is None:
                 # APPEND new row (full schema seed).
                 new_row = _build_master_task_row(
-                    task_id=sig.task_id,
+                    task_id=task_id,
                     primary_source=sig.primary_source,
                     url=sig.url,
                     related_source_key=sig.related_source_key,
@@ -755,7 +976,7 @@ def aggregate(
                 appends.append(new_row)
                 # Mirror it into the index so a duplicate signature in
                 # the same run merges instead of double-appending.
-                existing_index[sig.task_id] = dict(new_row)
+                existing_index[task_id] = dict(new_row)
                 emitted += 1
                 continue
 
@@ -779,12 +1000,12 @@ def aggregate(
                 # No-op: key already present (or rejoin produces same string).
                 no_op_count += 1
                 continue
-            merges.append((sig.task_id, new_d))
+            merges.append((task_id, new_d))
             # Mirror the merged value into the index so subsequent rows in
             # the same run see the updated D.
             existing_row = dict(existing_row)
             existing_row["related_sources"] = new_d
-            existing_index[sig.task_id] = existing_row
+            existing_index[task_id] = existing_row
             emitted += 1
 
         per_source_stats[src.sheet] = emitted
@@ -809,6 +1030,9 @@ def aggregate(
         skipped_manuel=skipped_manuel,
         no_op_count=no_op_count,
         per_source_stats=per_source_stats,
+        dropped_stats=dropped_stats,
+        id_map=working_map,
+        new_allocations=new_allocations,
     )
 
 
@@ -848,6 +1072,75 @@ def assert_idempotent_state(
 
 
 # ---------------------------------------------------------------------------
+# Persistent registry — content_signature → canonical task_id
+# ---------------------------------------------------------------------------
+
+def id_map_path(workspace_root: Path | str, project_slug: str) -> Path:
+    """Resolve projects/{slug}/_state/master_task_id_map.json."""
+    return (
+        Path(workspace_root) / "projects" / project_slug / "_state"
+        / ID_MAP_FILENAME
+    )
+
+
+def load_id_map(path: Path | str) -> dict[str, str]:
+    """Load the {content_signature → task_id} registry. Missing file → {}.
+
+    Tolerates both the flat `{sig: tid}` shape and the wrapped
+    `{"version": ..., "map": {sig: tid}}` shape (this module writes the
+    wrapped form). Raises MasterTaskSyncError on a corrupt/unexpected shape
+    (no silent fallback — a broken registry must surface, not re-allocate).
+    """
+    p = Path(path)
+    if not p.is_file():
+        return {}
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        raise MasterTaskSyncError(
+            f"master_task_id_map.json unreadable ({p}): {exc}. "
+            "Fix or remove the registry before re-running (do NOT let the "
+            "aggregator re-allocate over a corrupt map)."
+        ) from exc
+    if isinstance(data, dict) and "map" in data and isinstance(data["map"], dict):
+        raw = data["map"]
+    elif isinstance(data, dict):
+        raw = data
+    else:
+        raise MasterTaskSyncError(
+            f"master_task_id_map.json must be an object, got {type(data)}"
+        )
+    out: dict[str, str] = {}
+    for k, v in raw.items():
+        if not isinstance(k, str) or not isinstance(v, str):
+            raise MasterTaskSyncError(
+                f"registry entry must be str→str, got {k!r}→{v!r}"
+            )
+        out[k] = v
+    return out
+
+
+def save_id_map(
+    path: Path | str, id_map: Mapping[str, str], *, run_date: str,
+) -> Path:
+    """Persist the registry (wrapped shape, sorted keys for byte-stability)."""
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "version": ID_MAP_VERSION,
+        "id_base": TASK_ID_BASE,
+        "updated": run_date,
+        "count": len(id_map),
+        "map": {k: id_map[k] for k in sorted(id_map)},
+    }
+    p.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+    return p
+
+
+# ---------------------------------------------------------------------------
 # Snapshot writer — drift recovery payload
 # ---------------------------------------------------------------------------
 
@@ -874,6 +1167,9 @@ def build_snapshot(
         "skipped_manuel": batch.skipped_manuel,
         "no_op_count": batch.no_op_count,
         "per_source_stats": dict(batch.per_source_stats),
+        "dropped_stats": {k: dict(v) for k, v in batch.dropped_stats.items()},
+        "new_allocations_count": len(batch.new_allocations),
+        "id_map_size": len(batch.id_map),
         "appends": list(batch.appends),
         "merges": [
             {"task_id": tid, "related_sources": v}
@@ -907,9 +1203,11 @@ def build_report_markdown(
     lines.append("## Aggregation totals")
     lines.append("")
     lines.append(f"- new appends:        **{len(batch.appends)}**")
+    lines.append(f"- new task_ids allocated: **{len(batch.new_allocations)}**")
     lines.append(f"- D-only merges:      **{len(batch.merges)}**")
     lines.append(f"- manuel rows skipped: **{batch.skipped_manuel}**")
     lines.append(f"- no-op (already merged): **{batch.no_op_count}**")
+    lines.append(f"- registry size (content_signature → T-id): **{len(batch.id_map)}**")
     lines.append("")
     lines.append("## Per-source emit counts")
     lines.append("")
@@ -919,6 +1217,19 @@ def build_report_markdown(
         n = batch.per_source_stats.get(src.sheet, 0)
         lines.append(f"| `{src.sheet}` | {n} |")
     lines.append("")
+    # SEO-value guardrail drops — LOGGED, never silent.
+    if batch.dropped_stats:
+        lines.append("## SEO-value guardrail — dropped rows (not tasked)")
+        lines.append("")
+        lines.append("| upstream sheet | reason | dropped |")
+        lines.append("|---|---|---|")
+        for sheet in sorted(batch.dropped_stats):
+            for reason in sorted(batch.dropped_stats[sheet]):
+                lines.append(
+                    f"| `{sheet}` | {reason} | "
+                    f"{batch.dropped_stats[sheet][reason]} |"
+                )
+        lines.append("")
     if batch.appends:
         primary_breakdown: dict[str, int] = {}
         for r in batch.appends:
@@ -973,6 +1284,13 @@ def _parse_args(argv: Iterable[str]) -> argparse.Namespace:
                         "absent from --sources-json.")
     p.add_argument("--output-dir", default=None,
                    help="If set, writes snapshot.json + report.md here.")
+    p.add_argument("--id-map-json", default=None,
+                   help=(
+                       "Path to the persistent content_signature → canonical "
+                       "task_id registry (master_task_id_map.json). Read before "
+                       "aggregation (idempotent T-id re-use) AND rewritten with "
+                       "new allocations after. Missing file = fresh allocation."
+                   ))
     return p.parse_args(list(argv))
 
 
@@ -1015,6 +1333,15 @@ def main(argv: list[str]) -> int:
                 )
                 return 2
 
+    # Persistent registry (idempotent T-id re-use).
+    id_map: dict[str, str] = {}
+    if args.id_map_json:
+        try:
+            id_map = load_id_map(args.id_map_json)
+        except MasterTaskSyncError as exc:
+            print(f"id-map load failed: {exc}", file=sys.stderr)
+            return 1
+
     expected = (
         tuple(s.sheet for s in SOURCE_DEFS) if args.require_all_sheets else None
     )
@@ -1025,10 +1352,25 @@ def main(argv: list[str]) -> int:
             run_date=run_date,
             default_status=args.default_status,
             expected_sheets=expected,
+            id_map=id_map,
         )
     except MasterTaskSyncError as exc:
         print(f"aggregate failed: {exc}", file=sys.stderr)
         return 1
+
+    # Persist the updated registry (new allocations recorded).
+    if args.id_map_json:
+        save_id_map(args.id_map_json, batch.id_map, run_date=run_date)
+
+    # LOG guardrail drops to stderr — never silent truncation.
+    if batch.dropped_stats:
+        for sheet in sorted(batch.dropped_stats):
+            for reason in sorted(batch.dropped_stats[sheet]):
+                print(
+                    f"[guardrail] {sheet}: dropped "
+                    f"{batch.dropped_stats[sheet][reason]} rows ({reason})",
+                    file=sys.stderr,
+                )
 
     snapshot = build_snapshot(
         batch=batch, run_date=run_date, project_slug=args.project_slug,
@@ -1054,6 +1396,9 @@ def main(argv: list[str]) -> int:
             "report_path": str(report_path.resolve()),
             "appends_count": len(batch.appends),
             "merges_count": len(batch.merges),
+            "new_allocations_count": len(batch.new_allocations),
+            "id_map_size": len(batch.id_map),
+            "dropped_stats": {k: dict(v) for k, v in batch.dropped_stats.items()},
         }, ensure_ascii=False, indent=2))
     else:
         print(json.dumps({
@@ -1075,6 +1420,10 @@ __all__ = (
     "WRITER_NAME",
     "WRITER_SCOPE_SEMANTIC",
     "TASK_ID_PREFIX_LEN",
+    "CONTENT_SIG_PREFIX_LEN",
+    "TASK_ID_BASE",
+    "ID_MAP_FILENAME",
+    "CLUSTER_KEYWORDS_MIN_VOLUME",
     "RELATED_SOURCES_SEP",
     "SOURCE_DEFS",
     "SourceDef",
@@ -1095,5 +1444,8 @@ __all__ = (
     "build_snapshot",
     "build_report_markdown",
     "assert_idempotent_state",
+    "id_map_path",
+    "load_id_map",
+    "save_id_map",
     "main",
 )

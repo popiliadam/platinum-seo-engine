@@ -349,16 +349,20 @@ workflow_runner.complete(handle.run_id, project_slug=project_slug, outputs={
 Workflow status flips `running → done` (workflow-run schema) and a
 `workflow_action=done` event lands in `events.jsonl` (ADR-020).
 
-## task_id heuristic
+## task_id — kanonik T-NNNNN + kalıcı registry (v2, 2026-07-23)
+
+> **DEĞİŞİKLİK:** Görünür `task_id` artık **kanonik `T-NNNNN`** (authority `rules/master-task-id.md`, schema `^T-[0-9]{4,}$`). Eski sha256[:16] hex ID **write-layer schema-validate'i geçemiyordu** (BLOCKED); artık yalnızca idempotency **content-signature**'ı olarak kullanılır, görünür ID değil.
 
 ```
-task_id = sha256("{primary_source}|{url}|{task_signature}")[:16]
+content_signature = sha256("{primary_source}|{url}|{task_signature}")[:16]   # idempotency anahtarı (görünmez)
+task_id           = registry[content_signature]  ya da  yeni "T-NNNNN" tahsis  # görünür, kanonik
 ```
 
-The hex prefix length is **16 characters (64 bits)** — picked for
-collision-resistance over typical row volumes (< 5000 / project).
-`scripts/planning/master_task_sync.TaskIdCollisionError` (DURUR #3)
-fires if two distinct payloads ever hash to the same prefix.
+- **Kalıcı registry**: `projects/{slug}/_state/master_task_id_map.json` = `{content_signature → "T-NNNNN"}`. `load_id_map`/`save_id_map`; bozuk dosya → `MasterTaskSyncError` (sessizce re-allocate ETME).
+- **Allocation**: taban `TASK_ID_BASE=10001`; yeni id = max(mevcut kanonik T-id, registry) + 1 (çakışma yok). `aggregate()` `id_map` alır; `AggregateBatch` `id_map`+`new_allocations`+`dropped_stats` döner.
+- **İdempotency**: aynı signature → registry'den aynı T-id (re-run 0 append). `TaskIdCollisionError` (DURUR #3) hâlâ farklı payload aynı signature'a düşerse fırlar.
+- **Hacim guardrail**: `cluster_keywords` kaynağı `row_filter=_cluster_keywords_actionable` — yalnız `assigned_url` boş **ve** `monthly_volume>=CLUSTER_KEYWORDS_MIN_VOLUME (500)`; gerisi `already_assigned`/`low_volume` reason ile DÜŞÜRÜLÜR + LOG'lanır (no silent truncate).
+- **Blank seed**: protected `duration_est_min` + `priority` blank seed'i `""` DEĞİL `None` (schema `integer|null` / `severityEnum|null`).
 
 The per-source `task_signature` is declared in `SOURCE_DEFS`
 (`scripts/planning/master_task_sync.py`):

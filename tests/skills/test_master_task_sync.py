@@ -145,7 +145,11 @@ def synthetic_sources() -> dict[str, list[dict]]:
                 "keyword": "seo nedir",
                 "monthly_volume": 5400,
                 "data_source": "gsc",
-                "assigned_url": "https://example.com/seo-nedir",
+                # Unassigned + high-volume = actionable per the SEO-value
+                # guardrail (CLUSTER_KEYWORDS_MIN_VOLUME). An assigned_url
+                # would be DROPPED (already_assigned) — see the dedicated
+                # guardrail test.
+                "assigned_url": "",
                 "gsc_clicks": 50,
                 "gsc_impressions": 2000,
                 "gsc_position": 12.3,
@@ -302,7 +306,7 @@ def test_master_task_sync_idempotent_rerun_state_identical(
     This is the CRITICAL idempotency contract guard. assert_idempotent_state
     formalizes the assertion.
     """
-    # First run.
+    # First run — empty registry → fresh T-NNNNN allocation.
     first = mts.aggregate(
         sources=synthetic_sources,
         existing_master_task=[],
@@ -312,33 +316,46 @@ def test_master_task_sync_idempotent_rerun_state_identical(
     assert first.appends, "expected first run to produce some appends"
     assert first.merges == []
     n_appends_first = len(first.appends)
+    # Every appended task_id is canonical T-NNNNN (^T-[0-9]{4,}$).
+    for r in first.appends:
+        assert re.fullmatch(r"T-[0-9]{4,}", r["task_id"]), (
+            f"append task_id not canonical: {r['task_id']!r}"
+        )
+    # The registry now maps one content_signature per append.
+    assert len(first.id_map) == n_appends_first
+    assert len(first.new_allocations) == n_appends_first
 
-    # Second run — feed first.appends back in as existing rows.
+    # Second run — feed first.appends back AND the persisted registry.
+    # Idempotency now requires the registry (the content_signature cannot be
+    # reconstructed from a master_task row), which is the whole point of the
+    # canonical-id fix.
     second = mts.aggregate(
         sources=synthetic_sources,
         existing_master_task=list(first.appends),
         run_date="2026-05-01",
         default_status="TODO",
+        id_map=first.id_map,
     )
     # idempotency: 0 new appends, 0 actual merges (key already in D).
     assert second.appends == [], (
         f"second run produced {len(second.appends)} new appends "
-        "(expected 0 — task_id derivation must be deterministic)"
+        "(expected 0 — registry re-uses each canonical T-id)"
     )
     assert second.merges == [], (
         f"second run produced {len(second.merges)} merges "
         "(expected 0 — D was already populated)"
     )
+    assert second.new_allocations == {}, "second run must allocate 0 new T-ids"
     # The dedicated assertion helper — also asserts the contract.
     mts.assert_idempotent_state(first_state=first, second_state=second)
 
-    # Third run — call aggregate again with the same first.appends → still
-    # zero appends. Confirms determinism across multiple repeats.
+    # Third run — same inputs again → still zero. Confirms determinism.
     third = mts.aggregate(
         sources=synthetic_sources,
         existing_master_task=list(first.appends),
         run_date="2026-05-01",
         default_status="TODO",
+        id_map=first.id_map,
     )
     assert third.appends == []
     assert third.merges == []
@@ -377,13 +394,18 @@ def test_master_task_sync_append_new_task_full_row_non_protected_only(
         assert row["metric_impact_json"] == "{}"
         assert row["related_sources"]  # source-key seeded
 
-        # Protected columns are blank-seeded (B/F/G/H/I/M/N).
+        # Protected columns are blank-seeded (B/F/G/H/I/M/N). String columns
+        # seed as ""; the protected INTEGER column (duration_est_min) seeds as
+        # None (null) so it passes the write-layer integer|null validator.
         for col in mts.PROTECTED_COLUMNS:
             v = row[col]
-            assert v in ("", 0), (
+            assert v in ("", 0, None), (
                 f"protected column {col!r} not blank-seeded on new row "
                 f"{row['task_id']}: got {v!r}"
             )
+        # duration_est_min specifically must be schema-valid blank (None),
+        # never "" (which fails the integer|null row validator at write time).
+        assert row["duration_est_min"] is None
 
 
 # ---------------------------------------------------------------------------
@@ -404,23 +426,27 @@ def test_master_task_sync_merge_d_column_dedupe_existing_task(
     existing_master_task with a row that matches the cluster_keywords
     fingerprint, then aggregate and assert D is merged.
     """
-    # Build a synthetic existing row that matches the cluster_keywords
-    # signature for ("seo-temelleri" + "seo nedir").
+    # Build a synthetic existing row + registry entry that match the
+    # cluster_keywords signature for ("seo-temelleri" + "seo nedir").
     src_def = next(s for s in mts.SOURCE_DEFS if s.sheet == "cluster_keywords")
-    row = synthetic_sources["cluster_keywords"][0]
+    row = synthetic_sources["cluster_keywords"][0]  # actionable (assigned_url="")
     sig = mts._row_signature(row, src_def.signature_cols)
-    expected_task_id = mts._build_task_id(
-        src_def.derive_primary_source(row), row["assigned_url"], sig,
+    url = row.get("assigned_url") or ""
+    content_sig = mts._content_signature(
+        src_def.derive_primary_source(row), url, sig,
     )
+    # A prior run already allocated a canonical T-id for this content_sig.
+    canonical_tid = "T-10001"
+    id_map = {content_sig: canonical_tid}
 
     existing = [{
-        "task_id":            expected_task_id,
+        "task_id":            canonical_tid,
         "task":               "Custom human task description",  # protected — preserved
         "primary_source":     "pillar",
         # Pretend a prior aggregator already merged "topical_map" into D.
         # The new aggregate run should add "cluster_keywords" and dedupe.
         "related_sources":    "topical_map",
-        "url":                row["assigned_url"],
+        "url":                url,
         "category":           "blog",
         "priority":           "HIGH",
         "impact":             "HIGH",
@@ -442,11 +468,13 @@ def test_master_task_sync_merge_d_column_dedupe_existing_task(
         existing_master_task=existing,
         run_date="2026-05-01",
         default_status="TODO",
+        id_map=id_map,
     )
     assert batch.appends == [], "existing task_id must not append again"
+    assert batch.new_allocations == {}, "registry hit must not allocate"
     assert len(batch.merges) == 1
     tid, new_d = batch.merges[0]
-    assert tid == expected_task_id
+    assert tid == canonical_tid
     # Sorted + deduped — both keys present.
     assert "cluster_keywords" in new_d
     assert "topical_map" in new_d
@@ -460,6 +488,7 @@ def test_master_task_sync_merge_d_column_dedupe_existing_task(
         existing_master_task=existing2,
         run_date="2026-05-01",
         default_status="TODO",
+        id_map=id_map,
     )
     assert batch2.appends == []
     assert batch2.merges == []  # no-op (key already present)
@@ -535,17 +564,20 @@ def test_master_task_sync_manuel_entry_auto_false_skipped(
     src_def = next(s for s in mts.SOURCE_DEFS if s.sheet == "cluster_keywords")
     row = synthetic_sources["cluster_keywords"][0]
     sig = mts._row_signature(row, src_def.signature_cols)
-    expected_task_id = mts._build_task_id(
-        src_def.derive_primary_source(row), row["assigned_url"], sig,
+    url = row.get("assigned_url") or ""
+    content_sig = mts._content_signature(
+        src_def.derive_primary_source(row), url, sig,
     )
+    canonical_tid = "T-10001"
+    id_map = {content_sig: canonical_tid}
 
     # Existing manuel row — auto_generated=False.
     manuel = [{
-        "task_id":            expected_task_id,
+        "task_id":            canonical_tid,
         "task":               "Manuel: yazılan task",
         "primary_source":     "manual",
         "related_sources":    "human",
-        "url":                row["assigned_url"],
+        "url":                url,
         "category":           "blog",
         "priority":           "HIGH",
         "impact":             "HIGH",
@@ -566,6 +598,7 @@ def test_master_task_sync_manuel_entry_auto_false_skipped(
         existing_master_task=manuel,
         run_date="2026-05-01",
         default_status="TODO",
+        id_map=id_map,
     )
     assert batch.appends == [], "manuel row must not be appended over"
     assert batch.merges == [], "manuel row must not be merged into"
@@ -581,6 +614,7 @@ def test_master_task_sync_manuel_entry_auto_false_skipped(
         existing_master_task=manuel_str,
         run_date="2026-05-01",
         default_status="TODO",
+        id_map=id_map,
     )
     assert batch2.appends == []
     assert batch2.merges == []
@@ -827,12 +861,14 @@ def test_smoke_e2e_cli_output(
     src_path = tmp_path / "sources.json"
     src_path.write_text(json.dumps(synthetic_sources), encoding="utf-8")
     out_dir = tmp_path / "out"
+    id_map_path = tmp_path / "master_task_id_map.json"
 
     rc = mts.main([
         "--sources-json", str(src_path),
         "--project-slug", "smoketest",
         "--run-date", "2026-05-01",
         "--output-dir", str(out_dir),
+        "--id-map-json", str(id_map_path),
     ])
     assert rc == 0, "CLI returned non-zero exit code"
 
@@ -840,23 +876,31 @@ def test_smoke_e2e_cli_output(
     report = out_dir / "2026-05-01-master-task-sync.md"
     assert snap.exists()
     assert report.exists()
+    # The registry file was written with one entry per append.
+    assert id_map_path.exists()
+    registry = json.loads(id_map_path.read_text(encoding="utf-8"))
+    assert registry["map"], "registry must record content_signature → T-id"
 
     payload = json.loads(snap.read_text(encoding="utf-8"))
     assert payload["writer"] == "master_task_sync"
     assert payload["writer_scope"] == mts.WRITER_SCOPE_SEMANTIC
     assert payload["appends_count"] > 0
-    # Each append row should have full 19-col tuple.
+    # Each append row should have full 19-col tuple + a canonical task_id.
     for r in payload["appends"]:
         assert set(r.keys()) == set(mts.MASTER_TASK_COLUMNS)
         assert r["primary_source"] in mts.PRIMARY_SOURCE_ENUM
         assert r["auto_generated"] is True
+        assert re.fullmatch(r"T-[0-9]{4,}", r["task_id"]), (
+            f"append task_id not canonical: {r['task_id']!r}"
+        )
 
     report_md = report.read_text(encoding="utf-8")
     assert "master-task-sync" in report_md
     assert "writer_scope" in report_md
     assert "Per-source emit counts" in report_md
 
-    # Now feed the appends back as existing_master_task → 0 new appends.
+    # Now feed the appends back as existing_master_task AND the persisted
+    # registry → 0 new appends (idempotent T-id re-use).
     existing_path = tmp_path / "existing.json"
     existing_path.write_text(json.dumps(payload["appends"]), encoding="utf-8")
     out_dir2 = tmp_path / "out2"
@@ -866,6 +910,7 @@ def test_smoke_e2e_cli_output(
         "--project-slug", "smoketest",
         "--run-date", "2026-05-01",
         "--output-dir", str(out_dir2),
+        "--id-map-json", str(id_map_path),
     ])
     assert rc2 == 0
     snap2 = json.loads(
@@ -910,6 +955,98 @@ def test_on_page_audit_per_row_primary_source_routing() -> None:
 # ---------------------------------------------------------------------------
 # Test 18 — sanity: master_task_sync is in allowed_writers (schema)
 # ---------------------------------------------------------------------------
+
+def test_cluster_keywords_seo_value_guardrail() -> None:
+    """The cluster_keywords SEO-value guardrail keeps only actionable rows
+    (unassigned + monthly_volume >= CLUSTER_KEYWORDS_MIN_VOLUME) and DROPS
+    the rest with a machine-readable, LOGGED reason (never silent truncate):
+      - assigned_url populated → "already_assigned"
+      - monthly_volume < threshold → "low_volume"
+    """
+    rows = [
+        # actionable → task
+        {"cluster": "c1", "keyword": "kw high vol", "assigned_url": "",
+         "monthly_volume": 5000},
+        # already assigned → dropped (already_assigned)
+        {"cluster": "c1", "keyword": "kw assigned", "assigned_url":
+         "https://example.com/x", "monthly_volume": 9000},
+        # below threshold → dropped (low_volume)
+        {"cluster": "c2", "keyword": "kw low vol", "assigned_url": "",
+         "monthly_volume": 100},
+        # exactly at threshold → actionable (>=)
+        {"cluster": "c2", "keyword": "kw at threshold", "assigned_url": "",
+         "monthly_volume": mts.CLUSTER_KEYWORDS_MIN_VOLUME},
+    ]
+    batch = mts.aggregate(
+        sources={"cluster_keywords": rows},
+        existing_master_task=[],
+        run_date="2026-05-01",
+    )
+    # 2 actionable → tasks; 2 dropped.
+    assert len(batch.appends) == 2
+    kept_keywords = {r["url"] for r in batch.appends}  # url == assigned_url ("")
+    assert batch.per_source_stats["cluster_keywords"] == 2
+    dropped = batch.dropped_stats.get("cluster_keywords", {})
+    assert dropped.get("already_assigned") == 1
+    assert dropped.get("low_volume") == 1
+    # Every kept append is a pillar task with a canonical id.
+    for r in batch.appends:
+        assert r["primary_source"] == "pillar"
+        assert re.fullmatch(r"T-[0-9]{4,}", r["task_id"])
+
+
+def test_id_map_registry_roundtrip(tmp_path: Path) -> None:
+    """load_id_map / save_id_map round-trip; missing file → {}; corrupt →
+    explicit MasterTaskSyncError (no silent re-allocation)."""
+    p = tmp_path / "master_task_id_map.json"
+    assert mts.load_id_map(p) == {}  # missing → empty
+
+    sig_map = {"abc123": "T-10001", "def456": "T-10002"}
+    mts.save_id_map(p, sig_map, run_date="2026-05-01")
+    assert mts.load_id_map(p) == sig_map
+
+    # Wrapped shape on disk (version + map).
+    on_disk = json.loads(p.read_text(encoding="utf-8"))
+    assert on_disk["map"] == sig_map
+    assert on_disk["version"] == mts.ID_MAP_VERSION
+    assert on_disk["id_base"] == mts.TASK_ID_BASE
+
+    # Corrupt file → explicit error.
+    p.write_text("{not valid json", encoding="utf-8")
+    with pytest.raises(mts.MasterTaskSyncError):
+        mts.load_id_map(p)
+
+
+def test_canonical_id_allocation_floors_above_existing() -> None:
+    """New T-ids never collide with existing canonical rows: allocation
+    floors 1-above the max canonical T-<int> in master_task OR the registry,
+    and at least TASK_ID_BASE. Legacy non-canonical ids (MT-*, T-301-01) are
+    ignored by the allocator."""
+    existing = [
+        {"task_id": "MT-W3W2B-001", "auto_generated": True},
+        {"task_id": "T-301-01", "auto_generated": True},   # non-canonical
+        {"task_id": "T-10004", "auto_generated": True},    # canonical max
+    ]
+    rows = [{"cluster": "c1", "keyword": "kw", "assigned_url": "",
+             "monthly_volume": 5000}]
+    batch = mts.aggregate(
+        sources={"cluster_keywords": rows},
+        existing_master_task=existing,
+        run_date="2026-05-01",
+    )
+    assert len(batch.appends) == 1
+    # Must be 1 above the canonical max (10004) → T-10005, never colliding
+    # with the legacy MT-* / T-301-01 rows.
+    assert batch.appends[0]["task_id"] == "T-10005"
+
+    # Empty existing → base series.
+    batch0 = mts.aggregate(
+        sources={"cluster_keywords": rows},
+        existing_master_task=[],
+        run_date="2026-05-01",
+    )
+    assert batch0.appends[0]["task_id"] == f"T-{mts.TASK_ID_BASE}"
+
 
 def test_master_task_sync_in_allowed_writers(master_excel_schema: dict) -> None:
     """Sanity check (per worker brief gate #8): the writer name
