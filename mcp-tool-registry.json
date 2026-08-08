@@ -12,7 +12,11 @@
       "auth_config": {
         "keychain_service": "seo-core-gsc"
       },
-      "capabilities": ["read", "rate_limited", "cached"],
+      "capabilities": [
+        "read",
+        "rate_limited",
+        "cached"
+      ],
       "rate_limit": "200 queries per 100 seconds (GSC API quota)",
       "docs_url": "https://developers.google.com/webmaster-tools",
       "tools": [
@@ -20,7 +24,9 @@
           "tool_name": "gsc__search_analytics",
           "description": "Query GSC Search Analytics with dimension/filter/aggregation arguments. Canonical use-case: search_analytics_query_page_daily.",
           "category": "search_analytics",
-          "used_by_mappings": ["gsc-tool-mapping.json"],
+          "used_by_mappings": [
+            "gsc-tool-mapping.json"
+          ],
           "cost_credits_per_call": 0,
           "cache_ttl_hours": 24
         },
@@ -28,7 +34,9 @@
           "tool_name": "gsc__enhanced_search_analytics",
           "description": "Enhanced search analytics with rolling 16-month window + brand split. CTR returned as fraction (0-1); see gsc-tool-mapping.json gscMcpTool description.",
           "category": "search_analytics",
-          "used_by_mappings": ["gsc-tool-mapping.json"],
+          "used_by_mappings": [
+            "gsc-tool-mapping.json"
+          ],
           "cost_credits_per_call": 0,
           "cache_ttl_hours": 24
         },
@@ -36,7 +44,9 @@
           "tool_name": "gsc__detect_quick_wins",
           "description": "Detect queries ranking 8-20 with sufficient impression volume. CTR returned as percent (0-100); see gsc-tool-mapping.json CTR units note.",
           "category": "search_analytics",
-          "used_by_mappings": ["gsc-tool-mapping.json"],
+          "used_by_mappings": [
+            "gsc-tool-mapping.json"
+          ],
           "cost_credits_per_call": 0,
           "cache_ttl_hours": 24
         },
@@ -44,7 +54,9 @@
           "tool_name": "gsc__index_inspect",
           "description": "Per-URL Index Inspection API.",
           "category": "index_inspect",
-          "used_by_mappings": ["gsc-tool-mapping.json"],
+          "used_by_mappings": [
+            "gsc-tool-mapping.json"
+          ],
           "cost_credits_per_call": 0,
           "cache_ttl_hours": 168
         },
@@ -52,7 +64,9 @@
           "tool_name": "gsc__list_sitemaps",
           "description": "List sitemaps registered for the site.",
           "category": "sitemap",
-          "used_by_mappings": ["gsc-tool-mapping.json"],
+          "used_by_mappings": [
+            "gsc-tool-mapping.json"
+          ],
           "cost_credits_per_call": 0,
           "cache_ttl_hours": 168
         },
@@ -60,7 +74,9 @@
           "tool_name": "gsc__submit_sitemap",
           "description": "Submit a sitemap URL to GSC for re-crawl.",
           "category": "sitemap",
-          "used_by_mappings": ["gsc-tool-mapping.json"],
+          "used_by_mappings": [
+            "gsc-tool-mapping.json"
+          ],
           "cost_credits_per_call": 0,
           "cache_ttl_hours": 0
         },
@@ -68,7 +84,9 @@
           "tool_name": "gsc__get_sitemap",
           "description": "Fetch sitemap details for a single sitemap URL.",
           "category": "sitemap",
-          "used_by_mappings": ["gsc-tool-mapping.json"],
+          "used_by_mappings": [
+            "gsc-tool-mapping.json"
+          ],
           "cost_credits_per_call": 0,
           "cache_ttl_hours": 168
         },
@@ -76,7 +94,9 @@
           "tool_name": "gsc__list_sites",
           "description": "List all GSC sites the authenticated principal has access to.",
           "category": "search_analytics",
-          "used_by_mappings": ["gsc-tool-mapping.json"],
+          "used_by_mappings": [
+            "gsc-tool-mapping.json"
+          ],
           "cost_credits_per_call": 0,
           "cache_ttl_hours": 720
         }
@@ -89,9 +109,17 @@
       "version_lock": "2.8.10",
       "auth_method": "env_var",
       "auth_config": {
-        "env_vars": ["DATAFORSEO_USERNAME", "DATAFORSEO_PASSWORD"]
+        "env_vars": [
+          "DATAFORSEO_USERNAME",
+          "DATAFORSEO_PASSWORD"
+        ]
       },
-      "capabilities": ["read", "paid", "rate_limited", "cached"],
+      "capabilities": [
+        "read",
+        "paid",
+        "rate_limited",
+        "cached"
+      ],
       "rate_limit": "30 qps account aggregate (SERP); per-endpoint quotas in DFS docs",
       "docs_url": "https://docs.dataforseo.com/",
       "tools": [
@@ -99,7 +127,9 @@
           "tool_name": "dataforseo__serp_organic_live_advanced",
           "description": "SERP organic results live (advanced). One of the most cost-heavy DFS endpoints; gated by budget_policy.",
           "category": "serp_scrape",
-          "used_by_mappings": ["dataforseo-endpoint-mapping.json"],
+          "used_by_mappings": [
+            "dataforseo-endpoint-mapping.json"
+          ],
           "cost_credits_per_call": 0.0035,
           "cache_ttl_hours": 24
         },
@@ -107,7 +137,9 @@
           "tool_name": "dataforseo__dataforseo_labs_google_keyword_overview",
           "description": "Labs keyword overview — search volume, KD, CPC, SERP info per keyword.",
           "category": "keyword_research",
-          "used_by_mappings": ["dataforseo-endpoint-mapping.json"],
+          "used_by_mappings": [
+            "dataforseo-endpoint-mapping.json"
+          ],
           "cost_credits_per_call": 0.0001,
           "cache_ttl_hours": 168
         },
@@ -115,7 +147,9 @@
           "tool_name": "dataforseo__dataforseo_labs_google_keywords_for_site",
           "description": "Labs keywords-for-site — list of keywords a domain ranks for.",
           "category": "keyword_research",
-          "used_by_mappings": ["dataforseo-endpoint-mapping.json"],
+          "used_by_mappings": [
+            "dataforseo-endpoint-mapping.json"
+          ],
           "cost_credits_per_call": 0.0001,
           "cache_ttl_hours": 168
         },
@@ -123,7 +157,9 @@
           "tool_name": "dataforseo__keywords_data_google_ads_search_volume",
           "description": "Google Ads search volume per keyword (with locale).",
           "category": "keyword_research",
-          "used_by_mappings": ["dataforseo-endpoint-mapping.json"],
+          "used_by_mappings": [
+            "dataforseo-endpoint-mapping.json"
+          ],
           "cost_credits_per_call": 0.0001,
           "cache_ttl_hours": 168
         },
@@ -131,7 +167,9 @@
           "tool_name": "dataforseo__backlinks_summary",
           "description": "Domain-level backlinks summary (referring domains, rank, organic keywords).",
           "category": "backlinks",
-          "used_by_mappings": ["dataforseo-endpoint-mapping.json"],
+          "used_by_mappings": [
+            "dataforseo-endpoint-mapping.json"
+          ],
           "cost_credits_per_call": 0.0002,
           "cache_ttl_hours": 168
         },
@@ -139,32 +177,40 @@
           "tool_name": "dataforseo__on_page_lighthouse",
           "description": "Lighthouse audit for a single page (paid).",
           "category": "page_audit",
-          "used_by_mappings": ["dataforseo-endpoint-mapping.json"],
-          "cost_credits_per_call": 0.0050,
+          "used_by_mappings": [
+            "dataforseo-endpoint-mapping.json"
+          ],
+          "cost_credits_per_call": 0.005,
           "cache_ttl_hours": 24
         },
         {
           "tool_name": "dataforseo__on_page_instant_pages",
           "description": "On-page instant analysis (cheaper than full crawl).",
           "category": "page_audit",
-          "used_by_mappings": ["dataforseo-endpoint-mapping.json"],
-          "cost_credits_per_call": 0.0010,
+          "used_by_mappings": [
+            "dataforseo-endpoint-mapping.json"
+          ],
+          "cost_credits_per_call": 0.001,
           "cache_ttl_hours": 24
         },
         {
           "tool_name": "dataforseo__business_data_business_listings_search",
           "description": "Business listings search — local pack / GBP audit data source.",
           "category": "domain_analytics",
-          "used_by_mappings": ["dataforseo-endpoint-mapping.json"],
-          "cost_credits_per_call": 0.0010,
+          "used_by_mappings": [
+            "dataforseo-endpoint-mapping.json"
+          ],
+          "cost_credits_per_call": 0.001,
           "cache_ttl_hours": 168
         },
         {
           "tool_name": "dataforseo__ai_optimization_llm_response",
           "description": "Cross-LLM response query (ChatGPT/Claude/Gemini/Perplexity citations).",
           "category": "ai_optimization",
-          "used_by_mappings": ["dataforseo-endpoint-mapping.json"],
-          "cost_credits_per_call": 0.0020,
+          "used_by_mappings": [
+            "dataforseo-endpoint-mapping.json"
+          ],
+          "cost_credits_per_call": 0.002,
           "cache_ttl_hours": 168
         },
         {
@@ -251,7 +297,7 @@
           "tool_name": "dataforseo__on_page_content_parsing",
           "description": "On-page content parsing — structured extraction (headings, body text, links) for a single page.",
           "category": "page_audit",
-          "cost_credits_per_call": 0.0010,
+          "cost_credits_per_call": 0.001,
           "cache_ttl_hours": 24,
           "notes": "Skill-referenced DataForSEO tool added for registry completeness (P0-03)."
         },
@@ -259,7 +305,7 @@
           "tool_name": "dataforseo__content_analysis_search",
           "description": "Content analysis search — citation/mention search across the DataForSEO content index.",
           "category": "content_analysis",
-          "cost_credits_per_call": 0.0010,
+          "cost_credits_per_call": 0.001,
           "cache_ttl_hours": 168,
           "notes": "Skill-referenced DataForSEO tool added for registry completeness (P0-03)."
         },
@@ -267,7 +313,7 @@
           "tool_name": "dataforseo__ai_optimization_llm_mentions_search",
           "description": "AI optimization LLM mentions search — brand/entity mentions surfaced across LLM answers.",
           "category": "ai_optimization",
-          "cost_credits_per_call": 0.0020,
+          "cost_credits_per_call": 0.002,
           "cache_ttl_hours": 168,
           "notes": "Skill-referenced DataForSEO tool added for registry completeness (P0-03)."
         },
@@ -275,9 +321,49 @@
           "tool_name": "dataforseo__ai_optimization_llm_mentions_aggregated_metrics",
           "description": "AI optimization LLM mentions aggregated metrics — mention-volume / share-of-voice rollups.",
           "category": "ai_optimization",
-          "cost_credits_per_call": 0.0020,
+          "cost_credits_per_call": 0.002,
           "cache_ttl_hours": 168,
           "notes": "Skill-referenced DataForSEO tool added for registry completeness (P0-03)."
+        },
+        {
+          "tool_name": "dataforseo__backlinks_bulk_referring_domains",
+          "description": "Referring-domain counts for many targets in one call. Bulk companion to backlinks_summary.",
+          "category": "backlinks",
+          "cost_credits_per_call": 0.0002,
+          "cache_ttl_hours": 168,
+          "notes": "Declared by skills/ingestion/refresh-audit/SKILL.md; added for registry completeness (P0-03). Tool name verified present in a live runtime tool list."
+        },
+        {
+          "tool_name": "dataforseo__backlinks_bulk_spam_score",
+          "description": "Spam score for many targets in one call — the backlink-quality screen for a refresh audit.",
+          "category": "backlinks",
+          "cost_credits_per_call": 0.0002,
+          "cache_ttl_hours": 168,
+          "notes": "Declared by skills/ingestion/refresh-audit/SKILL.md; added for registry completeness (P0-03). Tool name verified present in a live runtime tool list."
+        },
+        {
+          "tool_name": "dataforseo__dataforseo_labs_bulk_keyword_difficulty",
+          "description": "Keyword difficulty for many keywords in one call. Bulk companion to the labs keyword tools.",
+          "category": "keyword_research",
+          "cost_credits_per_call": 0.0001,
+          "cache_ttl_hours": 168,
+          "notes": "Declared by skills/ingestion/refresh-audit/SKILL.md; added for registry completeness (P0-03). Tool name verified present in a live runtime tool list."
+        },
+        {
+          "tool_name": "dataforseo__dataforseo_labs_google_ranked_keywords",
+          "description": "Keywords a target currently ranks for, with position and volume — the ranked-universe feed.",
+          "category": "keyword_research",
+          "cost_credits_per_call": 0.0001,
+          "cache_ttl_hours": 168,
+          "notes": "Declared by skills/ingestion/refresh-audit/SKILL.md; added for registry completeness (P0-03). Tool name verified present in a live runtime tool list."
+        },
+        {
+          "tool_name": "dataforseo__dataforseo_labs_google_relevant_pages",
+          "description": "Pages of a domain ranked by organic relevance — the page-level companion to ranked_keywords.",
+          "category": "domain_analytics",
+          "cost_credits_per_call": 0.0001,
+          "cache_ttl_hours": 168,
+          "notes": "Declared by skills/ingestion/refresh-audit/SKILL.md; added for registry completeness (P0-03). Tool name verified present in a live runtime tool list."
         }
       ]
     },
@@ -287,7 +373,10 @@
       "runtime": "stdio",
       "version_lock": "none",
       "auth_method": "none",
-      "capabilities": ["read", "rate_limited"],
+      "capabilities": [
+        "read",
+        "rate_limited"
+      ],
       "rate_limit": "Tier-escalation managed: get → fetch → stealthy_fetch (§14.5)",
       "docs_url": "https://github.com/D4Vinci/Scrapling",
       "tools": [
@@ -295,63 +384,81 @@
           "tool_name": "scrapling__get",
           "description": "Tier 1 fetch — plain HTTP GET (fast, no JS).",
           "category": "scrapling_fetch",
-          "used_by_mappings": ["scrapling-output-mapping.json"],
+          "used_by_mappings": [
+            "scrapling-output-mapping.json"
+          ],
           "cache_ttl_hours": 24
         },
         {
           "tool_name": "scrapling__fetch",
           "description": "Tier 2 fetch — HTTP with browser-like headers / cookies.",
           "category": "scrapling_fetch",
-          "used_by_mappings": ["scrapling-output-mapping.json"],
+          "used_by_mappings": [
+            "scrapling-output-mapping.json"
+          ],
           "cache_ttl_hours": 24
         },
         {
           "tool_name": "scrapling__stealthy_fetch",
           "description": "Tier 3 fetch — full headless browser with anti-bot evasion.",
           "category": "scrapling_fetch",
-          "used_by_mappings": ["scrapling-output-mapping.json"],
+          "used_by_mappings": [
+            "scrapling-output-mapping.json"
+          ],
           "cache_ttl_hours": 24
         },
         {
           "tool_name": "scrapling__bulk_get",
           "description": "Bulk Tier 1 — many URLs in one call.",
           "category": "scrapling_fetch",
-          "used_by_mappings": ["scrapling-output-mapping.json"],
+          "used_by_mappings": [
+            "scrapling-output-mapping.json"
+          ],
           "cache_ttl_hours": 24
         },
         {
           "tool_name": "scrapling__bulk_fetch",
           "description": "Bulk Tier 2.",
           "category": "scrapling_fetch",
-          "used_by_mappings": ["scrapling-output-mapping.json"],
+          "used_by_mappings": [
+            "scrapling-output-mapping.json"
+          ],
           "cache_ttl_hours": 24
         },
         {
           "tool_name": "scrapling__bulk_stealthy_fetch",
           "description": "Bulk Tier 3 — most expensive in runtime cost.",
           "category": "scrapling_fetch",
-          "used_by_mappings": ["scrapling-output-mapping.json"],
+          "used_by_mappings": [
+            "scrapling-output-mapping.json"
+          ],
           "cache_ttl_hours": 24
         },
         {
           "tool_name": "scrapling__open_session",
           "description": "Open a persistent browser session for multi-request flows.",
           "category": "scrapling_fetch",
-          "used_by_mappings": ["scrapling-output-mapping.json"],
+          "used_by_mappings": [
+            "scrapling-output-mapping.json"
+          ],
           "cache_ttl_hours": 0
         },
         {
           "tool_name": "scrapling__close_session",
           "description": "Close a session opened via open_session.",
           "category": "scrapling_fetch",
-          "used_by_mappings": ["scrapling-output-mapping.json"],
+          "used_by_mappings": [
+            "scrapling-output-mapping.json"
+          ],
           "cache_ttl_hours": 0
         },
         {
           "tool_name": "scrapling__list_sessions",
           "description": "List currently-open scrapling sessions.",
           "category": "scrapling_fetch",
-          "used_by_mappings": ["scrapling-output-mapping.json"],
+          "used_by_mappings": [
+            "scrapling-output-mapping.json"
+          ],
           "cache_ttl_hours": 0
         }
       ]
@@ -362,7 +469,11 @@
       "version_lock": "24.0.0",
       "endpoint_url": "http://127.0.0.1:11435/mcp",
       "auth_method": "none",
-      "capabilities": ["read", "write", "rate_limited"],
+      "capabilities": [
+        "read",
+        "write",
+        "rate_limited"
+      ],
       "rate_limit": "Single concurrent crawl per SF GUI (D-SF-10 pre-flight check enforces)",
       "docs_url": "https://www.screamingfrog.co.uk/seo-spider/",
       "tools": [
@@ -370,67 +481,321 @@
           "tool_name": "sf__sf_crawl",
           "description": "Trigger a new SF crawl. Accepts URL list + optional crawl_config_file_path. Returns crawl_id for progress polling. v1.8 Phase 1 D-SF-12.",
           "category": "platform_detection",
-          "used_by_mappings": ["internal"],
+          "used_by_mappings": [
+            "internal"
+          ],
           "cache_ttl_hours": 0
         },
         {
           "tool_name": "sf__sf_crawl_progress",
           "description": "Poll progress of an in-flight crawl by crawl_id. Returns percent + URL count + IN_PROGRESS/COMPLETED/FAILED state.",
           "category": "platform_detection",
-          "used_by_mappings": ["internal"],
+          "used_by_mappings": [
+            "internal"
+          ],
           "cache_ttl_hours": 0
         },
         {
           "tool_name": "sf__sf_generate_report",
           "description": "Export an SF report by category ('Cat:Subcat' colon form from sf_list_available_reports) to file_path (relative to allowed_directory). Args: category (required), file_path, data_fields, export_type ('CSV'|'NDJSON'). Operates on the currently-loaded crawl. build_export_plan maps engine canonicals (issues_overview_report, redirect_chains, orphan_pages) to this tool.",
           "category": "platform_detection",
-          "used_by_mappings": ["internal"],
+          "used_by_mappings": [
+            "internal"
+          ],
           "cache_ttl_hours": 0
         },
         {
           "tool_name": "sf__sf_generate_bulk_export",
           "description": "Export an SF bulk export by category (from sf_list_available_bulk_exports) to file_path. Same arg shape as sf_generate_report: category (required), file_path, data_fields, export_type ('CSV'|'NDJSON'). build_export_plan maps link/content canonicals (all_inlinks, all_outlinks, all_anchor_text, near_duplicates_report, exact_duplicates_report) to this tool.",
           "category": "platform_detection",
-          "used_by_mappings": ["internal"],
+          "used_by_mappings": [
+            "internal"
+          ],
           "cache_ttl_hours": 0
         },
         {
           "tool_name": "sf__sf_export_seo_element_urls",
           "description": "Export the URL list for a named SEO element + filter to file_path (CSV by default; NO export_type arg). Args: seo_element_name (required enum incl. Internal/H1/H2/Page Titles/Meta Description/Canonicals/Directives/Images/Hreflang/Sitemaps/Structured Data/Pagination/Response Codes/Search Console), filter_name (required; 'All' valid for every element), file_path, segment_name, data_fields, start_index, max_rows. build_export_plan maps the majority of canonicals (internal_all, page_titles_all, h1_all, indexability, crawl_depth, etc.) to this tool.",
           "category": "platform_detection",
-          "used_by_mappings": ["internal"],
+          "used_by_mappings": [
+            "internal"
+          ],
           "cache_ttl_hours": 0
         },
         {
           "tool_name": "sf__sf_list_crawls",
           "description": "List currently-tracked crawls (running + recently-completed). Used by orchestrator for resume semantics.",
           "category": "platform_detection",
-          "used_by_mappings": ["internal"],
+          "used_by_mappings": [
+            "internal"
+          ],
           "cache_ttl_hours": 0
         },
         {
           "tool_name": "sf__sf_list_allowed_base_directory",
           "description": "Pre-flight probe — returns the SF GUI's currently-configured allowed_directory. Orchestrator compares against project.config.sf.mcp.allowed_directory for drift detection.",
           "category": "platform_detection",
-          "used_by_mappings": ["internal"],
+          "used_by_mappings": [
+            "internal"
+          ],
           "cache_ttl_hours": 24
         },
         {
           "tool_name": "sf__sf_load_crawl",
           "description": "Load a previously-identified completed SF crawl by crawl_id (instanceDirName) into the SF GUI so element/report exports operate on it. Native SfMcpClient.load_crawl wrapper; used by the D-SF-11 opt-in live-crawl path in schema-audit / on-page-audit / tech-audit / internal-links.",
           "category": "platform_detection",
-          "used_by_mappings": ["internal"],
+          "used_by_mappings": [
+            "internal"
+          ],
           "cache_ttl_hours": 0
+        },
+        {
+          "tool_name": "sf__sf_export_crawl",
+          "description": "Export a completed Screaming Frog crawl to disk for the file-based import path.",
+          "category": "platform_detection",
+          "cache_ttl_hours": 0,
+          "notes": "Declared by skills/ingestion/refresh-audit/SKILL.md; added for registry completeness (P0-03). Tool name verified present in a live runtime tool list."
         }
       ]
+    },
+    "adstark": {
+      "display_name": "AdStark CRM / task board MCP",
+      "runtime": "stdio",
+      "version_lock": "none",
+      "auth_method": "none",
+      "auth_config": {
+        "env_vars": [
+          "ADSTARK_API_URL"
+        ]
+      },
+      "capabilities": [
+        "read",
+        "write",
+        "destructive"
+      ],
+      "rate_limit": "none (local API)",
+      "docs_url": "",
+      "tools": [
+        {
+          "tool_name": "adstark__add_customer",
+          "description": "Yeni müşteri ekle. avatarColor paletten otomatik atanır.",
+          "category": "other",
+          "cost_credits_per_call": 0,
+          "notes": "Mutates CRM state."
+        },
+        {
+          "tool_name": "adstark__add_meeting_note",
+          "description": "Müşteriye toplantı/görüşme notu ekle (type: meeting|call|email|other).",
+          "category": "other",
+          "cost_credits_per_call": 0,
+          "notes": "Mutates CRM state."
+        },
+        {
+          "tool_name": "adstark__add_recurring_template",
+          "description": "Tekrarlayan görev ŞABLONU ekle (instance üretmez — web app açılışta üretir). customerName \"all\" tüm müşteriler demektir.",
+          "category": "other",
+          "cost_credits_per_call": 0,
+          "notes": "Mutates CRM state."
+        },
+        {
+          "tool_name": "adstark__add_task",
+          "description": "Bir müşteriye görev ekle. dueDate YYYY-MM-DD (boş bırakılırsa backlog). labels string listesi.",
+          "category": "other",
+          "cost_credits_per_call": 0,
+          "notes": "Mutates CRM state."
+        },
+        {
+          "tool_name": "adstark__backup_now",
+          "description": "Tüm veri anahtarlarının anlık yedeğini local-backup/mcp-<ts>/ altına yazar.",
+          "category": "other",
+          "cost_credits_per_call": 0,
+          "notes": "Mutates CRM state."
+        },
+        {
+          "tool_name": "adstark__board_summary",
+          "description": "Müşteri başına aktif/tamamlanan görev sayıları, bu haftanın (Pzt-Cum) günlük yükü ve toplamlar.",
+          "category": "other",
+          "cost_credits_per_call": 0
+        },
+        {
+          "tool_name": "adstark__bulk_add_tasks",
+          "description": "Bir müşteriye birden çok görevi tek atomik yazımla ekle. confirm yoksa önizleme döner; confirm:true ile önce yedek alınır.",
+          "category": "other",
+          "cost_credits_per_call": 0,
+          "notes": "Mutates CRM state."
+        },
+        {
+          "tool_name": "adstark__complete_task",
+          "description": "Bir görevi tamamlandı olarak işaretle.",
+          "category": "other",
+          "cost_credits_per_call": 0,
+          "notes": "Mutates CRM state."
+        },
+        {
+          "tool_name": "adstark__delete_customer_tasks",
+          "description": "Bir müşterinin TÜM görevlerini sil. confirm yoksa önizleme (kaç görev); confirm:true ile önce yedek.",
+          "category": "other",
+          "cost_credits_per_call": 0,
+          "notes": "DESTRUCTIVE — irreversibly deletes task data. NOT covered by outward_action_gate: its fs_delete class matches bash tokens only, so an MCP delete reaches the data with no consent check."
+        },
+        {
+          "tool_name": "adstark__delete_recurring_template",
+          "description": "Bir tekrarlayan şablonu sil. confirm yoksa önizleme; confirm:true ile önce yedek.",
+          "category": "other",
+          "cost_credits_per_call": 0,
+          "notes": "DESTRUCTIVE — irreversibly deletes task data. NOT covered by outward_action_gate: its fs_delete class matches bash tokens only, so an MCP delete reaches the data with no consent check."
+        },
+        {
+          "tool_name": "adstark__delete_task",
+          "description": "Tek görevi sil. confirm yoksa önizleme; confirm:true ile önce yedek, sonra silme.",
+          "category": "other",
+          "cost_credits_per_call": 0,
+          "notes": "DESTRUCTIVE — irreversibly deletes task data. NOT covered by outward_action_gate: its fs_delete class matches bash tokens only, so an MCP delete reaches the data with no consent check."
+        },
+        {
+          "tool_name": "adstark__delete_tasks",
+          "description": "Birden çok görevi id listesiyle sil. confirm yoksa önizleme; confirm:true ile önce yedek.",
+          "category": "other",
+          "cost_credits_per_call": 0,
+          "notes": "DESTRUCTIVE — irreversibly deletes task data. NOT covered by outward_action_gate: its fs_delete class matches bash tokens only, so an MCP delete reaches the data with no consent check."
+        },
+        {
+          "tool_name": "adstark__get_customer",
+          "description": "Bir müşterinin tam detayını döndürür (id veya ad ile). credentials.password ve portalAccess.accessToken MASKELENİR.",
+          "category": "other",
+          "cost_credits_per_call": 0
+        },
+        {
+          "tool_name": "adstark__get_customer_credentials",
+          "description": "Bir müşterinin GERÇEK (maskelenmemiş) erişim bilgilerini döndürür. Hassas — yalnızca açıkça istendiğinde kullan.",
+          "category": "other",
+          "cost_credits_per_call": 0,
+          "notes": "Returns UNMASKED customer credentials. Never route its output into a log, a report or a committed file."
+        },
+        {
+          "tool_name": "adstark__health_check",
+          "description": "ADSTARK API erişilebilir mi ve kayıt sayıları (müşteri, görev, tekrarlayan şablon).",
+          "category": "other",
+          "cost_credits_per_call": 0
+        },
+        {
+          "tool_name": "adstark__list_backups",
+          "description": "MCP tarafından alınan yedekleri (mcp-*) listeler.",
+          "category": "other",
+          "cost_credits_per_call": 0
+        },
+        {
+          "tool_name": "adstark__list_customers",
+          "description": "Tüm müşterilerin özetini döndürür (id, ad, hizmetler, iletişim). Şifreler maskelenir.",
+          "category": "other",
+          "cost_credits_per_call": 0
+        },
+        {
+          "tool_name": "adstark__list_recurring_templates",
+          "description": "Tüm tekrarlayan görev şablonlarını listele.",
+          "category": "other",
+          "cost_credits_per_call": 0
+        },
+        {
+          "tool_name": "adstark__list_tasks",
+          "description": "Görevleri filtreyle listele: customerName/customerId, status(active|completed|all), dueFrom/dueTo (YYYY-MM-DD), search, priority.",
+          "category": "other",
+          "cost_credits_per_call": 0
+        },
+        {
+          "tool_name": "adstark__move_task",
+          "description": "Görevin vade gününü değiştir (YYYY-MM-DD) veya null ile backlog'a taşı.",
+          "category": "other",
+          "cost_credits_per_call": 0,
+          "notes": "Mutates CRM state."
+        },
+        {
+          "tool_name": "adstark__neglected_customers",
+          "description": "Son aktivitesi eşik günden (varsayılan 14) eski olan veya hiç görevi olmayan müşteriler.",
+          "category": "other",
+          "cost_credits_per_call": 0
+        },
+        {
+          "tool_name": "adstark__reopen_task",
+          "description": "Tamamlanmış bir görevi yeniden aç.",
+          "category": "other",
+          "cost_credits_per_call": 0,
+          "notes": "Mutates CRM state."
+        },
+        {
+          "tool_name": "adstark__today_and_overdue",
+          "description": "Bugüne ve geçmişe ait (vadesi gelmiş/geçmiş), tamamlanmamış görevler.",
+          "category": "other",
+          "cost_credits_per_call": 0
+        },
+        {
+          "tool_name": "adstark__upcoming_deadlines",
+          "description": "Önümüzdeki N gün (varsayılan 7) içinde vadesi gelen, tamamlanmamış görevler.",
+          "category": "other",
+          "cost_credits_per_call": 0
+        },
+        {
+          "tool_name": "adstark__update_customer",
+          "description": "Müşteri güncelle: contact, services, contractStartDate/EndDate, addNote (yeni not ekler). Immutable.",
+          "category": "other",
+          "cost_credits_per_call": 0,
+          "notes": "Mutates CRM state."
+        },
+        {
+          "tool_name": "adstark__update_task",
+          "description": "Bir görevin alanlarını güncelle (title, description, priority, dueDate=YYYY-MM-DD). Immutable merge.",
+          "category": "other",
+          "cost_credits_per_call": 0,
+          "notes": "Mutates CRM state."
+        }
+      ]
+    },
+    "xquik": {
+      "display_name": "XQuik remote API proxy MCP (inventory unverified)",
+      "runtime": "npx",
+      "version_lock": "none",
+      "endpoint_url": "https://xquik.com/mcp",
+      "auth_method": "env_var",
+      "auth_config": {
+        "env_vars": [
+          "XQUIK_API_KEY"
+        ]
+      },
+      "capabilities": [
+        "read",
+        "write",
+        "paid"
+      ],
+      "rate_limit": "credit-metered (/api/v1/credits)",
+      "docs_url": "https://xquik.com",
+      "tools": [
+        {
+          "tool_name": "xquik__xquik",
+          "description": "Executes an author-supplied async JavaScript function against the XQuik API through an injected `xquik.request(path)` client. Observed calling /api/v1/x/accounts and /api/v1/credits. Arbitrary-endpoint reach: what it does is decided by the code passed in, not by the tool name.",
+          "category": "other",
+          "notes": "INVENTORY UNVERIFIED — reconstructed from calls recorded in earlier session logs, not from the server's own tools/list. The server is remote (https://xquik.com/mcp) and enumerating it needs XQUIK_API_KEY, so this entry may be INCOMPLETE. An unlisted tool here is exactly the gap F-27 exists to catch, so treat a surprise tool name as a finding, not as a registry bug. HIGH CAPABILITY: it runs supplied code, so it can reach any endpoint the key permits, including writes. Not covered by outward_action_gate, whose net_post class matches bash tokens only."
+        },
+        {
+          "tool_name": "xquik__explore",
+          "description": "Companion discovery tool for the XQuik API surface. Present in the runtime tool list of earlier sessions; no invocation with arguments was recorded, so its parameters are unknown.",
+          "category": "other",
+          "notes": "INVENTORY UNVERIFIED — reconstructed from calls recorded in earlier session logs, not from the server's own tools/list. The server is remote (https://xquik.com/mcp) and enumerating it needs XQUIK_API_KEY, so this entry may be INCOMPLETE. An unlisted tool here is exactly the gap F-27 exists to catch, so treat a surprise tool name as a finding, not as a registry bug. Description inferred from the tool NAME and its presence alongside xquik__xquik — no recorded call to verify it against."
+        }
+      ],
+      "package": "mcp-remote@latest"
     }
   },
   "external_user_dependencies": {
     "higgsfield": {
       "transport": "user_external",
       "not_in_mcp_json": true,
-      "tools": ["generate_image", "job_status"],
-      "required_by_skills": ["generate-images"],
+      "tools": [
+        "generate_image",
+        "job_status"
+      ],
+      "required_by_skills": [
+        "generate-images"
+      ],
       "note": "User-level MCP configured in the operator's own client env (e.g. VS Code), NOT installed by this plugin and intentionally absent from .mcp.json + servers (F-24 safe). generate-images preflights mcp__higgsfield__generate_image and falls back via DURUR #5 when absent (P1-13)."
     }
   }

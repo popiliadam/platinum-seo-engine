@@ -137,10 +137,17 @@ def events_schema() -> dict:
 def test_all_pass_green_verdict(clean_wb_path: Path, tmp_path: Path) -> None:
     slug = "drifttest"
     wb = load_workbook(str(clean_wb_path), data_only=True, read_only=True)
+    # F-02/F-03/F-04 read formulas, which the data_only=True handle never yields —
+    # it returns the cached value. Without this second view they report SKIP, not
+    # PASS, because a check that cannot see its subject has not measured it. The
+    # caller supplies the view; this test asserts they PASS, so it has to.
+    fwb = load_workbook(str(clean_wb_path), data_only=False, read_only=True)
     try:
-        results = vi.evaluate_all(wb, slug, workspace_root=tmp_path)
+        results = vi.evaluate_all(wb, slug, workspace_root=tmp_path,
+                                  formula_workbook=fwb)
     finally:
         wb.close()
+        fwb.close()
     agg = vi.aggregate_verdicts(results)
     # All-clean expectation: no FAIL anywhere; SKIPs are allowed (which
     # would land us on AMBER) — assert no RED at minimum, plus that the

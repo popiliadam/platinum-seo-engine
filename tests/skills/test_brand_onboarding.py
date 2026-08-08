@@ -55,8 +55,12 @@ MCP_JSON = REPO_ROOT / ".mcp.json"
 # Any drift from THIS hash means the skill — or unrelated plugin work — touched
 # the MCP boundary, which the F-16 invariant still forbids outside an
 # ADR-documented change.
-MCP_JSON_MD5_BASELINE = "634c8ed5b7cf3c852d9b41e1c0e1d3b5"
-MCP_JSON_BYTES_BASELINE = 565
+# Moved 634c8ed5b7cf3c852d9b41e1c0e1d3b5 -> 1dad329fe471a5de7336850943db2ccd when adstark and xquik were added
+# for refresh-audit. The tripwire held the change red until both servers were
+# registered and F-24 returned to PASS; moving it before that would have been
+# the drift it exists to catch.
+MCP_JSON_MD5_BASELINE = "1dad329fe471a5de7336850943db2ccd"
+MCP_JSON_BYTES_BASELINE = 982
 
 
 def _parse_frontmatter(skill_path: Path) -> dict:
