@@ -21,6 +21,18 @@
     "sf": {
       "type": "http",
       "url": "http://127.0.0.1:11435/mcp"
+    },
+    "adstark": {
+      "command": "node",
+      "args": ["/Users/apple/Downloads/geminiboard/mcp-server/dist/index.js"],
+      "env": { "ADSTARK_API_URL": "http://localhost:3000" }
+    },
+    "xquik": {
+      "command": "bash",
+      "args": [
+        "-c",
+        "set -a; [ -f .env ] && source .env; set +a; exec npx -y mcp-remote@latest https://xquik.com/mcp --header \"x-api-key:$XQUIK_API_KEY\""
+      ]
     }
   }
 }

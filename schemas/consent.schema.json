@@ -23,8 +23,8 @@
     },
     "action": {
       "type": "string",
-      "enum": ["git_push", "fs_delete", "net_post", "mcp_submit", "index_update", "dfs_oversized"],
-      "description": "The class of gated outward action consent is granted for. git_push=`git push`; fs_delete=rm/unlink/rmdir/shred; net_post=outbound curl/wget POST (exfil surface); mcp_submit=an MCP submit tool (e.g. mcp__gsc__submit_sitemap); index_update=Google Indexing-API URL_UPDATED (Süleyman hard-consent); dfs_oversized=an oversized DataForSEO request. Batch 2b maps each gate matcher onto exactly one of these. Additive enum bump if a new gated class is added later."
+      "enum": ["git_push", "fs_delete", "net_post", "mcp_submit", "index_update", "dfs_oversized", "crm_write"],
+      "description": "The class of gated outward action consent is granted for. git_push=`git push`; fs_delete=rm/unlink/rmdir/shred; net_post=outbound curl/wget POST (exfil surface); mcp_submit=an MCP submit tool (e.g. mcp__gsc__submit_sitemap); index_update=Google Indexing-API URL_UPDATED (Süleyman hard-consent); dfs_oversized=an oversized DataForSEO request; crm_write=an outward CRM/adstark mutation (ADR-018 additive enum bump — schema-only sink; the batch-2b gate matcher / consent_ledger._ACTIONS routing is intentionally NOT wired to it yet). Batch 2b maps each gate matcher onto exactly one of these. Additive enum bump if a new gated class is added later."
     },
     "target": {
       "type": "string",
