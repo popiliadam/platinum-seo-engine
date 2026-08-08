@@ -125,7 +125,7 @@ back via DURUR #5.
 
 | Concern                       | Location                                                    | Discipline                                       |
 |-------------------------------|-------------------------------------------------------------|--------------------------------------------------|
-| `.mcp.json`                   | Project-local (4 servers: gsc, dataforseo, ScraplingServer, sf) | Plugin agnostik; Higgsfield ABSENT (F-16 intact) |
+| `.mcp.json`                   | Project-local (6 servers: gsc, dataforseo, ScraplingServer, sf) | Plugin agnostik; Higgsfield ABSENT (F-16 intact) |
 | Higgsfield MCP                | VS Code user-level (Süleyman setup)                         | Per-user, not per-plugin                         |
 | `HIGGSFIELD_API_KEY`          | Süleyman `.env` (12-factor app)                              | Never committed; never in plugin                 |
 | `mcp__higgsfield__generate_image` | Claude tool registry runtime call                       | Worker calls if available; DURUR #5 if absent    |
@@ -556,7 +556,7 @@ schema authority + intent preservation = doğru fit.
   event_type 12-enum events.schema: `manual` for success AND DURUR #5 fallback).
 - `schemas/skill-frontmatter.schema.json` (8 required fields, category
   enum 8 values, status enum 3 values, `mcp_tools.required` advisory).
-- `.mcp.json` (4 servers: `gsc`, `dataforseo`, `ScraplingServer`, `sf`;
+- `.mcp.json` (6 servers: `gsc`, `dataforseo`, `ScraplingServer`, `sf`;
   Higgsfield ABSENT — F-16 plugin agnostik boundary intact).
 - ADR-020 (event_kind=workflow vs work routing).
 - ADR-028 (per-call / per-url credit shape anti-pattern).

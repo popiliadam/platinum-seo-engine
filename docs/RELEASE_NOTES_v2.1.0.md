@@ -37,7 +37,7 @@ A hostile full-repo audit (8 parallel agents, 2026-06-10) found that while the e
 
 ## Counts at release
 
-49 skills · 29 commands · 32 schemas (31 `*.schema.json` + invariants) · 24 rule files · rule-id ceiling **R-148** (R-142/R-143 reserved for the deferred backlinks module) · 6 hooks · 4 MCP servers.
+50 skills · 30 commands · 32 schemas (31 `*.schema.json` + invariants) · 24 rule files · rule-id ceiling **R-148** (R-142/R-143 reserved for the deferred backlinks module) · 6 hooks · 6 MCP servers.
 
 ## Deliberately deferred
 

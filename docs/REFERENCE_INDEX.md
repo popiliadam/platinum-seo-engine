@@ -32,7 +32,7 @@
 ## Architecture overview?
 → `docs/ARCHITECTURE.md` + spec §1, §2, §8
 
-## Skill catalog (49 skills, 29 commands)?
+## Skill catalog (50 skills, 30 commands)?
 → `docs/WORKFLOWS.md` + spec §11
 
 ## Manager protocol / fresh session wakeup?

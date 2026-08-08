@@ -35,8 +35,8 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 # invariant bump. Verified against the filesystem 2026-06-10 after the W1–W5
 # gap waves (GAP-T1/T2 brought skills 45 -> 49, commands 25 -> 29).
 # ---------------------------------------------------------------------------
-SKILL_COUNT = 49          # skills/**/SKILL.md
-COMMAND_COUNT = 29        # commands/*.md
+SKILL_COUNT = 50          # skills/**/SKILL.md
+COMMAND_COUNT = 30        # commands/*.md
 SCHEMA_FILE_COUNT = 31    # schemas/*.schema.json
 SCHEMA_JSON_COUNT = 32    # schemas/*.json (= SCHEMA_FILE_COUNT + cross-sheet-invariants.json)
 CSR_DECLARED = 32         # len(cross-sheet-invariants.json["rules"])

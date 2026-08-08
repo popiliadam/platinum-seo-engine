@@ -1,6 +1,6 @@
 # Workflow Catalog (v1 Skills)
 
-> v2.0.0 — **49 skill** kataloğu (Phase 5–13 baseline 43 + v1.7 gbp-audit + v1.8 sf-crawl-orchestrator + GAP-T 4 tech-seo skill: facet-nav-audit / robots-policy-audit / hreflang-audit / migration-map). Çoğu skill **active**; **production** (5: new-blog / revise-content / generate-images / content-remediation / faq-optimization), **publishing** (2: indexing-ping / verify-indexing), **mark-done** ve **monitoring-weekly** skill'leri **wip** — SKILL.md + paired test ile kontrat/spec kilitli, runtime ertelendi. Doğruluk kaynağı: her skill'in frontmatter `status`'u.
+> v2.0.0 — **50 skill** kataloğu (Phase 5–13 baseline 43 + v1.7 gbp-audit + v1.8 sf-crawl-orchestrator + GAP-T 4 tech-seo skill: facet-nav-audit / robots-policy-audit / hreflang-audit / migration-map). Çoğu skill **active**; **production** (5: new-blog / revise-content / generate-images / content-remediation / faq-optimization), **publishing** (2: indexing-ping / verify-indexing), **mark-done** ve **monitoring-weekly** skill'leri **wip** — SKILL.md + paired test ile kontrat/spec kilitli, runtime ertelendi. Doğruluk kaynağı: her skill'in frontmatter `status`'u.
 
 > **SF MCP call shapes — canonical contract (P3-01).** The inline `mcp__sf__*`
 > tool-call shapes in the SF crawl flow below are illustrative and have evolved.

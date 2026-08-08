@@ -68,7 +68,7 @@ Her biri `rules/*.md`'de tanımlı; drift-check ve CI otomatik denetler.
 | 13 | Governance Final | tamamlandı ✅ | 3 |
 | 14 | Workspace + CI + Pilot End-to-End | devam ediyor 🚧 | — |
 
-**Toplam ~49 skill** (49 SKILL.md filesystem SoT), 9 batch phase'e yayılmış (v1.7'de +1 gbp-audit; v1.8'de +1 sf-crawl-orchestrator). **Güncel durum (engine v2.1.0): foundation (Phase 0–4) + Phase 5–10 + 13 tamamlandı; Phase 11 (production) + Phase 12 (publishing) skill'leri `wip` — SKILL.md + paired test ile kontrat/spec kilitli, runtime ertelendi; Phase 14 (workspace + CI + pilot E2E) devam ediyor.** Foundation (Phase 0–4) skill phase'lerinden önce tamamlandı; Phase 5 **GO/NO-GO gateway** geçildi.
+**Toplam ~50 skill** (50 SKILL.md filesystem SoT), 9 batch phase'e yayılmış (v1.7'de +1 gbp-audit; v1.8'de +1 sf-crawl-orchestrator). **Güncel durum (engine v2.1.0): foundation (Phase 0–4) + Phase 5–10 + 13 tamamlandı; Phase 11 (production) + Phase 12 (publishing) skill'leri `wip` — SKILL.md + paired test ile kontrat/spec kilitli, runtime ertelendi; Phase 14 (workspace + CI + pilot E2E) devam ediyor.** Foundation (Phase 0–4) skill phase'lerinden önce tamamlandı; Phase 5 **GO/NO-GO gateway** geçildi.
 
 ---
 
@@ -77,8 +77,8 @@ Her biri `rules/*.md`'de tanımlı; drift-check ve CI otomatik denetler.
 v1 release için TÜM şunlar geçmeli:
 
 1. Plugin Claude Code'da yükleniyor.
-2. ~49 skill çalışıyor (her kategori için en az 1 happy-path test).
-3. 29 command (`/pseo-*`) çalışıyor.
+2. ~50 skill çalışıyor (her kategori için en az 1 happy-path test).
+3. 30 command (`/pseo-*`) çalışıyor.
 4. 6 hook (session-start, pre/post-tool-use, user-prompt-submit, stop, subagent-stop) tetikleniyor.
 5. 32 schema validation PASS (schemas/*.json).
 6. Content rules input doc tamamen işlenmiş (Phase 10).
@@ -130,7 +130,7 @@ sf-import projects to 6 sheets (`crawl_sitemap`, `inlinks`, `outlinks`, `redirec
 
 ## §16.5 MCP Discipline
 
-**v1.8+ 4 MCP servers** (3 stdio + 1 HTTP):
+**v1.8+ 6 MCP servers** (3 stdio + 1 HTTP):
 
 | Server | Transport | Source | Required? |
 |--------|-----------|--------|-----------|
@@ -143,7 +143,7 @@ sf-import projects to 6 sheets (`crawl_sitemap`, `inlinks`, `outlinks`, `redirec
 
 - `endpoint_url` in mcp-tool-registry instance (v1.8 Phase 1 `runtime` enum already supports `http` per `schemas/mcp-tool-registry.schema.json:47-51` — no schema change needed).
 - Reusable HTTP MCP client `scripts/util/sf_mcp_client.py` (D-SF-14): 3-retry exp backoff (1s/2s) + 100KB response cap (D-SF-05) + JSON-RPC envelope discipline + 307 redirect POST preservation (RFC 7231).
-- `mcp-tool-registry.json` instance file now exists at repo root (Q-SF-MCP-09 default) — first instance for all 4 servers (was schema-only pre-v1.8).
+- `mcp-tool-registry.json` instance file now exists at repo root (Q-SF-MCP-09 default) — first instance for all 6 servers (was schema-only pre-v1.8).
 
 ### F-23 cross-sheet invariant (v1.8 Phase 4)
 
@@ -155,10 +155,10 @@ sf-import projects to 6 sheets (`crawl_sitemap`, `inlinks`, `outlinks`, `redirec
 
 ### Plugin manifest counts (v1.8+)
 
-- 49 SKILL.md files (44 pre-v1.8 → 45 with +sf-crawl-orchestrator → 47 with GAP-T facet-nav-audit/robots-policy-audit → 49 with GAP-T2 hreflang-audit/migration-map)
-- 29 commands/*.md files (16 pre-v1.8 → 18 with +2 pseo-sf-crawl/pseo-sf-status → 25 at v2.0 with the AMO command suite: pseo-run/-run-portfolio/-status-portfolio/-schedule/-approve/-bind + pseo-coverage → 27 with GAP-T pseo-facet-audit/pseo-robots-policy → 29 with GAP-T2 pseo-hreflang-audit/pseo-migration-map)
+- 50 SKILL.md files (44 pre-v1.8 → 45 with +sf-crawl-orchestrator → 47 with GAP-T facet-nav-audit/robots-policy-audit → 49 with GAP-T2 hreflang-audit/migration-map)
+- 30 commands/*.md files (16 pre-v1.8 → 18 with +2 pseo-sf-crawl/pseo-sf-status → 25 at v2.0 with the AMO command suite: pseo-run/-run-portfolio/-status-portfolio/-schedule/-approve/-bind + pseo-coverage → 27 with GAP-T pseo-facet-audit/pseo-robots-policy → 29 with GAP-T2 pseo-hreflang-audit/pseo-migration-map)
 - 6 hooks (UNCHANGED; Q-SF-MCP-08 RESOLVED → NO; stop_validation.py perf budget intact)
-- 4 MCP servers (was 3; +sf HTTP)
+- 6 MCP servers (was 3; +sf HTTP)
 
 ### Events `event_type` enum is forward-declared (by design, not drift)
 

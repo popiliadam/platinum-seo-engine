@@ -14,7 +14,7 @@ Lock the additive contract for event_type enum extension:
     enum extension; ADR-018 paterni reuse)
 
 Brief premise revize per Lesson 38 v2 #46-52 (Süleyman onay 2026-05-07):
-  - "16 skill DSL workaround" iddiası runtime'da false (49 SKILL.md total)
+  - "16 skill DSL workaround" iddiası runtime'da false (50 SKILL.md total)
   - 2 skill DSL workaround (content-remediation:421 + whats-next:209-227)
   - 2 skill bilinçli semantic-correct (indexing-ping=manual+sub-object F-8
     compliance + monitoring-weekly=audit kind) — workaround DEĞİL

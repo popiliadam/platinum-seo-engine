@@ -1,6 +1,6 @@
 # Installation
 
-> Status: **v2.1.0** — 49 skills, 29 slash commands, 6 hooks, 4 MCP servers (gsc/dataforseo/scrapling stdio + sf HTTP), production-ready (schema-data aligned + drift-check AMBER: F-16 invariant intentionally reset to 565B baseline at v1.9.x per ADR-040 (sf type:http; 543B at v1.8/ADR-039) + F-17 PASS, F-13 historical).
+> Status: **v2.1.0** — 50 skills, 30 slash commands, 6 hooks, 6 MCP servers (gsc/dataforseo/scrapling stdio + sf HTTP), production-ready (schema-data aligned + drift-check AMBER: F-16 invariant intentionally reset to 565B baseline at v1.9.x per ADR-040 (sf type:http; 543B at v1.8/ADR-039) + F-17 PASS, F-13 historical).
 
 ## Requirements
 
