@@ -48,9 +48,34 @@ olarak duruyordu, yani kimse bakmıyordu. Bağlı workspace tarandığında
 | katrenur-tr | 1 | `T-0026-V` |
 | rkturizm-tr | 1 | `T-PIVOT-15G` |
 
-Bunlar **temizlenmedi**. Yeniden adlandırmak, arşivlenmiş `events.jsonl`
-satırlarında ve `completed_work` kayıtlarında askıda referans bırakır; o
-defterler append-only olduğu için yerinde onarılamaz. Karar sahibinin.
+### Yeniden adlandırılabilirlik ölçümü
+
+125 kimliğin kaçının geçmişe çivilendiği ayrıca ölçüldü:
+
+| | adet |
+|---|---:|
+| uyumsuz kimlik | 125 |
+| `events.jsonl` (canlı + `.legacy`) içinde geçen | 28 |
+| `completed_work` içinde geçen | 5 |
+| **hiçbir yerde referans verilmeyen** | **97** |
+
+Yani "hepsi askıda referans bırakır" doğru değil: 97'si yalnız `master_task`
+sayfasında duruyor ve teknik olarak güvenle yeniden adlandırılabilir. Yalnız 28'i
+(bigcat-tr 5, dentnotion 23) append-only deftere yazılmış durumda.
+
+### Verilen karar — 2026-08-08
+
+**Yeniden adlandırma yapılmadı; mevcut 125 kimlik grandfather edildi.**
+
+Gerekçe: teknik uygunluk tek ölçüt değil. Bu kimlikler operatörün ve müşterinin
+gördüğü tanımlayıcılar; `MT-001` → `T-10001` dönüşümü dışarıdaki eşlemeyi bozar
+ve karşılığında yalnız konvansiyon uyumu kazandırır — riski gerçek, faydası
+kozmetik. 28'i zaten append-only defterlere çivili olduğu için kısmi bir
+yeniden adlandırma da tutarsız bir kimlik uzayı bırakırdı.
+
+Bu karar geri alınabilir: 97'lik küme ölçülmüş ve listelenebilir durumda.
+Kararı değiştirirsen yeniden adlandırma `scripts/excel/transaction.py`
+üzerinden yapılmalı ve pin'ler aynı commit'te indirilmelidir.
 
 Kontrol bu yüzden bir **cırcır (ratchet)**: mevcut borç proje başına sayı
 olarak sabitlendi; sayı BÜYÜRSE kapı kırmızıya gider. Küçülürse de kırmızıya
