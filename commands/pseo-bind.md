@@ -24,7 +24,7 @@ Bu Claude session'ını (session UUID'sine göre) tek bir SEO projesine bağlar.
 
 `$1` verildiyse primitive CLI'yi çağır. `--workspace` opsiyoneldir: ilk seferinde bir kez geçilirse `~/.config/pseo/config.json`'a kalıcı yazılır (editör-bağımsız), sonraki çağrılarda gerek kalmaz. CLI sırasıyla: workspace root'u çözer (config → `$PSEO_WORKSPACE_ROOT`), session UUID'sini `$CLAUDE_CODE_SESSION_ID`'den alır, `projects/<slug>/project.config.json` var mı doğrular, sonra marker'ı atomik yazar (tempfile + fsync + os.replace).
 
-!`cd "$CLAUDE_PLUGIN_ROOT" && python3 -m scripts.state.session_binding bind $ARGUMENTS 2>&1`
+!`R=""; for c in "$CLAUDE_PLUGIN_ROOT" "$CLAUDE_PROJECT_DIR" "$PWD" "$HOME"/.claude/plugins/*/*/*/* "$HOME"/.claude/plugins/*/*/*; do [ -n "$c" ] && [ -f "$c/scripts/state/__init__.py" ] && { R="$c"; break; }; done; [ -n "$R" ] || { echo "PLUGIN_ROOT_UNRESOLVED: scripts/state bulunamadı — CLAUDE_PLUGIN_ROOT ayarlayın ya da plugin kökünden çağırın"; exit 2; }; PYTHONPATH="$R" python3 -m scripts.state.session_binding bind $ARGUMENTS 2>&1`
 
 Başarılı çıktı tek satırlık banner'dır, örn:
 

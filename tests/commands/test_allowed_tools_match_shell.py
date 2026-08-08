@@ -42,6 +42,10 @@ BUILTINS = {
     "while", "until", "case", "esac", "in", "set", "exit", "true", "false",
     "read", "local", "export", "return", "test", "printf", "source", "eval",
     "shift", "unset", "trap", "wait", "function", "time",
+    # Loop-control builtins — siblings of the `for`/`do`/`done` already listed.
+    # Their absence flagged `break` inside a plugin-root resolver loop as an
+    # undeclared external program (2026-08-08).
+    "break", "continue",
 }
 
 _PROGRAM = re.compile(r"^[a-z][a-z0-9_-]*$")

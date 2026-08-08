@@ -177,3 +177,84 @@ def test_real_approve_block_preserves_quoted_target_under_textsub(tmp_path: Path
     assert ledger.exists(), f"no consent ledger written: {combined!r}"
     entry = json.loads(ledger.read_text(encoding="utf-8").splitlines()[-1])
     assert entry["target_hash"] == target_hash(target)
+
+
+# --- the module must resolve even when CLAUDE_PLUGIN_ROOT is UNSET -----------
+#
+# Observed live 2026-08-08: the outward-action gate correctly BLOCKED a git_push
+# and told the operator to run `/pseo-approve …`; that command then died with
+# `ModuleNotFoundError: No module named 'scripts'`, because CLAUDE_PLUGIN_ROOT is
+# not exported in a normal session, `cd ""` succeeds silently, and `python3 -m`
+# then resolved against whatever cwd happened to be. The gate's own remediation
+# path was broken — the operator could not consent to what the gate denied.
+#
+# Note the trap this closes: the behavioural test ABOVE passes CLAUDE_PLUGIN_ROOT
+# into the subprocess env, so it models the world in which the variable is set —
+# the same class of mistake this file's docstring already records ("modelled
+# env-var passing, so it passed while production failed"), one level down.
+
+@pytest.mark.parametrize("name", _NAMES)
+def test_no_command_cds_into_a_possibly_empty_plugin_root(name: str) -> None:
+    """`cd "$CLAUDE_PLUGIN_ROOT"` is a silent no-op when the var is unset."""
+    text = _text(name)
+    for bad in ('cd "$CLAUDE_PLUGIN_ROOT"', 'cd "${CLAUDE_PLUGIN_ROOT}"'):
+        assert bad not in text, (
+            f"{name} cds into CLAUDE_PLUGIN_ROOT unguarded — when the variable "
+            f"is unset that is `cd \"\"`, which SUCCEEDS and leaves cwd wherever "
+            f"the session happened to be, so `python3 -m scripts.…` then fails "
+            f"with ModuleNotFoundError. Resolve the root with a fallback instead."
+        )
+
+
+@pytest.mark.skipif(not shutil.which("bash"), reason="bash required")
+@pytest.mark.parametrize("install_rel", [
+    # How Claude Code actually lays the plugin out on disk. The VERSIONED form is
+    # what this machine has (…/platinum-seo-engine/2.1.0/); an earlier draft of
+    # this test modelled only the unversioned form, so it went GREEN while the
+    # real command still could not find the module — a glob one directory short.
+    "cache/platinum-seo-marketplace/platinum-seo-engine/2.1.0",
+    "cache/platinum-seo-marketplace/platinum-seo-engine",
+])
+@pytest.mark.parametrize("name,module,sub", _FORWARDERS)
+def test_module_resolves_with_plugin_root_unset(
+    name: str, module: str, sub: str, install_rel: str, tmp_path: Path
+) -> None:
+    """Run the command's REAL block with CLAUDE_PLUGIN_ROOT absent and cwd
+    somewhere unrelated; the module must still import.
+
+    Models production faithfully and hermetically: the plugin IS installed under
+    HOME (a symlink to this checkout, mirroring
+    ~/.claude/plugins/<marketplace>/<plugin>), the variable is NOT exported, and
+    cwd is not the repo. Resolution therefore has to come from the install
+    location — which is the only anchor a real session actually has.
+
+    Arguments are omitted on purpose: argparse then rejects the call BEFORE any
+    ledger write, so this asserts import resolution with no side effect.
+    """
+    home = tmp_path / "home"
+    install = home / ".claude" / "plugins" / install_rel
+    install.parent.mkdir(parents=True, exist_ok=True)
+    install.symlink_to(_ROOT, target_is_directory=True)
+
+    block = _exec_block(name, module, sub)
+    src = block.replace("$ARGUMENTS", "")
+    out = subprocess.run(
+        ["bash", "-c", src],
+        cwd=str(tmp_path),                                      # NOT the repo
+        env={"PATH": os.environ["PATH"], "HOME": str(home)},    # no PLUGIN_ROOT
+        capture_output=True, text=True,
+    )
+    combined = out.stdout + out.stderr
+    assert "No module named" not in combined, (
+        f"{name} cannot find {module} without CLAUDE_PLUGIN_ROOT — the gate's "
+        f"own remediation path is broken in exactly this environment. Got: "
+        f"{combined.strip()[:400]!r}"
+    )
+    # Assert SUCCESS, not merely the absence of one failure mode: a clean
+    # "PLUGIN_ROOT_UNRESOLVED" bail also contains no ModuleNotFoundError, so the
+    # check above alone would pass on a resolver that resolved nothing. argparse
+    # emitting its usage line is proof the module was imported and RAN.
+    assert "usage" in combined.lower(), (
+        f"{name} never reached {module}'s argparse — the root was not resolved. "
+        f"Got: {combined.strip()[:400]!r}"
+    )
