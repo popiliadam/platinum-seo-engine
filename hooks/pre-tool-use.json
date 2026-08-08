@@ -27,6 +27,12 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/validate_content_write.py\"",
             "timeout": 15,
             "statusMessage": "Content rule validation..."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/check_events_writer.py\"",
+            "timeout": 15,
+            "statusMessage": "events.jsonl writer policy..."
           }
         ]
       },

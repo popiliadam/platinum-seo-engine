@@ -78,6 +78,18 @@ RUNTIME_HOOK_SCRIPTS = {
     # detection); recency-guarded (a read never triggers); non-blocking-on-error.
     # See scripts/hooks/README.md §1.
     "ai_disclosure_rescan.py",
+    # events.jsonl writer-policy guard — wired into hooks/pre-tool-use.json
+    # (matcher "Edit|Write|NotebookEdit|Bash") as the LAST command of the first
+    # block. Blocks (exit 2) a direct write to a live projects/*/_state/events.jsonl
+    # — redirect, tee, sed -i, cp-onto, or a Write/Edit payload — and points the
+    # caller at scripts/state/events_writer.py, which validates against
+    # events.schema.json BEFORE appending. READING the ledger is deliberately
+    # ALLOWED (diagnosis, monthly reporting and migrate_legacy_events all read it).
+    # Closes the boundary the 2026-07-09..08-06 drift walked through: 93 hand-written
+    # rows that the gitignored-file pre-commit guards could not see and that
+    # check_append_only.sh could not flag, because an append IS append-only.
+    # Escape hatch PSEO_EVENTS_WRITER=events_writer.py. See scripts/hooks/README.md §1.
+    "check_events_writer.py",
 }
 
 # NOT wired into hooks/*.json — CI/pre-commit/manual guard helpers.
