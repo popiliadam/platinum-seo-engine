@@ -4,14 +4,27 @@
   "title": "Events Log Entry v1.0",
   "description": "Unified events log schema — replaces provenance-log + work-log. One row/file = one event. Four kinds: 'provenance' (pipeline ingest/normalize/project/validate/cascade — every MCP response or SF file produces one entry, append-only, run_id monotonic per project), 'work' (DONE protocol §21.4 step 4 emits these into logs/work-done/{YYYY-MM}/{task_id}.json — 12 closed event_type subtypes including 2 skill_<name> canonical entries, monthly-report aggregates last-28-day events), 'audit' (governance placeholder — Phase 14+ for permission/access changes), 'workflow' (ADR-020 — workflow lifecycle transitions logged by workflow_runner.py state machine; workflow_action + workflow_run_id required). Discriminator field is event_kind. Common envelope: schema_version, event_kind, event_id, timestamp, project_id. Sub-kind specific fields are defined alongside; conditional requireds enforced via allOf if/then. Cross-kind invariants: agent_run_id on a work event must reference an existing provenance event run_id. Retention: provenance append-only forever; work 12 months active then archive zip (§20.3); audit policy TBD. Both url + url_normalized required on URL-bearing work events (D-S3-5). All hash fields use sha256:hex64 pattern.",
   "type": "object",
-  "required": ["schema_version", "event_kind", "event_id", "timestamp", "project_id"],
+  "required": [
+    "schema_version",
+    "event_kind",
+    "event_id",
+    "timestamp",
+    "project_id"
+  ],
   "additionalProperties": false,
   "properties": {
-    "schema_version": { "const": "1.0" },
+    "schema_version": {
+      "const": "1.0"
+    },
     "event_kind": {
       "type": "string",
       "description": "Top-level discriminator. Determines which sub-kind required fields apply. ADR-020: 'workflow' eklendi (workflow lifecycle event'leri için, audit routing workaround yerine semantik-doğru kategori).",
-      "enum": ["provenance", "work", "audit", "workflow"]
+      "enum": [
+        "provenance",
+        "work",
+        "audit",
+        "workflow"
+      ]
     },
     "event_id": {
       "type": "string",
@@ -20,13 +33,15 @@
       "minLength": 3,
       "maxLength": 128
     },
-    "timestamp": { "type": "string", "format": "date-time" },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
     "project_id": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]*$",
       "description": "Matches project-config.schema.json.project_id. Required across all kinds for portfolio cross-project aggregation (docs/ARCHITECTURE.md §26.2)."
     },
-
     "run_id": {
       "type": "integer",
       "minimum": 1,
@@ -35,28 +50,70 @@
     "source": {
       "type": "object",
       "description": "PROVENANCE-only. Origin of the data. source.kind determines which nested fields populate.",
-      "required": ["kind"],
+      "required": [
+        "kind"
+      ],
       "additionalProperties": false,
       "properties": {
         "kind": {
           "type": "string",
           "description": "sf_csv → filename_original + filename_normalized + file_hash + row_count; *_mcp → response_bytes + row_count; manual/tool_computed → neither. sf_mcp → same pattern (response_bytes + row_count + mcp_server + mcp_tool). sf_mcp added v1.8 Phase 1 D-SF-13 for Screaming Frog 24 native MCP, parallel to existing gsc_mcp / dataforseo_mcp.",
-          "enum": ["sf_csv", "gsc_mcp", "dataforseo_mcp", "scrapling_local", "scrapling_mcp", "sf_mcp", "manual", "tool_computed"]
+          "enum": [
+            "sf_csv",
+            "gsc_mcp",
+            "dataforseo_mcp",
+            "scrapling_local",
+            "scrapling_mcp",
+            "sf_mcp",
+            "manual",
+            "tool_computed"
+          ]
         },
-        "source_folder":       { "type": "string", "description": "For sf_csv: the ingest folder relative path (e.g. sf_exports/2026-04/)." },
-        "filename_original":   { "type": "string", "description": "Pre-normalization SF filename, Turkish chars preserved." },
-        "filename_normalized": { "type": "string", "description": "Post filename_alias normalization (docs/ARCHITECTURE.md §6.4) — ascii + v_/p_ prefix stripped." },
-        "file_hash":           { "$ref": "#/definitions/sha256Hash" },
-        "row_count":           { "type": "integer", "minimum": 0 },
-        "response_bytes":      { "type": "integer", "minimum": 0, "description": "MCP raw response size; used for storage budget." },
-        "mcp_server":          { "type": "string", "description": "Short server name (gsc / dataforseo / scrapling / sf) — matches mcp-tool-registry.json." },
-        "mcp_tool":            { "type": "string", "description": "Fully-qualified tool name (gsc__search_analytics, dataforseo__serp_organic_live_advanced, ...)." }
+        "source_folder": {
+          "type": "string",
+          "description": "For sf_csv: the ingest folder relative path (e.g. sf_exports/2026-04/)."
+        },
+        "filename_original": {
+          "type": "string",
+          "description": "Pre-normalization SF filename, Turkish chars preserved."
+        },
+        "filename_normalized": {
+          "type": "string",
+          "description": "Post filename_alias normalization (docs/ARCHITECTURE.md §6.4) — ascii + v_/p_ prefix stripped."
+        },
+        "file_hash": {
+          "$ref": "#/definitions/sha256Hash"
+        },
+        "row_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "response_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "MCP raw response size; used for storage budget."
+        },
+        "mcp_server": {
+          "type": "string",
+          "description": "Short server name (gsc / dataforseo / scrapling / sf) — matches mcp-tool-registry.json."
+        },
+        "mcp_tool": {
+          "type": "string",
+          "description": "Fully-qualified tool name (gsc__search_analytics, dataforseo__serp_organic_live_advanced, ...)."
+        }
       }
     },
     "operation": {
       "type": "string",
       "description": "PROVENANCE-only. Pipeline stage (docs/ARCHITECTURE.md §6.1 Stage 1-4 + DONE cascade §21.4). 'staging' = Phase 6 D-003 pre-Excel staging routing (raw MCP response → SQLite/JSON staging only, no master.xlsx write; Phase 8+ skills project later). One entry per (file|response, operation) pair.",
-      "enum": ["ingest", "normalize", "project_excel", "validate", "cascade_done", "staging"]
+      "enum": [
+        "ingest",
+        "normalize",
+        "project_excel",
+        "validate",
+        "cascade_done",
+        "staging"
+      ]
     },
     "target_table": {
       "type": "string",
@@ -67,37 +124,99 @@
         {
           "type": "string",
           "enum": [
-            "dashboard", "topical_map", "cluster_keywords", "cannibalization",
-            "quick_wins", "new_content_plan", "content_improve", "gsc_performance",
-            "content_decay", "on_page_audit", "opportunity", "tech_seo",
-            "crawl_sitemap", "robots_txt", "schema", "redirect_404",
-            "completed_work", "master_task"
+            "dashboard",
+            "topical_map",
+            "cluster_keywords",
+            "cannibalization",
+            "quick_wins",
+            "new_content_plan",
+            "content_improve",
+            "gsc_performance",
+            "content_decay",
+            "on_page_audit",
+            "opportunity",
+            "tech_seo",
+            "crawl_sitemap",
+            "robots_txt",
+            "schema",
+            "redirect_404",
+            "completed_work",
+            "master_task",
+            "gbp_audit",
+            "dfs_ranked_keywords",
+            "backlinks",
+            "dfs_relevant_pages"
           ]
         },
-        { "type": "null" }
+        {
+          "type": "null"
+        }
       ],
       "description": "PROVENANCE-only. Null when operation=ingest|normalize|validate (no Excel write). Required to be a logicalSheet when operation=project_excel."
     },
-    "rows_written":      { "type": "integer", "minimum": 0, "description": "PROVENANCE-only." },
-    "cells_written":     { "type": "integer", "minimum": 0, "description": "PROVENANCE-only. Projection-mode=kpi_cells writes cells, not rows." },
-    "validation_status": { "enum": ["pending", "pass", "fail"], "description": "PROVENANCE-only." },
+    "rows_written": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "PROVENANCE-only."
+    },
+    "cells_written": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "PROVENANCE-only. Projection-mode=kpi_cells writes cells, not rows."
+    },
+    "validation_status": {
+      "enum": [
+        "pending",
+        "pass",
+        "fail"
+      ],
+      "description": "PROVENANCE-only."
+    },
     "validation_errors": {
       "type": "array",
-      "items": { "type": "string" },
+      "items": {
+        "type": "string"
+      },
       "description": "PROVENANCE-only. Human-readable error strings; for machine-readable checks use consistency-report.checks[]."
     },
-    "duration_ms": { "type": "integer", "minimum": 0, "description": "PROVENANCE-only." },
-    "cache_hit":   { "type": "boolean", "description": "PROVENANCE-only." },
+    "duration_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "PROVENANCE-only."
+    },
+    "cache_hit": {
+      "type": "boolean",
+      "description": "PROVENANCE-only."
+    },
     "cost": {
       "type": "object",
       "description": "PROVENANCE-only. Cost accounting for paid sources (DFS credits, etc.). Absent when source.kind is free.",
       "additionalProperties": false,
       "properties": {
-        "provider":   { "enum": ["dataforseo", "scrapling_mcp_paid", "indexing_api", "other"] },
-        "credits":    { "type": "number", "minimum": 0 },
-        "currency":   { "type": "string", "description": "ISO 4217, only when billed in money not credits" },
-        "amount":     { "type": "number", "minimum": 0 },
-        "budget_key": { "type": "string", "description": "Dot-path into project.config (e.g. project.config.dataforseo.budget_credits_per_day)" }
+        "provider": {
+          "enum": [
+            "dataforseo",
+            "scrapling_mcp_paid",
+            "indexing_api",
+            "other"
+          ]
+        },
+        "credits": {
+          "type": "number",
+          "minimum": 0
+        },
+        "currency": {
+          "type": "string",
+          "description": "ISO 4217, only when billed in money not credits"
+        },
+        "amount": {
+          "type": "number",
+          "minimum": 0
+        },
+        "budget_key": {
+          "type": "string",
+          "description": "Dot-path into project.config (e.g. project.config.dataforseo.budget_credits_per_day)"
+        }
       }
     },
     "params_hash": {
@@ -110,9 +229,16 @@
       "description": "PROVENANCE-only. docs/ARCHITECTURE.md §9.4 L2 Hash Chain — hash at each hand-off must match.",
       "additionalProperties": false,
       "properties": {
-        "intake_hash":  { "$ref": "#/definitions/sha256Hash" },
-        "staging_hash": { "$ref": "#/definitions/sha256Hash" },
-        "match":        { "type": "boolean", "description": "Derived: intake_hash == staging_hash (after deterministic re-serialization)." }
+        "intake_hash": {
+          "$ref": "#/definitions/sha256Hash"
+        },
+        "staging_hash": {
+          "$ref": "#/definitions/sha256Hash"
+        },
+        "match": {
+          "type": "boolean",
+          "description": "Derived: intake_hash == staging_hash (after deterministic re-serialization)."
+        }
       }
     },
     "row_count_chain": {
@@ -120,9 +246,18 @@
       "description": "PROVENANCE-only. docs/ARCHITECTURE.md §9.4 L3 Row Count Chain — raw_lines − 1 (header) == staging_rows.",
       "additionalProperties": false,
       "properties": {
-        "raw_lines":    { "type": "integer", "minimum": 0 },
-        "staging_rows": { "type": "integer", "minimum": 0 },
-        "delta":        { "type": "integer", "description": "Expected delta is 1 (header row)." }
+        "raw_lines": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "staging_rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "delta": {
+          "type": "integer",
+          "description": "Expected delta is 1 (header row)."
+        }
       }
     },
     "excel_diff_hash": {
@@ -130,8 +265,12 @@
       "description": "PROVENANCE-only. docs/ARCHITECTURE.md §9.4 L7 Diff Verification — pre/post snapshot of target sheet. Only populated when operation=project_excel.",
       "additionalProperties": false,
       "properties": {
-        "pre_hash":  { "$ref": "#/definitions/sha256Hash" },
-        "post_hash": { "$ref": "#/definitions/sha256Hash" }
+        "pre_hash": {
+          "$ref": "#/definitions/sha256Hash"
+        },
+        "post_hash": {
+          "$ref": "#/definitions/sha256Hash"
+        }
       }
     },
     "backup_path": {
@@ -142,8 +281,10 @@
       "type": "string",
       "description": "PROVENANCE-only. Relative path to the consistency-report.json snapshot written at L6 checkpoint. Links provenance ↔ consistency for audit."
     },
-    "notes": { "type": "string", "description": "PROVENANCE-only. Free text. Distinct from work.note." },
-
+    "notes": {
+      "type": "string",
+      "description": "PROVENANCE-only. Free text. Distinct from work.note."
+    },
     "event_type": {
       "type": "string",
       "description": "WORK-only. docs/ARCHITECTURE.md §20.2 — closed 12-value enum (10 legacy + 2 skill_<name> canonical, additive 2026-05-07 v1.6-Phase-2 H-E ADR-018 paterni; operation enum staging Wave 3 + statusEnum 4→7 + primary_source 9→11 prior art). Stored value; display decoration (emoji in reports) applied at render time. skill_<name> canonical entries replace legacy DSL workaround event_type=manual + note=[skill=X] (whats-next router event + content-remediation improve_routing); semantic-doğru manual usages (indexing-ping F-8 sub-object compliance + monitoring-weekly audit kind) kapsam dışı — bilinçli design choice.",
@@ -165,11 +306,19 @@
     "task_id": {
       "description": "WORK-only. References master_task.task_id. Canonical convention: T-NNNN (zero-padded 4 digits, taskIdPattern). Legacy bypass for transitional MT-WxWyZ-NNN ids per rules/master-task-id.md (legacyTaskIdPattern, H-L v1.4-deep-audit-fix Tier 3 closure).",
       "oneOf": [
-        { "$ref": "#/definitions/taskIdPattern" },
-        { "$ref": "#/definitions/legacyTaskIdPattern" }
+        {
+          "$ref": "#/definitions/taskIdPattern"
+        },
+        {
+          "$ref": "#/definitions/legacyTaskIdPattern"
+        }
       ]
     },
-    "url":            { "type": "string", "format": "uri", "description": "WORK-only." },
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "description": "WORK-only."
+    },
     "url_normalized": {
       "type": "string",
       "description": "WORK-only. url after project.config.url_policy normalization (docs/ARCHITECTURE.md §6.6 + §12.2). Used for cross-sheet joins. Both url + url_normalized are required on URL-bearing work events (D-S3-5)."
@@ -179,19 +328,40 @@
       "pattern": "^P[0-9]+_[a-z_]+$",
       "description": "WORK-only. Matches project-config.pillars[].key (e.g. P01_sofa_sets). Required on pillar_launch and content_new with pillar context."
     },
-    "cluster":     { "type": "string", "description": "WORK-only. Cluster slug matching data/cluster defs. Required on content_new + quickwin_applied." },
-    "before":      { "$ref": "#/definitions/pageSnapshot", "description": "WORK-only." },
-    "after":       { "$ref": "#/definitions/pageSnapshot", "description": "WORK-only." },
+    "cluster": {
+      "type": "string",
+      "description": "WORK-only. Cluster slug matching data/cluster defs. Required on content_new + quickwin_applied."
+    },
+    "before": {
+      "$ref": "#/definitions/pageSnapshot",
+      "description": "WORK-only."
+    },
+    "after": {
+      "$ref": "#/definitions/pageSnapshot",
+      "description": "WORK-only."
+    },
     "metric_impact": {
       "type": "object",
       "description": "WORK-only. Measured outcome after the change (optional at event time; back-filled by monthly-report generator §22 from GSC 28-day delta).",
       "additionalProperties": false,
       "properties": {
-        "clicks_delta_28d":      { "type": "number" },
-        "impressions_delta_28d": { "type": "number" },
-        "position_delta_28d":    { "type": "number", "description": "Negative = improved (pos went from 7 → 3 is -4)." },
-        "ctr_delta_28d":         { "type": "number" },
-        "measured_at":           { "type": "string", "format": "date-time" }
+        "clicks_delta_28d": {
+          "type": "number"
+        },
+        "impressions_delta_28d": {
+          "type": "number"
+        },
+        "position_delta_28d": {
+          "type": "number",
+          "description": "Negative = improved (pos went from 7 → 3 is -4)."
+        },
+        "ctr_delta_28d": {
+          "type": "number"
+        },
+        "measured_at": {
+          "type": "string",
+          "format": "date-time"
+        }
       }
     },
     "author": {
@@ -212,39 +382,92 @@
       "description": "WORK-only. Optional docs/ARCHITECTURE.md §24 Indexing API ping record. Populated only when user accepted the prompt in DONE cascade step 6.",
       "additionalProperties": false,
       "properties": {
-        "attempted":         { "type": "boolean" },
-        "call_type":         { "enum": ["URL_UPDATED", "URL_DELETED"] },
-        "response_code":     { "type": "integer" },
-        "called_at":         { "type": "string", "format": "date-time" },
-        "verified_at":       { "type": "string", "format": "date-time", "description": "GSC urlInspection result timestamp (§24.4, 24h later)." },
-        "verified_coverage": { "type": "string" }
+        "attempted": {
+          "type": "boolean"
+        },
+        "call_type": {
+          "enum": [
+            "URL_UPDATED",
+            "URL_DELETED"
+          ]
+        },
+        "response_code": {
+          "type": "integer"
+        },
+        "called_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "verified_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "GSC urlInspection result timestamp (§24.4, 24h later)."
+        },
+        "verified_coverage": {
+          "type": "string"
+        }
       }
     },
     "primary_source": {
       "type": "string",
       "description": "WORK-only. Matches master_task.primary_source (§21.1 col C). Copied here so each work event is self-contained for archival replay. Enum 9→11 sync per master-excel ADR-018 additive policy (resolves Q-V1.2-MASTER-TASK-PRIMARY-SOURCE-01 events-side, K-05 v1.4-deep-audit-fix).",
-      "enum": ["content_decay", "quickwin", "tech_fix", "schema", "pillar", "sxo", "cannibalization", "redirect_404", "manual", "internal_links", "new_content_plan"]
+      "enum": [
+        "content_decay",
+        "quickwin",
+        "tech_fix",
+        "schema",
+        "pillar",
+        "sxo",
+        "cannibalization",
+        "redirect_404",
+        "manual",
+        "internal_links",
+        "new_content_plan"
+      ]
     },
     "related_sources": {
       "type": "array",
       "description": "WORK-only. Matches master_task.related_sources (§21.1 col D) — merged-task union. Enum mirrors primary_source (additive 9→11 per ADR-018).",
       "items": {
-        "enum": ["content_decay", "quickwin", "tech_fix", "schema", "pillar", "sxo", "cannibalization", "redirect_404", "manual", "internal_links", "new_content_plan"]
+        "enum": [
+          "content_decay",
+          "quickwin",
+          "tech_fix",
+          "schema",
+          "pillar",
+          "sxo",
+          "cannibalization",
+          "redirect_404",
+          "manual",
+          "internal_links",
+          "new_content_plan"
+        ]
       },
       "uniqueItems": true
     },
-    "note":        { "type": "string", "description": "WORK-only. Free text; required on event_type=manual and event_type=content_remove (to record redirect_from_to target). Distinct from provenance.notes." },
+    "note": {
+      "type": "string",
+      "description": "WORK-only. Free text; required on event_type=manual and event_type=content_remove (to record redirect_from_to target). Distinct from provenance.notes."
+    },
     "attachments": {
       "type": "array",
       "description": "WORK-only. Relative paths to supporting files (screenshots, outreach emails, redirect_from_to.txt). Relative to project workspace_root.",
-      "items": { "type": "string" },
+      "items": {
+        "type": "string"
+      },
       "uniqueItems": true
     },
-
     "audit_action": {
       "type": "string",
       "description": "AUDIT-only (placeholder, finalized Phase 14+ governance). What governance action was performed.",
-      "enum": ["created", "modified", "deleted", "accessed", "permission_changed", "config_changed"]
+      "enum": [
+        "created",
+        "modified",
+        "deleted",
+        "accessed",
+        "permission_changed",
+        "config_changed"
+      ]
     },
     "audit_target": {
       "type": "string",
@@ -254,11 +477,19 @@
       "type": "string",
       "description": "AUDIT-only. Identity that performed the action (user email, agent id, system process)."
     },
-
     "workflow_action": {
       "type": "string",
       "description": "WORKFLOW-only (ADR-020). Workflow lifecycle transition. Logged by workflow_runner.py state machine into events.jsonl.",
-      "enum": ["started", "paused", "resumed", "approved", "rejected", "retried", "done", "failed"]
+      "enum": [
+        "started",
+        "paused",
+        "resumed",
+        "approved",
+        "rejected",
+        "retried",
+        "done",
+        "failed"
+      ]
     },
     "workflow_run_id": {
       "type": "string",
@@ -271,98 +502,329 @@
       "description": "WORKFLOW-only (ADR-020). Zero-based index into workflow-run.steps[] of the step this event refers to. Optional but recommended for correlation."
     }
   },
-
   "allOf": [
     {
       "description": "PROVENANCE kind required fields.",
-      "if":   { "required": ["event_kind"], "properties": { "event_kind": { "const": "provenance" } } },
-      "then": { "required": ["run_id", "source", "operation"] }
+      "if": {
+        "required": [
+          "event_kind"
+        ],
+        "properties": {
+          "event_kind": {
+            "const": "provenance"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "run_id",
+          "source",
+          "operation"
+        ]
+      }
     },
     {
       "description": "WORK kind required fields.",
-      "if":   { "required": ["event_kind"], "properties": { "event_kind": { "const": "work" } } },
-      "then": { "required": ["event_type", "task_id"] }
+      "if": {
+        "required": [
+          "event_kind"
+        ],
+        "properties": {
+          "event_kind": {
+            "const": "work"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "event_type",
+          "task_id"
+        ]
+      }
     },
     {
       "description": "AUDIT kind required fields.",
-      "if":   { "required": ["event_kind"], "properties": { "event_kind": { "const": "audit" } } },
-      "then": { "required": ["audit_action", "audit_target", "actor"] }
+      "if": {
+        "required": [
+          "event_kind"
+        ],
+        "properties": {
+          "event_kind": {
+            "const": "audit"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "audit_action",
+          "audit_target",
+          "actor"
+        ]
+      }
     },
     {
       "description": "Per docs/ARCHITECTURE.md §20.2: URL-bearing work event types require url + url_normalized together.",
-      "if":   { "allOf": [
-                 { "required": ["event_kind"], "properties": { "event_kind": { "const": "work" } } },
-                 { "properties": { "event_type": { "enum": ["content_new", "content_revise", "content_remove", "tech_fix", "quickwin_applied", "pillar_launch", "schema_fix", "redirect_deployed"] } } }
-               ] },
-      "then": { "required": ["url", "url_normalized"] }
+      "if": {
+        "allOf": [
+          {
+            "required": [
+              "event_kind"
+            ],
+            "properties": {
+              "event_kind": {
+                "const": "work"
+              }
+            }
+          },
+          {
+            "properties": {
+              "event_type": {
+                "enum": [
+                  "content_new",
+                  "content_revise",
+                  "content_remove",
+                  "tech_fix",
+                  "quickwin_applied",
+                  "pillar_launch",
+                  "schema_fix",
+                  "redirect_deployed"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "then": {
+        "required": [
+          "url",
+          "url_normalized"
+        ]
+      }
     },
     {
       "description": "content_revise MUST carry both before + after snapshots (§20.2).",
-      "if":   { "allOf": [
-                 { "required": ["event_kind"], "properties": { "event_kind": { "const": "work" } } },
-                 { "properties": { "event_type": { "const": "content_revise" } } }
-               ] },
-      "then": { "required": ["before", "after"] }
+      "if": {
+        "allOf": [
+          {
+            "required": [
+              "event_kind"
+            ],
+            "properties": {
+              "event_kind": {
+                "const": "work"
+              }
+            }
+          },
+          {
+            "properties": {
+              "event_type": {
+                "const": "content_revise"
+              }
+            }
+          }
+        ]
+      },
+      "then": {
+        "required": [
+          "before",
+          "after"
+        ]
+      }
     },
     {
       "description": "content_new + pillar_launch require after snapshot + pillar (§20.2).",
-      "if":   { "allOf": [
-                 { "required": ["event_kind"], "properties": { "event_kind": { "const": "work" } } },
-                 { "properties": { "event_type": { "enum": ["content_new", "pillar_launch"] } } }
-               ] },
-      "then": { "required": ["after", "pillar"] }
+      "if": {
+        "allOf": [
+          {
+            "required": [
+              "event_kind"
+            ],
+            "properties": {
+              "event_kind": {
+                "const": "work"
+              }
+            }
+          },
+          {
+            "properties": {
+              "event_type": {
+                "enum": [
+                  "content_new",
+                  "pillar_launch"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "then": {
+        "required": [
+          "after",
+          "pillar"
+        ]
+      }
     },
     {
       "description": "schema_fix requires before + after schema_types (§20.2).",
-      "if":   { "allOf": [
-                 { "required": ["event_kind"], "properties": { "event_kind": { "const": "work" } } },
-                 { "properties": { "event_type": { "const": "schema_fix" } } }
-               ] },
-      "then": { "required": ["before", "after"] }
+      "if": {
+        "allOf": [
+          {
+            "required": [
+              "event_kind"
+            ],
+            "properties": {
+              "event_kind": {
+                "const": "work"
+              }
+            }
+          },
+          {
+            "properties": {
+              "event_type": {
+                "const": "schema_fix"
+              }
+            }
+          }
+        ]
+      },
+      "then": {
+        "required": [
+          "before",
+          "after"
+        ]
+      }
     },
     {
       "description": "redirect_deployed + content_remove + backlink_outreach + manual + skill_<name> canonical entries require note. skill_X canonical entries inherit note discipline because legacy DSL workaround stored skill metadata in note alanı; canonical paterni'nde note hala structured data taşıyıcı (router context, improve_routing explanation, etc).",
-      "if":   { "allOf": [
-                 { "required": ["event_kind"], "properties": { "event_kind": { "const": "work" } } },
-                 { "properties": { "event_type": { "enum": ["redirect_deployed", "content_remove", "backlink_outreach", "manual", "skill_content_remediation", "skill_whats_next"] } } }
-               ] },
-      "then": { "required": ["note"] }
+      "if": {
+        "allOf": [
+          {
+            "required": [
+              "event_kind"
+            ],
+            "properties": {
+              "event_kind": {
+                "const": "work"
+              }
+            }
+          },
+          {
+            "properties": {
+              "event_type": {
+                "enum": [
+                  "redirect_deployed",
+                  "content_remove",
+                  "backlink_outreach",
+                  "manual",
+                  "skill_content_remediation",
+                  "skill_whats_next"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "then": {
+        "required": [
+          "note"
+        ]
+      }
     },
     {
       "description": "quickwin_applied requires cluster + before + after (title/meta change diff).",
-      "if":   { "allOf": [
-                 { "required": ["event_kind"], "properties": { "event_kind": { "const": "work" } } },
-                 { "properties": { "event_type": { "const": "quickwin_applied" } } }
-               ] },
-      "then": { "required": ["cluster", "before", "after"] }
+      "if": {
+        "allOf": [
+          {
+            "required": [
+              "event_kind"
+            ],
+            "properties": {
+              "event_kind": {
+                "const": "work"
+              }
+            }
+          },
+          {
+            "properties": {
+              "event_type": {
+                "const": "quickwin_applied"
+              }
+            }
+          }
+        ]
+      },
+      "then": {
+        "required": [
+          "cluster",
+          "before",
+          "after"
+        ]
+      }
     },
     {
       "description": "WORKFLOW kind required fields (ADR-020). workflow_action + workflow_run_id mandatory; step_index optional.",
-      "if":   { "required": ["event_kind"], "properties": { "event_kind": { "const": "workflow" } } },
-      "then": { "required": ["workflow_action", "workflow_run_id"] }
+      "if": {
+        "required": [
+          "event_kind"
+        ],
+        "properties": {
+          "event_kind": {
+            "const": "workflow"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "workflow_action",
+          "workflow_run_id"
+        ]
+      }
     }
   ],
-
   "definitions": {
     "pageSnapshot": {
       "type": "object",
       "description": "Minimal page state snapshot. Both before/after share this shape so diffs are trivial. Used by work events; preserved verbatim from prior work-log.schema.json v1.0.",
       "additionalProperties": false,
       "properties": {
-        "title":        { "type": "string" },
-        "meta_description": { "type": "string" },
-        "h1":           { "type": "string" },
-        "word_count":   { "type": "integer", "minimum": 0 },
+        "title": {
+          "type": "string"
+        },
+        "meta_description": {
+          "type": "string"
+        },
+        "h1": {
+          "type": "string"
+        },
+        "word_count": {
+          "type": "integer",
+          "minimum": 0
+        },
         "schema_types": {
           "type": "array",
           "description": "Schema.org @type values present on the page at snapshot time (e.g. Article, Product, FAQPage).",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "uniqueItems": true
         },
-        "status_code":  { "type": "integer", "minimum": 100, "maximum": 599 },
-        "canonical":    { "type": "string", "format": "uri" },
-        "faq_count":    { "type": "integer", "minimum": 0 },
-        "internal_links_out": { "type": "integer", "minimum": 0 }
+        "status_code": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 599
+        },
+        "canonical": {
+          "type": "string",
+          "format": "uri"
+        },
+        "faq_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "internal_links_out": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     },
     "taskIdPattern": {

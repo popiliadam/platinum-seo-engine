@@ -22,11 +22,24 @@
     "statusEnum": {
       "type": "string",
       "description": "STORED value — what writers put in cells. Display decoration (emoji + date suffix) applied at Excel render time. ADR-018 hibrit: eski sistem 4 (TODO/ONGOING/EXISTS/DONE) + workflow extension 3 (BLOCKED/DEFERRED/CANCELED).",
-      "enum": ["TODO", "ONGOING", "EXISTS", "DONE", "BLOCKED", "DEFERRED", "CANCELED"]
+      "enum": [
+        "TODO",
+        "ONGOING",
+        "EXISTS",
+        "DONE",
+        "BLOCKED",
+        "DEFERRED",
+        "CANCELED"
+      ]
     },
     "severityEnum": {
       "type": "string",
-      "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
+      "enum": [
+        "CRITICAL",
+        "HIGH",
+        "MEDIUM",
+        "LOW"
+      ]
     },
     "taskIdPattern": {
       "type": "string",
@@ -37,14 +50,54 @@
   "sheets": {
     "dashboard": {
       "required_cells": [
-        { "cell": "R10", "kpi": "total_pillars",         "value_type": "integer", "source": "tool_computed" },
-        { "cell": "R47", "kpi": "master_task_total",     "value_type": "integer", "source": "tool_computed" },
-        { "cell": "R48", "kpi": "master_task_done",      "value_type": "integer", "source": "tool_computed" },
-        { "cell": "R49", "kpi": "master_task_todo",      "value_type": "integer", "source": "tool_computed" },
-        { "cell": "R50", "kpi": "master_task_ongoing",   "value_type": "integer", "source": "tool_computed" },
-        { "cell": "R51", "kpi": "cannibalization_count", "value_type": "integer", "source": "tool_computed" },
-        { "cell": "R52", "kpi": "quick_wins_count",      "value_type": "integer", "source": "tool_computed" },
-        { "cell": "R59", "kpi": "last_audit_date",       "value_type": "date",    "source": "tool_computed" }
+        {
+          "cell": "R10",
+          "kpi": "total_pillars",
+          "value_type": "integer",
+          "source": "tool_computed"
+        },
+        {
+          "cell": "R47",
+          "kpi": "master_task_total",
+          "value_type": "integer",
+          "source": "tool_computed"
+        },
+        {
+          "cell": "R48",
+          "kpi": "master_task_done",
+          "value_type": "integer",
+          "source": "tool_computed"
+        },
+        {
+          "cell": "R49",
+          "kpi": "master_task_todo",
+          "value_type": "integer",
+          "source": "tool_computed"
+        },
+        {
+          "cell": "R50",
+          "kpi": "master_task_ongoing",
+          "value_type": "integer",
+          "source": "tool_computed"
+        },
+        {
+          "cell": "R51",
+          "kpi": "cannibalization_count",
+          "value_type": "integer",
+          "source": "tool_computed"
+        },
+        {
+          "cell": "R52",
+          "kpi": "quick_wins_count",
+          "value_type": "integer",
+          "source": "tool_computed"
+        },
+        {
+          "cell": "R59",
+          "kpi": "last_audit_date",
+          "value_type": "date",
+          "source": "tool_computed"
+        }
       ],
       "forbidden_patterns": [
         "no Excel formulas (=...) in any cell",
@@ -55,46 +108,149 @@
       "header_row": 4,
       "data_start_row": 5,
       "required_columns": [
-        { "col": "A", "name": "pillar" },
-        { "col": "B", "name": "cluster" },
-        { "col": "C", "name": "primary_keyword" },
-        { "col": "D", "name": "monthly_volume",    "type": "integer" },
-        { "col": "E", "name": "data_source" },
-        { "col": "F", "name": "assigned_url" },
-        { "col": "G", "name": "page_type",          "enum": ["pillar", "cluster", "supporting"] },
-        { "col": "H", "name": "status",            "ref": "#/definitions/statusEnum" },
-        { "col": "I", "name": "priority" },
-        { "col": "J", "name": "note" }
+        {
+          "col": "A",
+          "name": "pillar"
+        },
+        {
+          "col": "B",
+          "name": "cluster"
+        },
+        {
+          "col": "C",
+          "name": "primary_keyword"
+        },
+        {
+          "col": "D",
+          "name": "monthly_volume",
+          "type": "integer"
+        },
+        {
+          "col": "E",
+          "name": "data_source"
+        },
+        {
+          "col": "F",
+          "name": "assigned_url"
+        },
+        {
+          "col": "G",
+          "name": "page_type",
+          "enum": [
+            "pillar",
+            "cluster",
+            "supporting"
+          ]
+        },
+        {
+          "col": "H",
+          "name": "status",
+          "ref": "#/definitions/statusEnum"
+        },
+        {
+          "col": "I",
+          "name": "priority"
+        },
+        {
+          "col": "J",
+          "name": "note"
+        }
       ]
     },
     "cluster_keywords": {
       "header_row": 3,
       "data_start_row": 4,
       "required_columns": [
-        { "col": "A", "name": "cluster" },
-        { "col": "B", "name": "keyword" },
-        { "col": "C", "name": "monthly_volume",    "type": "integer" },
-        { "col": "D", "name": "data_source" },
-        { "col": "E", "name": "assigned_url" },
-        { "col": "F", "name": "gsc_clicks",        "type": "integer" },
-        { "col": "G", "name": "gsc_impressions",   "type": "integer" },
-        { "col": "H", "name": "gsc_position",      "type": "number" },
-        { "col": "I", "name": "intent",            "enum": ["Informational", "Commercial", "Transactional", "Navigational"] },
-        { "col": "J", "name": "forbidden_kw" },
-        { "col": "K", "name": "forbidden_reason" }
+        {
+          "col": "A",
+          "name": "cluster"
+        },
+        {
+          "col": "B",
+          "name": "keyword"
+        },
+        {
+          "col": "C",
+          "name": "monthly_volume",
+          "type": "integer"
+        },
+        {
+          "col": "D",
+          "name": "data_source"
+        },
+        {
+          "col": "E",
+          "name": "assigned_url"
+        },
+        {
+          "col": "F",
+          "name": "gsc_clicks",
+          "type": "integer"
+        },
+        {
+          "col": "G",
+          "name": "gsc_impressions",
+          "type": "integer"
+        },
+        {
+          "col": "H",
+          "name": "gsc_position",
+          "type": "number"
+        },
+        {
+          "col": "I",
+          "name": "intent",
+          "enum": [
+            "Informational",
+            "Commercial",
+            "Transactional",
+            "Navigational"
+          ]
+        },
+        {
+          "col": "J",
+          "name": "forbidden_kw"
+        },
+        {
+          "col": "K",
+          "name": "forbidden_reason"
+        }
       ]
     },
     "cannibalization": {
       "header_row": 4,
       "data_start_row": 5,
       "required_columns": [
-        { "col": "A", "name": "conflict_pair" },
-        { "col": "B", "name": "overlapping_queries_est", "type": "integer" },
-        { "col": "C", "name": "total_impact" },
-        { "col": "D", "name": "resolution" },
-        { "col": "E", "name": "note" },
-        { "col": "F", "name": "status",  "ref": "#/definitions/statusEnum" },
-        { "col": "G", "name": "priority" }
+        {
+          "col": "A",
+          "name": "conflict_pair"
+        },
+        {
+          "col": "B",
+          "name": "overlapping_queries_est",
+          "type": "integer"
+        },
+        {
+          "col": "C",
+          "name": "total_impact"
+        },
+        {
+          "col": "D",
+          "name": "resolution"
+        },
+        {
+          "col": "E",
+          "name": "note"
+        },
+        {
+          "col": "F",
+          "name": "status",
+          "ref": "#/definitions/statusEnum"
+        },
+        {
+          "col": "G",
+          "name": "priority"
+        }
       ]
     },
     "quick_wins": {
@@ -102,20 +258,75 @@
       "data_start_row": 5,
       "description": "GAP-M2/M3 (additive, ADR-018 paterni — schema_version bump değil): +K aio_presence (AI Overview varlığı, R-140: present/not_detected/unchecked — asla absent), +L aio_own_cited, +M aio_checked_date, +N expected_uplift_clicks (CTR-uplift modeli, R-139 ctr-curve.json). transaction.replace header'ı kanonik sırada yeniden yazar → mevcut workbook'lar bir sonraki quick-wins run'da yeni kolonları alır (migration script gerekmez).",
       "required_columns": [
-        { "col": "A", "name": "query" },
-        { "col": "B", "name": "url" },
-        { "col": "C", "name": "current_position", "type": "number" },
-        { "col": "D", "name": "impressions_30d",  "type": "integer" },
-        { "col": "E", "name": "clicks_30d",       "type": "integer" },
-        { "col": "F", "name": "ctr_pct",          "type": "number" },
-        { "col": "G", "name": "potential_clicks", "type": "integer" },
-        { "col": "H", "name": "opportunity" },
-        { "col": "I", "name": "action" },
-        { "col": "J", "name": "priority" },
-        { "col": "K", "name": "aio_presence",          "enum": ["present", "not_detected", "unchecked"] },
-        { "col": "L", "name": "aio_own_cited",         "type": "boolean" },
-        { "col": "M", "name": "aio_checked_date",      "type": "date" },
-        { "col": "N", "name": "expected_uplift_clicks", "type": "integer" }
+        {
+          "col": "A",
+          "name": "query"
+        },
+        {
+          "col": "B",
+          "name": "url"
+        },
+        {
+          "col": "C",
+          "name": "current_position",
+          "type": "number"
+        },
+        {
+          "col": "D",
+          "name": "impressions_30d",
+          "type": "integer"
+        },
+        {
+          "col": "E",
+          "name": "clicks_30d",
+          "type": "integer"
+        },
+        {
+          "col": "F",
+          "name": "ctr_pct",
+          "type": "number"
+        },
+        {
+          "col": "G",
+          "name": "potential_clicks",
+          "type": "integer"
+        },
+        {
+          "col": "H",
+          "name": "opportunity"
+        },
+        {
+          "col": "I",
+          "name": "action"
+        },
+        {
+          "col": "J",
+          "name": "priority"
+        },
+        {
+          "col": "K",
+          "name": "aio_presence",
+          "enum": [
+            "present",
+            "not_detected",
+            "unchecked"
+          ]
+        },
+        {
+          "col": "L",
+          "name": "aio_own_cited",
+          "type": "boolean"
+        },
+        {
+          "col": "M",
+          "name": "aio_checked_date",
+          "type": "date"
+        },
+        {
+          "col": "N",
+          "name": "expected_uplift_clicks",
+          "type": "integer"
+        }
       ]
     },
     "new_content_plan": {
@@ -123,80 +334,276 @@
       "data_start_row": 4,
       "description": "Phase 8 W-C3 sheet, Phase 10 (additive bump): +image_prompt + alt_text columns + content_type column with widened enum (Q-IL-1 + Q-W-C2-01 paterni reuse, schema_version bump değil — additive, ADR-018 paterni). content_type enum kapsamı: listicle/guide/comparison/research/tutorial/review.",
       "required_columns": [
-        { "col": "A", "name": "id" },
-        { "col": "B", "name": "title" },
-        { "col": "C", "name": "url_slug" },
-        { "col": "D", "name": "primary_keyword" },
-        { "col": "E", "name": "monthly_volume",     "type": "integer" },
-        { "col": "F", "name": "assigned_cluster" },
-        { "col": "G", "name": "target_word_count",  "type": "integer" },
-        { "col": "H", "name": "priority" },
-        { "col": "I", "name": "created_date",       "type": "date" },
-        { "col": "J", "name": "tivl_tag",           "enum": ["T", "I", "V", "L"] },
-        { "col": "K", "name": "lifecycle_status",   "enum": ["GREEN", "RED", "ON_HOLD", "REMOVED"] },
-        { "col": "L", "name": "image_prompt" },
-        { "col": "M", "name": "alt_text" },
-        { "col": "N", "name": "content_type",       "enum": ["listicle", "guide", "comparison", "research", "tutorial", "review"] }
+        {
+          "col": "A",
+          "name": "id"
+        },
+        {
+          "col": "B",
+          "name": "title"
+        },
+        {
+          "col": "C",
+          "name": "url_slug"
+        },
+        {
+          "col": "D",
+          "name": "primary_keyword"
+        },
+        {
+          "col": "E",
+          "name": "monthly_volume",
+          "type": "integer"
+        },
+        {
+          "col": "F",
+          "name": "assigned_cluster"
+        },
+        {
+          "col": "G",
+          "name": "target_word_count",
+          "type": "integer"
+        },
+        {
+          "col": "H",
+          "name": "priority"
+        },
+        {
+          "col": "I",
+          "name": "created_date",
+          "type": "date"
+        },
+        {
+          "col": "J",
+          "name": "tivl_tag",
+          "enum": [
+            "T",
+            "I",
+            "V",
+            "L"
+          ]
+        },
+        {
+          "col": "K",
+          "name": "lifecycle_status",
+          "enum": [
+            "GREEN",
+            "RED",
+            "ON_HOLD",
+            "REMOVED"
+          ]
+        },
+        {
+          "col": "L",
+          "name": "image_prompt"
+        },
+        {
+          "col": "M",
+          "name": "alt_text"
+        },
+        {
+          "col": "N",
+          "name": "content_type",
+          "enum": [
+            "listicle",
+            "guide",
+            "comparison",
+            "research",
+            "tutorial",
+            "review"
+          ]
+        }
       ]
     },
     "content_improve": {
       "header_row": 4,
       "data_start_row": 5,
       "required_columns": [
-        { "col": "A", "name": "existing_url" },
-        { "col": "B", "name": "gsc_clicks",      "type": "integer" },
-        { "col": "C", "name": "gsc_impressions", "type": "integer" },
-        { "col": "D", "name": "current_position","type": "number" },
-        { "col": "E", "name": "issue" },
-        { "col": "F", "name": "optimization" },
-        { "col": "G", "name": "target_position", "type": "number" },
-        { "col": "H", "name": "priority" }
+        {
+          "col": "A",
+          "name": "existing_url"
+        },
+        {
+          "col": "B",
+          "name": "gsc_clicks",
+          "type": "integer"
+        },
+        {
+          "col": "C",
+          "name": "gsc_impressions",
+          "type": "integer"
+        },
+        {
+          "col": "D",
+          "name": "current_position",
+          "type": "number"
+        },
+        {
+          "col": "E",
+          "name": "issue"
+        },
+        {
+          "col": "F",
+          "name": "optimization"
+        },
+        {
+          "col": "G",
+          "name": "target_position",
+          "type": "number"
+        },
+        {
+          "col": "H",
+          "name": "priority"
+        }
       ]
     },
     "gsc_performance": {
       "header_row": 4,
       "data_start_row": 5,
       "required_columns": [
-        { "col": "A", "name": "url" },
-        { "col": "B", "name": "clicks_recent",        "type": "integer" },
-        { "col": "C", "name": "clicks_previous",      "type": "integer" },
-        { "col": "D", "name": "clicks_delta",         "type": "integer" },
-        { "col": "E", "name": "clicks_delta_pct",     "type": "number" },
-        { "col": "F", "name": "impressions_recent",   "type": "integer" },
-        { "col": "G", "name": "impressions_previous", "type": "integer" },
-        { "col": "H", "name": "impressions_delta",    "type": "integer" },
-        { "col": "I", "name": "ctr_recent",           "type": "number" },
-        { "col": "J", "name": "position_recent",      "type": "number" },
-        { "col": "K", "name": "position_previous",    "type": "number" },
-        { "col": "L", "name": "note" }
+        {
+          "col": "A",
+          "name": "url"
+        },
+        {
+          "col": "B",
+          "name": "clicks_recent",
+          "type": "integer"
+        },
+        {
+          "col": "C",
+          "name": "clicks_previous",
+          "type": "integer"
+        },
+        {
+          "col": "D",
+          "name": "clicks_delta",
+          "type": "integer"
+        },
+        {
+          "col": "E",
+          "name": "clicks_delta_pct",
+          "type": "number"
+        },
+        {
+          "col": "F",
+          "name": "impressions_recent",
+          "type": "integer"
+        },
+        {
+          "col": "G",
+          "name": "impressions_previous",
+          "type": "integer"
+        },
+        {
+          "col": "H",
+          "name": "impressions_delta",
+          "type": "integer"
+        },
+        {
+          "col": "I",
+          "name": "ctr_recent",
+          "type": "number"
+        },
+        {
+          "col": "J",
+          "name": "position_recent",
+          "type": "number"
+        },
+        {
+          "col": "K",
+          "name": "position_previous",
+          "type": "number"
+        },
+        {
+          "col": "L",
+          "name": "note"
+        }
       ]
     },
     "content_decay": {
       "header_row": 5,
       "data_start_row": 6,
       "required_columns": [
-        { "col": "A", "name": "url" },
-        { "col": "B", "name": "clicks_previous", "type": "integer" },
-        { "col": "C", "name": "clicks_recent",   "type": "integer" },
-        { "col": "D", "name": "clicks_delta",    "type": "integer" },
-        { "col": "E", "name": "delta_pct",       "type": "number" },
-        { "col": "F", "name": "trend" },
-        { "col": "G", "name": "pillar" },
-        { "col": "H", "name": "action" }
+        {
+          "col": "A",
+          "name": "url"
+        },
+        {
+          "col": "B",
+          "name": "clicks_previous",
+          "type": "integer"
+        },
+        {
+          "col": "C",
+          "name": "clicks_recent",
+          "type": "integer"
+        },
+        {
+          "col": "D",
+          "name": "clicks_delta",
+          "type": "integer"
+        },
+        {
+          "col": "E",
+          "name": "delta_pct",
+          "type": "number"
+        },
+        {
+          "col": "F",
+          "name": "trend"
+        },
+        {
+          "col": "G",
+          "name": "pillar"
+        },
+        {
+          "col": "H",
+          "name": "action"
+        }
       ]
     },
     "on_page_audit": {
       "header_row": 4,
       "data_start_row": 5,
       "required_columns": [
-        { "col": "A", "name": "url" },
-        { "col": "B", "name": "target_query" },
-        { "col": "C", "name": "impressions_30d", "type": "integer" },
-        { "col": "D", "name": "clicks_30d",      "type": "integer" },
-        { "col": "E", "name": "in_title",        "type": "boolean" },
-        { "col": "F", "name": "in_meta",         "type": "boolean" },
-        { "col": "G", "name": "in_h1",           "type": "boolean" },
-        { "col": "H", "name": "action" }
+        {
+          "col": "A",
+          "name": "url"
+        },
+        {
+          "col": "B",
+          "name": "target_query"
+        },
+        {
+          "col": "C",
+          "name": "impressions_30d",
+          "type": "integer"
+        },
+        {
+          "col": "D",
+          "name": "clicks_30d",
+          "type": "integer"
+        },
+        {
+          "col": "E",
+          "name": "in_title",
+          "type": "boolean"
+        },
+        {
+          "col": "F",
+          "name": "in_meta",
+          "type": "boolean"
+        },
+        {
+          "col": "G",
+          "name": "in_h1",
+          "type": "boolean"
+        },
+        {
+          "col": "H",
+          "name": "action"
+        }
       ]
     },
     "opportunity": {
@@ -204,16 +611,58 @@
       "data_start_row": 5,
       "description": "GAP-M2/M3 (additive, ADR-018 paterni): +I aio_presence (R-140 enum), +J expected_uplift_clicks (R-139 CTR-uplift modeli). opportunity_score (col B) LEGACY headroom skorunu korur — yeni model expected_uplift_clicks kolonunda taşınır (kolon yeniden-anlamlandırma yok).",
       "required_columns": [
-        { "col": "A", "name": "query" },
-        { "col": "B", "name": "opportunity_score", "type": "number" },
-        { "col": "C", "name": "current_position",  "type": "number" },
-        { "col": "D", "name": "ctr_pct",           "type": "number" },
-        { "col": "E", "name": "impressions_30d",   "type": "integer" },
-        { "col": "F", "name": "clicks_30d",        "type": "integer" },
-        { "col": "G", "name": "potential_clicks",  "type": "integer" },
-        { "col": "H", "name": "assigned_url_action" },
-        { "col": "I", "name": "aio_presence",          "enum": ["present", "not_detected", "unchecked"] },
-        { "col": "J", "name": "expected_uplift_clicks", "type": "integer" }
+        {
+          "col": "A",
+          "name": "query"
+        },
+        {
+          "col": "B",
+          "name": "opportunity_score",
+          "type": "number"
+        },
+        {
+          "col": "C",
+          "name": "current_position",
+          "type": "number"
+        },
+        {
+          "col": "D",
+          "name": "ctr_pct",
+          "type": "number"
+        },
+        {
+          "col": "E",
+          "name": "impressions_30d",
+          "type": "integer"
+        },
+        {
+          "col": "F",
+          "name": "clicks_30d",
+          "type": "integer"
+        },
+        {
+          "col": "G",
+          "name": "potential_clicks",
+          "type": "integer"
+        },
+        {
+          "col": "H",
+          "name": "assigned_url_action"
+        },
+        {
+          "col": "I",
+          "name": "aio_presence",
+          "enum": [
+            "present",
+            "not_detected",
+            "unchecked"
+          ]
+        },
+        {
+          "col": "J",
+          "name": "expected_uplift_clicks",
+          "type": "integer"
+        }
       ]
     },
     "tech_seo": {
@@ -221,12 +670,38 @@
       "data_start_row": 4,
       "description": "Tech audit findings. Modern Web Vitals 2024: INP supersedes FID for responsiveness measurement (Q-W-A3-01 closure); transform-owned threshold logic (rules/schema-first.md). issue_category enum locked per ADR-028; future categories require additive bump (ADR-018 paterni).",
       "required_columns": [
-        { "col": "A", "name": "issue_category", "enum": ["Performance", "Layout Stability", "Meta Tags", "Structured Data", "Accessibility"] },
-        { "col": "B", "name": "detail" },
-        { "col": "C", "name": "affected_urls" },
-        { "col": "D", "name": "impact",     "ref": "#/definitions/severityEnum" },
-        { "col": "E", "name": "resolution" },
-        { "col": "F", "name": "priority" }
+        {
+          "col": "A",
+          "name": "issue_category",
+          "enum": [
+            "Performance",
+            "Layout Stability",
+            "Meta Tags",
+            "Structured Data",
+            "Accessibility"
+          ]
+        },
+        {
+          "col": "B",
+          "name": "detail"
+        },
+        {
+          "col": "C",
+          "name": "affected_urls"
+        },
+        {
+          "col": "D",
+          "name": "impact",
+          "ref": "#/definitions/severityEnum"
+        },
+        {
+          "col": "E",
+          "name": "resolution"
+        },
+        {
+          "col": "F",
+          "name": "priority"
+        }
       ]
     },
     "gbp_audit": {
@@ -234,105 +709,447 @@
       "data_start_row": 4,
       "description": "GBP discovery skill output — Google Business Profile gap analysis per project. Local-service profile gate; read-only audit per feedback_indexing_api_consent (no autonomous GBP API submit; DFS business_data_business_listings_search + Scrapling fallback). G-AI-02 finding closure (v1.7 Phase 5). Category enum locked per ADR-028; status/severity reuse codebase definitions for cross-sheet consistency (statusEnum 7-value + severityEnum 4-value, not the plan-suggested custom enums).",
       "required_columns": [
-        { "col": "A", "name": "audit_id" },
-        { "col": "B", "name": "audit_date",         "type": "date" },
-        { "col": "C", "name": "category",           "enum": ["nap", "categories", "photos", "hours", "attributes", "posts", "qa", "reviews"] },
-        { "col": "D", "name": "gap_description" },
-        { "col": "E", "name": "severity",           "ref": "#/definitions/severityEnum" },
-        { "col": "F", "name": "recommended_action" },
-        { "col": "G", "name": "status",             "ref": "#/definitions/statusEnum" }
+        {
+          "col": "A",
+          "name": "audit_id"
+        },
+        {
+          "col": "B",
+          "name": "audit_date",
+          "type": "date"
+        },
+        {
+          "col": "C",
+          "name": "category",
+          "enum": [
+            "nap",
+            "categories",
+            "photos",
+            "hours",
+            "attributes",
+            "posts",
+            "qa",
+            "reviews"
+          ]
+        },
+        {
+          "col": "D",
+          "name": "gap_description"
+        },
+        {
+          "col": "E",
+          "name": "severity",
+          "ref": "#/definitions/severityEnum"
+        },
+        {
+          "col": "F",
+          "name": "recommended_action"
+        },
+        {
+          "col": "G",
+          "name": "status",
+          "ref": "#/definitions/statusEnum"
+        }
       ]
     },
     "crawl_sitemap": {
       "header_row": 3,
       "data_start_row": 4,
       "required_columns": [
-        { "col": "A", "name": "category" },
-        { "col": "B", "name": "metric" },
-        { "col": "C", "name": "value" },
-        { "col": "D", "name": "status", "ref": "#/definitions/statusEnum" },
-        { "col": "E", "name": "action" }
+        {
+          "col": "A",
+          "name": "category"
+        },
+        {
+          "col": "B",
+          "name": "metric"
+        },
+        {
+          "col": "C",
+          "name": "value"
+        },
+        {
+          "col": "D",
+          "name": "status",
+          "ref": "#/definitions/statusEnum"
+        },
+        {
+          "col": "E",
+          "name": "action"
+        }
       ]
     },
     "robots_txt": {
       "header_row": 4,
       "data_start_row": 5,
       "required_columns": [
-        { "col": "A", "name": "id" },
-        { "col": "B", "name": "level",   "ref": "#/definitions/severityEnum" },
-        { "col": "C", "name": "issue" },
-        { "col": "D", "name": "detail" },
-        { "col": "E", "name": "resolution" }
+        {
+          "col": "A",
+          "name": "id"
+        },
+        {
+          "col": "B",
+          "name": "level",
+          "ref": "#/definitions/severityEnum"
+        },
+        {
+          "col": "C",
+          "name": "issue"
+        },
+        {
+          "col": "D",
+          "name": "detail"
+        },
+        {
+          "col": "E",
+          "name": "resolution"
+        }
       ]
     },
     "schema": {
       "header_row": 3,
       "data_start_row": 4,
       "required_columns": [
-        { "col": "A", "name": "schema_type" },
-        { "col": "B", "name": "status",       "ref": "#/definitions/statusEnum" },
-        { "col": "C", "name": "location" },
-        { "col": "D", "name": "scope" },
-        { "col": "E", "name": "remaining_work" }
+        {
+          "col": "A",
+          "name": "schema_type"
+        },
+        {
+          "col": "B",
+          "name": "status",
+          "ref": "#/definitions/statusEnum"
+        },
+        {
+          "col": "C",
+          "name": "location"
+        },
+        {
+          "col": "D",
+          "name": "scope"
+        },
+        {
+          "col": "E",
+          "name": "remaining_work"
+        }
       ]
     },
     "redirect_404": {
       "header_row": 4,
       "data_start_row": 5,
       "required_columns": [
-        { "col": "A", "name": "url" },
-        { "col": "B", "name": "inlinks", "type": "integer" },
-        { "col": "C", "name": "action" },
-        { "col": "D", "name": "target_url" },
-        { "col": "E", "name": "status", "ref": "#/definitions/statusEnum" }
+        {
+          "col": "A",
+          "name": "url"
+        },
+        {
+          "col": "B",
+          "name": "inlinks",
+          "type": "integer"
+        },
+        {
+          "col": "C",
+          "name": "action"
+        },
+        {
+          "col": "D",
+          "name": "target_url"
+        },
+        {
+          "col": "E",
+          "name": "status",
+          "ref": "#/definitions/statusEnum"
+        }
       ]
     },
     "completed_work": {
       "header_row": 4,
       "data_start_row": 5,
       "required_columns": [
-        { "col": "A", "name": "id" },
-        { "col": "B", "name": "task_or_content" },
-        { "col": "C", "name": "url" },
-        { "col": "D", "name": "date", "type": "date" },
-        { "col": "E", "name": "category" },
-        { "col": "F", "name": "note" }
+        {
+          "col": "A",
+          "name": "id"
+        },
+        {
+          "col": "B",
+          "name": "task_or_content"
+        },
+        {
+          "col": "C",
+          "name": "url"
+        },
+        {
+          "col": "D",
+          "name": "date",
+          "type": "date"
+        },
+        {
+          "col": "E",
+          "name": "category"
+        },
+        {
+          "col": "F",
+          "name": "note"
+        }
       ]
     },
     "master_task": {
       "header_row": 3,
       "data_start_row": 4,
       "required_columns": [
-        { "col": "A", "name": "task_id", "ref": "#/definitions/taskIdPattern" },
-        { "col": "B", "name": "task" },
-        { "col": "C", "name": "primary_source", "enum": ["content_decay", "quickwin", "tech_fix", "schema", "pillar", "manual", "sxo", "cannibalization", "redirect_404", "internal_links", "new_content_plan"], "_note": "Q-IL-1 paterni reuse: enum 9→10 (Phase 8 W-D1 +internal_links) → 10→11 (v1.2 Phase B audit followup +new_content_plan, additive only, schema_version unchanged per ADR-018 convention; resolves Q-V1.2-MASTER-TASK-PRIMARY-SOURCE-01)" },
-        { "col": "D", "name": "related_sources" },
-        { "col": "E", "name": "url" },
-        { "col": "F", "name": "category" },
-        { "col": "G", "name": "priority",         "ref": "#/definitions/severityEnum" },
-        { "col": "H", "name": "impact" },
-        { "col": "I", "name": "duration_est_min", "type": "integer" },
-        { "col": "J", "name": "status",           "ref": "#/definitions/statusEnum" },
-        { "col": "K", "name": "created_date",     "type": "date" },
-        { "col": "L", "name": "done_date",        "type": "date" },
-        { "col": "M", "name": "assignee" },
-        { "col": "N", "name": "note" },
-        { "col": "O", "name": "auto_generated",   "type": "boolean" },
-        { "col": "P", "name": "dependencies" },
-        { "col": "Q", "name": "effort_actual_min","type": "integer" },
-        { "col": "R", "name": "metric_impact_json" },
-        { "col": "S", "name": "work_log_ref" }
+        {
+          "col": "A",
+          "name": "task_id",
+          "ref": "#/definitions/taskIdPattern"
+        },
+        {
+          "col": "B",
+          "name": "task"
+        },
+        {
+          "col": "C",
+          "name": "primary_source",
+          "enum": [
+            "content_decay",
+            "quickwin",
+            "tech_fix",
+            "schema",
+            "pillar",
+            "manual",
+            "sxo",
+            "cannibalization",
+            "redirect_404",
+            "internal_links",
+            "new_content_plan"
+          ],
+          "_note": "Q-IL-1 paterni reuse: enum 9→10 (Phase 8 W-D1 +internal_links) → 10→11 (v1.2 Phase B audit followup +new_content_plan, additive only, schema_version unchanged per ADR-018 convention; resolves Q-V1.2-MASTER-TASK-PRIMARY-SOURCE-01)"
+        },
+        {
+          "col": "D",
+          "name": "related_sources"
+        },
+        {
+          "col": "E",
+          "name": "url"
+        },
+        {
+          "col": "F",
+          "name": "category"
+        },
+        {
+          "col": "G",
+          "name": "priority",
+          "ref": "#/definitions/severityEnum"
+        },
+        {
+          "col": "H",
+          "name": "impact"
+        },
+        {
+          "col": "I",
+          "name": "duration_est_min",
+          "type": "integer"
+        },
+        {
+          "col": "J",
+          "name": "status",
+          "ref": "#/definitions/statusEnum"
+        },
+        {
+          "col": "K",
+          "name": "created_date",
+          "type": "date"
+        },
+        {
+          "col": "L",
+          "name": "done_date",
+          "type": "date"
+        },
+        {
+          "col": "M",
+          "name": "assignee"
+        },
+        {
+          "col": "N",
+          "name": "note"
+        },
+        {
+          "col": "O",
+          "name": "auto_generated",
+          "type": "boolean"
+        },
+        {
+          "col": "P",
+          "name": "dependencies"
+        },
+        {
+          "col": "Q",
+          "name": "effort_actual_min",
+          "type": "integer"
+        },
+        {
+          "col": "R",
+          "name": "metric_impact_json"
+        },
+        {
+          "col": "S",
+          "name": "work_log_ref"
+        }
       ],
-      "allowed_writers": ["human", "dashboard_refresh", "done_protocol", "master_task_sync"],
+      "allowed_writers": [
+        "human",
+        "dashboard_refresh",
+        "done_protocol",
+        "master_task_sync"
+      ],
       "writer_scope": {
-        "human":             "full sheet access",
+        "human": "full sheet access",
         "dashboard_refresh": "no writes — read-only for R48/R49/R50 counts",
-        "done_protocol":     "status (J), done_date (L), effort_actual_min (Q), metric_impact_json (R), work_log_ref (S) — only rows transitioning to DONE",
-        "master_task_sync":  "append new auto-generated rows AND merge related_sources (D); forbidden to touch protected_columns"
+        "done_protocol": "status (J), done_date (L), effort_actual_min (Q), metric_impact_json (R), work_log_ref (S) — only rows transitioning to DONE",
+        "master_task_sync": "append new auto-generated rows AND merge related_sources (D); forbidden to touch protected_columns"
       },
-      "protected_columns": ["task", "category", "priority", "impact", "duration_est_min", "assignee", "note"],
+      "protected_columns": [
+        "task",
+        "category",
+        "priority",
+        "impact",
+        "duration_est_min",
+        "assignee",
+        "note"
+      ],
       "computed_ranges": [],
       "formula_policy": "values_only"
+    },
+    "dfs_ranked_keywords": {
+      "header_row": 3,
+      "data_start_row": 4,
+      "description": "DataForSEO ranked_keywords projeksiyonu — vento'nun organik SERP'te sıralandığı keyword'ler (pozisyon+url+hacim). dfs-pull → dfs_project_transform yazar.",
+      "required_columns": [
+        {
+          "col": "A",
+          "name": "keyword"
+        },
+        {
+          "col": "B",
+          "name": "rank_group",
+          "type": "integer"
+        },
+        {
+          "col": "C",
+          "name": "rank_absolute",
+          "type": "integer"
+        },
+        {
+          "col": "D",
+          "name": "url"
+        },
+        {
+          "col": "E",
+          "name": "search_volume",
+          "type": "integer"
+        },
+        {
+          "col": "F",
+          "name": "etv",
+          "type": "number"
+        },
+        {
+          "col": "G",
+          "name": "cpc",
+          "type": "number"
+        },
+        {
+          "col": "H",
+          "name": "competition",
+          "type": "number"
+        },
+        {
+          "col": "I",
+          "name": "title"
+        },
+        {
+          "col": "J",
+          "name": "data_source"
+        }
+      ]
+    },
+    "backlinks": {
+      "header_row": 3,
+      "data_start_row": 4,
+      "description": "DataForSEO backlinks özeti — referring domain sayıları + spam skoru (otorite/toksik sinyali). dfs-pull → dfs_project_transform yazar.",
+      "required_columns": [
+        {
+          "col": "A",
+          "name": "target"
+        },
+        {
+          "col": "B",
+          "name": "referring_domains",
+          "type": "integer"
+        },
+        {
+          "col": "C",
+          "name": "referring_main_domains",
+          "type": "integer"
+        },
+        {
+          "col": "D",
+          "name": "referring_domains_nofollow",
+          "type": "integer"
+        },
+        {
+          "col": "E",
+          "name": "spam_score",
+          "type": "integer"
+        },
+        {
+          "col": "F",
+          "name": "data_source"
+        },
+        {
+          "col": "G",
+          "name": "last_updated"
+        }
+      ]
+    },
+    "dfs_relevant_pages": {
+      "header_row": 3,
+      "data_start_row": 4,
+      "description": "DataForSEO relevant_pages projeksiyonu — sayfa başına sıralanan keyword sayısı + pozisyon dağılımı + etv. dfs_project_transform yazar.",
+      "required_columns": [
+        {
+          "col": "A",
+          "name": "url"
+        },
+        {
+          "col": "B",
+          "name": "ranked_keywords_count",
+          "type": "integer"
+        },
+        {
+          "col": "C",
+          "name": "etv",
+          "type": "number"
+        },
+        {
+          "col": "D",
+          "name": "pos_2_3",
+          "type": "integer"
+        },
+        {
+          "col": "E",
+          "name": "pos_4_10",
+          "type": "integer"
+        },
+        {
+          "col": "F",
+          "name": "pos_11_20",
+          "type": "integer"
+        },
+        {
+          "col": "G",
+          "name": "data_source"
+        }
+      ]
     }
   }
 }

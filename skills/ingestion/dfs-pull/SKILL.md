@@ -148,6 +148,9 @@ source — not hardcoded here). For a NEW market, resolve the DFS
 
 > **Note:** dfs-pull does NOT write to `master.xlsx`. Phase 8 `cluster-map` skill consumes the staging tables and projects to `master.xlsx#cluster_keywords` + `opportunity` downstream (F-09 shared writer disiplini orada uygulanır).
 
+> **PROJECTION for ranked_keywords + backlinks (v1.7 — completeness gap fix):** When the caller ALSO pulls the richer optional endpoints (`ranked_keywords`, `backlinks_bulk_referring_domains`, `backlinks_bulk_spam_score`), those raw payloads (in `inbox/dfs/`) previously had NO writer and stayed orphaned. Project them into master via `scripts/ingestion/dfs_project_transform.py`: `ranked_keywords` → `master.xlsx#dfs_ranked_keywords` (337-row SERP position/url/volume universe), `backlinks` → `master.xlsx#backlinks` (referring_domains + spam_score authority row). Idempotent `transaction.replace`, `writer="dfs-project"`. Do NOT leave these raw-only and then claim "DFS fully in master" (refresh-audit Faz 9 completeness gate + Faz 3 PROJEKSİYON ZORUNLU).
+> **ENVELOPE TRAP (v1.9 — A22, engine weakness):** `dfs_project_transform._find_items` does NOT traverse a full DFS REST `tasks[]` envelope (it does not recurse into list elements) → feeding a raw MCP/REST payload directly yields **0 rows with no error** (dry-run count=0) — a silent completeness trap ("DFS fully in master" while the projection is empty). FIX: write dict-addressable `{"items":[...]}.norm.json` sibling files as transform input (keep the raw envelope for drift-recovery), then feed that. Permanent engine fix recommended. Evidence rkturizm-tr: ranked_keywords projected 483/483 via this workaround.
+
 ## Drift note (D-003 RESOLVED via staging-only routing)
 
 The Phase 6 worker brief originally referred to `master.xlsx#keyword_data`,
@@ -198,6 +201,20 @@ handle = workflow_runner.create_run(
 Computes `estimated_credits = len(keywords) * (1.0 + 0.5)` (overview +
 volume) and runs `scripts.budget.check_budget` against the project's
 24h running total. DURUR #5 if exceeded — never silently downgrade.
+
+> **PARTIAL CREDIT ACCOUNTING (v2.1 — bigcat-tr).** The budget estimate/check
+> covers **only** `keyword_overview` (1.0) + `search_volume` (0.5) — the two
+> endpoints with a `credits_per_call` rate in `mcp-tool-registry.json`. When
+> a full-audit caller also pulls `bulk_keyword_difficulty`, `ranked_keywords`,
+> `relevant_pages`, and `backlinks_*`, those have **no registry cost entry** →
+> recorded as `0.0` credits in provenance (not fabricated, but **untracked**).
+> So `check_budget`'s number is a FLOOR, not total spend — real DFS API usage
+> exceeds it. Do NOT report the tracked figure as "total credits"; report it
+> as "tracked (overview+volume only); other endpoints uncosted in registry".
+> Evidence bigcat-tr: 166.5 tracked, but 5 further endpoints (difficulty,
+> ranked_keywords ×619 rows, relevant_pages, 2× backlinks) billed real API
+> quota at 0.0 recorded. Engine follow-up: add `cost_credits_per_call` for
+> those endpoints in `mcp-tool-registry.json` so estimates reflect reality.
 
 ```python
 from scripts.ingestion import dfs_pull
@@ -260,7 +277,13 @@ volume_inbox = (
 volume_inbox.write_text(json.dumps(raw_volume, ensure_ascii=False, indent=2))
 ```
 
-### Step 6 — `transform`
+> **SILENT 10-ITEM CAP (v2.1 — bigcat-tr).** `keywords_data_google_ads_search_volume`
+> silently caps its response at **10 items regardless of requested batch size**
+> — no truncation warning (distinct from the TR-forwarding bug). If you pass
+> 111 keywords you get 10 back and lose the other 101 SILENTLY → completeness
+> violation. FIX: sub-batch the keyword list into chunks of ≤10 and merge the
+> results; assert `len(returned) == len(chunk)` per call. Evidence bigcat-tr:
+> 111 keywords needed 12 sub-batches for full coverage.
 
 Pure compute via `scripts/ingestion/dfs_pull.py` (staging-only output).
 The transform calls `_normalize_dfs_response()` first to flatten REST
