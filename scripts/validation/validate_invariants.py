@@ -1736,6 +1736,31 @@ def _looks_outward(registry_tool: str) -> bool:
     return bool(_OUTWARD_VERB_RE.search(name))
 
 
+@functools.lru_cache(maxsize=1)
+def _registry_outward_tools() -> frozenset[str]:
+    """Outward-looking tools as declared by mcp-tool-registry.json.
+
+    An INDEPENDENT source of truth for what the gate must cover. Deriving the
+    expectation from the gate's own constant — as the rest of F-27 does — can
+    only confirm the gate is consistent with itself.
+    """
+    for path in (_REPO_ROOT / "mcp-tool-registry.json",):
+        try:
+            doc = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        out: set[str] = set()
+        for cfg in (doc.get("servers") or {}).values():
+            if not isinstance(cfg, dict):
+                continue
+            for tool in cfg.get("tools") or []:
+                name = tool.get("tool_name") if isinstance(tool, dict) else tool
+                if isinstance(name, str) and _looks_outward(name):
+                    out.add(name)
+        return frozenset(out)
+    return frozenset()
+
+
 def _scan_declared_outward(
     skills_root: Path,
 ) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
@@ -1804,10 +1829,19 @@ def check_F_27(workbook: Any, project_slug: str, *,
     gate_matchers = {_strip_mcp_prefix(_MCP_SUBMIT_TOOL)}
     curated, unclassified = _scan_declared_outward(root)
     # FAIL (RED): an outward tool the gate does NOT cover — a declared curated
-    # tool that is ungated, OR a curated outward tool the gate forgot wholesale.
+    # tool that is ungated, OR a curated outward tool the gate forgot wholesale,
+    # OR an outward-looking tool the REGISTRY carries that the gate never saw.
+    #
+    # The third source matters because the first two both flow through the gate's
+    # own constant: the declared set is normalised with _strip_mcp_prefix and
+    # compared against a set built from _MCP_SUBMIT_TOOL, so the comparison can
+    # only ever confirm the gate agrees with itself about tools somebody wrote a
+    # SKILL.md for. A tool that exists in mcp-tool-registry.json and is outward by
+    # its own name was invisible here — it could ship ungated with this rule GREEN.
     ungated = sorted(
         {t for t in curated if t not in gate_matchers}
         | (set(_OUTWARD_MCP_TOOLS) - gate_matchers)
+        | (_registry_outward_tools() - gate_matchers)
     )
     if ungated:
         violations = [
@@ -1887,10 +1921,58 @@ def evaluate_all(workbook: Any, project_slug: str, *,
 # Aggregation
 # ---------------------------------------------------------------------------
 
-_VALID_RULE_IDS: frozenset[str] = frozenset(
+_IMPLEMENTED_RULE_IDS: frozenset[str] = frozenset(
     fn.__name__.replace("check_", "").replace("_", "-")
     for fn in _RULE_FUNCTIONS
 )
+
+
+@functools.lru_cache(maxsize=1)
+def _declared_rules() -> dict[str, dict]:
+    """Every rule id declared in cross-sheet-invariants.json.
+
+    The registry above is what RUNS; this is what the contract PROMISES. They
+    are not the same set, and the difference is the point of the next function.
+    """
+    path = _REPO_ROOT / "schemas" / "cross-sheet-invariants.json"
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return {r["id"]: r for r in doc.get("rules", []) if isinstance(r, dict) and "id" in r}
+
+
+def unimplemented_results() -> list[dict]:
+    """One NOT_IMPLEMENTED row per declared rule that has no check function.
+
+    Without this, a declared rule with no implementation emits NOTHING — not a
+    FAIL, not even a SKIP — so a run reports a verdict over the rules that
+    happen to exist as though it covered the whole contract. Two of the absent
+    rules are CRITICAL, which means a GREEN report could be issued while a
+    critical invariant was never evaluated by anything.
+    """
+    out: list[dict] = []
+    for rid, spec in sorted(_declared_rules().items()):
+        if rid in _IMPLEMENTED_RULE_IDS:
+            continue
+        out.append(_make_result(
+            id_=rid,
+            severity=str(spec.get("severity", "MEDIUM")),
+            verdict="NOT_IMPLEMENTED",
+            evidence=(
+                "declared in cross-sheet-invariants.json but no check_%s function "
+                "exists — this rule was NOT evaluated"
+                % rid.replace("-", "_")
+            ),
+            rule=str(spec.get("rule", "")),
+            category=str(spec.get("category", "unknown")),
+        ))
+    return out
+
+
+# Accepts both what runs and what is merely declared, so aggregation can report
+# the gap instead of refusing to look at it.
+_VALID_RULE_IDS: frozenset[str] = _IMPLEMENTED_RULE_IDS | frozenset(_declared_rules())
 
 
 def aggregate_verdicts(rule_results: list[dict]) -> dict:
@@ -1904,6 +1986,7 @@ def aggregate_verdicts(rule_results: list[dict]) -> dict:
     overall = "GREEN"
     manual_review_required: list[str] = []
     auto_repair_available: list[str] = []
+    not_implemented: list[str] = []
 
     saw_red = False
     saw_amber = False
@@ -1926,6 +2009,12 @@ def aggregate_verdicts(rule_results: list[dict]) -> dict:
         elif verdict == "SKIP":
             warn_count += 1
             saw_amber = True
+        elif verdict == "NOT_IMPLEMENTED":
+            # A declared rule nobody wrote is a coverage gap, not a data fault.
+            # It must never be silent and must never read as GREEN.
+            warn_count += 1
+            saw_amber = True
+            not_implemented.append(rid)
         elif verdict == "FAIL":
             fail_count += 1
             if manual:
@@ -1954,8 +2043,10 @@ def aggregate_verdicts(rule_results: list[dict]) -> dict:
         "warn_count": warn_count,
         "fail_count": fail_count,
         "total": len(rule_results),
+        "declared_total": len(_declared_rules()) or len(rule_results),
         "manual_review_required": manual_review_required,
         "auto_repair_available": auto_repair_available,
+        "not_implemented": not_implemented,
     }
 
 
@@ -2095,3 +2186,99 @@ __all__: Iterable[str] = (
     "check_F_26",
     "check_F_27",
 )
+
+
+# ---------------------------------------------------------------------------
+# Command-line entry point
+# ---------------------------------------------------------------------------
+#
+# This module was 2000 lines with no __main__ block. Running it as a script did
+# nothing and exited 0 — which is indistinguishable from running it and passing.
+# Every "I ran the invariants and they were clean" was unverifiable until now.
+#
+# Three things this prints that the library alone never surfaced:
+#   * NOT_IMPLEMENTED rows, so declared-but-absent rules stop being invisible
+#   * the row count each rule saw, so a 3-row PASS cannot be read as a 3000-row one
+#   * a non-zero exit on RED, so a caller can actually gate on it
+
+def _sheet_row_counts(workbook: Any, sheets: list[str] | None) -> str:
+    """Rows behind a verdict. A PASS over an empty sheet is not a measurement."""
+    if not sheets:
+        return ""
+    parts = []
+    for s in sheets:
+        if not _has_sheet(workbook, s):
+            parts.append("%s=absent" % s)
+            continue
+        try:
+            parts.append("%s=%d" % (s, len(_iter_rows_as_dicts(workbook, s))))
+        except Exception:
+            parts.append("%s=?" % s)
+    return " ".join(parts)
+
+
+def main(argv: list[str] | None = None) -> int:
+    import argparse
+
+    ap = argparse.ArgumentParser(
+        prog="validate_invariants.py",
+        description="Evaluate the declared cross-sheet invariants for one project.",
+    )
+    ap.add_argument("--project", required=True, help="project slug under projects/")
+    ap.add_argument("--workspace-root", default=None,
+                    help="workspace root (defaults to the resolved workspace)")
+    ap.add_argument("--json", action="store_true", help="emit the full result as JSON")
+    args = ap.parse_args(argv)
+
+    try:
+        ws_root = _resolve_workspace_root(
+            Path(args.workspace_root) if args.workspace_root else None)
+        wb_path = _project_dir(args.project, ws_root) / "master.xlsx"
+    except Exception as exc:
+        print("ERROR resolving workspace: %s" % exc, file=sys.stderr)
+        return 2
+    if not wb_path.is_file():
+        print("ERROR master.xlsx not found: %s" % wb_path, file=sys.stderr)
+        return 2
+
+    try:
+        from openpyxl import load_workbook
+    except ImportError:
+        print("ERROR openpyxl is not installed", file=sys.stderr)
+        return 2
+
+    wb = load_workbook(filename=str(wb_path), read_only=True, data_only=True)
+    try:
+        results = evaluate_all(wb, args.project, workspace_root=ws_root)
+        rows = {r["id"]: _sheet_row_counts(wb, r.get("affected_sheets"))
+                for r in results}
+    finally:
+        wb.close()
+
+    results = results + unimplemented_results()
+    agg = aggregate_verdicts(results)
+
+    if args.json:
+        print(json.dumps({"summary": agg, "checks": results}, indent=1, default=str))
+    else:
+        print("invariants — project=%s  workbook=%s" % (args.project, wb_path))
+        for r in sorted(results, key=lambda x: x["id"]):
+            print("  %-6s %-16s %-8s %s" % (
+                r["id"], r["verdict"], r["severity"],
+                rows.get(r["id"], "") or r["evidence"][:80]))
+        print()
+        print("  overall=%s   pass=%d warn=%d fail=%d   evaluated=%d of %d declared"
+              % (agg["overall"], agg["pass_count"], agg["warn_count"],
+                 agg["fail_count"], len(results) - len(agg["not_implemented"]),
+                 agg["declared_total"]))
+        if agg["not_implemented"]:
+            print("  NOT IMPLEMENTED (declared, never evaluated): %s"
+                  % ", ".join(agg["not_implemented"]))
+        if agg["manual_review_required"]:
+            print("  manual review: %s" % ", ".join(agg["manual_review_required"]))
+
+    return 1 if agg["overall"] == "RED" else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
