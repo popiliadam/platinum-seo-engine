@@ -29,4 +29,32 @@ Phase 14 W3-W2-B sırasında `MT-W3W2B-001` formatında task_id'ler oluşturuldu
 - Yeni task yazarken `mark-done` skill Step 1'de `^T-[0-9]{4,}$` doğrulama ZORUNLU.
 - `master-excel.schema.json` `master_task.task_id` field pattern reference: `#/definitions/taskIdPattern`.
 - events.jsonl `task_id` field'ı canonical pattern ile yazılır; legacy ID'ler historical olarak kabul edilir.
-- drift-check F-XX aday: `master_task.task_id` pattern cross-check (Phase 16+ scope).
+- `master_task.task_id` pattern cross-check: **uygulandı** —
+  `tests/state/test_master_task_id_convention.py` (workspace bağlıyken koşar;
+  bağlı değilken kapsamanın SIFIR olduğunu uyarı ile söyler, sessizce geçmez).
+
+## Ölçülen drift — 2026-08-08
+
+Bu kural `status: enforced` diyordu ama yukarıdaki satır "Phase 16+ scope"
+olarak duruyordu, yani kimse bakmıyordu. Bağlı workspace tarandığında
+**3677 task içinde 125 uyumsuz kimlik** bulundu, altı projede, altı ayrı
+şekilde:
+
+| proje | adet | şekil |
+|---|---:|---|
+| dentnotion | 64 | `T-301-01`, `T-PIL-PEK-01`, `MT-FIYAT-NN` (19'u) |
+| bayder | 54 | `MT-NNN` |
+| bigcat-tr | 5 | `QW-NNN` |
+| katrenur-tr | 1 | `T-0026-V` |
+| rkturizm-tr | 1 | `T-PIVOT-15G` |
+
+Bunlar **temizlenmedi**. Yeniden adlandırmak, arşivlenmiş `events.jsonl`
+satırlarında ve `completed_work` kayıtlarında askıda referans bırakır; o
+defterler append-only olduğu için yerinde onarılamaz. Karar sahibinin.
+
+Kontrol bu yüzden bir **cırcır (ratchet)**: mevcut borç proje başına sayı
+olarak sabitlendi; sayı BÜYÜRSE kapı kırmızıya gider. Küçülürse de kırmızıya
+gider — pin bilerek, düzeltmeyle birlikte indirilsin diye. Şemayı diskteki
+şekilleri kabul edecek biçimde genişletmek değerlendirildi ve **reddedildi**:
+o, yeşile ulaşmak için kapıyı gevşetmek ve ad-hoc kimlik uydurmayı
+konvansiyon ilan etmek olurdu.
