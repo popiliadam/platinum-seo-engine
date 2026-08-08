@@ -187,6 +187,23 @@ Upstream SKIP/FAIL → downstream **atlanır + "gated" satırı** (sessiz geçme
 `quick-wins`/F-08 ← gsc_performance; `content-gaps` ← DFS staging; `cluster-map` D-02 ← topical_map;
 `competitive-analysis`/topical otorite ← SERP+backlink verisi; Faz 7 ← Faz 6 master_task tazelenmiş.
 
+**Faz 1–4 arasında kenar YOKTUR — numaralandırma sıra değil, okuma sırasıdır.**
+Yukarıdaki liste bağımlılıkların TAMAMIDIR ve hiçbiri Faz 3'ü Faz 2'ye bağlamaz.
+Dört ingestion fazı ayrık sheet'lere yazar, dolayısıyla §143'teki disjoint-sheet
+paralel delege kuralı doğrudan geçerlidir:
+
+| faz | yazdığı sheet |
+|---|---|
+| Faz 1 GSC | `gsc_performance` |
+| Faz 2 SF | `crawl_sitemap`, `redirect_404` |
+| Faz 3 DFS | `dfs_ranked_keywords`, `dfs_relevant_pages`, `backlinks` |
+| Faz 4 Scrapling | *(master'a yazmaz — tutarsızlık listesi üretir)* |
+
+İkili kesişim: yok. Bu yüzden **Faz 1/2/3 eşzamanlı başlatılır**; DFS'i SF crawl'ın
+arkasında sıraya koymak duvar saatini boşuna uzatır (SF crawl fazın en yavaş
+adımıdır ve DFS ondan tek bir girdi almaz). Sıralı koşmak isteniyorsa bu bir
+BÜTÇE kararıdır (eşzamanlı kredi tavanı), bağımlılık değil — ve öyle yazılır.
+
 ## Faz 1 — GSC tazeleme (→ `gsc-pull`)
 `days_back` recent + eşit previous; enhanced + search_analytics, raw-inbox-first → transform →
 approval → write. Sonra index_inspect + detect_quick_wins. **ÇIKTI:** satır, yeni query, quick-win, indexlenmeyen.
