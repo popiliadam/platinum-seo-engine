@@ -15,7 +15,7 @@ model: sonnet
 
 ## 1. Aktif proje
 
-!`set -- $ARGUMENTS; if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş"; else PROJECT="${1:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/sessions/${CLAUDE_CODE_SESSION_ID:-__unbound__}.json" 2>/dev/null)}"; PROJECT="${PROJECT:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/active.json" 2>/dev/null)}"; if [ -z "$PROJECT" ]; then echo "NO_ACTIVE_PROJECT — once /pseo-active <slug>"; else echo "active=$PROJECT"; fi; fi`
+!`set -- $ARGUMENTS; if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş"; else ARG_SLUG="$1"; case "$ARG_SLUG" in [a-z]*) case "$ARG_SLUG" in *[!a-z0-9-]*) ARG_SLUG="" ;; esac ;; *) ARG_SLUG="" ;; esac; PROJECT="${ARG_SLUG:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/sessions/${CLAUDE_CODE_SESSION_ID:-__unbound__}.json" 2>/dev/null)}"; PROJECT="${PROJECT:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/active.json" 2>/dev/null)}"; if [ -z "$PROJECT" ]; then echo "NO_ACTIVE_PROJECT — once /pseo-active <slug>"; else echo "active=$PROJECT"; fi; fi`
 
 ## 2. Skill chain
 
@@ -34,7 +34,7 @@ model: sonnet
 
 Quick check — aktif projenin `project.config.json`'unun schema'ya uyup uymadığı:
 
-!`set -- $ARGUMENTS; if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "skip: PSEO_WORKSPACE_ROOT set edilmemiş"; else WS="$PSEO_WORKSPACE_ROOT"; PROJECT="${1:-$(jq -r '.active_project // empty' "$WS/shared/sessions/${CLAUDE_CODE_SESSION_ID:-__unbound__}.json" 2>/dev/null)}"; PROJECT="${PROJECT:-$(jq -r '.active_project // empty' "$WS/shared/active.json" 2>/dev/null)}"; CFG="$WS/projects/$PROJECT/project.config.json"; SCHEMA="${CLAUDE_PLUGIN_ROOT}/schemas/project-config.schema.json"; if [ -z "$PROJECT" ]; then echo "skip: NO_ACTIVE_PROJECT"; elif [ ! -f "$CFG" ]; then echo "skip: $CFG yok (önce /pseo-init)"; else python3 "${CLAUDE_PLUGIN_ROOT}/scripts/validation/validate_schema.py" "$CFG" "$SCHEMA" && echo "GREEN: project.config.json schema'ya uyuyor" || echo "RED: schema validation FAIL (yukarıdaki stderr)"; fi; fi`
+!`set -- $ARGUMENTS; if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "skip: PSEO_WORKSPACE_ROOT set edilmemiş"; else WS="$PSEO_WORKSPACE_ROOT"; ARG_SLUG="$1"; case "$ARG_SLUG" in [a-z]*) case "$ARG_SLUG" in *[!a-z0-9-]*) ARG_SLUG="" ;; esac ;; *) ARG_SLUG="" ;; esac; PROJECT="${ARG_SLUG:-$(jq -r '.active_project // empty' "$WS/shared/sessions/${CLAUDE_CODE_SESSION_ID:-__unbound__}.json" 2>/dev/null)}"; PROJECT="${PROJECT:-$(jq -r '.active_project // empty' "$WS/shared/active.json" 2>/dev/null)}"; CFG="$WS/projects/$PROJECT/project.config.json"; SCHEMA="${CLAUDE_PLUGIN_ROOT}/schemas/project-config.schema.json"; if [ -z "$PROJECT" ]; then echo "skip: NO_ACTIVE_PROJECT"; elif [ ! -f "$CFG" ]; then echo "skip: $CFG yok (önce /pseo-init)"; else python3 "${CLAUDE_PLUGIN_ROOT}/scripts/validation/validate_schema.py" "$CFG" "$SCHEMA" && echo "GREEN: project.config.json schema'ya uyuyor" || echo "RED: schema validation FAIL (yukarıdaki stderr)"; fi; fi`
 
 ## 4. Bağımlılıklar
 

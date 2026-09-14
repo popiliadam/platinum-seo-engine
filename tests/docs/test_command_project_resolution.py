@@ -62,6 +62,19 @@ def test_every_active_json_read_consults_session_marker_first(name: str, lineno:
     assert marker_at < active_at, f"{name}:{lineno} must read the session marker BEFORE active.json"
 
 
+@pytest.mark.parametrize("name,lineno,line", _resolver_lines(), ids=lambda v: str(v)[:40])
+def test_positional_argument_is_validated_as_a_slug_before_use(name: str, lineno: int, line: str) -> None:
+    """A flag (`--resume`, `--days-back`) or a number (`28`) in the slug position must not become the
+    project: every resolver validates the positional arg against the slug grammar first
+    (session_binding._SLUG_RE ``^[a-z][a-z0-9-]*$``) instead of `${N:-$(jq …)}` pass-through."""
+    assert '${1:-$(jq' not in line and '${2:-$(jq' not in line, (
+        f"{name}:{lineno} passes the raw positional arg through as the project"
+    )
+    assert 'case "$ARG_SLUG" in' in line or 'case "$SLUG" in' in line, (
+        f"{name}:{lineno} does not validate the positional arg as a slug"
+    )
+
+
 def _status_block() -> str:
     text = (COMMANDS_DIR / "pseo-status.md").read_text(encoding="utf-8")
     line = next(l for l in text.splitlines() if l.startswith("Aktif marker: !`"))
@@ -102,6 +115,13 @@ def test_explicit_argument_wins(workspace: Path) -> None:
 
 
 @pytestmark_jq
+@pytest.mark.parametrize("args", ["--days-back 28", "28", "Bad_Slug", "-x"])
+def test_non_slug_argument_falls_through_to_session_marker(workspace: Path, args: str) -> None:
+    _bind(workspace, json.dumps({"active_project": "bound-proj"}))
+    assert _run_block(args, workspace, SID) == "active=bound-proj"
+
+
+@pytestmark_jq
 def test_session_marker_beats_global_pointer(workspace: Path) -> None:
     _bind(workspace, json.dumps({"active_project": "bound-proj"}))
     assert _run_block("", workspace, SID) == "active=bound-proj"
@@ -123,6 +143,30 @@ def test_corrupt_or_empty_marker_falls_back_to_global_pointer(workspace: Path, p
 def test_missing_session_id_falls_back_to_global_pointer(workspace: Path) -> None:
     _bind(workspace, json.dumps({"active_project": "bound-proj"}))
     assert _run_block("", workspace, None) == "active=global-proj"
+
+
+def _run_block_line(filename: str, needle: str, args: str, workspace: Path, session_id: str | None) -> str:
+    text = (COMMANDS_DIR / filename).read_text(encoding="utf-8")
+    line = next(l for l in text.splitlines() if l.startswith("!`") and needle in l)
+    source = line[2:line.rindex("`")].replace("$ARGUMENTS", args)
+    env = {"PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin", "PSEO_WORKSPACE_ROOT": str(workspace)}
+    if session_id is not None:
+        env["CLAUDE_CODE_SESSION_ID"] = session_id
+    return subprocess.run(["bash", "-c", source], capture_output=True, text=True, env=env, timeout=20).stdout.strip()
+
+
+@pytestmark_jq
+@pytest.mark.parametrize("args,expected", [
+    ("monthly --resume", "workflow=monthly project=bound-proj"),
+    ("monthly arg-proj", "workflow=monthly project=arg-proj"),
+    ("monthly arg-proj --resume", "workflow=monthly project=arg-proj"),
+    ("monthly", "workflow=monthly project=bound-proj"),
+])
+def test_pseo_run_resume_flag_is_not_taken_as_the_project(workspace: Path, args: str, expected: str) -> None:
+    """`/pseo-run <workflow> [slug] [--resume]`: a bare `--resume` in the slug position must fall
+    through to the session marker, not become a project named "--resume" (review 2026-09-14)."""
+    _bind(workspace, json.dumps({"active_project": "bound-proj"}))
+    assert _run_block_line("pseo-run.md", 'WF="${1:-monthly}"', args, workspace, SID) == expected
 
 
 @pytestmark_jq

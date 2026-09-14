@@ -17,7 +17,7 @@ model: sonnet
 
 `$1` verilmişse onu kullan; yoksa bu session'ın bind işareti (`shared/sessions/<session-id>.json`) → `shared/active.json`:
 
-!`set -- $ARGUMENTS; if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş"; else PROJECT="${1:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/sessions/${CLAUDE_CODE_SESSION_ID:-__unbound__}.json" 2>/dev/null)}"; PROJECT="${PROJECT:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/active.json" 2>/dev/null)}"; if [ -z "$PROJECT" ]; then echo "NO_ACTIVE_PROJECT — once /pseo-active <slug>"; else echo "active=$PROJECT"; fi; fi`
+!`set -- $ARGUMENTS; if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş"; else ARG_SLUG="$1"; case "$ARG_SLUG" in [a-z]*) case "$ARG_SLUG" in *[!a-z0-9-]*) ARG_SLUG="" ;; esac ;; *) ARG_SLUG="" ;; esac; PROJECT="${ARG_SLUG:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/sessions/${CLAUDE_CODE_SESSION_ID:-__unbound__}.json" 2>/dev/null)}"; PROJECT="${PROJECT:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/active.json" 2>/dev/null)}"; if [ -z "$PROJECT" ]; then echo "NO_ACTIVE_PROJECT — once /pseo-active <slug>"; else echo "active=$PROJECT"; fi; fi`
 
 ## 2. SF MCP pre-flight
 

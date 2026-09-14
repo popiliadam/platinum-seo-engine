@@ -38,10 +38,10 @@ model: sonnet
 
 `$1` = workflow (varsayılan `monthly`); `$2` = opsiyonel slug; yoksa bu session'ın bind işareti (`shared/sessions/<session-id>.json`) → `shared/active.json`:
 
-!`set -- $ARGUMENTS; if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş"; else WF="${1:-monthly}"; PROJECT="${2:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/sessions/${CLAUDE_CODE_SESSION_ID:-__unbound__}.json" 2>/dev/null)}"; PROJECT="${PROJECT:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/active.json" 2>/dev/null)}"; if [ -z "$PROJECT" ]; then echo "workflow=$WF project=NO_ACTIVE_PROJECT — önce /pseo-active <slug>"; else echo "workflow=$WF project=$PROJECT"; fi; fi`
+!`set -- $ARGUMENTS; if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "ERROR: PSEO_WORKSPACE_ROOT env var set edilmemiş"; else WF="${1:-monthly}"; ARG_SLUG="$2"; case "$ARG_SLUG" in [a-z]*) case "$ARG_SLUG" in *[!a-z0-9-]*) ARG_SLUG="" ;; esac ;; *) ARG_SLUG="" ;; esac; PROJECT="${ARG_SLUG:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/sessions/${CLAUDE_CODE_SESSION_ID:-__unbound__}.json" 2>/dev/null)}"; PROJECT="${PROJECT:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/active.json" 2>/dev/null)}"; if [ -z "$PROJECT" ]; then echo "workflow=$WF project=NO_ACTIVE_PROJECT — önce /pseo-active <slug>"; else echo "workflow=$WF project=$PROJECT"; fi; fi`
 
 - `PROJECT` boşsa: kullanıcıdan slug iste veya `/pseo-active <slug>` öner; aşağıdaki adımları atla.
-- `$2` `--resume` ise slug'ı `active.json`'dan çöz ve **2.b**'deki resume yolunu izle.
+- `$2` `--resume` ise (proje adı değil — geçerli bir slug olmayan argüman proje sayılmaz) proje bu session'ın bind işaretinden → `shared/active.json`'dan çözülür; **2.b**'deki resume yolunu izle.
 - Workflow `monthly` ise: **Bölüm 2-7**'yi izle. Workflow `audit` ise: **Bölüm 8** (audit
   suite, Faz-3) — DURUR'ma. Workflow `setup` ise: **Bölüm 9** (yeni-proje içerik-planı
   pipeline'ı, Faz-3) — DURUR'ma. Workflow `content` ise: **Bölüm 10** (blog-içerik üretim

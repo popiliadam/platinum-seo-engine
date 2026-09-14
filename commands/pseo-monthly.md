@@ -17,7 +17,7 @@ model: sonnet
 
 `$1` opsiyonel `YYYY-MM`; yoksa "geçen ay":
 
-!`set -- $ARGUMENTS; MONTH="${1:-$(date -u -v-1m +%Y-%m 2>/dev/null || date -u --date='last month' +%Y-%m)}"; if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "month=$MONTH project=NO_WORKSPACE_ROOT (PSEO_WORKSPACE_ROOT env var set edilmemiş)"; else PROJECT="${2:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/sessions/${CLAUDE_CODE_SESSION_ID:-__unbound__}.json" 2>/dev/null)}"; PROJECT="${PROJECT:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/active.json" 2>/dev/null)}"; echo "month=$MONTH project=${PROJECT:-NO_ACTIVE_PROJECT}"; fi`
+!`set -- $ARGUMENTS; MONTH="${1:-$(date -u -v-1m +%Y-%m 2>/dev/null || date -u --date='last month' +%Y-%m)}"; if [ -z "$PSEO_WORKSPACE_ROOT" ]; then echo "month=$MONTH project=NO_WORKSPACE_ROOT (PSEO_WORKSPACE_ROOT env var set edilmemiş)"; else ARG_SLUG="$2"; case "$ARG_SLUG" in [a-z]*) case "$ARG_SLUG" in *[!a-z0-9-]*) ARG_SLUG="" ;; esac ;; *) ARG_SLUG="" ;; esac; PROJECT="${ARG_SLUG:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/sessions/${CLAUDE_CODE_SESSION_ID:-__unbound__}.json" 2>/dev/null)}"; PROJECT="${PROJECT:-$(jq -r '.active_project // empty' "$PSEO_WORKSPACE_ROOT/shared/active.json" 2>/dev/null)}"; echo "month=$MONTH project=${PROJECT:-NO_ACTIVE_PROJECT}"; fi`
 
 `PROJECT` boşsa: kullanıcıdan slug iste veya `/pseo-active <slug>` öner; aşağıdaki adımları atla.
 
