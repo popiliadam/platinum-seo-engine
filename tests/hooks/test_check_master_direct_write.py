@@ -158,6 +158,66 @@ def test_malformed_tool_input_is_allowed():
 
 
 # ===========================================================================
+# Review findings (2026-09-14): false positives, escape-hatch spoofing, decoy writer
+# ===========================================================================
+
+def test_read_only_master_analysis_that_saves_a_report_is_allowed():
+    cmd = (
+        "python3 - <<'EOF'\n"
+        "from openpyxl import load_workbook, Workbook\n"
+        f"src = load_workbook('{MASTER}', read_only=True)\n"
+        "report = Workbook()\n"
+        "report.save('outputs/report.xlsx')\n"
+        "EOF"
+    )
+    assert not _deny(_bash(cmd))
+
+
+def test_loading_master_then_saving_to_an_unrelated_literal_path_is_allowed():
+    cmd = (
+        "python3 - <<'EOF'\n"
+        "from openpyxl import load_workbook\n"
+        f"wb = load_workbook('{MASTER}')\n"
+        "wb.save('/tmp/master-copy-for-diff.xlsx.bak')\n"
+        "EOF"
+    )
+    assert not _deny(_bash(cmd))
+
+
+def test_master_path_built_with_os_path_join_then_saved_is_denied():
+    cmd = (
+        "python3 - <<'EOF'\n"
+        "import os\n"
+        "from openpyxl import load_workbook\n"
+        "path = os.path.join(ws, 'projects', 'vento', 'master.xlsx')\n"
+        "wb = load_workbook(path)\n"
+        "wb.save(path)\n"
+        "EOF"
+    )
+    assert _deny(_bash(cmd))
+
+
+def test_escape_hatch_text_inside_an_echo_does_not_bypass_the_guard():
+    cmd = (
+        "echo 'hint: PSEO_EXCEL_WRITER=transaction.py' && "
+        f"python3 -c \"import openpyxl; openpyxl.Workbook().save('{MASTER}')\""
+    )
+    assert _deny(_bash(cmd))
+
+
+def test_exported_escape_hatch_is_allowed():
+    cmd = f"export PSEO_EXCEL_WRITER=transaction.py; python3 -c \"openpyxl.Workbook().save('{MASTER}')\""
+    assert not _deny(_bash(cmd))
+
+
+def test_decoy_transaction_py_outside_the_engine_is_not_trusted(tmp_path: Path):
+    decoy = tmp_path / "scripts" / "excel" / "transaction.py"
+    decoy.parent.mkdir(parents=True)
+    decoy.write_text(f"import openpyxl\nopenpyxl.Workbook().save('{MASTER}')\n", encoding="utf-8")
+    assert _deny(_bash(f"python3 {decoy}"))
+
+
+# ===========================================================================
 # main() — real subprocess contract
 # ===========================================================================
 
