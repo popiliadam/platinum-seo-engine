@@ -33,6 +33,12 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/check_events_writer.py\"",
             "timeout": 15,
             "statusMessage": "events.jsonl writer policy..."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/check_master_direct_write.py\"",
+            "timeout": 15,
+            "statusMessage": "master.xlsx direct-write policy..."
           }
         ]
       },

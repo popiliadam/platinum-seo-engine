@@ -373,6 +373,19 @@ def _state_dir(state_root: Path | None, workbook_path: Path, project_slug: str) 
     return sd
 
 
+def _lock_path(workbook_path: Path) -> Path:
+    """The excel.lock sentinel of a WORKBOOK — independent of the caller's state_root.
+
+    Lock identity must be the workbook's: deriving it from ``_state_dir(state_root…)``
+    let two writers of the same master.xlsx (one passing an explicit state_root, one
+    relying on the default) lock DIFFERENT files, never contend, and silently revert
+    each other's sheets. Sidecars (backups, provenance) still honour state_root.
+    """
+    state = workbook_path.parent / "_state"
+    state.mkdir(parents=True, exist_ok=True)
+    return state / "excel.lock"
+
+
 def _read_sentinel(lock_path: Path) -> tuple[int | None, str | None]:
     if not lock_path.exists():
         return None, None
@@ -883,7 +896,7 @@ def update(
     state_dir = _state_dir(
         Path(state_root) if state_root else None, workbook_path, project_slug
     )
-    lock_path = state_dir / "excel.lock"
+    lock_path = _lock_path(workbook_path)
     fd = _acquire_lock(lock_path, acquire_blocking=acquire_blocking)
     try:
         wb = _load_or_new(workbook_path)
@@ -992,7 +1005,7 @@ def _write_or_append(
     state_dir = _state_dir(
         Path(state_root) if state_root else None, workbook_path, project_slug
     )
-    lock_path = state_dir / "excel.lock"
+    lock_path = _lock_path(workbook_path)
     fd = _acquire_lock(lock_path, acquire_blocking=acquire_blocking)
     try:
         wb = _load_or_new(workbook_path)

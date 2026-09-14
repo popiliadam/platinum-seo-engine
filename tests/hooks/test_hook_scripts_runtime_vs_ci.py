@@ -90,6 +90,15 @@ RUNTIME_HOOK_SCRIPTS = {
     # check_append_only.sh could not flag, because an append IS append-only.
     # Escape hatch PSEO_EVENTS_WRITER=events_writer.py. See scripts/hooks/README.md §1.
     "check_events_writer.py",
+    # master.xlsx direct-write guard — wired into hooks/pre-tool-use.json right AFTER
+    # check_events_writer.py. Blocks (exit 2) a Bash command, or a `python <file>.py`
+    # script it runs, that would SAVE a master workbook outside
+    # scripts/excel/transaction.py (openpyxl .save / pandas to_excel onto a
+    # master….xlsx literal, or master literal + load_workbook + .save). Such a write
+    # takes no excel.lock and reverts a parallel transaction writer's sheet.
+    # Reading is allowed. Escape hatch PSEO_EXCEL_WRITER=transaction.py.
+    # See scripts/hooks/README.md §1.
+    "check_master_direct_write.py",
 }
 
 # NOT wired into hooks/*.json — CI/pre-commit/manual guard helpers.
