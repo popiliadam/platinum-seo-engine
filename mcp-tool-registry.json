@@ -749,40 +749,6 @@
           "notes": "Mutates CRM state."
         }
       ]
-    },
-    "xquik": {
-      "display_name": "XQuik remote API proxy MCP (inventory unverified)",
-      "runtime": "npx",
-      "version_lock": "none",
-      "endpoint_url": "https://xquik.com/mcp",
-      "auth_method": "env_var",
-      "auth_config": {
-        "env_vars": [
-          "XQUIK_API_KEY"
-        ]
-      },
-      "capabilities": [
-        "read",
-        "write",
-        "paid"
-      ],
-      "rate_limit": "credit-metered (/api/v1/credits)",
-      "docs_url": "https://xquik.com",
-      "tools": [
-        {
-          "tool_name": "xquik__xquik",
-          "description": "Executes an author-supplied async JavaScript function against the XQuik API through an injected `xquik.request(path)` client. Observed calling /api/v1/x/accounts and /api/v1/credits. Arbitrary-endpoint reach: what it does is decided by the code passed in, not by the tool name.",
-          "category": "other",
-          "notes": "INVENTORY UNVERIFIED — reconstructed from calls recorded in earlier session logs, not from the server's own tools/list. The server is remote (https://xquik.com/mcp) and enumerating it needs XQUIK_API_KEY, so this entry may be INCOMPLETE. An unlisted tool here is exactly the gap F-27 exists to catch, so treat a surprise tool name as a finding, not as a registry bug. HIGH CAPABILITY: it runs supplied code, so it can reach any endpoint the key permits, including writes. Not covered by outward_action_gate, whose net_post class matches bash tokens only."
-        },
-        {
-          "tool_name": "xquik__explore",
-          "description": "Companion discovery tool for the XQuik API surface. Present in the runtime tool list of earlier sessions; no invocation with arguments was recorded, so its parameters are unknown.",
-          "category": "other",
-          "notes": "INVENTORY UNVERIFIED — reconstructed from calls recorded in earlier session logs, not from the server's own tools/list. The server is remote (https://xquik.com/mcp) and enumerating it needs XQUIK_API_KEY, so this entry may be INCOMPLETE. An unlisted tool here is exactly the gap F-27 exists to catch, so treat a surprise tool name as a finding, not as a registry bug. Description inferred from the tool NAME and its presence alongside xquik__xquik — no recorded call to verify it against."
-        }
-      ],
-      "package": "mcp-remote@latest"
     }
   },
   "external_user_dependencies": {

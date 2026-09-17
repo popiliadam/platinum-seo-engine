@@ -59,8 +59,11 @@ MCP_JSON = REPO_ROOT / ".mcp.json"
 # for refresh-audit. The tripwire held the change red until both servers were
 # registered and F-24 returned to PASS; moving it before that would have been
 # the drift it exists to catch.
-MCP_JSON_MD5_BASELINE = "1dad329fe471a5de7336850943db2ccd"
-MCP_JSON_BYTES_BASELINE = 982
+# Moved 1dad329fe471a5de7336850943db2ccd -> dae4375cb24c3df51a581d54478cf6cd (982B -> 753B)
+# on 2026-09-17 when xquik was removed by operator decision (no skill used it);
+# its mcp-tool-registry.json entry was removed in the same change.
+MCP_JSON_MD5_BASELINE = "dae4375cb24c3df51a581d54478cf6cd"
+MCP_JSON_BYTES_BASELINE = 753
 
 
 def _parse_frontmatter(skill_path: Path) -> dict:

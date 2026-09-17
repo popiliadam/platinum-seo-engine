@@ -85,8 +85,9 @@ jobs:
         env:
           CLIENT_SLUG_PATTERN: ${{ secrets.CLIENT_SLUG_PATTERN }}
         run: |
-          # .mcp.json 4 server invariant (gsc + dataforseo + ScraplingServer + sf; v1.8 ADR-039)
-          test "$(jq '.mcpServers | keys | length' .mcp.json)" = "4"
+          # .mcp.json 5 server invariant (gsc + dataforseo + ScraplingServer + sf, v1.8 ADR-039;
+          # + adstark for refresh-audit). xquik removed 2026-09-17.
+          test "$(jq '.mcpServers | keys | length' .mcp.json)" = "5"
           # Repo-wide client-slug grep (pattern from repo secret; -I skips binaries)
           if [ -n "$CLIENT_SLUG_PATTERN" ]; then
             ! grep -rIEn "$CLIENT_SLUG_PATTERN" . --exclude-dir=.git
