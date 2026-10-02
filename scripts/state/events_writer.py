@@ -92,8 +92,11 @@ _DEFAULT_SCHEMA_PATH = _REPO_ROOT / "schemas" / "events.schema.json"
 # canonical full-scan — which does NOT exclude this module — stays GREEN on it.
 _SECRET_VALUE_PATTERNS: tuple[re.Pattern[str], ...] = (
     # openai / anthropic            [openai_or_anthropic_sk_prefix]
-    re.compile(r"sk-(?:proj-)?[A-Za-z0-9_\-]{20,}"),
-    re.compile(r"sk-ant-[A-Za-z0-9_\-]{20,}"),
+    #   (?<![A-Za-z0-9]): `sk-` must START a token — inside a word (`task-…`,
+    #   `disk-…`) it is not a key prefix; without this a long `task-mts-…` CRM
+    #   id was persisted as `ta***REDACTED***` (2026-10-02).
+    re.compile(r"(?<![A-Za-z0-9])sk-(?:proj-)?[A-Za-z0-9_\-]{20,}"),
+    re.compile(r"(?<![A-Za-z0-9])sk-ant-[A-Za-z0-9_\-]{20,}"),
     # google api key                [google_api_key_AIza]
     re.compile(r"AIza[0-9A-Za-z_\-]{35}"),
     # slack token                   [slack_token_xox]

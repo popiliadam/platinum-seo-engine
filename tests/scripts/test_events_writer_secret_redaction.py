@@ -158,3 +158,46 @@ def test_canonical_scanner_flags_class(label: str) -> None:
         f"malformed):\n{proc.stdout}\n{proc.stderr}"
     )
     assert secret not in proc.stdout, "scanner must never echo matched content"
+
+
+# ---------------------------------------------------------------------------
+# 4) Word-boundary — ``sk-`` INSIDE a word is not a key prefix.
+#    2026-10-02: two rows whose ``crm_task_id`` was a long ``task-mts-…`` CRM id
+#    were persisted as ``ta***REDACTED***`` — the ``sk-`` pattern matched the
+#    tail of ``task-``. Every normal write carrying such an id was corrupted.
+#    Fragments are concatenated so no contiguous watched token sits in this file.
+# ---------------------------------------------------------------------------
+
+_SK = "sk" + "-"
+_TAIL = "0123456789abcdefghijKLMNOPqrst"
+
+
+@pytest.mark.parametrize("value", [
+    "ta" + _SK + "mts-" + _TAIL,          # task-mts-<long id>  (the observed bug)
+    "ta" + _SK + _TAIL,                   # task-<long id>
+    "ta" + _SK + "ant-" + _TAIL,          # task-ant-<long id>  (sk-ant- variant)
+    "di" + _SK + _TAIL,                   # disk-<long id>
+    "ri" + _SK + "proj-" + _TAIL,         # risk-proj-<long id> (sk-proj- variant)
+])
+def test_sk_inside_a_word_is_not_redacted(value: str) -> None:
+    assert events_writer._redact_value(value) == value
+
+
+def test_crm_task_id_survives_a_real_write(tmp_path: Path) -> None:
+    crm_id = "ta" + _SK + "mts-" + _TAIL
+    assert events_writer._redact_recursive({"crm_task_id": crm_id}) == {"crm_task_id": crm_id}
+    persisted = _persist_note(tmp_path, crm_id)
+    assert crm_id in persisted, f"CRM id was mangled on write: {persisted!r}"
+    assert events_writer._REDACTED not in persisted
+
+
+@pytest.mark.parametrize("secret", [
+    _SK + _TAIL,
+    _SK + "proj-" + _TAIL,
+    _SK + "ant-" + _TAIL,
+])
+@pytest.mark.parametrize("prefix", ["", " ", "=", '"', "'", ":", "(", "\n", "_"])
+def test_standalone_sk_keys_are_still_redacted(secret: str, prefix: str) -> None:
+    out = events_writer._redact_value(f"{prefix}{secret} end")
+    assert secret not in out
+    assert out == f"{prefix}{events_writer._REDACTED} end"
