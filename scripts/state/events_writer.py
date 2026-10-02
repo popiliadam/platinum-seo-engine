@@ -330,6 +330,25 @@ def _redact_recursive(obj: Any) -> Any:
     return _redact_value(obj)
 
 
+def _resolve_schema_path(schema_path: Path | None) -> Path:
+    """The schema to validate against; a foreign one only inside a pytest run.
+
+    ``schema_path`` exists so tests can validate against fixture schemas. Outside
+    pytest it is refused unless it IS the repo schema: on 2026-08-20 a loosened
+    copy passed through this parameter let 11 off-schema rows into a live ledger.
+    """
+    if schema_path is None:
+        return _DEFAULT_SCHEMA_PATH
+    if os.environ.get("PYTEST_CURRENT_TEST"):
+        return Path(schema_path)
+    if Path(schema_path).resolve() == _DEFAULT_SCHEMA_PATH.resolve():
+        return _DEFAULT_SCHEMA_PATH
+    raise EventValidationError(
+        f"schema_path override is test-only (got {schema_path}); events are "
+        f"validated against {_DEFAULT_SCHEMA_PATH} outside pytest"
+    )
+
+
 def _validate_event(event: dict, schema_path: Path) -> None:
     """Draft7 validation. Raises EventValidationError aggregating all errors."""
     try:
@@ -554,7 +573,9 @@ def append_event(
         project_id: Project slug (matches projects/{slug}/ + project-config).
         workspace_root: Override env PSEO_WORKSPACE_ROOT. None → env or fail.
         redact: If True (default), apply secret redaction recursively.
-        schema_path: Override events.schema.json location (test-only).
+        schema_path: Override events.schema.json location (test-only:
+            outside pytest anything but the repo schema raises
+            EventValidationError before the ledger is touched).
 
     Returns:
         EventResult(event_id, path, bytes_written).
@@ -562,7 +583,7 @@ def append_event(
     if not isinstance(event, dict):
         raise EventValidationError(f"event must be a dict, got {type(event).__name__}")
 
-    schema_p = schema_path or _DEFAULT_SCHEMA_PATH
+    schema_p = _resolve_schema_path(schema_path)
 
     # 1. Envelope auto-populate.
     populated = _populate_envelope(event, project_id)
