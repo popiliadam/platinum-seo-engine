@@ -77,6 +77,11 @@ from scripts.state.session_binding import (  # noqa: E402
 
 _MCP_SUBMIT_TOOL = "mcp__gsc__submit_sitemap"
 
+# The approval command as the harness REGISTERS it: a plugin command is only
+# reachable under its namespaced name (`<plugin.json name>:<command file stem>`).
+# The bare `/pseo-approve` the hint used to print answered "Unknown command".
+_APPROVE_COMMAND = "/platinum-seo-engine:pseo-approve"
+
 # The SAME server is exposed under two different tool names depending on how it
 # resolves: `mcp__gsc__submit_sitemap` directly, and
 # `mcp__plugin_platinum-seo-engine_gsc__submit_sitemap` through the plugin. Both
@@ -178,6 +183,93 @@ _SEGMENT_SEP_RE = re.compile(r"&&|\|\||;|\n|\|")
 # ---------------------------------------------------------------------------
 # PURE classification (no IO; the heart, fully unit-tested)
 # ---------------------------------------------------------------------------
+
+# An UNQUOTED shell redirection operator, with its optional fd / `&` prefix.
+# Longest operators first so `>>` / `>&` win over `>`.
+_REDIR_OP_RE = re.compile(r"(?:\d+|&)?(?:>>|>&|>\||<<<|<<-|<<|<>|<&|>|<)")
+
+
+def _is_span_start(s: str, i: int) -> bool:
+    """A quote, a backtick, ``$(``/``${`` or a process substitution ``<(``/``>(``."""
+    nxt = s[i + 1:i + 2]
+    return s[i] in "'\"`" or (s[i] == "$" and nxt in ("(", "{")) or (
+        s[i] in "<>" and nxt == "(")
+
+
+def _span_end(s: str, i: int) -> int:
+    """End index of the span opened at ``s[i]`` (see _is_span_start). Its content
+    is copied verbatim — a ``<``/``>`` inside it is NOT a redirection.
+    Unterminated -> end of string."""
+    n = len(s)
+    if s[i] == "'":
+        j = s.find("'", i + 1)
+        return n if j < 0 else j + 1
+    if s[i] in '"`':
+        j = i + 1
+        while j < n and s[j] != s[i]:
+            j += 2 if s[j] == "\\" else 1
+        return min(j + 1, n)
+    opener = s[i + 1]
+    closer = ")" if opener == "(" else "}"
+    depth, j = 0, i + 1
+    while j < n:
+        if _is_span_start(s, j) and s[j] not in "<>$":
+            j = _span_end(s, j)
+            continue
+        if s[j] == opener:
+            depth += 1
+        elif s[j] == closer:
+            depth -= 1
+            if depth == 0:
+                return j + 1
+        j += 1
+    return n
+
+
+def _strip_redirections(segment: str) -> str:
+    """Remove UNQUOTED redirections (``2>&1``, ``>/dev/null``, ``< in``, ``&>f``…)
+    and their operand word — exactly what the shell removes before building argv.
+
+    A redirection is never an argument of the command (``rm a 2>/dev/null``
+    deletes only ``a``), so keeping it in the target made the consent the operator
+    gave for the real object (``origin main``) unmatchable on the re-run
+    (``origin main 2>&1``). Quoted / escaped / expansion-embedded ``<`` ``>`` are
+    filenames or code, NOT operators, and are copied verbatim: ``rm a ">" b``
+    keeps ``a > b``, so a consent for ``a`` can never cover deleting ``b``.
+    """
+    out: list[str] = []
+    i, n = 0, len(segment)
+    word_start = True
+    while i < n:
+        c = segment[i]
+        if _is_span_start(segment, i):
+            j = _span_end(segment, i)
+            out.append(segment[i:j])
+            i, word_start = j, False
+            continue
+        if c == "\\":
+            out.append(segment[i:i + 2])
+            i, word_start = i + 2, False
+            continue
+        is_op_char = c in "<>" or (c == "&" and segment[i + 1:i + 2] == ">")
+        m = _REDIR_OP_RE.match(segment, i) if (word_start or is_op_char) else None
+        if m is None:
+            out.append(c)
+            word_start = c in " \t"
+            i += 1
+            continue
+        i = m.end()
+        while i < n and segment[i] in " \t":
+            i += 1
+        while i < n and segment[i] not in " \t<>":  # the operand word
+            if _is_span_start(segment, i):
+                i = _span_end(segment, i)
+            else:
+                i += 2 if segment[i] == "\\" else 1
+        out.append(" ")
+        word_start = True
+    return "".join(out)
+
 
 def _tokenize(command: str) -> list[str]:
     """shlex-split (strips quotes) with a str.split fallback on malformed quoting."""
@@ -363,7 +455,9 @@ def _classify_segment(segment: str) -> tuple[str, str] | None:
         (recognised even behind git global flags, e.g. `git -C <path> push`).
       * net_post / index_update -> the request URL.
     """
-    tokens = _unwrap_wrappers(_tokenize(segment))  # peel sudo/env/... wrappers (#10)
+    # Redirections are not argv: drop them before deriving the target, then peel
+    # sudo/env/... wrappers (#10).
+    tokens = _unwrap_wrappers(_tokenize(_strip_redirections(segment)))
     if not tokens:
         return None
     first = tokens[0].rsplit("/", 1)[-1]  # strip any leading path (mirror events_writer)
@@ -535,9 +629,13 @@ def evaluate(
         return (0, [])  # consented THIS session -> ALLOW
 
     run_label = "sess-" + (session_id[:8] if session_id else "unknown")
+    # The target is shell-quoted (single quotes) because the command text-substitutes
+    # it into a shell block: inside "…" a `$T` would expand and a `"` would split it,
+    # so the recorded hash would no longer be the one the gate checks.
     messages = [
         f"BLOCKED: {action} → {target}  (bu oturumda onay yok)",
-        f'İzin vermek için çalıştır:  /pseo-approve {run_label} {action} "{target}"',
+        f"İzin vermek için Claude sohbetine yaz (terminale değil):  "
+        f"{_APPROVE_COMMAND} {run_label} {action} {shlex.quote(target)}",
     ]
     if consent_error:
         messages.append(

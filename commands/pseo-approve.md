@@ -6,6 +6,7 @@ description: |
 argument-hint: "<run_id> <action> <target>"
 allowed-tools: Bash(python3:*), Bash(ls:*), Read
 model: sonnet
+disable-model-invocation: true
 ---
 
 # /pseo-approve — Bir Aksiyona Operatör Onayı Ver
@@ -29,7 +30,7 @@ Bu komut aksiyonu **çalıştırmaz** — sadece izni KAYDEDER. Gate (batch 2b) 
 
 `$1` run_id, `$2` action, `$3` target ZORUNLU. Eksikse DURDUR ve kullanımı göster:
 
-!`set -- $ARGUMENTS; if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then echo "MISSING_ARGS: usage /pseo-approve <run_id> <action> <target>"; echo "action ∈ {git_push, fs_delete, net_post, mcp_submit, index_update, dfs_oversized}"; echo "örnek: /pseo-approve demo-furniture-2026-06-06-ab12 index_update https://demo-furniture.example/sitemap.xml"; fi`
+!`set -- $ARGUMENTS; if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then echo "MISSING_ARGS: usage /platinum-seo-engine:pseo-approve <run_id> <action> <target>"; echo "action ∈ {git_push, fs_delete, net_post, mcp_submit, index_update, dfs_oversized}"; echo "örnek: /platinum-seo-engine:pseo-approve demo-furniture-2026-06-06-ab12 index_update https://demo-furniture.example/sitemap.xml"; fi`
 
 ## 3. Onay komutunu çalıştır
 
