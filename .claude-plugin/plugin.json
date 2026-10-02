@@ -1,6 +1,6 @@
 {
   "name": "platinum-seo-engine",
-  "version": "2.1.3",
+  "version": "2.1.4",
   "description": "SEO operasyonunu VS Code + Claude Code \u00fczerinden y\u00f6neten plugin sistemi \u2014 schema-locked, Excel+JSONL state, drift-checked, 50 skill, 30 slash command, 6 hook, 5 MCP server.",
   "author": {
     "name": "Suleyman Capar",

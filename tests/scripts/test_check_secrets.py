@@ -219,3 +219,84 @@ def test_secrets_management_documents_base64_boundary() -> None:
     assert ("padding" in low) or ("padded" in low), (
         "must document the '=' padding precision anchor / recall boundary"
     )
+
+
+# ---------------------------------------------------------------------------
+# sk- left boundary (v2.1.4) — `sk-` INSIDE a word is not a key prefix.
+#   v2.1.3 taught the event redactor (scripts/state/events_writer.py) this; the
+#   canonical scanner kept a bare `sk-` pattern, so any write carrying a
+#   `task-<20+ alnum>` id tripped openai_or_anthropic_sk_prefix (rc=1) and the
+#   PreToolUse hook blocked it. Same root cause, same fix: `sk-` must not be
+#   preceded by a letter or digit.
+#   Recall must not drop: standalone keys after line start / space / tab /
+#   quote / `=` / `:` / `(` / `_` / `/`, after a JSON-escaped `\n`/`\t`, or
+#   after a URL-encoded byte (`%3D`) are still caught — and the sk-proj- /
+#   sk-ant- shapes (whose body carries `-`/`_`) are caught too, matching the
+#   redactor's mirror (before v2.1.4 the scanner missed both shapes entirely).
+#   Fragments are concatenated at runtime; no contiguous token lands on disk.
+# ---------------------------------------------------------------------------
+import pytest  # noqa: E402
+
+_SK = "sk" + "-"
+_TAIL = "0123456789abcdefghijKLMNOPqrst"   # 30 alnum
+_BODY = "AbC_dEf-" + _TAIL                  # proj/ant body: carries `_` and `-`
+_SK_LABEL = "openai_or_anthropic_sk_prefix"
+
+_IN_WORD = [
+    "ta" + _SK + _TAIL,                      # task-<id>       (the observed block)
+    "Ta" + _SK + _TAIL.upper(),              # TASK-ish, upper-case id
+    "di" + _SK + _TAIL,                      # disk-<id>
+    "ri" + _SK + _TAIL,                      # risk-<id>
+    "ta" + _SK + "mts-" + _TAIL,             # task-mts-<id>   (CRM id shape)
+    "ta" + _SK + "proj-" + _BODY,            # task-proj-<id>
+    "ri" + _SK + "ant-" + _BODY,             # risk-ant-<id>
+    "9" + _SK + _TAIL,                       # digit before sk-
+]
+
+_KEYS = [
+    _SK + _TAIL,                             # sk-<alnum>
+    _SK + "proj-" + _BODY,                   # sk-proj-<body>
+    _SK + "ant-api03-" + _BODY,              # sk-ant-api03-<body>
+]
+
+_KEY_CONTEXTS = ["{k}", " {k}", "\t{k}", "x\n{k}", "KEY={k}", 'k="{k}"',
+                 "k='{k}'", "key: {k}", "f({k})", "OPENAI_{k}", "/{k}",
+                 "a\\n{k}", "a\\t{k}", "q=a%3D{k}"]
+
+
+@pytest.mark.parametrize("value", _IN_WORD, ids=lambda v: f"inword{_IN_WORD.index(v)}")
+def test_scan_stdin_sk_inside_a_word_is_not_flagged(value: str) -> None:
+    result = _run_scan_stdin(f"crm_task_id: {value}\nrun {value} now\n")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert _SK_LABEL not in result.stdout
+
+
+@pytest.mark.parametrize("key", _KEYS, ids=["sk", "sk_proj", "sk_ant"])
+@pytest.mark.parametrize("ctx", _KEY_CONTEXTS, ids=lambda c: f"ctx{_KEY_CONTEXTS.index(c)}")
+def test_scan_stdin_standalone_sk_keys_still_flagged(key: str, ctx: str) -> None:
+    result = _run_scan_stdin(ctx.format(k=key) + " end\n")
+    assert result.returncode == 1, (ctx, result.stdout + result.stderr)
+    assert _SK_LABEL in result.stdout
+    assert key not in result.stdout and key not in result.stderr
+
+
+def test_scan_stdin_task_id_next_to_a_real_key_still_flagged() -> None:
+    """A benign in-word id on the same line must not mask a real key."""
+    line = f"ta{_SK}{_TAIL} OPENAI_KEY={_SK}{_TAIL}\n"
+    result = _run_scan_stdin(line)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert _SK_LABEL in result.stdout
+
+
+def test_full_mode_ignores_in_word_sk_but_flags_key(tmp_path: Path) -> None:
+    """Full-tree mode (CI step 6 path) uses the same pattern: an in-word id file
+    is clean, a key file is RED."""
+    (tmp_path / "ids.txt").write_text("\n".join(_IN_WORD) + "\n", encoding="utf-8")
+    clean = subprocess.run(["bash", str(SCRIPT), str(tmp_path)],
+                           capture_output=True, text=True, timeout=30)
+    assert clean.returncode == 0, clean.stdout + clean.stderr
+    (tmp_path / "cfg.env.txt").write_text(f"OPENAI_KEY={_KEYS[1]}\n", encoding="utf-8")
+    dirty = subprocess.run(["bash", str(SCRIPT), str(tmp_path)],
+                           capture_output=True, text=True, timeout=30)
+    assert dirty.returncode == 1, dirty.stdout + dirty.stderr
+    assert _SK_LABEL in dirty.stdout

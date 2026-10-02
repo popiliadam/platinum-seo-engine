@@ -69,8 +69,16 @@ EXIT=0
 PATTERNS=(
   # Google API key (39 chars, AIza prefix)
   "AIza[0-9A-Za-z_-]{35}"
-  # OpenAI / Anthropic-style keys
-  "sk-[A-Za-z0-9]{20,}"
+  # OpenAI / Anthropic-style keys (sk-, sk-proj-, sk-ant-)
+  #   Left boundary (v2.1.4, same root cause as events_writer v2.1.3): `sk-`
+  #   must START a token — inside a word (`task-…`, `disk-…`, `risk-…`) it is
+  #   not a key prefix, and a bare `sk-` blocked every write carrying a
+  #   `task-<20+ alnum>` id. ERE has no lookbehind, so the boundary is the
+  #   `(^|[^A-Za-z0-9]|…)` alternation; JSON-escaped `\n`/`\r`/`\t` and a
+  #   URL-encoded byte (`%3D`) also count as a boundary so recall does not drop
+  #   on escaped/encoded text. sk-proj-/sk-ant- bodies carry `-`/`_`, so they
+  #   get their own branch (the bare-alnum branch never matched them).
+  "(^|[^A-Za-z0-9]|\\\\[nrt]|%[0-9A-Fa-f]{2})sk-([A-Za-z0-9]{20,}|(proj|ant)-[A-Za-z0-9_-]{20,})"
   # Google Service Account JSON private key marker
   "\"private_key\":\\s*\"-----BEGIN"
   # Generic PEM private keys
