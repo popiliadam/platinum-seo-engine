@@ -77,6 +77,8 @@ Bu karar geri alınabilir: 97'lik küme ölçülmüş ve listelenebilir durumda.
 Kararı değiştirirsen yeniden adlandırma `scripts/excel/transaction.py`
 üzerinden yapılmalı ve pin'ler aynı commit'te indirilmelidir.
 
+- 2026-10-02 — sahip kararı değişti: 2026-08-20 yeniden adlandırması kalıcı; pin 54→0.
+
 Kontrol bu yüzden bir **cırcır (ratchet)**: mevcut borç proje başına sayı
 olarak sabitlendi; sayı BÜYÜRSE kapı kırmızıya gider. Küçülürse de kırmızıya
 gider — pin bilerek, düzeltmeyle birlikte indirilsin diye. Şemayı diskteki

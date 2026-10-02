@@ -42,7 +42,7 @@ _LEGACY_W3W2B = re.compile(r"^MT-W[0-9]+W[0-9]+[A-Z]?-[0-9]+$")
 # Lower a number when the ids are actually fixed; never raise one to make the
 # suite green — a rise is new drift and is exactly what this gate exists for.
 KNOWN_DRIFT: dict[str, int] = {
-    "bayder": 54,        # MT-NNN
+    "bayder": 0,         # MT-NNN renamed 2026-08-20; owner made it permanent 2026-10-02
     "bigcat-tr": 5,      # QW-NNN
     "dentnotion": 64,    # T-NNN-NN, T-AAA-AAA-NN, MT-FIYAT-NN (19 of them)
     "katrenur-tr": 1,    # T-0026-V
