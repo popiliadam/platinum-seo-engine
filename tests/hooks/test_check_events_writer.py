@@ -194,3 +194,151 @@ def test_hook_exits_2_and_explains_on_a_direct_write():
 def test_hook_exits_0_on_a_read():
     proc = _run(_bash(f"cat {LEDGER}"))
     assert proc.returncode == 0
+
+
+# ===========================================================================
+# classify() — Python writing the ledger directly (2026-10-02 diagnosis)
+#
+# Between 2026-08-08 and 08-24, 31 off-schema rows reached live ledgers through
+# inline Python — a heredoc or `-c` that open()s the ledger in append mode —
+# a shape the redirect/tee/sed/cp checks above never look at. Each case below
+# reproduces one of the measured forms with a demo slug.
+# ===========================================================================
+
+DEMO = "/ws/projects/demo-acme/_state/events.jsonl"
+DEMO_DIR = "/ws/projects/demo-acme"
+
+
+def _hit(command: str) -> str | None:
+    return guard.classify("Bash", {"command": command})
+
+
+@pytest.mark.parametrize("command", [
+    # heredoc, absolute literal bound to a name, then `with open(P,'a') as f: f.write`
+    "python3 - <<'PY'\n"
+    "import json, uuid\n"
+    f"P='{DEMO}'\n"
+    "ev={'event_kind':'provenance','event_id':uuid.uuid4().hex}\n"
+    "with open(P,'a') as f: f.write(json.dumps(ev,ensure_ascii=False)+\"\\n\")\n"
+    "PY",
+    # heredoc, RELATIVE literal after a cd
+    f"cd {DEMO_DIR}\n"
+    "python3 - <<'PY'\n"
+    "import json\n"
+    "ev={'event_kind':'provenance'}\n"
+    "with open('_state/events.jsonl','a') as f: f.write(json.dumps(ev)+\"\\n\")\n"
+    "PY",
+    # unquoted delimiter + env prefix (shell expands $P inside the body)
+    f"P={DEMO_DIR}\n"
+    "PYTHONPATH=/engine python3 - <<PYEOF\n"
+    "import json\n"
+    "open('$P/_state/events.jsonl', mode='a', encoding='utf-8').write('{}\\n')\n"
+    "PYEOF",
+    # f-string path
+    "python3 - <<'PY'\n"
+    f"P='{DEMO_DIR}'\n"
+    "with open(f\"{P}/_state/events.jsonl\", \"a\", encoding=\"utf-8\") as f:\n"
+    "    f.write('{}\\n')\n"
+    "PY",
+    # Path(...).open('a')
+    "python3 - <<'PY'\n"
+    "from pathlib import Path\n"
+    f"Path('{DEMO}').open('a').write('{{}}\\n')\n"
+    "PY",
+    # pathlib division built from parts
+    "python3 - <<'PY'\n"
+    "from pathlib import Path\n"
+    "ws = Path('/ws')\n"
+    "ledger = ws / 'projects' / 'demo-acme' / '_state' / 'events.jsonl'\n"
+    "with ledger.open(mode='a') as fh:\n"
+    "    fh.write('{}\\n')\n"
+    "PY",
+    # os.path.join
+    "python3 - <<'PY'\n"
+    "import os\n"
+    f"P='{DEMO_DIR}'\n"
+    "open(os.path.join(P, '_state', 'events.jsonl'), 'a').write('{}\\n')\n"
+    "PY",
+    # overwrite rather than append is a write too
+    "python3 - <<'PY'\n"
+    f"open('{DEMO}', 'w').write('')\n"
+    "PY",
+    # write_text replaces the whole ledger
+    "python3 - <<'PY'\n"
+    "from pathlib import Path\n"
+    "Path('_state/events.jsonl').write_text('')\n"
+    "PY",
+    # `-c`, absolute
+    f"python3 -c \"open('{DEMO}','a').write('{{}}\\n')\"",
+    # `-c`, relative, in a later shell segment
+    f"cd {DEMO_DIR} && python3 -c \"import json; open('_state/events.jsonl','a').write(json.dumps({{}}))\"",
+    # `-c` with single quotes around the code
+    f"python -c 'with open(\"{DEMO}\", \"a\") as f: f.write(\"x\")'",
+])
+def test_inline_python_writing_the_ledger_is_caught(command):
+    hit = _hit(command)
+    assert hit is not None
+    assert hit.endswith("events.jsonl")
+
+
+@pytest.mark.parametrize("command", [
+    # reading: open() with no mode, 'r', 'rb', json.loads per line
+    "python3 - <<'PY'\n"
+    "import json\n"
+    f"P='{DEMO}'\n"
+    "rows=[json.loads(l) for l in open(P)]\n"
+    "print(len(rows))\n"
+    "PY",
+    f"python3 -c \"import json; print(sum(1 for _ in open('{DEMO}', 'r')))\"",
+    f"python3 -c \"print(len(open('{DEMO}', 'rb').read()))\"",
+    "python3 - <<'PY'\n"
+    "from pathlib import Path\n"
+    f"print(Path('{DEMO}').read_text().count('\\n'))\n"
+    f"with Path('{DEMO}').open(encoding='utf-8') as fh:\n"
+    "    print(fh.readline())\n"
+    "PY",
+    # read the ledger, write an UNRELATED file
+    "python3 - <<'PY'\n"
+    "import json\n"
+    f"line=open('{DEMO}').readlines()[-1]\n"
+    "json.dump(json.loads(line), open('/tmp/ev.json','w'))\n"
+    "PY",
+    # the sanctioned writer, plus an append to a different _state file
+    "PYTHONPATH=/engine python3 - <<'PYEOF'\n"
+    "import json\n"
+    "from pathlib import Path\n"
+    "from scripts.state.events_writer import append_provenance\n"
+    f"P=Path('{DEMO_DIR}')\n"
+    "m=P/'_state/metrics/refresh-audit.jsonl'\n"
+    "with open(m,'a',encoding='utf-8') as f: f.write(json.dumps({'run_id':1})+'\\n')\n"
+    "append_provenance(project_id='demo-acme', run_id=1, source={'kind':'tool_computed'},\n"
+    "                  operation='validate', workspace_root=Path('/ws'))\n"
+    "PYEOF",
+    # two `-c` programs in a row: the first READS the ledger, the `;` right after
+    # its closing quote must not glue onto the code (replay false positive)
+    f"cd {DEMO_DIR} && python3 -c \"\nimport json\n"
+    "ls=[json.loads(l) for l in open('_state/events.jsonl') if l.strip()]\n"
+    "json.dump(ls, open('_state/staging/link.json','w'))\n"
+    "\"; python3 -c \"print('ok')\"",
+    # running the test suite
+    "PSEO_WORKSPACE_ROOT=/ws python3 -m pytest -p no:cacheprovider tests/state -q",
+    # the migration's own archives are not the live ledger
+    f"python3 -c \"open('{DEMO}.legacy','a').write('x')\"",
+    f"python3 -c \"open('{DEMO}.bak','w').write('x')\"",
+    "python3 - <<'PY'\n"
+    f"open('{DEMO_DIR}/_state/archive/events-2026-08.jsonl','a').write('x')\n"
+    f"open('{DEMO_DIR}/archive/events.jsonl','a').write('x')\n"
+    "PY",
+    # a non-Python heredoc that merely QUOTES ledger-writing code (a doc/note)
+    "cat > /tmp/notes.md <<'MD'\n"
+    "never do: with open('_state/events.jsonl','a') as f: f.write(x)\n"
+    "MD",
+])
+def test_inline_python_that_does_not_write_the_ledger_is_allowed(command):
+    assert _hit(command) is None
+
+
+def test_inline_python_write_is_denied_by_the_hook():
+    proc = _run(_bash(f"python3 -c \"open('{DEMO}','a').write('x')\""))
+    assert proc.returncode == 2
+    assert "events_writer" in proc.stderr
