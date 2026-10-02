@@ -424,8 +424,13 @@ def test_evaluate_no_consent_emits_copy_paste_approve_line(bound_ws: Path) -> No
     assert len(msgs) == 2
     assert msgs[0].startswith("BLOCKED: git_push → origin main")
     assert "(bu oturumda onay yok)" in msgs[0]
-    # the operator copies THIS exact line — same action + target the gate hashed.
-    assert f'/pseo-approve sess-{SID8} git_push "origin main"' in msgs[1]
+    # the operator copies THIS exact line — same action + target the gate hashed,
+    # under the NAMESPACED command name (bare /pseo-approve is "Unknown command")
+    # and single-quoted (see test_pseo_approve_roundtrip.py).
+    assert (
+        f"/platinum-seo-engine:pseo-approve sess-{SID8} git_push 'origin main'"
+        in msgs[1]
+    )
 
 
 def test_evaluate_tampered_chain_is_denied(bound_ws: Path) -> None:
@@ -536,7 +541,7 @@ def test_main_gated_no_consent_exits_2_with_fix(tmp_path: Path) -> None:
     })
     proc = _run_gate(payload, {"HOME": str(tmp_path / "home")})
     assert proc.returncode == 2, proc.stderr
-    assert "/pseo-approve" in proc.stderr
+    assert "/platinum-seo-engine:pseo-approve" in proc.stderr
     assert "git_push" in proc.stderr
 
 

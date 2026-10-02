@@ -477,6 +477,17 @@ def _cmd_approve(
         return 2
     # 3. Slug bound to THIS session (marker -> shared/active.json -> raise).
     session_id = session_binding.current_session_id()
+    if not session_id:
+        # The gate matches consent per session (has_session_consent); an entry
+        # without one can never authorise anything, so writing it would print
+        # "consent recorded" for a consent that does not work.
+        print(
+            "error: no session id ($CLAUDE_CODE_SESSION_ID unset) — a consent "
+            "without a session can never satisfy the gate. Type the approval in "
+            "the Claude chat (/platinum-seo-engine:pseo-approve …), not a terminal.",
+            file=sys.stderr,
+        )
+        return 6
     try:
         slug = session_binding.resolve_session_project(
             ws, session_id=session_id, strict=True

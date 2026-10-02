@@ -162,6 +162,9 @@ def test_real_approve_block_preserves_quoted_target_under_textsub(tmp_path: Path
         "HOME": str(home),
         "PSEO_WORKSPACE_ROOT": str(ws),
         "CLAUDE_PLUGIN_ROOT": str(_ROOT),
+        # The block runs inside a Claude session, which always exports this; a
+        # session-less approve is refused (the gate could never match it).
+        "CLAUDE_CODE_SESSION_ID": "sess-textsub",
     }
     target = "/tmp/My Dir/sitemap.xml"  # < 48 chars → shown verbatim in banner
     src = block.replace("$ARGUMENTS", f'r1 git_push "{target}"')
