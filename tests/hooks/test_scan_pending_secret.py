@@ -273,3 +273,41 @@ def test_matcher_covers_pending_write_tools() -> None:
     assert matcher is not None, "no PreToolUse block runs scan_pending_secret.py"
     for tool in ("Write", "Edit", "NotebookEdit", "Bash"):
         assert tool in matcher, f"matcher {matcher!r} does not cover {tool}"
+
+
+# ---------------------------------------------------------------------------
+# v2.1.4 — `sk-` INSIDE a word (`task-<20+ alnum>`) is not a key prefix.
+#   The canonical scanner flagged it, so this hook blocked a release agent's
+#   write-shaped Bash command carrying a task id. Same root cause as the v2.1.3
+#   event-redactor fix. Fragments are concatenated; nothing contiguous on disk.
+# ---------------------------------------------------------------------------
+_SK = "sk" + "-"
+_ID_TAIL = "0123456789abcdefghijKLMNOPqrst"
+
+
+def test_bash_heredoc_with_task_id_allows(tmp_path: Path) -> None:
+    task_id = "ta" + _SK + _ID_TAIL
+    cmd = f"cat > notes.md <<EOF\ncrm_task_id: {task_id}\nEOF"
+    proc = _run_hook({"tool_name": "Bash", "tool_input": {"command": cmd}}, cwd=str(tmp_path))
+    assert proc.returncode == 0, f"task id must not block; stdout={proc.stdout!r}"
+
+
+def test_write_with_task_id_allows(tmp_path: Path) -> None:
+    task_id = "ta" + _SK + _ID_TAIL
+    payload = {"tool_name": "Write",
+               "tool_input": {"file_path": str(tmp_path / "notes.md"),
+                              "content": f"crm_task_id: {task_id}\n"}}
+    proc = _run_hook(payload, cwd=str(tmp_path))
+    assert proc.returncode == 0, f"task id must not block; stdout={proc.stdout!r}"
+
+
+@pytest.mark.parametrize("key", [
+    _SK + _ID_TAIL,
+    _SK + "proj-" + "AbC_dEf-" + _ID_TAIL,
+    _SK + "ant-api03-" + "AbC_dEf-" + _ID_TAIL,
+], ids=["sk", "sk_proj", "sk_ant"])
+def test_bash_heredoc_with_standalone_key_still_blocks(tmp_path: Path, key: str) -> None:
+    cmd = f"cat > .cfg <<EOF\nOPENAI_API_KEY={key}\nEOF"
+    proc = _run_hook({"tool_name": "Bash", "tool_input": {"command": cmd}}, cwd=str(tmp_path))
+    assert proc.returncode == 2, f"expected BLOCK; stdout={proc.stdout!r}"
+    assert key not in proc.stdout and key not in proc.stderr
