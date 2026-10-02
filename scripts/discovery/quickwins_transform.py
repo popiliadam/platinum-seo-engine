@@ -149,6 +149,7 @@ def expected_uplift_clicks(
     clicks: float | None,
     curve: "_ctr_curve.Curve",
     aio_presence: str = "unchecked",
+    absolute_position: float | None = None,
 ) -> int:
     """Expected 28-day click gain from moving a quick-win onto page 1.
 
@@ -171,6 +172,20 @@ def expected_uplift_clicks(
         pos = float(position)
     except (TypeError, ValueError):
         return 0
+    # T-10690: prefer ABSOLUTE SERP rank over the GSC organic position when it
+    # is known. GSC reports rank among organic links only; AIO / PAA / video
+    # blocks push the real on-screen slot further down, so an "organic 7" can be
+    # absolute 12. The CTR curve models what a user actually sees, so feeding it
+    # the organic rank systematically overstates upside. Unknown (None) keeps
+    # the previous organic-rank behaviour — never a penalty for missing data
+    # (R-140 honesty).
+    if absolute_position is not None:
+        try:
+            abs_pos = float(absolute_position)
+            if abs_pos > 0:
+                pos = max(pos, abs_pos)
+        except (TypeError, ValueError):
+            pass
     target = min(10.0, max(5.0, pos - 5.0))
     ctr_t = curve.expected_ctr(target) * curve.aio_factor(target, aio_presence)
     try:
@@ -335,24 +350,30 @@ def _action_text(position: float) -> str:
     return "Expand content depth + add FAQ schema"
 
 
-def _row_pct(ctr: float | None) -> float:
+def _row_pct(clicks: int | None, impressions: int | None) -> float:
     """
-    Convert GSC ctr (0-1 fractional) → integer-friendly percentage.
+    Derive CTR percentage from clicks/impressions — the only unambiguous source.
 
-    GSC quick-wins responses sometimes return CTR as a percent already
-    (e.g. 0.63 == 0.63%). enhanced_search_analytics returns 0-1
-    fractional. Heuristic: if value <= 1.0 treat as fractional; else as
-    already-percent. Rounded to 4 decimals to keep the schema clean.
+    T-10690 defect 1: the previous implementation took the upstream `ctr` float
+    and guessed its unit ("<= 1.0 means fractional, else already-percent").
+    That heuristic is UNDECIDABLE precisely in the band quick-wins live in:
+    0.0023 (fraction) and 0.23 (percent) are both <= 1.0, so an
+    already-percent input got multiplied by 100 a second time. Real case:
+    7 clicks / 3,102 impressions = 0.2256% was stored as 22.56% — a
+    catastrophic CTR rendered as a healthy one, hiding the actual opportunity.
+
+    clicks and impressions are integers with no unit ambiguity, so computing
+    from them removes the guess entirely. Rounded to 4 decimals to keep the
+    schema clean.
     """
-    if ctr is None:
-        return 0.0
     try:
-        val = float(ctr)
+        imp = int(impressions or 0)
+        clk = int(clicks or 0)
     except (TypeError, ValueError):
         return 0.0
-    if val <= 1.0:
-        val = val * 100.0
-    return round(val, 4)
+    if imp <= 0:
+        return 0.0
+    return round(clk / imp * 100.0, 4)
 
 
 # ---------------------------------------------------------------------------
@@ -540,11 +561,16 @@ def transform(
         row_checked_date = aio_info["checked_date"] if aio_info else ""
 
         # GAP-M3: expected 28-day click uplift (CTR curve × AIO factor).
+        # Absolute SERP rank rides the AIO-presence file (same SERP fetch), so
+        # no new quick_wins column is needed — adding one is not additive under
+        # F-05 exact-count and would force a coordinated schema migration.
+        row_abs_rank = aio_info.get("rank_absolute") if aio_info else None
         uplift = expected_uplift_clicks(
             impressions, position, clicks, curve, aio_presence=row_presence,
+            absolute_position=row_abs_rank,
         )
 
-        ctr_pct = _row_pct(ctr_raw)
+        ctr_pct = _row_pct(clicks, impressions)
 
         scored.append({
             "_uplift": uplift,
@@ -555,7 +581,12 @@ def transform(
             "impressions_30d": int(impressions),
             "clicks_30d": int(clicks) if clicks is not None else 0,
             "ctr_pct": ctr_pct,
-            "potential_clicks": int(potential) if potential is not None else 0,
+            # T-10690 defect 2: the upstream `potentialClicks` is impressions x 5%,
+            # a SERP-blind constant (167 of 169 portfolio rows matched it exactly).
+            # `uplift` is the same quantity computed properly — CTR curve by
+            # position, discounted by AIO presence — so it is what gets stored.
+            # The raw upstream value is deliberately NOT written.
+            "potential_clicks": uplift,
             "opportunity": _opportunity_label(uplift),
             "action": _action_text(float(position)),
             "priority": _priority_label(uplift),
