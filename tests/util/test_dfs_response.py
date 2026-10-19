@@ -286,6 +286,7 @@ def test_dfs_response_module_exports():
         "DFSTaskError",       # D-08
         "task_errors",        # D-08
         "check_tasks",        # D-08
+        "response_cost",      # D-13
         "normalize_dfs_response",
         "safe_int",
         "safe_float",

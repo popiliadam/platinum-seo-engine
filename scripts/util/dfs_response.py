@@ -52,6 +52,7 @@ __all__ = [
     "DFSTaskError",
     "task_errors",
     "check_tasks",
+    "response_cost",
     "normalize_dfs_response",
     "safe_int",
     "safe_float",
@@ -130,6 +131,23 @@ def check_tasks(raw: Any) -> None:
     errors = task_errors(raw)
     if errors:
         raise DFSTaskError(errors)
+
+
+def response_cost(raw: Any) -> float | None:
+    """The USD cost DataForSEO reports for this response (D-13), or None.
+
+    The REST envelope carries ``cost`` at the top and per task; the top-level
+    value is the request total. Flat MCP wrappers drop it — then None
+    (unknown), never 0.
+    """
+    if not isinstance(raw, dict):
+        return None
+    top = raw.get("cost")
+    if isinstance(top, (int, float)) and not isinstance(top, bool):
+        return float(top)
+    task_costs = [t.get("cost") for t in raw.get("tasks") or [] if isinstance(t, dict)]
+    task_costs = [c for c in task_costs if isinstance(c, (int, float)) and not isinstance(c, bool)]
+    return float(sum(task_costs)) if task_costs else None
 
 
 # ---------------------------------------------------------------------------
