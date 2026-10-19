@@ -166,3 +166,12 @@ def test_sitemap_warnings_are_reported_for_live_pages(tmp_path: Path) -> None:
     res = ix.submit([u], project_dir=_project(tmp_path), now=NOW, fetch=fake.fetch,
                     publish=fake.publish, sitemap={"https://x.test/baska": "2026-10-01"})
     assert fake.posted and "not in the sitemap" in res.report["results"][0]["sitemap_warnings"][0]
+
+
+def test_unreadable_sitemap_skips_the_check(monkeypatch) -> None:
+    def boom(url):
+        raise OSError("dns")
+    monkeypatch.setattr(ix, "http_fetch", boom)
+    assert ix._load_sitemap("https://x.test/sitemap.xml") is None
+    monkeypatch.setattr(ix, "http_fetch", lambda url: (404, "", {}))
+    assert ix._load_sitemap("https://x.test/sitemap.xml") is None

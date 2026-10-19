@@ -23,8 +23,12 @@ FACET_PARAMS = frozenset({"filter", "sort", "order", "orderby", "color", "renk",
 
 def url_type(path: str) -> str:
     u = urlparse(path)
+    # extension first: WordPress versions nearly every asset (?ver=6.4), and a
+    # versioned stylesheet is not facet waste (review fix)
+    if re.search(r"\.(css|js|png|jpe?g|webp|avif|svg|gif|ico|woff2?)$", u.path, re.I):
+        return "static_asset"
     if not u.query:
-        return "static_asset" if re.search(r"\.(css|js|png|jpe?g|webp|avif|svg|gif|ico|woff2?)$", u.path, re.I) else "clean"
+        return "clean"
     keys = {k.lower() for k in parse_qs(u.query, keep_blank_values=True)}
     if keys & {"page", "sayfa"} and len(keys) == 1:
         return "pagination"

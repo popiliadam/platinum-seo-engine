@@ -15,6 +15,7 @@ field names) and the page's Product markup:
 """
 from __future__ import annotations
 
+from decimal import Decimal, InvalidOperation
 from typing import Any, Iterable, Mapping
 
 REQUIRED = ("id", "title", "description", "link", "image_link", "price", "availability", "brand")
@@ -25,6 +26,14 @@ def _present(v: Any) -> bool:
     return v not in (None, "", [], {})
 
 
+def _price(value: Any) -> Decimal | None:
+    raw = str(value or "").strip().split(" ")[0].replace(",", ".")
+    try:
+        return Decimal(raw) if raw else None
+    except InvalidOperation:
+        return None
+
+
 def audit_item(item: Mapping[str, Any], page_offer: Mapping[str, Any] | None = None) -> dict:
     missing = [f for f in REQUIRED if not _present(item.get(f))]
     if not (_present(item.get("gtin")) or _present(item.get("mpn"))):
@@ -32,11 +41,13 @@ def audit_item(item: Mapping[str, Any], page_offer: Mapping[str, Any] | None = N
     rich_missing = [f for f in RICH if not _present(item.get(f))]
     mismatch = []
     if page_offer:
-        for field in ("price", "availability"):
-            norm = lambda v: str(v or "").split(" ")[0].lower().replace("_", "").rsplit("/", 1)[-1]  # noqa: E731
-            a, b = norm(item.get(field)), norm(page_offer.get(field))  # in_stock == InStock == schema.org/InStock
-            if a and b and a not in b and b not in a:
-                mismatch.append(field)
+        fp, pp = _price(item.get("price")), _price(page_offer.get("price"))
+        if fp is not None and pp is not None and fp != pp:   # numeric, not substring (review fix)
+            mismatch.append("price")
+        norm = lambda v: str(v or "").lower().replace("_", "").rsplit("/", 1)[-1]  # noqa: E731
+        a, b = norm(item.get("availability")), norm(page_offer.get("availability"))
+        if a and b and a != b:   # in_stock == InStock == https://schema.org/InStock
+            mismatch.append("availability")
     return {"id": item.get("id"), "missing_required": missing, "missing_rich": rich_missing,
             "markup_mismatch": mismatch}
 

@@ -11,8 +11,8 @@ drop it — every drop has a named reason that lands in ``dropped_stats``:
 
 * ``cooldown_60d``          (O-18) the url had a task DONE within 60 days of
                              the run — wait for the outcome measurement (O-01).
-* ``low_acceptance``        (O-02) the source type has >= 20 cancellations and
-                             under 10 % of its closed tasks were done.
+* ``low_acceptance``        (O-02) among tasks created in the last 180 days the
+                             source has >= 20 cancellations and under 10 % done.
 * ``previously_canceled``   (O-19) the same url + source was canceled before.
 
 ``cancel_standards`` turns the CANCELED rows into the per-project
@@ -28,6 +28,9 @@ from datetime import date, datetime
 from typing import Any, Iterable, Mapping
 
 COOLDOWN_DAYS = 60
+# Only tasks CREATED in this window count toward low_acceptance, so a throttled
+# source recovers once its old cancellations age out (review fix).
+LOW_ACCEPT_WINDOW_DAYS = 180
 LOW_ACCEPT_MIN_CANCELED = 20
 LOW_ACCEPT_MAX_DONE_SHARE = 0.10
 STANDING_RULE_REPEATS = 3
@@ -69,13 +72,17 @@ class NoiseGate:
         canceled_by_src: Counter = Counter()
         for r in rows:
             st, src, url = _status(r), str(r.get("primary_source") or ""), _url(r)
+            created = _d(r.get("created_date"))
+            recent = created is None or (today - created).days <= LOW_ACCEPT_WINDOW_DAYS
             if st == "DONE":
-                done_by_src[src] += 1
+                if recent:
+                    done_by_src[src] += 1
                 dd = _d(r.get("done_date"))
                 if url and dd is not None and 0 <= (today - dd).days <= COOLDOWN_DAYS:
                     gate.recent_done.add(url)
             elif st == "CANCELED":
-                canceled_by_src[src] += 1
+                if recent:
+                    canceled_by_src[src] += 1
                 if url:
                     gate.canceled_pairs.add((src, url))
         for src, canceled in canceled_by_src.items():

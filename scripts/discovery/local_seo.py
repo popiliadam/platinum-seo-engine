@@ -49,24 +49,45 @@ def _texts(pattern: str, html: str) -> list[str]:
     return [re.sub(r"<[^>]+>", "", m).strip() for m in re.findall(pattern, html or "", re.S | re.I)]
 
 
+def _jsonld_field(html: str, field: str) -> str | None:
+    m = re.search(rf'"{field}"\s*:\s*"([^"]+)"', html or "")
+    return m.group(1).strip() if m else None
+
+
+def page_nap(html: str) -> dict:
+    """NAP as the PAGE states it (review fix: the profile was compared with itself).
+
+    Name / address from the page's LocalBusiness JSON-LD; phone from JSON-LD,
+    a tel: link, or a printed number. A field the page does not state is None.
+    """
+    street, locality = _jsonld_field(html, "streetAddress"), _jsonld_field(html, "addressLocality")
+    address = " ".join(p for p in (street, locality) if p) or None
+    tel = (_jsonld_field(html, "telephone")
+           or (m.group(1) if (m := re.search(r"tel:([+\d][\d\s()-]{6,})", html or "")) else None)
+           or (m.group(0) if (m := re.search(r"\+?\d[\d\s()-]{9,}\d", re.sub(r"<[^>]+>", " ", html or ""))) else None))
+    return {"business_name": _jsonld_field(html, "name"), "phone": tel, "address": address,
+            "source": "landing_page"}
+
+
 def landing_checks(html: str, *, category: str, city: str, secondary_categories: Sequence[str],
-                   nap: Mapping[str, Any]) -> dict[str, bool]:
+                   nap: Mapping[str, Any]) -> dict[str, bool | None]:
+    """The 7 checks; ``None`` = not applicable (no secondary categories given)."""
     title = " ".join(_texts(r"<title[^>]*>(.*?)</title>", html))
     h1 = " ".join(_texts(r"<h1[^>]*>(.*?)</h1>", html))
     h2 = [fold_key(t) for t in _texts(r"<h2[^>]*>(.*?)</h2>", html)]
     has = lambda text, word: fold_key(word) in fold_key(text)  # noqa: E731
     text = re.sub(r"<[^>]+>", " ", html or "")
-    phone = re.search(r"tel:([+\d][\d\s()-]{6,})", html or "")
-    observed = {"business_name": nap.get("business_name"), "phone": phone.group(1) if phone else None,
-                "address": nap.get("address") if fold_key(str(nap.get("address", ""))[:12]) in fold_key(text) else None,
-                "source": "landing_page"}
+    observed = page_nap(html)
     return {
         "title_has_category_and_city": has(title, category) and has(title, city),
         "h1_has_category_and_city": has(h1, category) and has(h1, city),
-        "google_maps_embed": bool(re.search(r"google\.[a-z.]+/maps|maps\.google\.", html or "", re.I)),
-        "secondary_categories_as_h2": all(any(fold_key(s) in h for h in h2) for s in secondary_categories),
+        # an EMBED (iframe), not just a link to Google Maps
+        "google_maps_embed": bool(re.search(r"<iframe[^>]+src=[\"'][^\"']*(google\.[a-z.]+/maps|maps\.google\.)",
+                                            html or "", re.I)),
+        "secondary_categories_as_h2": (all(any(fold_key(s) in h for h in h2) for s in secondary_categories)
+                                       if secondary_categories else None),
         "reviews_block": bool(re.search(r"(yorum|review|değerlendirme)", text, re.I)),
-        "nap_matches_profile": observed["phone"] is not None and observed["address"] is not None
+        "nap_matches_profile": all(observed[k] for k in ("business_name", "phone", "address"))
                                and not compare_nap(dict(nap), observed),
         "local_business_schema": bool(re.search(r'"@type"\s*:\s*"[A-Za-z]*(LocalBusiness|Dentist|'
                                                 r'MedicalClinic|HomeAndConstructionBusiness)', html or "")),

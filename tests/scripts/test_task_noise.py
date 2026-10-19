@@ -47,3 +47,9 @@ def test_cancel_standards_marks_repeated_reasons() -> None:
     md = cancel_standards(rows, project="demo")
     assert "## internal_links" in md and "sayfa zaten link alıyor (3) — **KALICI KURAL**" in md
     assert "1 iptal gerekçesiz" in md
+
+
+def test_low_acceptance_recovers_when_cancellations_age_out() -> None:
+    old = [{**_t(i, "internal_links", "CANCELED", f"https://x.test/{i}"), "created_date": "2025-01-01"}
+           for i in range(25)]
+    assert NoiseGate.from_master_task(old, RUN).drop_reason("internal_links", "https://x.test/n") is None

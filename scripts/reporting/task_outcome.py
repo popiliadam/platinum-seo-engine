@@ -46,7 +46,7 @@ REPO = Path(__file__).resolve().parents[2]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
-from scripts.util.gsc_window import GSC_LAG_DAYS  # noqa: E402
+from scripts.util.gsc_window import GSC_LAG_DAYS, GSC_ROW_LIMIT, truncation  # noqa: E402
 from scripts.util.url_normalize import normalize_url  # noqa: E402
 
 WINDOW_DAYS = 28
@@ -178,7 +178,8 @@ def fetch_windows(reqs: Sequence[Request]) -> list[dict]:
     714 per-URL calls for rkturizm-tr collapse to one call per distinct window.
     """
     seen = sorted({(r.start, r.end) for r in reqs})
-    return [{"startDate": s, "endDate": e} for s, e in seen]
+    return [{"startDate": s, "endDate": e, "dimensions": "page", "rowLimit": GSC_ROW_LIMIT}
+            for s, e in seen]
 
 
 def rows_from_window_payloads(reqs: Sequence[Request],
@@ -192,6 +193,10 @@ def rows_from_window_payloads(reqs: Sequence[Request],
     """
     by_window: dict[tuple[str, str], dict[str, list[dict]]] = {}
     for key, payload in payloads.items():
+        if truncation(payload or {})["truncated"]:
+            # a capped answer would record missing pages as zero clicks in an
+            # append-only ledger — skip the window, it stays due (review fix)
+            continue
         idx: dict[str, list[dict]] = {}
         for row in (payload or {}).get("rows") or []:
             keys = row.get("keys") or []

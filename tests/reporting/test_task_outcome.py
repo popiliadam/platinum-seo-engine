@@ -114,3 +114,11 @@ def test_monthly_report_carries_task_outcomes_and_validates() -> None:
     mc_schema = schema["properties"]["sections"]["properties"]["measurement_context"]
     assert not list(Draft7Validator(mc_schema).iter_errors(ctx))
     assert ctx["task_outcomes"][0]["verdict"] == "engine_positive"
+
+
+def test_truncated_window_is_not_recorded_as_zero() -> None:
+    reqs = to.due_requests(TASKS, GSC, [], today=TODAY)
+    w = to.fetch_windows(reqs)[0]
+    assert w["rowLimit"] == 25000 and w["dimensions"] == "page"
+    capped = {"rows": [{"keys": [f"https://x.test/p{i}"], "clicks": 1, "impressions": 1} for i in range(1000)]}
+    assert to.rows_from_window_payloads(reqs, {(w["startDate"], w["endDate"]): capped}, measured_at="t") == []

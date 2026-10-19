@@ -44,12 +44,28 @@ def test_landing_page_seven_checks() -> None:
     html = ("<title>Diş Kliniği İzmir | Usta</title><h1>İzmir Diş Kliniği</h1><h2>İmplant</h2>"
             "<iframe src=\"https://www.google.com/maps/embed?x\"></iframe><p>Hasta yorumları</p>"
             "<a href=\"tel:+902325551122\">ara</a><p>Alsancak Mah. İzmir</p>"
-            '<script type="application/ld+json">{"@type": "Dentist"}</script>')
+            '<script type="application/ld+json">{"@type": "Dentist", "name": "Usta Klinik", '
+            '"address": {"streetAddress": "Alsancak Mah.", "addressLocality": "İzmir"}}</script>')
     checks = ls.landing_checks(html, category="Diş Kliniği", city="İzmir",
                                secondary_categories=["İmplant"], nap=nap)
     assert all(checks.values()), checks
-    assert not ls.landing_checks("<title>x</title>", category="Diş Kliniği", city="İzmir",
-                                 secondary_categories=[], nap=nap)["title_has_category_and_city"]
+    bare = ls.landing_checks("<title>x</title>", category="Diş Kliniği", city="İzmir",
+                             secondary_categories=[], nap=nap)
+    assert not bare["title_has_category_and_city"] and bare["secondary_categories_as_h2"] is None
+
+
+def test_review_nap_and_maps_negatives() -> None:
+    """Review fixes: the page's own NAP is compared (a different street number
+    fails) and a plain link to Google Maps is not an embed."""
+    nap = {"business_name": "Usta", "phone": "+902325551122", "address": "Atatürk Cad. No:5 İzmir"}
+    html = ('<a href="https://www.google.com/maps/place/x">yol tarifi</a><a href="tel:+902325551122">ara</a>'
+            '<script type="application/ld+json">{"name": "Usta", '
+            '"streetAddress": "Atatürk Cad. No:15", "addressLocality": "İzmir"}</script>')
+    checks = ls.landing_checks(html, category="Kombi", city="İzmir", secondary_categories=[], nap=nap)
+    assert checks["nap_matches_profile"] is False and checks["google_maps_embed"] is False
+    no_nap = ls.landing_checks("<p>x</p>", category="Kombi", city="İzmir", secondary_categories=[],
+                               nap={**nap, "address": ""})
+    assert no_nap["nap_matches_profile"] is False
 
 
 def test_service_city_matrix_caps_and_requires_unique_elements() -> None:

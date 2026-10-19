@@ -363,9 +363,19 @@ def _deletion_consent(slug: str) -> Callable[[str], bool]:
     return allowed
 
 
-def _load_sitemap(url: str) -> dict:
+def _load_sitemap(url: str) -> dict | None:
+    """Sitemap entries, or None when it could not be read — then the optional
+    O-24 check is skipped instead of flagging every URL or aborting the run."""
     from scripts.production.post_publish_check import load_sitemap
-    return load_sitemap(url, http_fetch)
+    try:
+        status = http_fetch(url)[0]
+        if status != 200:
+            print(f"sitemap check skipped: {url} answered HTTP {status}", file=sys.stderr)
+            return None
+        return load_sitemap(url, http_fetch)
+    except OSError as exc:
+        print(f"sitemap check skipped: {exc}", file=sys.stderr)
+        return None
 
 
 def main(argv: list[str]) -> int:

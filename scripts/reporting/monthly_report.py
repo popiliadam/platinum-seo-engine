@@ -946,10 +946,12 @@ def _flatten_for_template(report: Mapping[str, Any]) -> dict[str, str]:
             f"- Sonucu ölçülen tamamlanmış görev: {cov.get('measured', 0)}/"
             f"{cov.get('eligible', 0)} (O-01)")
     for to_row in mc.get("task_outcomes", []):
+        diff = to_row.get("difference_pp")
+        diff_txt = f"{diff}pp" if diff is not None else "fark hesaplanamadı (kontrol verisi yok)"
         mc_lines.append(
             f"- {_safe_str(to_row.get('primary_source'))}: "
             f"{_safe_str(to_row.get('verdict'))} — kontrol grubuna göre "
-            f"{to_row.get('difference_pp')}pp, {to_row.get('tasks_measured')} görev "
+            f"{diff_txt}, {to_row.get('tasks_measured')} görev "
             f"{_safe_str(to_row.get('caveat'))}".rstrip())
     for oc in mc.get("intervention_outcomes", []):
         mc_lines.append(

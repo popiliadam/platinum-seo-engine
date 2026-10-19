@@ -43,3 +43,10 @@ def test_preferred_sources_and_indexnow_key() -> None:
     ok, _ = bs.indexnow_key_live("x.test", key, lambda u: (200, key + "\n", {}))
     bad, why = bs.indexnow_key_live("x.test", key, lambda u: (404, "", {}))
     assert ok and not bad and "404" in why
+
+
+def test_review_price_versioned_assets() -> None:
+    item = {"id": "1", "price": "9.99 TRY", "availability": "in_stock"}
+    assert mf.audit_item(item, {"price": "99.99"})["markup_mismatch"] == ["price"]
+    assert mf.audit_item(item, {"price": "9,99", "availability": "https://schema.org/InStock"})["markup_mismatch"] == []
+    assert cl.url_type("/wp-content/style.css?ver=6.4") == "static_asset"
