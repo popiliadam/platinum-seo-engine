@@ -154,8 +154,11 @@ def test_real_approve_block_preserves_quoted_target_under_textsub(tmp_path: Path
     ws = tmp_path / "ws"
     (home / ".config" / "pseo").mkdir(parents=True)  # exists but NO config.json
     (ws / "shared").mkdir(parents=True)
-    (ws / "shared" / "active.json").write_text(
-        json.dumps({"active_project": "testproj"}), encoding="utf-8"
+    # approve writes only for a BOUND session (G-05), so bind sess-textsub.
+    (ws / "shared" / "sessions").mkdir()
+    (ws / "shared" / "sessions" / "sess-textsub.json").write_text(
+        json.dumps({"active_project": "testproj", "session_id": "sess-textsub"}),
+        encoding="utf-8",
     )
     env = {
         "PATH": os.environ["PATH"],

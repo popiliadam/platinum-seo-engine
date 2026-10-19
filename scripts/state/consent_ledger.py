@@ -475,7 +475,7 @@ def _cmd_approve(
             file=sys.stderr,
         )
         return 2
-    # 3. Slug bound to THIS session (marker -> shared/active.json -> raise).
+    # 3. Slug bound to THIS session (marker only — never active.json, G-05).
     session_id = session_binding.current_session_id()
     if not session_id:
         # The gate matches consent per session (has_session_consent); an entry
@@ -515,7 +515,10 @@ def _cmd_approve(
         print(f"error: {exc}", file=sys.stderr)
         return 5
     shown = target if len(target) <= 48 else target[:48]
-    print(f"consent recorded: {action} on {shown} for {run_id}  (seq {entry['seq']})")
+    print(
+        f"consent recorded: {action} on {shown} for {run_id}  "
+        f"(project {slug}, seq {entry['seq']})"
+    )
     return 0
 
 

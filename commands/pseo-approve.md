@@ -34,7 +34,7 @@ Bu komut aksiyonu **çalıştırmaz** — sadece izni KAYDEDER. Gate (batch 2b) 
 
 ## 3. Onay komutunu çalıştır
 
-Üç argüman da verildiyse recorder CLI'yi çağır. CLI sırasıyla: action'ı doğrular, workspace root'u çözer (config → `$PSEO_WORKSPACE_ROOT`), session UUID'sini `$CLAUDE_CODE_SESSION_ID`'den alır, bu session'a bağlı projeyi çözer (`shared/sessions/<uuid>.json` → `shared/active.json`), sonra deftere atomik (O_APPEND + flock + fsync) bir satır ekler.
+Üç argüman da verildiyse recorder CLI'yi çağır. CLI sırasıyla: action'ı doğrular, workspace root'u çözer (config → `$PSEO_WORKSPACE_ROOT`), session UUID'sini `$CLAUDE_CODE_SESSION_ID`'den alır, bu session'a bağlı projeyi çözer (yalnız `shared/sessions/<uuid>.json`; `shared/active.json`'a DÜŞMEZ — bağsız session'da önce `/pseo-bind <slug>`, G-05), sonra deftere atomik (O_APPEND + flock + fsync) bir satır ekler.
 
 !`R=""; for c in "$CLAUDE_PLUGIN_ROOT" "$CLAUDE_PROJECT_DIR" "$PWD" "$HOME"/.claude/plugins/*/*/*/* "$HOME"/.claude/plugins/*/*/*; do [ -n "$c" ] && [ -f "$c/scripts/state/__init__.py" ] && { R="$c"; break; }; done; [ -n "$R" ] || { echo "PLUGIN_ROOT_UNRESOLVED: scripts/state bulunamadı — CLAUDE_PLUGIN_ROOT ayarlayın ya da plugin kökünden çağırın"; exit 2; }; PYTHONPATH="$R" python3 -m scripts.state.consent_ledger approve $ARGUMENTS 2>&1`
 

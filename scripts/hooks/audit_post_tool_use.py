@@ -11,9 +11,10 @@ of the append-only ``events.jsonl`` ledgers.
 
 The fix resolves the target project for THIS session via the batch-0b/0c binding
 primitive (``scripts.state.session_binding.resolve_session_project``): the
-per-session marker (``shared/sessions/<session_id>.json``) wins, falling back to
-``shared/active.json`` only when the session is UNBOUND. Single-project users
-(no session marker) keep today's active.json behaviour — no regression.
+per-session marker (``shared/sessions/<session_id>.json``) decides, with NO
+``shared/active.json`` fallback (strict=True, G-05): an UNBOUND session writes no
+audit row at all, because active.json may name another session's project and an
+append-only row cannot be taken back. Each written row carries ``session_id``.
 
 Everything else is byte-for-byte the legacy emission:
   * the REDACTED audit_target — Bash collapses to ``<head> [REDACTED args]`` and
@@ -119,13 +120,15 @@ def main() -> int:
         workspace_root = resolve_workspace_root()
         if workspace_root is None:
             return 0  # nothing to attribute to (legacy "no workspace" no-op)
-        project_id = resolve_session_project(
-            workspace_root,
-            session_id=current_session_id(payload),
-            strict=False,
-        )
-        if not project_id:
-            return 0  # unbound + no active.json fallback (legacy "no pid" no-op)
+        session_id = current_session_id(payload)
+        try:
+            # strict: THIS session's marker only. An unbound session writes no
+            # audit row rather than one in active.json's project (G-05).
+            project_id = resolve_session_project(
+                workspace_root, session_id=session_id, strict=True,
+            )
+        except FileNotFoundError:
+            return 0
         fields = build_audit_fields(payload)
         append_audit(
             project_id=project_id,
@@ -133,6 +136,7 @@ def main() -> int:
             audit_target=fields["audit_target"],
             actor=_ACTOR,
             workspace_root=workspace_root,
+            session_id=session_id,
         )
     except Exception:  # mirror the legacy `|| { echo 'WARNING …'; true; }`
         print(_WARNING, file=sys.stderr)
