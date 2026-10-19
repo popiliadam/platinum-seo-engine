@@ -18,6 +18,7 @@ inputs:
   threshold_position_min: { type: integer, required: false, default: 11 }
   threshold_position_max: { type: integer, required: false, default: 20 }
   threshold_impressions: { type: integer, required: false, default: 100 }
+  threshold_max_ctr: { type: number, required: false, default: 100 }
   top_n: { type: integer, required: false, default: 50 }
   aio_check: { type: boolean, required: false, default: true }
   aio_top_k: { type: integer, required: false, default: 20 }
@@ -82,6 +83,7 @@ deviate only with an ADR.
 | `threshold_position_min`   | integer | 11      | Lower bound on `currentPosition` for inclusion.         |
 | `threshold_position_max`   | integer | 20      | Upper bound; also the scoring ceiling (D-03 invariant). |
 | `threshold_impressions`    | integer | 100     | Minimum `impressions` per row to qualify.               |
+| `threshold_max_ctr`        | number  | 100     | CTR % ceiling passed as `maxCtr` (D-16: the tool's hidden default is 2 %; 100 = no CTR filter). |
 | `top_n`                    | integer | 50      | Cap on rows written into `quick_wins`.                  |
 | `aio_check`                | boolean | true    | Fetch AI-Overview presence (+ own-domain citation) for the top `aio_top_k` queries (GAP-M2; ON by default since S-18). |
 | `aio_top_k`                | integer | 20      | How many provisional top queries to AIO-check (only when `aio_check`).  |
@@ -144,11 +146,11 @@ workflow_runner.start_step(handle.run_id, 0,
                            project_slug=project_slug)
 raw = mcp__gsc__detect_quick_wins(
     siteUrl=project_config["gsc"]["site_url"],
-    startDate=(today - days_back).isoformat(),
-    endDate=today.isoformat(),
+    **gsc_window.recent_window(today, days_back).as_params(),  # D-04: ends today-3
     positionRangeMin=threshold_position_min,
     positionRangeMax=threshold_position_max,
     minImpressions=threshold_impressions,
+    maxCtr=threshold_max_ctr,   # D-16: explicit — the tool silently applies 2 % otherwise
 )
 inbox_path = (
     workspace_root / "projects" / project_slug
@@ -178,6 +180,7 @@ python3 scripts/discovery/quickwins_transform.py \
     --enriched inbox/gsc/{date}-enhanced_search_analytics-{slug}.json \
     --top-n 50 \
     --threshold-position-max 20 \
+    --threshold-position-min 11 \
     --ctr-curve ctr-curve.json \
     --aio-presence inbox/dfs/{date}-aio_presence-{slug}.json \
     --market {project.config market} \

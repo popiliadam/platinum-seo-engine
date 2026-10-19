@@ -622,3 +622,22 @@ def test_qw_skill_documents_cohort_step_r138() -> None:
     assert "quickwin-cohorts" in body and "-cohort.json" in body
     assert "control_cohort" in body
     assert "R-138" in body
+
+
+def test_d16_band_rechecked_in_transform() -> None:
+    """D-16: a row outside the 11-20 band never becomes a quick win, whatever
+    the MCP filter returned; the skill passes maxCtr explicitly."""
+    raw = {"quickWins": [
+        {"query": "in", "page": "https://example.com/a/", "currentPosition": 14.0,
+         "impressions": 500, "currentClicks": 2, "currentCtr": 0.004},
+        {"query": "low", "page": "https://example.com/b/", "currentPosition": 6.0,
+         "impressions": 900, "currentClicks": 9, "currentCtr": 0.01},
+        {"query": "deep", "page": "https://example.com/c/", "currentPosition": 27.0,
+         "impressions": 900, "currentClicks": 0, "currentCtr": 0.0},
+    ]}
+    out = quickwins_transform.transform(raw, threshold_position_min=11)
+    queries = {r["query"] for r in out["quick_wins"]}
+    assert queries == {"in"}
+    skill = (Path(__file__).resolve().parents[2] / "skills" / "discovery" / "quick-wins"
+             / "SKILL.md").read_text(encoding="utf-8")
+    assert "maxCtr=threshold_max_ctr" in skill
