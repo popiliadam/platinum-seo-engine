@@ -34,7 +34,7 @@ Bu doc Phase 10 SEO disiplinini tanımlar (heading, internal link, FAQ, keyword,
 
 **Statement.** İçerik ne thin ne de word wall. Paragraf 2-4 cümle; her bölümde liste/tablo/görsel/blockquote ritim; scannable.
 
-**Rationale.** Thin content (Helpful Content Update penalty) + word wall (UX dwell time düşüş). Denge SEO + UX.
+**Rationale.** İnce içerik insan odaklı (people-first) içerik ölçütlerini karşılamaz — çekirdek sıralama sistemleri bunu değerlendirir — + word wall (UX dwell time düşüş). Denge SEO + UX.
 
 **Enforcement.** Paragraf cümle sayımı; 5+ cümle paragraflar AMBER; 1000+ word section'da medya öğesi yoksa AMBER.
 

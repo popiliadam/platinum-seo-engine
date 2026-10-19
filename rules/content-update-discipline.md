@@ -78,7 +78,7 @@ Profile-aware:
 
 **Statement.** Sahte güncellik yasak: dateModified update edip içeriği değiştirmemek (sadece tarih bump) **YASAK**. Genuine content change zorunlu.
 
-**Rationale.** Principle 3 (AI imza paterni preempt) + Google freshness theater detection (Helpful Content Update penalty).
+**Rationale.** Principle 3 (AI imza paterni preempt) + sahte tazelik (yalnız tarih değiştirmek) Google'ın insan odaklı içerik ölçütlerine aykırıdır; çekirdek sıralama sistemleri değerlendirir.
 
 **Enforcement.** revise-content skill change_summary boş veya word diff < 50 word → AMBER → 2x AMBER → RED. dateModified update'i content diff olmadan reject.
 
