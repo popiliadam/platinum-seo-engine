@@ -224,8 +224,8 @@
           "description": "GAP-M-W2 (R-137 core-update overlap + R-138 intervention outcomes) — measurement-honesty annotation. Additive OPTIONAL section (NOT in sections.required). Framing-INVARIANT: built identically under both framings (the builder takes no framing_policy). measurement_quality flags whether period deltas are attributable; core_updates_overlap annotates Google Search Ranking-update windows (incl. 7-day settling buffer); intervention_outcomes carries treated-vs-control quick-win verdicts (difference in pp, n<30 directional caveat).",
           "properties": {
             "measurement_quality": {
-              "enum": ["clean", "update_overlap", "post_update_settling", "insufficient_history"],
-              "description": "clean = no Ranking-update overlap; update_overlap = window overlaps an active rollout; post_update_settling = within the 7-day settle buffer after rollout end; insufficient_history = no calendar loaded (overlap undeterminable, never asserted clean)."
+              "enum": ["clean", "update_overlap", "post_update_settling", "insufficient_history", "calendar_stale"],
+              "description": "clean = no Ranking-update overlap; update_overlap = window overlaps an active rollout; post_update_settling = within the 7-day settle buffer after rollout end; insufficient_history = no calendar loaded (overlap undeterminable, never asserted clean); calendar_stale = no overlap found, but the calendar was retrieved before the period ended, so a later update would be invisible (S-17)."
             },
             "core_updates_overlap": {
               "type": "array",

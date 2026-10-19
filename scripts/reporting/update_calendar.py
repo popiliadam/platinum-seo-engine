@@ -104,6 +104,24 @@ def load_calendar(
     )
 
 
+def calendar_retrieved_at(
+    engine_path: Path | str, overlay_path: Path | str | None = None,
+) -> str | None:
+    """The newest ``retrieved_at`` of the engine seed and the optional overlay —
+    how far the calendar actually knows about Google's updates (S-17)."""
+    stamps: list[str] = []
+    for path in (engine_path, overlay_path):
+        if path is None or not Path(path).exists():
+            continue
+        try:
+            value = json.loads(Path(path).read_text(encoding="utf-8")).get("retrieved_at")
+        except (OSError, ValueError):
+            continue
+        if isinstance(value, str) and value:
+            stamps.append(value)
+    return max(stamps) if stamps else None
+
+
 # ---------------------------------------------------------------------------
 # Overlap detection (R-137)
 # ---------------------------------------------------------------------------
@@ -178,4 +196,4 @@ def _hit(u: dict, begin: datetime, raw_end, overlap_days: int, phase: str) -> di
     }
 
 
-__all__ = ("load_calendar", "overlaps")
+__all__ = ("load_calendar", "calendar_retrieved_at", "overlaps")

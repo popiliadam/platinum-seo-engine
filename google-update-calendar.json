@@ -1,16 +1,43 @@
 {
   "schema_version": "1.0",
-  "retrieved_at": "2026-06-10T00:00:00Z",
+  "retrieved_at": "2026-10-19T15:29:12Z",
   "source_url": "https://status.search.google.com/incidents.json",
   "updates": [
+    {
+      "id": "XhUDXP7A67iHCD2kmbVu",
+      "name": "September 2026 spam update",
+      "begin": "2026-09-24T16:15:00Z",
+      "end": "2026-10-08T08:00:00Z",
+      "service_name": "Ranking",
+      "source": "google_status_dashboard",
+      "severity": "low"
+    },
+    {
+      "id": "LEubPCm2octf2uMqCFKE",
+      "name": "August 2026 spam update",
+      "begin": "2026-08-18T16:27:00Z",
+      "end": "2026-08-21T08:49:00Z",
+      "service_name": "Ranking",
+      "source": "google_status_dashboard",
+      "severity": "low"
+    },
+    {
+      "id": "YUX1peHev5a4fkxLDiUQ",
+      "name": "June 2026 spam update",
+      "begin": "2026-06-24T16:00:00Z",
+      "end": "2026-06-26T17:00:00Z",
+      "service_name": "Ranking",
+      "source": "google_status_dashboard",
+      "severity": "low"
+    },
     {
       "id": "wdAXJk6LRRihEjpzEeWE",
       "name": "May 2026 core update",
       "begin": "2026-05-21T15:40:00Z",
       "end": "2026-06-02T12:40:00Z",
       "service_name": "Ranking",
-      "severity": "low",
-      "source": "google_status_dashboard"
+      "source": "google_status_dashboard",
+      "severity": "low"
     },
     {
       "id": "7eTbAa2jWdToLkraZj5y",
@@ -18,8 +45,8 @@
       "begin": "2026-03-27T09:00:00Z",
       "end": "2026-04-08T13:00:00Z",
       "service_name": "Ranking",
-      "severity": "low",
-      "source": "google_status_dashboard"
+      "source": "google_status_dashboard",
+      "severity": "low"
     },
     {
       "id": "VbnSXAH4SmEcxPtx4YSD",
@@ -27,8 +54,8 @@
       "begin": "2026-03-24T19:00:00Z",
       "end": "2026-03-25T14:30:00Z",
       "service_name": "Ranking",
-      "severity": "low",
-      "source": "google_status_dashboard"
+      "source": "google_status_dashboard",
+      "severity": "low"
     },
     {
       "id": "mYbNTqV1ytDc2fA8hUz4",
@@ -36,8 +63,8 @@
       "begin": "2026-02-05T17:00:00Z",
       "end": "2026-02-27T10:00:00Z",
       "service_name": "Ranking",
-      "severity": "low",
-      "source": "google_status_dashboard"
+      "source": "google_status_dashboard",
+      "severity": "low"
     },
     {
       "id": "DsirqJ1gpPRgVQeccPRv",
@@ -45,8 +72,8 @@
       "begin": "2025-12-11T17:25:00Z",
       "end": "2025-12-29T19:00:00Z",
       "service_name": "Ranking",
-      "severity": "low",
-      "source": "google_status_dashboard"
+      "source": "google_status_dashboard",
+      "severity": "low"
     },
     {
       "id": "a7Aainy6E9rZsmfq82xt",
