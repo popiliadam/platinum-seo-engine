@@ -10,7 +10,7 @@ model: sonnet
 
 # /pseo-new-blog — Production Content Generation
 
-> **Skill:** `skills/production/new-blog/SKILL.md` (Phase 11 W1, **wip** — runtime `scripts/production/new_blog.py` henüz yok). NCP satırı → SERP analiz → 5 template render → JSON-LD @graph 5 entity → Foundational Principles 3-layer enforce → 4 artifact yazar (`outputs/blog/{slug}/article.html` + `schema.jsonld` + `meta-tags.json` + `upload-instructions.md`) → onay gate.
+> **Skill:** `skills/production/new-blog/SKILL.md` (Phase 11 W1, **wip** — runtime `scripts/production/new_blog.py` henüz yok). NCP satırı → SERP analiz → 5 template render → JSON-LD @graph 4 entity → Foundational Principles 3-layer enforce → 5 artifact yazar (`outputs/blog/{slug}/article.html` + `schema.jsonld` + `meta-tags.json` + `upload-instructions.md` + `verification.json`) → onay gate.
 >
 > **DRAFT-ONLY artifact generator.** Skill `master.xlsx`'e karşı **READ-ONLY**'dir (`new_content_plan` allowed_writers=null, F-1); workbook'a append/update/delete YAPMAZ. Tek state mutasyonu `events.jsonl` audit append'idir.
 
@@ -29,7 +29,7 @@ model: sonnet
 3. R-71..R-76 image discipline enforce (8K ultra realistic, nano-banana model R-72 default, hero image R-73, picture LCP, format cascade webp+jpg+avif R-76, alt text R-74)
 4. Content generation: markdown + HTML + JSON-LD @graph (4 entity: Article + Person/Organization + WebPage + BreadcrumbList; FAQPage yok — R-79)
 5. Foundational Principles 3-layer enforce (Truth-Verifiable + Profile-Aware + AI-Suistimal)
-6. Output write — 4 artifact: `outputs/blog/{slug}/article.html` + `schema.jsonld` + `meta-tags.json` + `upload-instructions.md` (markdown article YOK; HTML fragment + ayrı JSON-LD dosyası)
+6. Output write — 5 artifact: `outputs/blog/{slug}/article.html` + `schema.jsonld` + `meta-tags.json` + `upload-instructions.md` + `verification.json` (R-155 insan doğrulama kaydı — boş başlar, dolmadan yayın yok; markdown article YOK)
 7. events.jsonl append — `event_kind=work + event_type=content_new + task_id=T-XXXXX` (URL-bearing pillar pattern: url+url_normalized+after+pillar mandatory per events.schema)
 8. Onay gate: `awaiting_approval` (workflow-run.schema)
 
