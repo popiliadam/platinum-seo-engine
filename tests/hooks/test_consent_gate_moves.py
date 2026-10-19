@@ -36,3 +36,13 @@ def test_moving_protected_data_or_malformed_calls_need_consent(tool: str, tool_i
 ])
 def test_ordinary_moves_stay_free(tool: str, tool_input: dict) -> None:
     assert _eval(tool, tool_input) == 0
+
+
+@pytest.mark.parametrize("cmd", [
+    "mv -t /tmp projects/demo/master.xlsx",
+    "mv --target-directory=/tmp projects/demo/_state",
+    "/bin/mv projects/demo/master.xlsx /tmp/",
+    "command mv projects/demo/master.xlsx /tmp/",
+])
+def test_mv_target_directory_forms_are_caught(cmd: str) -> None:
+    assert _eval("Bash", {"command": cmd}) == 2

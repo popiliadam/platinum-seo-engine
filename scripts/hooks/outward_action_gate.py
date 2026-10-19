@@ -551,9 +551,10 @@ def _classify_segment(segment: str) -> tuple[str, str] | None:
         operands = _operands(tokens, 1)
         return ("fs_delete", " ".join(operands) if operands else segment.strip())
 
-    if first == "mv":  # moving protected data away removes it from the project
-        sources = _operands(tokens, 1)[:-1]
-        protected = [src for src in sources if _is_protected_path(src)]
+    if first == "mv":  # moving protected data away (or over it) changes the project
+        # Every operand counts, not just operands[:-1]: `mv -t DIR SRC…` puts the
+        # target first, and moving INTO a protected path is sensitive too.
+        protected = [op for op in _operands(tokens, 1) if _is_protected_path(op)]
         return ("fs_delete", " ".join(protected)) if protected else None
 
     if first == "find":
@@ -918,7 +919,22 @@ def _segment_hit(segment: str) -> Hit | None:
         return Hit(action, target, _delete_tier(tokens))
     if action == "git_push":
         return Hit(action, target, _push_tier(target))
-    return Hit(action, target, _post_tier(action, target, segment))
+    tokens = _tokenize(_strip_redirections(segment))
+    return _strictest_url_hit(action, target, segment,
+                              [t for t in tokens if t.startswith(("http://", "https://"))])
+
+
+def _strictest_url_hit(action: str, target: str, text: str, urls: list[str]) -> Hit:
+    """One request may go to several URLs (curl sends to each): tier EVERY public
+    one and keep the strictest, naming that URL as the consent target."""
+    public = [u for u in urls if not _is_loopback_host((urlparse(u).hostname or "").lower())]
+    if not public:
+        return Hit(action, target, _post_tier(action, target, text))
+    tiered = [(_post_tier(action, u, text), u) for u in public]
+    tier, url = max(tiered, key=lambda tu: _TIER_RANK[tu[0]])
+    if action == "index_update" and (urlparse(url).hostname or "").lower() != _INDEXING_HOST:
+        action = "net_post"
+    return Hit(action, url, tier)
 
 
 def assess_all(tool_name: str, tool_input) -> list[Hit]:
@@ -936,7 +952,7 @@ def assess_all(tool_name: str, tool_input) -> list[Hit]:
     hits: list[Hit] = []
     interp = _classify_interpreter_net_write(command)
     if interp is not None:
-        hits.append(Hit(*interp, _post_tier(*interp, command)))
+        hits.append(_strictest_url_hit(*interp, command, _URL_IN_TEXT_RE.findall(command)))
     deleting = _classify_interpreter_delete(command)
     if deleting is not None:
         hits.append(deleting)
