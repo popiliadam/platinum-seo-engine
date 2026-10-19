@@ -507,3 +507,14 @@ application strengthens lesson 31 paterni production-ready signal.
 This skill is `status: wip` until Phase 12 Wave 2 acceptance gate;
 `active` bump deferred to the post-Wave 2 closeout. Manager owns the
 status flip + governance audit.
+
+## Priority rotation (O-06)
+
+Instead of ad-hoc batches: `scripts/discovery/index_rotation.pick(urls, ledger,
+today=…)` returns today's inspection list within the 2,000/day quota —
+new content, then money pages (category/product/service), then pages changed
+in the last 30 days, then the rest — skipping URLs inspected in the last 14
+days. Each answer is appended as `index_rotation.ledger_row(url, raw, today=…)`
+to `_state/metrics/index_inspection.jsonl`; `freshness()` reports the share of
+priority URLs with a status ≤ 14 days old and `not_indexed_clusters()` turns
+"crawled / discovered – not indexed" groups into one task per path segment.

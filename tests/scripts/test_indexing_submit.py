@@ -158,3 +158,11 @@ def test_url_deleted_overflow_is_not_claimed_as_queued(tmp_path: Path) -> None:
                     publish=fake.publish, notification="URL_DELETED", cap=1,
                     deletion_allowed=lambda _u: True)
     assert res.queued == [] and res.report["not_sent_rerun_tomorrow"] == urls[1:]
+
+
+def test_sitemap_warnings_are_reported_for_live_pages(tmp_path: Path) -> None:
+    u = "https://x.test/yeni/"
+    fake = Fake({u: (200, _page(u))})
+    res = ix.submit([u], project_dir=_project(tmp_path), now=NOW, fetch=fake.fetch,
+                    publish=fake.publish, sitemap={"https://x.test/baska": "2026-10-01"})
+    assert fake.posted and "not in the sitemap" in res.report["results"][0]["sitemap_warnings"][0]

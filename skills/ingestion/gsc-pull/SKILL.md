@@ -404,3 +404,15 @@ Stop and flag the manager — do not patch, do not fall back.
       quick_wins.url ⊆ (crawl_sitemap.url ∪ gsc_performance.url) invariant
       precondition (the active F-08 rule enforced by check_F_08; the deferred
       `target_url` form is disclaimed in cross-sheet-invariants.json).
+
+## Weekly URL × query history (O-03)
+
+`gsc_performance` is replaced on every refresh; the history lives in
+`_state/metrics/gsc_url_query_weekly.jsonl` (append-only). Each run:
+`gsc_history.weeks_to_pull(ledger, today=…)` lists the complete ISO weeks not
+yet stored; pull each ONCE with `dimensions="query,page"`,
+`rowLimit=gsc_window.GSC_ROW_LIMIT` and that week's start/end, then
+`gsc_history.append_rows(path, gsc_history.rows_for_week(week, raw))`.
+`gsc_history.update_impact(ledger, update)` answers "which pages did this
+Google update hit" (4 weeks before vs 4 weeks after, losers/gainers) for any
+entry of `google-update-calendar.json`.
