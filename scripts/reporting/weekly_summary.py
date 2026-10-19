@@ -200,7 +200,7 @@ def read_events_jsonl(
     if not events_path.is_file():
         return []
     out: list[dict] = []
-    for line in events_path.read_text(encoding="utf-8").splitlines():
+    for line in events_path.read_text(encoding="utf-8").split("\n"):
         line = line.strip()
         if not line:
             continue

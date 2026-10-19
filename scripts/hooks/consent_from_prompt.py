@@ -50,7 +50,7 @@ def parse_approval(prompt: str, session_id: str) -> tuple[str, str, str] | None:
     Raises ValueError for an approval line whose arguments cannot be parsed.
     """
     stripped = prompt.lstrip()
-    first_line = stripped.splitlines()[0] if stripped else ""
+    first_line = stripped.split("\n", 1)[0] if stripped else ""
     slash = _SLASH_RE.fullmatch(first_line.strip())
     if slash:
         args = shlex.split(slash.group("args"))

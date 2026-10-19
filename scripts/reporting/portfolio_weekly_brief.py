@@ -205,7 +205,7 @@ def read_events_in_window(
         return []
     out: list[dict[str, Any]] = []
     raw = events_path.read_text(encoding="utf-8")
-    for line in raw.splitlines():
+    for line in raw.split("\n"):
         line = line.strip()
         if not line:
             continue

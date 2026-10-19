@@ -433,7 +433,7 @@ def read_events(events_path: str | os.PathLike[str]) -> list[dict]:
     except OSError:
         return []
     events: list[dict] = []
-    for line in text.splitlines():
+    for line in text.split("\n"):
         line = line.strip()
         if not line:
             continue
