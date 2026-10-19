@@ -29,7 +29,7 @@ inputs:
   submission_type:
     type: string
     required: true
-    description: "Enum: indexnow, google_indexing_api, both. Invalid değer DURUR #2 ABORT. 'indexnow' sadece IndexNow REST POST; 'google_indexing_api' şu an sitemap-submit path (mcp__gsc__submit_sitemap = sitemap.xml submit, per-URL DEĞİL); per-URL Google Indexing API URL_UPDATED GENEL bir kanal DEĞİL — yalnızca JobPosting/BroadcastEvent sayfaları için uygundur (eligibility hard-gate + consent gate, Wave 2 sonrası wire); 'both' iki path paralel çalışır."
+    description: "Enum: indexnow, google_indexing_api, both. Invalid değer DURUR #2 ABORT. 'indexnow' sadece IndexNow REST POST; 'google_indexing_api' şu an sitemap-submit path (mcp__gsc__submit_sitemap = sitemap.xml submit, per-URL DEĞİL); per-URL Google Indexing API (URL_UPDATED / URL_DELETED) tek resmi yoldan gider: scripts/production/indexing_submit.py (/pseo-index — canlı kontrol + günlük kota + kayıt; S-01); 'both' iki path paralel çalışır."
 outputs:
   - "_state/events.jsonl"
   - "outputs/indexing/{date}-submission-report.json"
@@ -56,8 +56,8 @@ budget:
   estimated_credits: 0
 autonomy:
   confidence: HIGH
-  requires_approval: true
-  safe_auto_execute: false
+  requires_approval: false
+  safe_auto_execute: true
 ---
 
 # indexing-ping — publishing skill (Phase 12 Wave 1, W-G1)
@@ -79,14 +79,14 @@ surviving URL set via two parallel paths:
    two **generic** indexing channels (works for any valid URL on the domain).
 
    The **per-URL Google Indexing API** (`indexing.googleapis.com/v3/
-   urlNotifications:publish`, notification types `URL_UPDATED` /
-   `URL_DELETED`) is **NOT a generic channel**: per Google's documented
-   restriction it is eligible ONLY for **JobPosting** or **BroadcastEvent**
-   pages — submitting any other page type violates Google's spam policies.
-   It is **not yet wired** (reserved for post-Wave-2) and, when wired, is
-   governed by the two-gate contract in Step 5 (an eligibility hard-gate AND
-   the operator-consent gate). **Never autonomous** — autonomous submission
-   is forbidden (`requires_approval: true`, `safe_auto_execute: false`).
+   urlNotifications:publish`, `URL_UPDATED` / `URL_DELETED`) is used for
+   **every page** — owner decision 2026-10-13, taken knowing that Google's
+   documentation limits the API to JobPosting / BroadcastEvent pages. It runs
+   only through the official path `scripts/production/indexing_submit.py`
+   (`/pseo-index`, S-01): live check before sending, daily quota per project
+   with a next-day queue, one report per run. `URL_UPDATED` needs no consent;
+   `URL_DELETED` needs this session's `/pseo-approve` for that URL.
+   Hand-written `outputs/_index_*.py` scripts are no longer produced.
 
 The skill is **READ-ONLY** with respect to `master.xlsx`. F-1 schema
 authority: `redirect_404` and `robots_txt` sheets allowed_writers=null
@@ -272,32 +272,24 @@ Sadece `submission_type in [google_indexing_api, both]` ise çalışır.
 (sitemap-level submission, NOT per-URL). Per GSC sitemap API: 200/204
 success, 429 quota, 5xx server.
 
-**Per-URL Google Indexing API — eligibility hard-gate (NOT a generic channel).**
-The per-URL Indexing API (`indexing.googleapis.com/v3/
-urlNotifications:publish`) is **not a generic URL-indexing channel**: per
-Google's documented restriction it accepts ONLY pages whose primary content
-is a **JobPosting** posting or a **BroadcastEvent** (live-stream) — any other
-page type is a spam-policy violation. Generic indexing therefore stays on the
-two generic channels (sitemap submission + IndexNow). This per-URL path is
-**not yet wired** (reserved for post-Wave-2). When it IS wired, BOTH of the
-following gates must pass before any per-URL notification fires:
+**Per-URL Google Indexing API — official path (S-01).** Every page may be
+sent (owner decision 2026-10-13; Google documents the API for JobPosting /
+BroadcastEvent only — the risk was accepted knowingly). The only way to send
+is `scripts/production/indexing_submit.py`:
 
-1. **Eligibility pre-check (deterministic hard-gate, policy).** Parse the
-   target page's JSON-LD and confirm the `@type` is `JobPosting` or
-   `BroadcastEvent` structured data. **Ineligible page → REFUSE** with an
-   explanation (`"Indexing API yalnızca JobPosting / BroadcastEvent sayfaları
-   için uygundur; bu sayfa uygun değil — sitemap submission + IndexNow
-   kullan"`). This gate is Google's documented eligibility restriction and is
-   **independent of consent** — an ineligible page is refused even WITH
-   operator approval.
-2. **Operator-consent gate.** Explicit per-run Süleyman approval
-   (`requires_approval: true`, `safe_auto_execute: false`); autonomous
-   submission is forbidden. Consent is **necessary but NOT sufficient**: it
-   gates an *eligible* page's notification but cannot make an ineligible page
-   eligible.
+1. **Live check first.** URL_UPDATED: HTTP 200, self (or no) canonical, no
+   `noindex`, and with `--expect` the new text on the page; URL_DELETED: 404
+   or 410. A URL that fails is skipped with its reason in the report — no
+   quota is spent on a page whose new content is not live yet.
+2. **Daily quota** (default 200 / project): today's reports are counted; the
+   overflow waits in `_state/indexing_queue.json` and goes first next run.
+3. **Consent only for URL_DELETED** (G-01 tier "onaylı"); URL_UPDATED is free.
+4. **IndexNow** is pinged for the same URLs when `INDEXNOW_KEY` is set.
+5. **Record:** `outputs/indexing/{date}-{HHMMSS}-submission.json`; `status`
+   reads Google's last notification time (getMetadata).
 
-The `URL_UPDATED` / `URL_DELETED` notification types stay RESERVED for this
-unbuilt per-URL path and are never emitted on the wired sitemap path (which
+The `URL_UPDATED` / `URL_DELETED` notification types belong to the
+per-URL path above and are never emitted on the sitemap path (which
 records `sitemap_submission` semantics — see Step 7).
 
 **DURUR #4 trigger.** GSC API 5xx / timeout → AMBER + retry-once
