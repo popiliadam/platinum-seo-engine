@@ -240,9 +240,29 @@ profile-aware gate sıkılaştırması:
 
 DURUR #2 trigger: R-90 manuel approve YOK → STOP.
 
-### Step 4: R-91 301/410 Decision Tree (4 Senaryo)
+### Step 3b: Code Veto on Removal (S-25 — model kararı DEĞİL)
 
-R-91 decision tree branch:
+Silme/410 kararı modele bırakılmaz. Step 4'ten ÖNCE her URL için:
+
+```python
+from scripts.production.remediation_guard import PageSignals, guard
+decision = guard(action, PageSignals(
+    url=url, word_count=..., clicks_16m=..., external_links=...,   # SF + GSC 16 ay
+    clicks_90d=..., impressions_90d=..., published=...,             # GSC 90 gün + CMS
+), today=today, merge_target=topical_map_relevant_or_input_target)
+```
+
+- 600 kelimeden uzun, son 16 ayda tıklaması ya da dış linki olan sayfa **silinemez /
+  410 verilemez**: karar `merge` (301 → hedef) ya da `rewrite` (revise-content'e
+  devir) olur. Bilinmeyen sinyal sayfayı "güvenli" kanıtlamaz → veto.
+- `prune` ek filtre: 90 günde 0 tıklama, < 50 gösterim, son 3 ayda yayınlanmamış.
+- Step 4 `decision.action` ile çalışır (input action değil); `decision.reasons`
+  rapora yazılır ("neden silinmedi").
+- Canlı sayfayı kaldırma deploy'u onaylı kademededir (G-01; müşteri sunucusuna POST).
+
+### Step 4: R-91 301/410 Decision Tree (4 Senaryo + noindex)
+
+R-91 decision tree branch (Step 3b `decision.action` üzerinden):
 
 **Senaryo 1 — action="prune" + organic traffic VAR (R-85 GSC clicks > 0):**
 - 301 redirect (target_url topical_map'ten relevant page derive,
@@ -252,11 +272,12 @@ R-91 decision tree branch:
 - master.xlsx[redirect_404] write: `[url, inlinks, "301",
   target_url, "active"]`.
 
-**Senaryo 2 — action="prune" + organic traffic YOK (R-85 GSC clicks == 0):**
+**Senaryo 2 — action="prune" + organic traffic YOK (Step 3b removal_allowed):**
 - 410 Gone (permanent removal).
 - R-118 humanize 410 reason text (tone_phrases_blocklist consume).
-- master.xlsx[robots_txt] write: `[id, "warning", "disallow_404",
-  url, "robots Disallow:"]`.
+- **robots Disallow EKLENMEZ** (S-12 / R-133): Disallow'lu URL'nin 410'unu Google
+  göremez. master.xlsx[robots_txt] write: `[id, "LOW", "410 URL must stay
+  crawlable", url, "robots.txt'e Disallow ekleme; 410 görülsün"]`.
 - master.xlsx[redirect_404] entry: `[url, inlinks, "410", null,
   "permanent"]`.
 
@@ -269,12 +290,20 @@ R-91 decision tree branch:
 - DURUR #3 trigger: target_url == null → REJECT (R-91 decision
   tree).
 
-**Senaryo 4 — action="delete":**
+**Senaryo 4 — action="delete" (Step 3b removal_allowed):**
 - 410 Gone (permanent, irreversible).
-- master.xlsx[robots_txt] write: `[id, "critical", "disallow_410",
-  url, "robots Disallow: + 410"]`.
+- **robots Disallow EKLENMEZ** (S-12): master.xlsx[robots_txt] write: `[id, "LOW",
+  "410 URL must stay crawlable", url, "robots.txt'e Disallow ekleme; 410 görülsün"]`.
 - master.xlsx[redirect_404] entry: `[url, inlinks, "410", null,
   "permanent"]`.
+
+**Senaryo 5 — merge (Step 3b veto + hedef var):** 301 → `decision.target`
+(içerik hedef sayfaya taşınır; redirect_404 `[url, inlinks, "301", target, "active"]`).
+
+**Senaryo 6 — noindex (sayfa kalmalı ama dizinde olmamalı):** etiket/filtre/yasal
+sayfalar gibi kullanıcıya gerekli ama aramada değersiz URL'ler → `noindex,follow`
+(R-58 lifecycle map; robots Disallow YOK, noindex görülebilsin). Veto edilen ve
+hedefi olmayan sayfa ise `rewrite` → revise-content.
 
 ### Step 5: R-118 Humanize Pass (Scope-Out Check, Principle 3)
 

@@ -107,9 +107,11 @@ Profile-aware:
 ### R-91: Silinen URL 301/410 Decision Tree
 
 **Statement.** Sunsetted/pruned URL decision tree:
-- Cluster relevance gone + low traffic → **410 Gone** (Google permanent removal signal).
-- Cluster relevance partial + redirect target var → **301 Permanent Redirect** (link equity transfer).
-- Decision: `master.xlsx[redirect_404].action` enum (`301`, `410`); user override.
+- **Kod vetosu önce (S-25):** 600+ kelime, son 16 ayda tıklama veya dış link olan sayfa silinemez / 410 verilemez → 301 ile birleştir ya da yeniden yaz (`scripts/production/remediation_guard.py`; bilinmeyen sinyal = veto). Budama filtresi: 90 günde 0 tıklama, < 50 gösterim, son 3 ayda yayınlanmamış.
+- Cluster relevance gone + low traffic + veto yok → **410 Gone** (Google permanent removal signal). 410 verilen URL robots.txt'te **açık kalır** (Disallow eklenmez — R-133; aksi hâlde 410 görülmez).
+- Cluster relevance partial + redirect target var → **301 Permanent Redirect** (link equity transfer / birleştirme).
+- Kullanıcıya gerekli ama aramada değersiz sayfa → **noindex,follow** (sayfa kalır; Disallow yok).
+- Decision: `master.xlsx[redirect_404].action` enum (`301`, `410`); user override yalnız veto sınırları içinde.
 
 **Rationale.** 301 vs 410 SEO impact farklı; 410 hızlı deindex, 301 link equity korur.
 
