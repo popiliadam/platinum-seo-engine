@@ -50,6 +50,7 @@ def build_step(
     observed_mcp: Iterable[str] | None = None,
     input_count: int | None = None,
     scored_count: int | None = None,
+    reason: str | None = None,
 ) -> dict:
     """Build ONE coverage step dict with only the declared keys present.
 
@@ -78,6 +79,8 @@ def build_step(
         step["input_count"] = input_count
     if scored_count is not None:
         step["scored_count"] = scored_count
+    if reason:
+        step["reason"] = reason
     return step
 
 

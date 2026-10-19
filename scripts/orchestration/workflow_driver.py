@@ -47,7 +47,7 @@ from typing import Callable
 
 from scripts.orchestration import committer, coverage
 from scripts.orchestration.run_step import (
-    StepSpec, empty_commit_kwargs, precommit_rejects, run_step,
+    StepSpec, empty_commit_kwargs, isolated_step, precommit_rejects, run_step,
 )
 from scripts.orchestration.verify import verify_raw_drop
 from scripts.state.engine_version import engine_version as current_engine_version
@@ -183,14 +183,15 @@ def _run_attested_step(
         status = "missing" if vr.reason == "missing_file" else "failed"
         return coverage.build_step(
             spec.name, spec.verification_class, status,
-            observed_mcp=list(spec.observed_mcp),
+            observed_mcp=list(spec.observed_mcp), reason=vr.reason,
         )
     rows_out = spec.transform(vr.rows)  # loader: model-produced output rows
-    if precommit_rejects(spec, vr.input_count, rows_out, enforce_ratio=False):
+    rejected = precommit_rejects(spec, vr.input_count, rows_out, enforce_ratio=False)
+    if rejected:
         return coverage.build_step(
             spec.name, spec.verification_class, "failed",
             observed_mcp=list(spec.observed_mcp),
-            input_count=vr.input_count, scored_count=len(rows_out),
+            input_count=vr.input_count, scored_count=len(rows_out), reason=rejected,
         )
     result = commit_fn(
         workbook_path, spec.sheet, rows_out,
@@ -299,11 +300,11 @@ def run_workflow(
     )
     specs = build_steps(steps_table, run_id, project_slug, workspace_root)
     steps = [
-        _run_one(
+        isolated_step(spec, lambda spec=spec: _run_one(
             spec, run_id=run_id, project_slug=project_slug,
             workspace_root=workspace_root, workbook_path=workbook_path,
             now_epoch=now_epoch, schema_path=schema_path, commit_fn=commit_fn,
-        )
+        ))
         for spec in specs
     ]
     if report_step_name is not None:

@@ -64,6 +64,11 @@
             "type": "integer",
             "minimum": 0,
             "description": "Rows/items the transform actually committed (numerator). A high silent-skip ratio HARD-FAILS the step in 1b."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional. Why a step is not satisfied: a verify_raw_drop code (missing_file, stale, truncated, ...), empty_output / silent_skip (refused before the write, V-01), or exception:<Type>: <message> for an error raised inside the step (V-09)."
           }
         }
       }

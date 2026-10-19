@@ -43,8 +43,9 @@ class StepSpec:
 
 def precommit_rejects(
     spec: StepSpec, input_count: int, rows_out: list[dict], *, enforce_ratio: bool
-) -> bool:
-    """True iff ``rows_out`` must NOT be committed (V-01) — checked BEFORE the write.
+) -> str | None:
+    """The reason ``rows_out`` must NOT be committed (V-01), or None — checked
+    BEFORE the write.
 
     ``replace`` clears the sheet first, so the count gate has to run before it:
     an empty output is refused unless the step declares ``allow_empty``; with
@@ -52,8 +53,23 @@ def precommit_rejects(
     (model_attested steps aggregate legitimately, so they skip the ratio).
     """
     if not rows_out:
-        return not spec.allow_empty
-    return enforce_ratio and silent_skip_exceeds(input_count, len(rows_out))
+        return None if spec.allow_empty else "empty_output"
+    if enforce_ratio and silent_skip_exceeds(input_count, len(rows_out)):
+        return "silent_skip"
+    return None
+
+
+def isolated_step(spec: StepSpec, run: Callable[[], dict]) -> dict:
+    """Run one step; an exception raised inside it becomes a FAILED coverage step
+    with an ``exception:<Type>`` reason instead of aborting the loop (V-09)."""
+    try:
+        return run()
+    except Exception as exc:  # any step error is recorded, never escapes the loop
+        return coverage.build_step(
+            spec.name, spec.verification_class, "failed",
+            observed_mcp=list(spec.observed_mcp),
+            reason=f"exception:{type(exc).__name__}: {exc}"[:300],
+        )
 
 
 def empty_commit_kwargs(rows_out: list[dict]) -> dict:
@@ -97,10 +113,12 @@ def run_step(
             spec.verification_class,
             status,
             observed_mcp=list(spec.observed_mcp),
+            reason=vr.reason,
         )
 
     rows_out = spec.transform(vr.rows)  # pure; must not mutate vr.rows
-    if precommit_rejects(spec, vr.input_count, rows_out, enforce_ratio=True):
+    rejected = precommit_rejects(spec, vr.input_count, rows_out, enforce_ratio=True)
+    if rejected:
         return coverage.build_step(
             spec.name,
             spec.verification_class,
@@ -108,6 +126,7 @@ def run_step(
             observed_mcp=list(spec.observed_mcp),
             input_count=vr.input_count,
             scored_count=len(rows_out),
+            reason=rejected,
         )
     result = commit_fn(
         workbook_path,
@@ -119,14 +138,15 @@ def run_step(
         **empty_commit_kwargs(rows_out),
     )
     scored = result.rows_affected
-    status = "failed" if silent_skip_exceeds(vr.input_count, scored) else "satisfied"
+    skipped = silent_skip_exceeds(vr.input_count, scored)
     return coverage.build_step(
         spec.name,
         spec.verification_class,
-        status,
+        "failed" if skipped else "satisfied",
         observed_mcp=list(spec.observed_mcp),
         input_count=vr.input_count,
         scored_count=scored,
+        reason="silent_skip" if skipped else None,
     )
 
 
@@ -154,7 +174,7 @@ def run_sequence(
     the verdict reflects it.
     """
     steps = [
-        run_step(
+        isolated_step(spec, lambda spec=spec: run_step(
             spec,
             run_id=run_id,
             project_slug=project_slug,
@@ -164,7 +184,7 @@ def run_sequence(
             max_age_seconds=max_age_seconds,
             schema_path=schema_path,
             commit_fn=commit_fn,
-        )
+        ))
         for spec in specs
     ]
     required_satisfied, verdict = coverage.derive_verdict(steps)
