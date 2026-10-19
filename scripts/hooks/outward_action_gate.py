@@ -551,6 +551,11 @@ def _classify_segment(segment: str) -> tuple[str, str] | None:
         operands = _operands(tokens, 1)
         return ("fs_delete", " ".join(operands) if operands else segment.strip())
 
+    if first == "mv":  # moving protected data away removes it from the project
+        sources = _operands(tokens, 1)[:-1]
+        protected = [src for src in sources if _is_protected_path(src)]
+        return ("fs_delete", " ".join(protected)) if protected else None
+
     if first == "find":
         target = _find_delete_target(tokens)
         return ("fs_delete", target) if target is not None else None
@@ -1082,8 +1087,8 @@ _SHELL_TOOL_FIELDS = {
 _FILE_TOOL_FIELDS = {
     "__write_file": ("Write", "path"),
     "__edit_block": ("Edit", "file_path"),
-    "__move_file": ("Write", "destination"),
 }
+_MALFORMED = "__malformed_tool_call__"
 
 
 def _tool_variants(tool_name: str, tool_input) -> list[tuple[str, dict]]:
@@ -1103,9 +1108,20 @@ def _tool_variants(tool_name: str, tool_input) -> list[tuple[str, dict]]:
             code = ti["input"]
             return [("Bash", {"command": code}),
                     ("Bash", {"command": "python3 -c " + shlex.quote(code)})]
+        if tool_name.endswith("__move_file"):
+            src, dst = ti.get("source"), ti.get("destination")
+            if isinstance(src, str) and isinstance(dst, str):
+                # the destination is written; the source is removed from its place
+                return [("Write", {"file_path": dst}),
+                        ("Bash", {"command": "mv " + shlex.quote(src) + " " + shlex.quote(dst)})]
+            return [(_MALFORMED, {"tool": tool_name})]
         for suffix, (canonical, field) in _FILE_TOOL_FIELDS.items():
-            if tool_name.endswith(suffix) and isinstance(ti.get(field), str):
-                return [(canonical, {"file_path": ti[field]})]
+            if tool_name.endswith(suffix):
+                if isinstance(ti.get(field), str):
+                    return [(canonical, {"file_path": ti[field]})]
+                return [(_MALFORMED, {"tool": tool_name})]
+        if any(tool_name.endswith(suffix) for suffix in (*_SHELL_TOOL_FIELDS, "__interact_with_process")):
+            return [(_MALFORMED, {"tool": tool_name})]  # field missing: fail closed
     return [(tool_name, tool_input)]
 
 
@@ -1118,7 +1134,11 @@ def _gated(payload: dict) -> tuple[str | None, list[Hit]]:
         reason = forgery_reason(name, ti, payload.get("cwd"))
         if reason is not None:
             break
-    hits = [hit for name, ti in variants for hit in assess_all(name, ti)]
+    hits = [
+        Hit("fs_delete", ti["tool"], TIER_CONSENT) if name == _MALFORMED else hit
+        for name, ti in variants
+        for hit in ([None] if name == _MALFORMED else assess_all(name, ti))
+    ]
     return reason, hits
 
 
