@@ -545,7 +545,7 @@ def gsc_data_age_days(events_path: Path, today: _date) -> int | None:
     """Days since the newest GSC pull recorded in events.jsonl (D-15); None = never."""
     newest: _date | None = None
     try:
-        lines = events_path.read_text(encoding="utf-8").splitlines()
+        lines = events_path.read_text(encoding="utf-8").split("\n")  # V-13: not splitlines
     except OSError:
         return None
     for line in lines:

@@ -142,8 +142,17 @@ def _normalize_ndjson_csv_in_place(path: Path) -> bool:
     if not _sniff_is_ndjson(path):
         return False
     from scripts.ingestion.sf_crawl_orchestrator import ndjson_to_csv  # deferred: avoid import cycle
-    csv_text = ndjson_to_csv(path.read_text(encoding="utf-8-sig"))
-    path.write_text(csv_text, encoding="utf-8")
+    original = path.read_bytes()
+    csv_text = ndjson_to_csv(original.decode("utf-8-sig"))
+    # D-18: never lose the raw export — keep it beside the converted CSV
+    # (".ndjson-original" is not matched by the *.csv walk) and swap the CSV
+    # in atomically so a crash cannot leave a half-written file.
+    keep = path.with_name(path.name + ".ndjson-original")
+    if not keep.exists():
+        keep.write_bytes(original)
+    tmp = path.with_name(f".{path.name}.tmp")
+    tmp.write_text(csv_text, encoding="utf-8")
+    os.replace(tmp, path)
     return True
 
 
@@ -182,8 +191,10 @@ def match_tiers(raw_dir: Path) -> tuple[list[FileMatch], set[str], set[str]]:
         with open(path, "rb") as f:
             data = f.read()
         sha = hashlib.sha256(data).hexdigest()
-        with open(path, "r", encoding="utf-8") as f:
-            row_count = max(0, sum(1 for _ in f) - 1)
+        # D-18: count CSV records, not physical lines — a quoted field with a
+        # newline is one row.
+        with open(path, "r", encoding="utf-8-sig", newline="") as f:
+            row_count = max(0, sum(1 for rec in csv.reader(f) if rec) - 1)
 
         matched.append(FileMatch(
             canonical_name=canonical,
