@@ -175,15 +175,30 @@ def _build_report_id(project_id: str, period_end: str) -> str:
 
 # --- openpyxl thin wrapper — INLINE (no helper extract per Q-MTS-1) ------
 
+def schema_header_rows(schema_path: Path | None = None) -> dict[str, int]:
+    """{sheet: header_row} from schemas/master-excel.schema.json (D-15)."""
+    path = schema_path or (_REPO_ROOT / "schemas" / "master-excel.schema.json")
+    try:
+        sheets = json.loads(path.read_text(encoding="utf-8")).get("sheets") or {}
+    except (OSError, ValueError):
+        return {}
+    return {name: int(spec["header_row"]) for name, spec in sheets.items()
+            if isinstance(spec, dict) and isinstance(spec.get("header_row"), int)}
+
+
 def read_workbook(
     *, workbook_path: Path, sheets: Sequence[str],
+    header_rows: Mapping[str, int] | None = None,
 ) -> dict[str, list[dict]]:
     """Read named sheets from master.xlsx → row-dict form. READ-ONLY.
 
-    First non-empty row is the header; subsequent rows become
-    {col_name: cell_value} dicts. Empty rows skipped. Sheets not in the
-    workbook map to []  (tolerant — caller decides on graceful degrade).
+    D-15: the header is the schema's ``header_row`` for the sheet (a stray
+    title in row 1 used to become the header), and column POSITIONS are kept —
+    an empty header cell no longer shifts every later column. Sheets without a
+    schema entry fall back to the first non-empty row. Empty data rows are
+    skipped. Sheets not in the workbook map to [] (tolerant).
     """
+    header_rows = schema_header_rows() if header_rows is None else header_rows
     if not workbook_path.is_file():
         raise WorkbookMissingError(
             f"master.xlsx not found at {workbook_path}"
@@ -205,13 +220,14 @@ def read_workbook(
             ws = wb[sheet_name]
             header: list[str] | None = None
             sheet_rows: list[dict] = []
-            for raw_row in ws.iter_rows(values_only=True):
+            fixed_header = header_rows.get(sheet_name)
+            for row_no, raw_row in enumerate(ws.iter_rows(values_only=True), start=1):
+                if fixed_header is not None and row_no < fixed_header:
+                    continue
                 if raw_row is None or all(c in (None, "") for c in raw_row):
                     continue
                 if header is None:
-                    header = [
-                        _safe_str(c) for c in raw_row if c not in (None, "")
-                    ]
+                    header = [_safe_str(c) for c in raw_row]  # positions kept
                     continue
                 row_dict: dict[str, Any] = {}
                 for i, h in enumerate(header):
@@ -522,6 +538,33 @@ def _measurement_notes(
     return head + ("" if outcomes else " | kohort verisi yok")
 
 
+GSC_MAX_AGE_DAYS = 7
+
+
+def gsc_data_age_days(events_path: Path, today: _date) -> int | None:
+    """Days since the newest GSC pull recorded in events.jsonl (D-15); None = never."""
+    newest: _date | None = None
+    try:
+        lines = events_path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return None
+    for line in lines:
+        try:
+            ev = json.loads(line)
+        except ValueError:
+            continue
+        src = ev.get("source") if isinstance(ev, dict) else None
+        if not isinstance(src, dict) or src.get("kind") != "gsc_mcp":
+            continue
+        ts = _safe_str(ev.get("timestamp"))[:10]
+        try:
+            d = datetime.strptime(ts, "%Y-%m-%d").date()
+        except ValueError:
+            continue
+        newest = d if newest is None or d > newest else newest
+    return None if newest is None else (today - newest).days
+
+
 def _build_measurement_context(
     period_start: str,
     period_end: str,
@@ -529,6 +572,7 @@ def _build_measurement_context(
     cohort_results: Sequence[Mapping[str, Any]] | None,
     *,
     calendar_retrieved_at: str | None = None,
+    gsc_age_days: int | None = None,
 ) -> dict:
     """Section 12 (additive-OPTIONAL) — measurement-honesty annotation.
 
@@ -553,8 +597,15 @@ def _build_measurement_context(
         "measurement_quality": quality,
         "core_updates_overlap": overlap,
         "intervention_outcomes": outcomes,
-        "notes": _measurement_notes(quality, overlap, outcomes, calendar_retrieved_at),
+        "notes": _measurement_notes(quality, overlap, outcomes, calendar_retrieved_at)
+                 + _gsc_age_note(gsc_age_days),
     }
+
+
+def _gsc_age_note(age: int | None) -> str:
+    if age is None or age <= GSC_MAX_AGE_DAYS:
+        return ""
+    return f" | GSC verisi {age} gün önce çekildi — rapordan önce yenileyin (D-15)"
 
 
 def _completed_to_section(
@@ -735,6 +786,7 @@ def assemble_report(
     calendar_updates: Sequence[Mapping[str, Any]] = (),
     calendar_retrieved_at: str | None = None,
     cohort_results: Sequence[Mapping[str, Any]] | None = None,
+    gsc_age_days: int | None = None,
 ) -> dict:
     """Pure assembler: ReportInputs → schema-conformant dict.
 
@@ -771,7 +823,7 @@ def assemble_report(
     )
     measurement_context = _build_measurement_context(
         inputs.period_start, inputs.period_end, calendar_updates, cohort_results,
-        calendar_retrieved_at=calendar_retrieved_at,
+        calendar_retrieved_at=calendar_retrieved_at, gsc_age_days=gsc_age_days,
     )
     exec_summary = _build_exec_summary(
         gsc_trends, pages_up, tech_done, content_revised, new_content,
@@ -1072,7 +1124,9 @@ def main(argv: list[str]) -> int:
             inputs=inputs, framing_policy=args.framing_policy,
             output_formats=output_formats, data_sources=data_sources,
             calendar_updates=calendar_updates, cohort_results=cohort_results,
-            calendar_retrieved_at=calendar_retrieved_at)
+            calendar_retrieved_at=calendar_retrieved_at,
+            gsc_age_days=gsc_data_age_days(project_dir / "_state" / "events.jsonl",
+                                           datetime.now(timezone.utc).date()))
     except MonthlyReportError as exc:
         print(f"assemble failed: {exc}", file=sys.stderr)
         return 1
