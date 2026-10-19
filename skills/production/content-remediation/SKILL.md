@@ -111,9 +111,9 @@ Multi-signal cross-check zorunlu (R-85), single-signal yetmez.
 - **Layer 1 (pre-remediation):** skill prompt explicit "uydurma decay
   reason yasak" sentinel; remediation kararı GSC actual data ile
   bağlanır.
-- **Layer 2 (multi-signal verify):** R-85 multi-signal threshold —
-  clicks_delta + position_delta + impressions_delta + delta_pct +
-  trend (3/5 minimum satisfied gerekli, single-signal YASAK).
+- **Layer 2 (multi-signal verify):** R-85 multi-signal threshold — tek
+  tanım `rules/content-update-discipline.md` (clicks + position VEYA
+  impressions + rank; `trend == "DECAY"`), single-signal YASAK.
 - **Layer 3 (audit trail):** completed_work entry verifiable kaynak
   (GSC actual data); `note` field decay reason + signal list
   belirtir, fabricate yasak.
@@ -208,14 +208,12 @@ content_decay.action ile cross-check; mismatch durumunda RED
 GSC data cross-check (`master.xlsx[content_decay]` sütunları +
 `content_improve` sheet F-15 READ-ONLY):
 
-- `clicks_delta < -20%` (significant drop)
-- `delta_pct < -15%`
-- `position_delta > +5` (position drop)
-- `impressions_delta < -10%`
-- `trend == "down"` (3-month rolling)
-
-Multi-signal threshold: minimum 3/5 signal satisfied gerekli (single-
-signal remediation YASAK — Principle 1 Layer 2).
+R-85 multi-signal threshold — **tek tanım** `rules/content-update-discipline.md`
+(kod: `content_decay_transform._trend_label`): clicks_delta / delta_pct +
+position kötüleşmesi VEYA impressions çöküşü + rank kötüleşmesi; profil
+eşikleri ve hacim tabanı dahil. Bu skill eşik yeniden tanımlamaz:
+`content_decay` satırının `trend == "DECAY"` olması gerekir (single-signal
+remediation YASAK — Principle 1 Layer 2).
 
 DURUR #1 trigger: R-85 threshold satisfied değil → manual approve
 gerekli (Süleyman onayı), single-signal remediation YASAK.
@@ -378,8 +376,7 @@ Event entry (5 required field F-14 strict):
 ## DURUR Conditions (5 koşul)
 
 1. **DURUR #1 — R-85 Multi-Signal Threshold Satisfied Değil.**
-   `clicks_delta + delta_pct + position_delta + impressions_delta +
-   trend` 3/5 minimum sağlanmıyor → single-signal remediation YASAK
+   `content_decay.trend != "DECAY"` (R-85 tek tanım) → single-signal remediation YASAK
    (P1 Layer 2). Manual approve gerekli (Süleyman onayı). Default
    path: STOP, master_task close suggestion.
 2. **DURUR #2 — R-90 Manuel Approve YOK.** Süleyman onay gate

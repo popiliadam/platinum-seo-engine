@@ -95,7 +95,7 @@ def test_h3_r25_no_phantom_internal_links_sheet():
 # --- H4: R-35 single canonical title/desc authority ------------------------
 def test_h4_r35_single_authority_with_heuristic_note():
     block = _rule_block(_read("content-html-discipline.md"), "R-35")
-    assert "580" in block and "990" in block, "R-35 canonical px caps: title 580 / desc 990"
+    assert "580" in block and "920" in block, "R-35 canonical px caps: title 580 / desc 920"
     low = block.lower()
     assert "tek otorite" in low or "single authority" in low, "R-35 must declare itself the single authority"
     assert "60/160" in block, "char counts (60/160) must be named as the tech-audit heuristic"

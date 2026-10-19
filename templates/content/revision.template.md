@@ -87,7 +87,7 @@ PRE-COMMIT zorunlu kontrol — bu check FAIL ederse revise reject:
 - [ ] R-89 canonical immutable, dateModified ISO 8601
 - [ ] R-86 user explicit approve audit trail (`change_summary.approved_by`)
 - [ ] R-87 change_summary `events.jsonl` veya `master.xlsx[completed_work].note` log
-- [ ] R-103 major revise → content-version increment + content-version meta tag
+- [ ] R-103 major revise → version.json increment (sayfaya meta etiketi yok)
 - [ ] R-78..R-84 schema markup re-render (Article.dateModified updated)
 - [ ] R-58 lifecycle robots meta (lifecycle_status değişmediyse no-op)
 - [ ] Content diff scope master.xlsx[content_decay].action = `pending_approve` → `approved` flip

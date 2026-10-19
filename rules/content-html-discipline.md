@@ -82,7 +82,7 @@ Bu doc Phase 10 HTML/CSS/image disiplinini tanımlar. **Foundational Principles*
 
 ### R-35: Meta Pixel Cap (Title/Description Tek Otorite)
 
-**Statement.** Meta title pixel ≤ 580px (desktop) + meta description pixel ≤ 990px (desktop). **Bu kural başlık/açıklama uzunluğunun TEK otoritesidir (single authority).** Pixel cap karakter cap'inden otoriterdir (Türkçe `ş`, `ğ`, `ı` farklı pixel genişliği). Karakter sayıları (≈60/160 karakter) yalnızca **tech-audit yaklaşık sezgisel ölçüsüdür (approximation heuristic)** — production skill'ler (new-blog vb.) uzunluk için R-35 pixel cap'ini cite eder, sabit karakter sayısını değil.
+**Statement.** Meta title pixel ≤ 580px (desktop) + meta description pixel ≤ 920px (desktop; mobilde ≈680px'te kesilir). **Bu kural başlık/açıklama uzunluğunun TEK otoritesidir (single authority).** Pixel cap karakter cap'inden otoriterdir (Türkçe `ş`, `ğ`, `ı` farklı pixel genişliği). Karakter sayıları (≈60/160 karakter) yalnızca **tech-audit yaklaşık sezgisel ölçüsüdür (approximation heuristic)** — production skill'ler (new-blog vb.) uzunluk için R-35 pixel cap'ini cite eder, sabit karakter sayısını değil.
 
 **Rationale.** Google SERP truncate eşiği pixel-tabanlıdır; 60/160 karakter yalnızca kaba bir tech-audit tahminidir (Türkçe glif genişlikleri sabit değil). Tek otorite uzunluk/tasarım drift'ini önler: new-blog'un 540px/680px ve tech-audit'in 60/160-char varyantları R-35'e hizalanır.
 
@@ -120,7 +120,7 @@ Bu doc Phase 10 HTML/CSS/image disiplinini tanımlar. **Foundational Principles*
 
 **Statement.** Content lifecycle status (`master.xlsx[new_content_plan].lifecycle_status`) → robots meta map: `GREEN`/`RED` → `index,follow`; `ON_HOLD` → `noindex,follow`; `REMOVED` → 410/301 (R-91).
 
-**Rationale.** Profile-aware Principle 2. Hold'daki content'i Google crawl etmesin ama internal link'ler korunur.
+**Rationale.** Profile-aware Principle 2. Hold'daki içerik dizine girmesin ama internal link'ler korunur. `noindex` taramayı ENGELLEMEZ — Google sayfayı tarar ve etiketi okur, sadece dizine almaz; bu yüzden aynı URL robots.txt ile Disallow EDİLMEZ (engellenirse noindex görülmez, R-133).
 
 **Enforcement.** Skill `<meta name="robots">` lifecycle map'ten render eder.
 

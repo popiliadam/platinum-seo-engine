@@ -67,11 +67,11 @@ Varsayılan öneri: arama ve kullanıcı botlarına izin; eğitim botları müş
 
 ### R-103: Content Versioning Marker (Major Revise)
 
-**Statement.** Major revise (R-87 section-targeted bilinen, > 30% content değişimi) → content versioning marker `<meta name="content-version" content="v{{N}}">` head'de. v1 default; v2+ revise sonrası increment.
+**Statement.** Major revise (`claim_delta > 5` VEYA `structure_changed` VEYA profil değişimi — revise-content Step 7 tek tanım) → içerik sürümü artar (v1 → v2). Sürüm **motorda** tutulur: `outputs/blog/{slug}/version.json` + change_summary geçmişi. Sayfaya standart dışı `<meta name="content-version">` etiketi YAZILMAZ (S-23: hiçbir arama motoru okumaz); sayfadaki tazelik sinyali gerçek değişiklikle birlikte güncellenen `dateModified`'dır (R-88).
 
-**Rationale.** AIO/LLM bot freshness signal; major revise re-citation şansı.
+**Rationale.** Hangi revizyonun ne değiştirdiği izlenebilir kalır; sayfaya anlamsız işaret eklenmez.
 
-**Enforcement.** revise-content skill change_summary > 30% → version increment.
+**Enforcement.** revise-content Step 7 version.json'u günceller.
 
 **Failure mode.** Silent.
 

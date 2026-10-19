@@ -99,8 +99,9 @@ def test_r85_multi_signal_threshold():
     assert "impressions" in lower, "impressions signal missing"
     assert "delta_pct" in text or "delta pct" in lower, "delta_pct signal missing"
     assert "trend" in lower, "trend signal missing"
-    # Threshold: minimum 3/5 satisfied
-    assert "3/5" in text or "minimum 3" in lower, "3/5 threshold missing"
+    # S-23: the skill cites the single R-85 definition instead of its own 3/5 scheme.
+    assert "tek tanım" in lower and "_trend_label" in text
+    assert "3/5" not in text
 
 
 # --- Test 3: R-90 manual approve gate test (autonomy MEDIUM) ---

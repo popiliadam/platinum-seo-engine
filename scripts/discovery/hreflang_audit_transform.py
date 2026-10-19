@@ -40,7 +40,9 @@ _DETAIL_CHAR_CAP = 300
 _OFFENDER_SAMPLE = 5
 
 # Permissive BCP-47-ish SHAPE regex (R-126) — lang (+ optional script + region).
-_CODE_RE = re.compile(r"^[a-z]{2,3}(-[A-Za-z]{4})?(-[A-Z]{2})?$")
+# Case-insensitive (S-23): Google treats hreflang values case-insensitively,
+# so "en-gb" is as valid as "en-GB".
+_CODE_RE = re.compile(r"^[a-z]{2,3}(-[a-z]{4})?(-[a-z]{2})?$", re.IGNORECASE)
 # Documented region mistakes R-126 names (region subtag -> ISO 3166-1 correction).
 _COMMON_INVALID_REGIONS = {"uk": "GB"}
 

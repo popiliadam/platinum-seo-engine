@@ -97,7 +97,7 @@ Brief Paketi, then renders four artifacts:
    entities (Article + Organization + Person + BreadcrumbList;
    R-78..R-83). No FAQPage (R-79 / S-05: the FAQ rich result is gone).
 3. `outputs/blog/{slug}/meta-tags.json` — meta title (≤580px desktop)
-   + meta description (≤990px desktop) per R-35 (single authority) +
+   + meta description (≤920px desktop) per R-35 (single authority) +
    OpenGraph + Twitter card pack.
 4. `outputs/blog/{slug}/upload-instructions.md` — Section A new-blog
    manuel WordPress upload workflow (R-74); skill itself does NOT
@@ -125,7 +125,7 @@ with `event_type=content_new`.
 - `outputs/blog/{slug}/schema.jsonld` — JSON-LD `@graph` 4 entity
   (Article + Organization + Person + BreadcrumbList); no FAQPage (R-79).
 - `outputs/blog/{slug}/meta-tags.json` — meta title (≤580px) + meta
-  description (≤990px) per R-35 + OG + Twitter pack.
+  description (≤920px) per R-35 + OG + Twitter pack.
 - `outputs/blog/{slug}/upload-instructions.md` — Section A new-blog
   WordPress manual upload steps (R-74).
 - `_state/events.jsonl` — audit append, `event_type=content_new`,
@@ -546,7 +546,7 @@ actual API call optional). DURUR #8 trigger: REJECT → schema fix önce.
 Meta title pixel calc: ≤580px desktop (R-35 single authority; ~60 char
 is only a tech-audit approximation heuristic — Türkçe glyph widths
 vary, so the pixel cap is authoritative, not the char count). Meta
-description pixel calc: ≤990px desktop (R-35; ~160 char heuristic
+description pixel calc: ≤920px desktop (R-35; ~160 char heuristic
 only). DURUR #7 trigger: cap aşımı → auto-correct attempt; fail ise
 manuel revise.
 
@@ -666,7 +666,7 @@ Expected: schema_version `"1.2"`, profile.enum array of 5 strings.
 | Tier-1 Scrapling 403 / blocked   | AMBER | tier-0 SERP description fallback                                      |
 | P1 citation missing              | RED   | DURUR #6, claim revize                                                |
 | P3 7-pattern AMBER 2x same pass  | RED   | manuel revise                                                         |
-| meta pixel cap > 580 / 990 (R-35)| AMBER | auto-correct → fail RED                                               |
+| meta pixel cap > 580 / 920 (R-35)| AMBER | auto-correct → fail RED                                               |
 | Schema Rich Results REJECT       | RED   | DURUR #8, `@graph` fix                                                |
 
 ## References

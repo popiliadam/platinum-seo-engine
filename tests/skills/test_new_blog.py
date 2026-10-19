@@ -11,7 +11,7 @@ Coverage:
   7. R-118 humanize blocklist consume reference.
   8. JSON-LD @graph 5 entity (Article + Organization + Person +
      BreadcrumbList + FAQPage) named.
-  9. Meta title/desc cite R-35 canonical caps (580/990 desktop); stats-density
+  9. Meta title/desc cite R-35 canonical caps (580/920 desktop); stats-density
      restates R-104 min+max caps (FIX-K K3).
   10. Forbidden tokens (8 slugs + 3 Phase 7-lesson tokens) absent.
   11. events.jsonl event_type=content_new (F-8 enum).
@@ -221,18 +221,18 @@ def test_schema_markup_graph_5_entities() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test 9 — FIX-K K3: meta title/desc cite R-35 canonical caps (580/990 desktop)
+# Test 9 — FIX-K K3: meta title/desc cite R-35 canonical caps (580/920 desktop)
 # ---------------------------------------------------------------------------
 
 def test_meta_pixel_cap_cites_r35() -> None:
     """FIX-K K3 / FIX-H4: R-35 is the SINGLE authority for title/description
-    length — title ≤580px desktop, description ≤990px desktop. new-blog must
+    length — title ≤580px desktop, description ≤920px desktop. new-blog must
     cite those canonical numbers (not its old divergent 540/680 'mobil'
     variant) and reference R-35. Char counts (~60/160) are only a tech-audit
     approximation heuristic."""
     text = _skill_text()
     assert "580" in text, "meta title pixel cap (≤580px desktop, R-35) not documented"
-    assert "990" in text, "meta description pixel cap (≤990px desktop, R-35) not documented"
+    assert "920" in text, "meta description pixel cap (≤920px desktop, R-35) not documented"
     assert "R-35" in text, "new-blog must cite R-35 as the title/desc authority"
     # The old divergent caps must be gone (single-source discipline, FIX-H4).
     assert "540" not in text, "old divergent 540px title cap must be removed (cite R-35)"

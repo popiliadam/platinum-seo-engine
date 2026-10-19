@@ -39,9 +39,11 @@ Bu doc Phase 10 content lifecycle (decay → revise → sunset/prune) disiplinin
 
 ### R-85: Decay Multi-Signal Threshold
 
-**Statement.** Content decay multi-signal threshold:
+**Statement.** Content decay multi-signal threshold — **TEK TANIM** (S-23; content-decay, revise-content ve content-remediation bunu cite eder, yeniden tanımlamaz; kod: `content_decay_transform._trend_label`):
 - GSC clicks delta < -30% (90 day vs prior 90) **AND** position delta > +5 (kötüleşme), **VEYA**
-- Impressions delta < -40% **AND** ranking trend negative.
+- Impressions delta < -40% **AND** ranking trend negative (pozisyon kötüleşmiş).
+- **Hacim tabanı:** önceki pencerede < 10 tıklama olan URL decay sayılmaz (3 → 1 tıklama gürültüdür); proje bazında `decay_min_previous_clicks`.
+- Profil `project.config.profiles` listesinden okunur; profil yoksa varsayılan eşik kullanılır ve bu rapor meta'sında yazılır (sessiz varsayılan yok).
 
 Profile-aware:
 - YMYL: decay threshold daha sıkı (-20% clicks, +3 position).
@@ -80,7 +82,7 @@ Profile-aware:
 
 **Rationale.** Principle 3 (AI imza paterni preempt) + sahte tazelik (yalnız tarih değiştirmek) Google'ın insan odaklı içerik ölçütlerine aykırıdır; çekirdek sıralama sistemleri değerlendirir.
 
-**Enforcement.** revise-content skill change_summary boş veya word diff < 50 word → AMBER → 2x AMBER → RED. dateModified update'i content diff olmadan reject.
+**Enforcement.** TEK TANIM (S-23): `abs(word_delta) < 50 AND claim_delta == 0 AND NOT structure_changed` → RED (dateModified bump yok, çıktı discard); `claim_delta == 0 AND NOT structure_changed` ama `abs(word_delta) >= 50` → AMBER (manuel review); diğer her durum PASS. revise-content Step 6 bunu uygular.
 
 **Failure mode.** RED.
 

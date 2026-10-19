@@ -130,7 +130,7 @@ revision_metadata:
 1. WordPress Posts → Edit existing post (URL: `existing_url`)
 2. Body: section-targeted update (added/updated/removed sections)
 3. RankMath/Yoast schema panel: `Article.dateModified` update
-4. Eğer major revise: `<meta name="content-version" content="v{{N}}">` head'de update (Yoast custom code box veya theme functions.php)
+4. Eğer major revise: sürüm motorda (`outputs/blog/{slug}/version.json`) artar; sayfaya ayrı bir meta etiketi eklenmez (R-103)
 5. Save (NOT "Update Date" — yalnızca content değişimi; R-88 freshness theater yasağı)
 6. master.xlsx[completed_work] sheet manuel append: id, task=revise, url, date, category=revise-content, note=change_summary
 
