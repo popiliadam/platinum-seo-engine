@@ -143,3 +143,28 @@ def mock_dfs_budget_exhausted(monkeypatch: pytest.MonkeyPatch) -> None:
     """DFS budget pre-flight returns False — discovery DURUR awaiting_approval."""
     from scripts.meta import brand_onboarding_discovery as d
     monkeypatch.setattr(d, "_budget_preflight", lambda: False)
+
+
+# --------------------------------------------------------------------------
+# K-05 skip budget — a growing number of SKIPPED tests is a gate that measures
+# less every week while staying green. The full suite may skip at most
+# SKIP_BUDGET tests (39 today: live-crawl / operator-workspace fixtures absent
+# on CI). Lower it when a skip is fixed; raising it is a reviewed change.
+# Only enforced on a full run (``tests`` collected as a whole), so running a
+# single file never trips it.
+# --------------------------------------------------------------------------
+
+SKIP_BUDGET = 39
+
+
+def pytest_sessionfinish(session, exitstatus):  # noqa: D401 — pytest hook
+    reporter = session.config.pluginmanager.get_plugin("terminalreporter")
+    if reporter is None or session.testscollected < 3000:
+        return
+    skipped = len(reporter.stats.get("skipped", []))
+    if skipped > SKIP_BUDGET:
+        reporter.write_line(
+            f"SKIP BUDGET EXCEEDED: {skipped} skipped > {SKIP_BUDGET} "
+            "(tests/conftest.py SKIP_BUDGET, K-05)", red=True)
+        if session.exitstatus == 0:
+            session.exitstatus = 1

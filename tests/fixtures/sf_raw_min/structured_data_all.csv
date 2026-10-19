@@ -1,0 +1,4 @@
+﻿"Address","Errors","Warnings","Total Types","Unique Types","Type-1","Type-2","Indexability","Indexability Status"
+"https://example.test/","0","0","2","2","Organization","WebSite","Indexable",""
+"https://example.test/kombi/","1","2","1","1","Service","","Indexable",""
+"https://example.test/blog/bakim/","0","1","1","1","Article","","Indexable",""

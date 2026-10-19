@@ -1,0 +1,6 @@
+﻿"Address","Occurrences","Meta Description 1","Meta Description 1 Length","Meta Description 1 Pixel Width","Indexability","Indexability Status"
+"https://example.test/","1","Example home page.","18","108","Indexable",""
+"https://example.test/kombi/","1","Kombi bakım ve onarım.","22","132","Indexable",""
+"https://example.test/klima/","1","Klima montajı.","14","84","Indexable",""
+"https://example.test/blog/bakim/","1","","0","0","Indexable",""
+"https://example.test/etiket/eski/","1","Etiket sayfası.","15","90","Non-Indexable","noindex"

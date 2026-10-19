@@ -1,0 +1,6 @@
+﻿"Address","Occurrences","Title 1","Title 1 Length","Title 1 Pixel Width","Indexability","Indexability Status"
+"https://example.test/","1","Example Home","12","96","Indexable",""
+"https://example.test/kombi/","1","Kombi Servisi","13","104","Indexable",""
+"https://example.test/klima/","1","","0","0","Indexable",""
+"https://example.test/blog/bakim/","1","Bakım Rehberi","13","104","Indexable",""
+"https://example.test/etiket/eski/","1","Etiket","6","48","Non-Indexable","noindex"

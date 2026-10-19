@@ -1,0 +1,5 @@
+﻿"Issue Name","Issue Type","Issue Priority","URLs","% of Total","Description","How To Fix"
+"Page Titles: Missing","Issue","High","1","20.0","Pages without a title.","Add a unique title."
+"Meta Description: Missing","Opportunity","Medium","1","20.0","Pages without a meta description.","Write a meta description."
+"Response Codes: Internal Client Error (4xx)","Issue","High","1","10.0","Internal URLs returning 4xx.","Fix or redirect the URL."
+"Directives: Noindex","Warning","Low","1","20.0","Pages carrying noindex.","Check the noindex is intended."

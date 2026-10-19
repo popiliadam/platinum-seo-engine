@@ -1,0 +1,6 @@
+﻿"Address","Occurrences","H1-1","H1-1 Length","Indexability","Indexability Status"
+"https://example.test/","1","Welcome","7","Indexable",""
+"https://example.test/kombi/","1","Kombi Servisi","13","Indexable",""
+"https://example.test/klima/","1","Klima","5","Indexable",""
+"https://example.test/blog/bakim/","1","Bakım Rehberi","13","Indexable",""
+"https://example.test/etiket/eski/","1","Etiket","6","Non-Indexable","noindex"
