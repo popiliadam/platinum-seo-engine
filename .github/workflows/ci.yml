@@ -45,10 +45,12 @@ jobs:
         run: python3 scripts/ci/run_skill_python.py skills/governance/schema-validate/SKILL.md
         continue-on-error: false
 
-      # Step 3 — governance skill glossary-audit (drift cross-ref REFERENCE_INDEX + spec section + reverse-lookup orphan/missing AMBER + defensive acronym whitelist 22-token)
-      # Phase 14 W3-W3-α strict mode.
+      # Step 3 — glossary (K-07): red when a spec §20 term is missing from
+      # docs/GLOSSARY.md, REFERENCE_INDEX loses its glossary link, or orphan
+      # glossary terms exceed the budget. The old step computed these and
+      # discarded them.
       - name: 3. glossary-audit
-        run: python3 scripts/ci/run_skill_python.py skills/governance/glossary-audit/SKILL.md
+        run: python3 scripts/ci/glossary_gate.py
         continue-on-error: false
 
       # Step 4 — pytest baseline + W2 yeni, no regression
