@@ -64,8 +64,8 @@
             "deltas": {
               "type": "object",
               "properties": {
-                "clicks_delta_pct":      { "type": "number" },
-                "impressions_delta_pct": { "type": "number" },
+                "clicks_delta_pct":      { "type": ["number", "null"], "description": "null = previous period was 0 (new; D-03)." },
+                "impressions_delta_pct": { "type": ["number", "null"], "description": "null = previous period was 0 (new; D-03)." },
                 "ctr_delta_pp":          { "type": "number", "description": "Percentage points (not pct)." },
                 "position_delta":        { "type": "number", "description": "Negative = improved." }
               },
@@ -182,7 +182,7 @@
           "type": "object",
           "description": "FIX-K K1(b) — declining keywords/pages (\"Düşenler\"). Additive OPTIONAL section (NOT in sections.required). Present in BOTH framings with byte-identical rows/numbers; positive_client may order it after wins and use constructive tone, but never alters these facts.",
           "properties": {
-            "net_clicks_delta_pct": { "type": "number", "description": "Signed net clicks delta % — the headline fact, stated identically in both framings." },
+            "net_clicks_delta_pct": { "type": ["number", "null"], "description": "null = previous period was 0 (new). Signed net clicks delta % — the headline fact, stated identically in both framings." },
             "pages_down": {
               "type": "array",
               "description": "Pages with negative clicks or impressions delta (mirror of pages_up). Source: gsc_performance.",

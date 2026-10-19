@@ -49,3 +49,14 @@ def test_transforms_report_truncation() -> None:
              "ctr": 0.05, "position": 5.0} for i in range(1000)]
     meta = cn.transform({"rows": rows})["meta"]
     assert meta["gsc_truncation"]["truncated"] is True
+
+
+def test_thursday_cold_start_writes_no_partial_week() -> None:
+    from datetime import timedelta
+    from scripts.ingestion import gsc_pull as gp
+    start = date(2026, 6, 25)  # a Thursday (ISO W26)
+    rows = [{"keys": [(start + timedelta(days=i)).isoformat()], "clicks": 100, "impressions": 1000,
+             "position": 5.0} for i in range(25)]
+    weeks = gp.aggregate_iso_weeks(rows, today=date(2026, 7, 25))
+    assert weeks and weeks[0]["iso_week"] != "2026-W26"
+    assert all(w["clicks"] == 700 for w in weeks)

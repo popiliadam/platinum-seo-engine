@@ -286,12 +286,16 @@ def _gsc_totals(rows: Sequence[Mapping[str, Any]], suffix: str) -> dict:
     impressions = sum(
         _safe_int(r.get(f"impressions_{suffix}")) for r in rows
     )
-    if rows:
-        positions = [_safe_float(r.get(f"position_{suffix}")) for r in rows]
-        positions = [p for p in positions if p > 0]
-        avg_position = sum(positions) / len(positions) if positions else 0.0
-    else:
-        avg_position = 0.0
+    # D-03: impression-weighted, like GSC's own site average — a 10-impression
+    # page at 80 must not outweigh a 100,000-impression page at 2.
+    weight = weighted = 0.0
+    for r in rows:
+        pos = _safe_float(r.get(f"position_{suffix}"))
+        imp = _safe_int(r.get(f"impressions_{suffix}"))
+        if pos > 0 and imp > 0:
+            weight += imp
+            weighted += pos * imp
+    avg_position = weighted / weight if weight else 0.0
     ctr = (clicks / impressions) if impressions > 0 else 0.0
     return {
         "clicks": clicks, "impressions": impressions,
@@ -299,22 +303,30 @@ def _gsc_totals(rows: Sequence[Mapping[str, Any]], suffix: str) -> dict:
     }
 
 
+def _fmt_pct(value) -> str:
+    return "yeni" if value is None else str(value)
+
+
+def _pct_change(current: float, previous: float) -> float | None:
+    """Percent change; None ("new") when the previous period was 0 (D-03).
+
+    The old "previous or 1" rule turned 0 -> 500 clicks into +50,000 %.
+    """
+    if previous == 0:
+        return 0.0 if current == 0 else None
+    return round((current - previous) / previous * 100.0, 2)
+
+
 def _build_gsc_positive_trends(gsc_perf: Sequence[Mapping[str, Any]]) -> dict:
     """Section 2 — current vs prior 28-day totals + deltas."""
     current = _gsc_totals(gsc_perf, "recent")
     previous = _gsc_totals(gsc_perf, "previous")
-    prev_clicks = previous["clicks"] or 1
-    prev_imps = previous["impressions"] or 1
     return {
         "current_period": current,
         "previous_period": previous,
         "deltas": {
-            "clicks_delta_pct": round(
-                (current["clicks"] - previous["clicks"]) / prev_clicks * 100.0, 2
-            ),
-            "impressions_delta_pct": round(
-                (current["impressions"] - previous["impressions"]) / prev_imps * 100.0, 2
-            ),
+            "clicks_delta_pct": _pct_change(current["clicks"], previous["clicks"]),
+            "impressions_delta_pct": _pct_change(current["impressions"], previous["impressions"]),
             "ctr_delta_pp": round((current["ctr"] - previous["ctr"]) * 100.0, 4),
             "position_delta": round(
                 current["avg_position"] - previous["avg_position"], 4
@@ -648,7 +660,10 @@ def _build_exec_summary(
     # softens the surrounding tone (positive_client) vs states it plainly
     # (internal); it never omits the figure, even when negative.
     delta_pct = gsc_trends["deltas"].get("clicks_delta_pct", 0.0)
-    if delta_pct > 0:
+    if delta_pct is None:
+        delta_clause = (f"GSC tıklama: önceki dönem 0, bu dönem "
+                        f"{gsc_trends['current_period']['clicks']} (yeni)")
+    elif delta_pct > 0:
         delta_clause = f"GSC net tıklama değişimi %{delta_pct} (artış)"
     elif delta_pct < 0:
         if framing_policy == "positive_client":
@@ -872,7 +887,7 @@ def _flatten_for_template(report: Mapping[str, Any]) -> dict[str, str]:
         mc_lines.append(f"- {_safe_str(mc.get('notes'))}")
     measurement_context_md = "\n".join(mc_lines)
     return {
-        "net_clicks_delta_pct": str(dec.get("net_clicks_delta_pct", 0.0)),
+        "net_clicks_delta_pct": _fmt_pct(dec.get("net_clicks_delta_pct", 0.0)),
         "decliners_md": decliners_md,
         "measurement_context_md": measurement_context_md,
         "measurement_quality": _safe_str(mc.get("measurement_quality")),
@@ -891,8 +906,8 @@ def _flatten_for_template(report: Mapping[str, Any]) -> dict[str, str]:
         "current_position": str(cur.get("avg_position", 0.0)),
         "previous_clicks": str(prev.get("clicks", 0)),
         "previous_impressions": str(prev.get("impressions", 0)),
-        "clicks_delta_pct": str(deltas.get("clicks_delta_pct", 0.0)),
-        "impressions_delta_pct": str(deltas.get("impressions_delta_pct", 0.0)),
+        "clicks_delta_pct": _fmt_pct(deltas.get("clicks_delta_pct", 0.0)),
+        "impressions_delta_pct": _fmt_pct(deltas.get("impressions_delta_pct", 0.0)),
         # GAP-M-W2: a null position_before (no longitudinal source) renders as
         # "?" — an honest unknown, never a literal "None" or a fabricated number.
         "keywords_up_md": _bulleted(
