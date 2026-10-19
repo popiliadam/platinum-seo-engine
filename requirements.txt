@@ -2,6 +2,5 @@ jsonschema>=4.0
 pytest>=7.0
 openpyxl>=3.1
 pyyaml>=6.0
-piexif>=1.1.3
-Pillow>=10.0
+Pillow>=11.3  # XMP on JPEG (11.0) + AVIF (11.2) for R-123 IPTC
 httpx>=0.27,<1.0
