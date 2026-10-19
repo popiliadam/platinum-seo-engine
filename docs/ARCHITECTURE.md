@@ -85,7 +85,7 @@ v1 release için TÜM şunlar geçmeli:
 7. Pilot proje (demo-dental) end-to-end: init → ingest → discovery → planning → reporting → production → publishing zinciri çalışıyor; drift-check GREEN; whats-next priority list doğru.
 8. CI pipeline 7 check PASS.
 9. `events.jsonl`'de tüm aktiviteler logged.
-10. master.xlsx invariant check temiz (32 declared / 25 implemented CSR rule).
+10. master.xlsx invariant check temiz (32 declared / 26 implemented CSR rule).
 11. docs (ARCHITECTURE, GLOSSARY, WORKFLOWS) güncel; phase status doğru.
 12. Workspace repo açılmış, `.env.example` doğru, init-project ile yeni proje eklenebiliyor.
 13. Budget guardrail çalışıyor (DataForSEO çağrısı bütçeyi aşmıyor).

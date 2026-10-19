@@ -36,11 +36,12 @@ if str(REPO) not in sys.path:
 from scripts.validation import validate_invariants as vi  # noqa: E402
 
 PROJECT = "ci-fixture"
-# Declared in schemas/cross-sheet-invariants.json with no check function yet
-# (K-02 tracks writing them or retiring them). Changing this list is a
+# Declared in schemas/cross-sheet-invariants.json with no check function yet —
+# the same set, with reasons, as KNOWN_SCHEMA_ONLY in
+# tests/schemas/test_cross_sheet_invariants_sync.py (K-02). Changing this list is a
 # deliberate, reviewed act.
-EXPECTED_NOT_IMPLEMENTED = frozenset({"D-01", "D-02", "D-03", "F-06", "F-07", "M-01", "M-02"})
-MIN_EVALUATED = 25
+EXPECTED_NOT_IMPLEMENTED = frozenset({"D-01", "D-02", "F-06", "F-07", "M-01", "M-02"})
+MIN_EVALUATED = 26
 
 
 def run_gate(workbook: Path) -> tuple[int, dict]:

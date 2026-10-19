@@ -32,10 +32,12 @@ def _implemented() -> int:
     return len(validate_invariants._RULE_FUNCTIONS)
 
 
-def test_ground_truth_is_32_declared_25_implemented() -> None:
-    """Anchor: pin the source-of-truth counters (mirror test_count_consistency)."""
-    assert _declared() == 32
-    assert _implemented() == 25
+def test_ground_truth_matches_the_count_pins() -> None:
+    """Anchor: the source-of-truth counters equal tests/_count_pins (K-14 — one
+    place to change when a rule is added)."""
+    from _count_pins import CSR_DECLARED, CSR_IMPLEMENTED
+    assert _declared() == CSR_DECLARED
+    assert _implemented() == CSR_IMPLEMENTED
 
 
 def test_driftcheck_cites_declared_and_implemented_counts() -> None:
@@ -55,9 +57,9 @@ def test_driftcheck_has_no_stale_28() -> None:
 
 
 def test_driftcheck_tier_breakdown_sums_to_implemented() -> None:
-    """The CRITICAL/HIGH/MEDIUM split must match validate_invariants (5+14+6=25)."""
+    """The CRITICAL/HIGH/MEDIUM split must match the pinned tier counts."""
+    from _count_pins import TIER_COUNTS
     text = DRIFTCHECK.read_text(encoding="utf-8")
-    assert "5 CRITICAL + 14 HIGH + 6 MEDIUM" in text, (
-        "driftcheck must cite the implemented tier split (5 CRITICAL + 14 HIGH "
-        "+ 6 MEDIUM), which sums to the 25 implemented rules"
-    )
+    split = (f"{TIER_COUNTS['CRITICAL']} CRITICAL + {TIER_COUNTS['HIGH']} HIGH + "
+             f"{TIER_COUNTS['MEDIUM']} MEDIUM")
+    assert split in text, f"driftcheck must cite the implemented tier split ({split})"

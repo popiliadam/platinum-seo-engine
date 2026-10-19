@@ -164,7 +164,7 @@ wb = None
 loads cached values, not formula bodies. Write attempts on a read-only
 workbook raise immediately.
 
-### Step 3 — `evaluate_invariants` (25 rules)
+### Step 3 — `evaluate_invariants` (26 rules)
 
 ```python
 from scripts.validation import validate_invariants
@@ -182,12 +182,12 @@ if wb_path.exists():
     results = results + validate_invariants.unimplemented_results()
 ```
 
-The 25 rules are partitioned:
+The 26 rules are partitioned:
 
 | Tier      | Count | Verdict on FAIL  |
 |-----------|-------|------------------|
 | CRITICAL  | 5     | RED              |
-| HIGH      | 14    | RED (F-15 AMBER) |
+| HIGH      | 15    | RED (F-15 / D-03 AMBER) |
 | MEDIUM    | 6     | AMBER            |
 
 ### Step 4 — `aggregate_verdict`
@@ -284,7 +284,7 @@ complete_outputs = {
 (workflow-run.schema.json `outputs.additionalProperties.type` is
 `"string"`). `fail_count` is `str(agg["fail_count"])`, NOT a raw int.
 
-## 25 Invariant Rules
+## 26 Invariant Rules
 
 Source of truth: `scripts/validation/validate_invariants.py`. Each
 rule function signature:
@@ -313,7 +313,7 @@ def check_F_XX(workbook, project_slug) -> dict:
 | F-04  | dashboard formula `=AVERAGEIF(...)` drift check                       |
 | F-05  | schema_version field per-sheet present (every schema-known sheet has a header row matching schema column count; header row resolved via schema authority `sheets[sheet].header_row` with row-1 fallback — Phase 14 W3-W2-C-a) |
 
-### HIGH (14)
+### HIGH (15)
 
 | ID    | Rule                                                                  |
 |-------|-----------------------------------------------------------------------|

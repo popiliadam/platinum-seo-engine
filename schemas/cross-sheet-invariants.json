@@ -151,7 +151,7 @@
     },
     {
       "id": "D-03",
-      "rule": "url_normalizer(x) == x for every URL in every sheet",
+      "rule": "url_normalizer(x) == x for every URL in every engine-written join sheet",
       "severity": "HIGH",
       "category": "csr_data",
       "rationale": "Non-idempotent URLs break cross-sheet JOINs; mirrored as CI-05. Any failure means the url_normalizer was bypassed at write time (boundary violation §6.6).",

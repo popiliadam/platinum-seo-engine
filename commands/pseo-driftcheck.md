@@ -11,7 +11,7 @@ model: sonnet
 # /pseo-driftcheck — Cross-Sheet Invariants & Schema Validation
 
 > **Skill:** `skills/governance/drift-check/SKILL.md` (Phase 5, aktif; v1.8 Phase 4 F-23 land).
-> Master.xlsx full sweep + cross-sheet invariant (32 declared / 25 implemented) + consistency raporu üretir.
+> Master.xlsx full sweep + cross-sheet invariant (32 declared / 26 implemented) + consistency raporu üretir.
 
 ## 1. Aktif proje
 
@@ -39,6 +39,6 @@ Quick check — aktif projenin `project.config.json`'unun schema'ya uyup uymadı
 ## 4. Bağımlılıklar
 
 - `skills/governance/drift-check/SKILL.md` — aktif (Phase 5)
-- `scripts/validation/validate_invariants.py` — implement edilmiş 25 cross-sheet kuralı (5 CRITICAL + 14 HIGH + 6 MEDIUM; F-23 SF MCP cross-sheet HIGH dahil); cross-sheet-invariants.json toplam 32 kural DECLARE eder (engine self-governance F-29..F-34 narrative label'ları henüz function olarak implement edilmemiş) + `build_consistency_report()` (consistency-report.schema.json üretimi, Draft7Validator inline)
+- `scripts/validation/validate_invariants.py` — implement edilmiş 26 cross-sheet kuralı (5 CRITICAL + 15 HIGH + 6 MEDIUM; F-23 SF MCP cross-sheet HIGH ve K-02 D-03 URL normalizasyonu dahil); cross-sheet-invariants.json toplam 32 kural DECLARE eder (engine self-governance F-29..F-34 narrative label'ları henüz function olarak implement edilmemiş) + `build_consistency_report()` (consistency-report.schema.json üretimi, Draft7Validator inline)
 - `scripts/reporting/render_template.py` — drift markdown render
 - `templates/reports/drift.template.md` — markdown template

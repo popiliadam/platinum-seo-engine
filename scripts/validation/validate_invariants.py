@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-validate_invariants.py — 25 hand-coded invariant rules for drift-check.
+validate_invariants.py — 26 hand-coded invariant rules for drift-check.
 
 Owned by `skills/governance/drift-check/SKILL.md`. Read-only governance:
 loads `master.xlsx` (data_only=True, read_only=True) plus _state side
-files (events.jsonl, workflows/*.json, backups/) and evaluates the 25
+files (events.jsonl, workflows/*.json, backups/) and evaluates the 26
 invariants enumerated in §17.2 + the F-08 quick-wins URL subset rule.
 
 Single exception to read-only: F-12 records/advances a monotonic high-water
@@ -488,10 +488,17 @@ def check_F_05(workbook: Any, project_slug: str, **_) -> dict:
         if header is None:
             bad.append(f"{sheet_name}: no header row at row {header_row_idx}")
             continue
-        n_header = sum(1 for h in header if h is not None)
-        if n_header != len(required):
+        actual = [str(h).strip() for h in header if h is not None and str(h).strip()]
+        expected = [str(c.get("name", "")).strip() for c in required]
+        if len(actual) != len(expected):
             bad.append(f"{sheet_name}: header at row {header_row_idx} has "
-                       f"{n_header} cols, schema requires {len(required)}")
+                       f"{len(actual)} cols, schema requires {len(expected)}")
+        elif actual != expected:
+            # K-04: same count, wrong names / order — the count-only check
+            # passed a renamed or swapped column.
+            diff = next(i for i, (a, e) in enumerate(zip(actual, expected)) if a != e)
+            bad.append(f"{sheet_name}: column {diff + 1} is {actual[diff]!r}, "
+                       f"schema expects {expected[diff]!r}")
         checked += 1
     if checked == 0:
         return _make_result(
@@ -515,8 +522,72 @@ def check_F_05(workbook: Any, project_slug: str, **_) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# HIGH (14)
+# HIGH (15)
 # ---------------------------------------------------------------------------
+
+_URL_COLUMN_NAMES = frozenset({"url", "assigned_url", "existing_url", "target_url",
+                               "url_normalized", "redirect_target"})
+# Sheets written by the engine's transforms through normalize_url and used as
+# JOIN keys. Hand-curated sheets (topical_map, new_content_plan,
+# content_improve, redirect_404 …) keep the site's own display URL (often with
+# a trailing slash); joins normalize those on read, so they are out of scope.
+_D03_JOIN_SHEETS = frozenset({"gsc_performance", "quick_wins", "opportunity",
+                              "content_decay", "cluster_keywords", "on_page_audit"})
+
+
+def check_D_03(workbook: Any, project_slug: str, **_) -> dict:
+    """url_normalizer(x) == x for every absolute URL in every engine-written join sheet (K-02).
+
+    F-10 covered quick_wins only; a URL written past the normalizer anywhere
+    else silently breaks cross-sheet joins (cluster_map wrote raw GSC pages —
+    D-05). Relative paths / slugs are out of scope (not absolute URLs).
+    """
+    rule = "url_normalizer(x) == x for every URL in every engine-written join sheet"
+    schema = _load_master_excel_schema()
+    drift: list[str] = []
+    sheets_seen: list[str] = []
+    n_total = 0
+    for sheet_name, sdef in (schema.get("sheets") or {}).items():
+        cols = [c.get("name") for c in (sdef.get("required_columns") or [])]
+        url_cols = [c for c in cols if c in _URL_COLUMN_NAMES]
+        if (sheet_name not in _D03_JOIN_SHEETS or not url_cols
+                or not _has_sheet(workbook, sheet_name)):
+            continue
+        sheets_seen.append(sheet_name)
+        for r in _iter_rows_as_dicts(workbook, sheet_name):
+            for c in url_cols:
+                u = r.get(c)
+                if not isinstance(u, str) or not u.lower().startswith(("http://", "https://")):
+                    continue
+                n_total += 1
+                n1 = _normalize_url(u)
+                if u != n1 or _normalize_url(n1) != n1:
+                    drift.append(f"{sheet_name}.{c}: {u} -> {n1}")
+    if not sheets_seen:
+        return _make_result(
+            id_="D-03", severity="HIGH", verdict="SKIP",
+            evidence="no URL-bearing schema sheet present",
+            rule=rule, category="url_normalization",
+        )
+    if drift:
+        # manual_triage: rows written before the D-05/D-07 normalizer fixes are
+        # real drift but must not block workbook commits (check_excel_writer
+        # refuses RED); scripts/maintenance/normalize_join_urls.py repairs them.
+        return _make_result(
+            id_="D-03", severity="HIGH", verdict="FAIL",
+            evidence=(f"{len(drift)} of {n_total} URLs not idempotent under D-03 — "
+                      "run scripts/maintenance/normalize_join_urls.py"),
+            rule=rule, category="url_normalization", manual_triage=True,
+            affected_sheets=sorted({d.split(".", 1)[0] for d in drift}),
+            sample_violations=drift,
+            affected_rows=len(drift),
+        )
+    return _make_result(
+        id_="D-03", severity="HIGH", verdict="PASS",
+        evidence=f"all {n_total} URLs across {len(sheets_seen)} sheets are D-03 idempotent",
+        rule=rule, category="url_normalization",
+        affected_sheets=sheets_seen,
+    )
 
 def check_F_08(workbook: Any, project_slug: str, **_) -> dict:
     """quick_wins.url ⊆ (crawl_sitemap.url ∪ gsc_performance.url).
@@ -1935,6 +2006,7 @@ _RULE_FUNCTIONS = (
     check_F_24,  # v1.9 Phase 2 .mcp.json↔registry key sync
     check_F_25,  # v1.9 Phase 3 sf.mcp.enabled ⇒ schema_version >= 1.5
     check_F_27,  # AMO 3-gov-driftF declared OUTWARD MCP tool ⊆ gate matchers
+    check_D_03,  # K-02: every URL in every sheet D-03 idempotent
     # MEDIUM
     check_F_18, check_F_19, check_F_20, check_F_21, check_F_22,
     check_F_26,  # v1.9 Phase 4 orphan SF crawl detection (MCP-aware AMBER)
@@ -2023,7 +2095,7 @@ def aggregate_verdicts(rule_results: list[dict]) -> dict:
 
     Raises UnknownRuleError if a result.id is outside the registered set
     — that would mean the caller injected a synthetic rule outside the
-    25-rule contract.
+    26-rule contract.
     """
     pass_count = warn_count = fail_count = 0
     overall = "GREEN"
@@ -2038,7 +2110,7 @@ def aggregate_verdicts(rule_results: list[dict]) -> dict:
         rid = r.get("id")
         if rid not in _VALID_RULE_IDS:
             raise UnknownRuleError(
-                f"unknown rule id {rid!r} — outside 25-rule registry"
+                f"unknown rule id {rid!r} — outside 26-rule registry"
             )
         verdict = r.get("verdict")
         severity = r.get("severity", "MEDIUM")
