@@ -240,6 +240,32 @@ a window that was not fetched writes nothing — never a fabricated zero).
 treated vs control median Δclicks, difference in pp, n<30 directional) and
 `task_outcome_coverage` (measured / eligible; wave goal ≥ 0.8).
 
+## Monthly measurement modules (Dalga 5)
+
+Each module is pure: the skill fetches, the module decides. Paid DFS calls go
+through the budget pre-flight; free sources (GSC, CrUX, URL Inspection) do not.
+
+| item | module | input the skill fetches |
+|---|---|---|
+| O-04 AI visibility, O-12 SERP features, O-21 list pages | `scripts/discovery/serp_snapshot.py` | DFS `serp_organic_live_advanced` for the priority keywords (+ `fanout_queries`) |
+| O-03 page × query history / update impact | `scripts/ingestion/gsc_history.py` | GSC `query,page` per complete ISO week |
+| O-06 index status rotation | `scripts/discovery/index_rotation.py` | `mcp__gsc__index_inspect` within the daily quota |
+| O-07 field Core Web Vitals | `scripts/discovery/crux_field.py` (S-19) | CrUX API, phone, p75 |
+| O-08 IndexNow readiness | `scripts/production/brief_signals.indexnow_key_live` | `https://host/<key>.txt`; pings via `/pseo-index` |
+| O-09 link gap, O-22 mentions / dead links, O-26 PR prospects | `scripts/discovery/offpage.py` | DFS `backlinks_domain_intersection`, `content_analysis_search`, broken backlinks |
+| O-10 rank grid, O-23 landing checks + top-3 %, O-25 service × place plan | `scripts/discovery/local_seo.py` | DFS maps per grid point, the GBP landing page HTML, DFS volume + CPC |
+| O-13 product feed readiness | `scripts/discovery/merchant_feed_audit.py` | Merchant feed export + page Product markup |
+| O-14 crawl budget (optional) | `scripts/discovery/crawl_log.py` | server access log |
+| O-15 preferred sources, O-20 brief secondary queries | `scripts/production/brief_signals.py` | project profile; DFS `ranked_keywords` of the #1 URL |
+
+Outreach outputs (O-09/O-21/O-22/O-26) are candidate lists only — the engine
+never sends e-mail; paid placement requires `rel="sponsored"`.
+
+**Deferred, with reason:** O-05 weekly auto-refresh — the O5 scheduler exists
+(default OFF); switching it on per project is an operator decision taken with
+the plugin reinstall, after the revision waves. O-11 GA4 — needs a GA4 Data API
+credential per property, which no project has yet.
+
 ## DURUR conditions (8 + base)
 
 Stop and flag the manager — do not patch, do not fall back.
