@@ -66,7 +66,6 @@ _DEFAULT_SCHEMA_PATH = _REPO_ROOT / "schemas" / "master-excel.schema.json"
 
 _BACKUPS_KEEP = 7
 _EXCEL_CELL_MAX_CHARS = 32_767  # openpyxl/Excel hard limit
-_LOCK_STALE_SECONDS = 5 * 60  # 5 minutes
 # acquire_blocking=True bounds: wait at most _LOCK_BLOCKING_DEADLINE_SECONDS for a
 # concurrent holder to release, polling every _LOCK_POLL_INTERVAL_SECONDS. Fixed
 # cadence (NOT exponential backoff) — adequate for a single-operator tool, and the
@@ -386,42 +385,6 @@ def _lock_path(workbook_path: Path) -> Path:
     return state / "excel.lock"
 
 
-def _read_sentinel(lock_path: Path) -> tuple[int | None, str | None]:
-    if not lock_path.exists():
-        return None, None
-    try:
-        raw = lock_path.read_text(encoding="utf-8").strip()
-        obj = json.loads(raw)
-        return obj.get("pid"), obj.get("ts")
-    except (OSError, json.JSONDecodeError, ValueError):
-        return None, None
-
-
-def _is_stale(pid: int | None, ts: str | None) -> bool:
-    if pid is None or ts is None:
-        # Corrupt sentinel = stale.
-        return True
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        # No process with that PID → stale.
-        return True
-    except PermissionError:
-        # Process exists but is not ours; not stale.
-        pid_alive = True
-    else:
-        pid_alive = True
-    if not pid_alive:  # pragma: no cover (ProcessLookupError handled above)
-        return True
-    # Age check.
-    try:
-        when = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-    except ValueError:
-        return True
-    age = (datetime.now(timezone.utc) - when).total_seconds()
-    return age > _LOCK_STALE_SECONDS
-
-
 def _flock_or_raise(
     fd: int,
     lock_path: Path,
@@ -475,15 +438,10 @@ def _acquire_lock(
     release, then raise LockTimeout. Opt-in parallel-write safety so a concurrent
     second writer waits its turn instead of silently losing its work.
     """
-    # First, stale reclaim. Sentinel content is informational; flock provides
-    # the actual mutual exclusion below.
-    pid, ts = _read_sentinel(lock_path)
-    if pid is not None and _is_stale(pid, ts):
-        try:
-            lock_path.unlink()
-        except FileNotFoundError:  # pragma: no cover
-            pass
-
+    # The sentinel is NEVER unlinked (V-02): flock lives on the inode, so deleting
+    # the file lets the next writer lock a fresh inode while the old holder still
+    # owns the old one. A dead holder's flock is dropped by the kernel; the pid/ts
+    # payload is informational only and never decides who may write.
     fd = os.open(str(lock_path), os.O_WRONLY | os.O_CREAT, 0o644)
     _flock_or_raise(
         fd, lock_path,
@@ -515,11 +473,8 @@ def _release_lock(fd: int, lock_path: Path) -> None:
         os.close(fd)
     except OSError:  # pragma: no cover
         pass
-    # Best-effort sentinel cleanup; OK if it lingers (next writer reclaims).
-    try:
-        lock_path.unlink()
-    except FileNotFoundError:  # pragma: no cover
-        pass
+    # The sentinel file stays (see _acquire_lock): unlinking it here would let a
+    # writer that already opened it and one that opens it next hold two inodes.
 
 
 # ---------------------------------------------------------------------------

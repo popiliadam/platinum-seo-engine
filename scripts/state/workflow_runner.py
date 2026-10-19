@@ -58,7 +58,6 @@ _SCHEMA_VERSION = "1.0"
 _RUN_ID_PATTERN = re.compile(
     r"^[a-z][a-z0-9-]*-\d{4}-\d{2}-\d{2}-[a-f0-9]{4}$"
 )
-_LOCK_STALE_SECONDS = 5 * 60
 _RUN_ID_COLLISION_TRIES = 5
 
 
@@ -223,37 +222,11 @@ def _atomic_write_json(data: dict, path: Path) -> None:
         pass
 
 
-def _is_stale_lock(lock_path: Path) -> bool:
-    if not lock_path.exists():
-        return False
-    try:
-        obj = json.loads(lock_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return True
-    pid = obj.get("pid")
-    ts = obj.get("ts")
-    if not isinstance(pid, int) or not isinstance(ts, str):
-        return True
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return True
-    except PermissionError:
-        pass
-    try:
-        when = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-    except ValueError:
-        return True
-    return (datetime.now(timezone.utc) - when).total_seconds() > _LOCK_STALE_SECONDS
-
-
 def _acquire_run_lock(path: Path) -> int:
     lock_path = path.with_suffix(path.suffix + ".lock")
-    if _is_stale_lock(lock_path):
-        try:
-            lock_path.unlink()
-        except FileNotFoundError:  # pragma: no cover
-            pass
+    # Never unlinked (V-05): a fresh lockfile is empty until its holder writes
+    # pid/ts, and an unlink — "stale" or on release — lets a second writer flock a
+    # new inode at the same path. The kernel drops a dead holder's flock.
     fd = os.open(str(lock_path), os.O_WRONLY | os.O_CREAT, 0o644)
     try:
         fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -279,6 +252,7 @@ def _acquire_run_lock(path: Path) -> int:
 
 
 def _release_run_lock(fd: int, path: Path) -> None:
+    """Unlock + close; the sidecar lockfile is kept (see _acquire_run_lock)."""
     try:
         fcntl.flock(fd, fcntl.LOCK_UN)
     except OSError:  # pragma: no cover
@@ -286,11 +260,6 @@ def _release_run_lock(fd: int, path: Path) -> None:
     try:
         os.close(fd)
     except OSError:  # pragma: no cover
-        pass
-    lock_path = path.with_suffix(path.suffix + ".lock")
-    try:
-        lock_path.unlink()
-    except FileNotFoundError:  # pragma: no cover
         pass
 
 
