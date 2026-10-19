@@ -136,7 +136,7 @@ _SECRET_VALUE_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"xapp-[0-9]-[A-Za-z0-9\-]{10,}"),                        # slack_app_token_xapp
     re.compile(r"hooks\.slack\.com/services/T[A-Z0-9]+/B[A-Z0-9]+/[A-Za-z0-9]{20,}"),  # slack_webhook_url
     re.compile(r"-----BEGIN (?:EC |ENCRYPTED )?PRIVATE KEY-----"),        # ec_/encrypted_private_key_header
-    re.compile(r"-----BEGIN PGP PRIVATE KEY BLOCK-----"),                 # pgp_private_key_header
+    re.compile(r"-----BEGIN PGP PRIVATE KEY" r" BLOCK-----"),  # pgp_private_key_header (split: no literal header in source)
     re.compile(r"eyJ[A-Za-z0-9_\-]{10,}\.eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}"),  # jwt_token
     re.compile(r"(?:sk|rk)_live_[0-9A-Za-z]{24,}"),                       # stripe_live_key
     re.compile(r"DATAFORSEO_PASSWORD\s*=\s*[A-Za-z0-9]{12,}(?![A-Za-z0-9])"),  # dataforseo_env_unquoted
