@@ -299,6 +299,10 @@ R-91 decision tree branch (Step 3b `decision.action` üzerinden):
 
 **Senaryo 5 — merge (Step 3b veto + hedef var):** 301 → `decision.target`
 (içerik hedef sayfaya taşınır; redirect_404 `[url, inlinks, "301", target, "active"]`).
+Hedef sayfanın birleştirilmiş yeni sürümü yayınlanmadan önce
+`scripts/production/deploy_diff_gate.py` ile hedefin canlı hâline karşı
+karşılaştırılır (S-24): hedefin mevcut tablo/form/embed/görsel/iç link/H2/JSON-LD
+öğelerinden biri kaybolursa yayın durur.
 
 **Senaryo 6 — noindex (sayfa kalmalı ama dizinde olmamalı):** etiket/filtre/yasal
 sayfalar gibi kullanıcıya gerekli ama aramada değersiz URL'ler → `noindex,follow`

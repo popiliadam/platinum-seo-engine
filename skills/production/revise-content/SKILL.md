@@ -405,6 +405,20 @@ visible HTML).
 Output write: `outputs/blog/{slug}/article.html` (atomic temp+
 rename).
 
+### Step 7b: Pre-Deploy Element Diff (S-24)
+
+Yeni sürüm yayınlanmadan ÖNCE canlı sayfa çekilir ve iki sürüm karşılaştırılır:
+
+```bash
+python3 scripts/production/deploy_diff_gate.py --live live.html --new outputs/blog/{slug}/article.html --host <site-host>
+```
+
+Envanter: tablo, form, iframe/embed, görsel, iç link (benzersiz path), H2 listesi,
+JSON-LD türleri. Yeni sürümde EKSİLEN her öğe listelenir; ekleme serbesttir.
+Liste boş değilse (exit 1) yayın durur — **DURUR #9**. Bu bir kalite kapısıdır
+(onay değil): yeni sürüm düzeltilir ve kapı tekrar koşulur. WordPress REST ile
+yayınlayan her script de aynı kapıdan geçer.
+
 ### Step 8: change_summary.md + events.jsonl Append
 
 **change_summary.md format:**
@@ -453,7 +467,7 @@ rename).
   trail)
 - `canonical_preserved` = `true` (R-89 invariant)
 
-## DURUR Conditions (8 koşul)
+## DURUR Conditions (9 koşul)
 
 1. **DURUR #1 — Existing Blog Yok.** `outputs/blog/{slug}/article.
    html` filesystem'de bulunamıyor → R-89 canonical preserve enforce
@@ -482,6 +496,10 @@ rename).
    bump bloklu). Operatör inceleyeni adlandırmalı; skill
    `append_audit` ile reviewer + review_date + content_version kaydını
    yazar (Principle 1 Truth-Verifiable; uydurulmuş yazarlık yasak).
+9. **DURUR #9 — Canlı Sayfadan Öğe Kaybı (S-24).** `deploy_diff_gate.py`
+   yeni sürümün canlı sayfadaki bir tabloyu, formu, embed'i, görseli, iç
+   linki, H2 bölümünü ya da JSON-LD türünü kaybettiğini raporladı → RED,
+   yayın yok; kayıp geri eklenir ya da operatör kaybı açıkça kabul eder.
 
 ## READ-ONLY Contract (F-6 Enforcement)
 
