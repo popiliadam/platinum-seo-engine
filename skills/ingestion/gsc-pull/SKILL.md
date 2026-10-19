@@ -143,8 +143,8 @@ workflow_runner.start_step(handle.run_id, 0,
                            project_slug=project_slug)
 raw = mcp__gsc__search_analytics(
     siteUrl=project_config["gsc"]["site_url"],
-    startDate=(today - days_back).isoformat(),
-    endDate=today.isoformat(),
+    **gsc_window.recent_window(today, days_back).as_params(),  # D-04: ends today-3, no overlap
+    rowLimit=gsc_window.GSC_ROW_LIMIT,  # D-01: tool default is 1,000; check gsc_window.truncation(raw)
     dimensions=dimensions,  # default: ["page"]
 )
 inbox_path = (
@@ -167,8 +167,8 @@ with no date column, so it cannot hold a weekly time series — the ledger does.
 ```python
 daily = mcp__gsc__search_analytics(
     siteUrl=project_config["gsc"]["site_url"],
-    startDate=(today - days_back).isoformat(),   # cold-start backfill: days_back=112
-    endDate=today.isoformat(),
+    **gsc_window.recent_window(today, days_back).as_params(),  # D-04: ends today-3, no overlap   # cold-start backfill: days_back=112
+    rowLimit=gsc_window.GSC_ROW_LIMIT,  # D-01: tool default is 1,000; check gsc_window.truncation(raw)
     dimensions=["date"],                          # site-level, one row per day
 )
 daily_path = (

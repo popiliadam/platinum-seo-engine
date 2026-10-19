@@ -57,6 +57,7 @@ if str(_REPO_ROOT) not in sys.path:
 # Direct re-export: quickwins previously raised bare ValueError;
 # URLNormalizeError(ValueError) preserves that contract (K-01 dedup,
 # v1.5-Phase-1 Tier 1).
+from scripts.util import gsc_window  # noqa: E402  (D-01 truncation flag)
 from scripts.util.profile_aware_defaults import (  # noqa: E402
     cascade_default,
 )
@@ -673,6 +674,7 @@ def transform(
         "opportunity": opportunity_rows,
         "control_cohort": control_cohort,
         "meta": {
+            "gsc_truncation": gsc_window.truncation(raw),
             "input_count": len(items),
             "scored_count": len(scored),
             "top_n_applied": len(quick_wins_rows),

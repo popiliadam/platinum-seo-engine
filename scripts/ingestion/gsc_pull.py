@@ -60,6 +60,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from scripts.util import gsc_window  # noqa: E402  (D-01 truncation flag)
 from scripts.util.url_normalize import (  # noqa: E402  (sys.path mutation)
     URLNormalizeError as _URLNormalizeError,
     normalize_url as _canonical_normalize_url,
@@ -345,6 +346,7 @@ def transform(
     return {
         "gsc_performance": gsc_perf_rows,
         "meta": {
+            "gsc_truncation": gsc_window.truncation(raw),
             "recent_url_count": len(recent),
             "previous_url_count": len(previous),
             "merged_url_count": len(gsc_perf_rows),

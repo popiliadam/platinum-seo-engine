@@ -539,3 +539,12 @@ Seçenek D Wave 1 baseline reuse).
   promote).
 - Output schema_version: `1.0` (events.jsonl payload kontratı,
   events.schema const).
+
+## GSC row limit and window (D-01 / D-04)
+
+Every `mcp__gsc__search_analytics` / `mcp__gsc__enhanced_search_analytics` call
+passes `rowLimit=gsc_window.GSC_ROW_LIMIT` (25,000 — the tool default is 1,000
+and it cannot page) and takes its dates from `scripts/util/gsc_window.py`
+(`recent_window` / `comparison_windows`: end = today-3, windows never overlap).
+A response whose row count sits on a cap (`gsc_window.truncation(raw)`) is cut:
+narrow the window or add a page/query filter before using it.

@@ -139,15 +139,15 @@ handle = workflow_runner.create_run(
 
 ### Step 2 — `fetch_recent` (MCP §16.5 step 3 — raw inbox first)
 
-Recent window (today - days_back .. today).
+Recent window: `gsc_window.recent_window(today, days_back)` — the latest complete days, ending today-3 (D-04).
 
 ```python
 workflow_runner.start_step(handle.run_id, 0,
                            project_slug=project_slug)
 raw_recent = mcp__gsc__enhanced_search_analytics(
     siteUrl=project_config["gsc"]["site_url"],
-    startDate=(today - days_back).isoformat(),
-    endDate=today.isoformat(),
+    **gsc_window.recent_window(today, days_back).as_params(),  # D-04: ends today-3, no overlap
+    rowLimit=gsc_window.GSC_ROW_LIMIT,  # D-01: tool default is 1,000; check gsc_window.truncation(raw)
     dimensions=dimensions,    # default: ["page"]
 )
 inbox_recent = (
@@ -165,7 +165,9 @@ workflow_runner.finish_step(handle.run_id, 0,
 ### Step 3 — `fetch_previous` (previous window for delta — MUST succeed)
 
 `mcp__gsc__enhanced_search_analytics` covering the PREVIOUS window of
-equal length (today - 2*days_back .. today - days_back). Persist to
+equal length — `gsc_window.comparison_windows(today, days_back)[1]`: it ends the
+day before the recent window starts (D-04: no shared boundary day), with
+`rowLimit=gsc_window.GSC_ROW_LIMIT` (D-01). Persist to
 `inbox/gsc/{date}-enhanced_search_analytics-decay-previous-{slug}.json`.
 
 **Both windows are required.** Unlike gsc-pull (where previous-window

@@ -191,8 +191,8 @@ When `use_gsc_cross_ref=true`:
 ```python
 raw_gsc = mcp__gsc__search_analytics(
     siteUrl=project_config["gsc"]["site_url"],
-    startDate=(today - 30).isoformat(),
-    endDate=today.isoformat(),
+    **gsc_window.recent_window(today, 30).as_params(),  # D-04: ends today-3, no overlap
+    rowLimit=gsc_window.GSC_ROW_LIMIT,  # D-01: tool default is 1,000; check gsc_window.truncation(raw)
     dimensions=["page", "query"],
 )
 gsc_inbox = (

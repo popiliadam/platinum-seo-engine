@@ -50,6 +50,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from scripts.util import gsc_window  # noqa: E402  (D-01 truncation flag)
 from scripts.util.profile_aware_defaults import (  # noqa: E402  (sys.path mutation)
     cascade_default,
 )
@@ -563,6 +564,7 @@ def transform(
     return {
         "cannibalization": cannibalization_rows,
         "meta": {
+            "gsc_truncation": gsc_window.truncation(raw),
             "input_row_count": len(page_rows),
             "queries_seen": len(grouped),
             "candidate_count": len(candidate_queries),

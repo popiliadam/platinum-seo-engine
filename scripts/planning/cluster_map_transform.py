@@ -81,6 +81,7 @@ if str(_REPO_ROOT) not in sys.path:
 # IMPORT discipline (NOT copy): _normalize_dfs_response is owned by
 # scripts.ingestion.dfs_pull. We REUSE it so any shape evolution is
 # inherited automatically — Phase 6 D-003 lesson, Phase 7 W-B1 paterni.
+from scripts.util import gsc_window  # noqa: E402  (D-01 truncation flag)
 from scripts.ingestion.dfs_pull import (   # noqa: E402  (sys.path mutation above)
     _normalize_dfs_response,
 )
@@ -785,6 +786,7 @@ def transform(
     return {
         "cluster_keywords": rows,
         "meta": {
+            "gsc_truncation":       gsc_window.truncation(raw_gsc or {}),
             "project_slug":         project_slug.strip(),
             "seed_keyword":         seed_keyword.strip(),
             "fetched_at":           _utc_iso_microseconds(),
