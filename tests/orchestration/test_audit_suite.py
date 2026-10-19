@@ -346,11 +346,13 @@ def test_attested_step_commits_scored_count(tmp_path: Path) -> None:
     run(RUN_ID, SLUG, tmp_path, tmp_path / "master.xlsx", NOW,
         commit_fn=_spy_commit, write=False)
     by_sheet = dict(committed)
-    # every audit sheet was committed via the injected commit_fn, attested or not.
+    # every attested audit sheet was committed via the injected commit_fn ...
     assert by_sheet["tech_seo"] == 3
     assert by_sheet["schema"] == 3
     assert by_sheet["cannibalization"] == 3
-    assert by_sheet["on_page_audit"] == 3
+    # ... but the code_verified step dropped 70% of its input, so V-01 refuses the
+    # write BEFORE it lands (it used to overwrite the sheet, then report failed).
+    assert "on_page_audit" not in by_sheet
 
 
 # --- CLI boundary (clock-free: --now-epoch is required) --------------------

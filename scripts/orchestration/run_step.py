@@ -38,6 +38,28 @@ class StepSpec:
     expected_window: str | None = None
     expected_tool: str | None = None
     observed_mcp: tuple[str, ...] = ()
+    allow_empty: bool = False
+
+
+def precommit_rejects(
+    spec: StepSpec, input_count: int, rows_out: list[dict], *, enforce_ratio: bool
+) -> bool:
+    """True iff ``rows_out`` must NOT be committed (V-01) — checked BEFORE the write.
+
+    ``replace`` clears the sheet first, so the count gate has to run before it:
+    an empty output is refused unless the step declares ``allow_empty``; with
+    ``enforce_ratio`` a drop of more than half the input is refused too
+    (model_attested steps aggregate legitimately, so they skip the ratio).
+    """
+    if not rows_out:
+        return not spec.allow_empty
+    return enforce_ratio and silent_skip_exceeds(input_count, len(rows_out))
+
+
+def empty_commit_kwargs(rows_out: list[dict]) -> dict:
+    """``allow_empty=True`` for the (already approved) empty commit, else nothing —
+    so injected fake committers with the narrow signature keep working."""
+    return {} if rows_out else {"allow_empty": True}
 
 
 def run_step(
@@ -78,6 +100,15 @@ def run_step(
         )
 
     rows_out = spec.transform(vr.rows)  # pure; must not mutate vr.rows
+    if precommit_rejects(spec, vr.input_count, rows_out, enforce_ratio=True):
+        return coverage.build_step(
+            spec.name,
+            spec.verification_class,
+            "failed",
+            observed_mcp=list(spec.observed_mcp),
+            input_count=vr.input_count,
+            scored_count=len(rows_out),
+        )
     result = commit_fn(
         workbook_path,
         spec.sheet,
@@ -85,6 +116,7 @@ def run_step(
         run_id=run_id,
         project_slug=project_slug,
         schema_path=schema_path,
+        **empty_commit_kwargs(rows_out),
     )
     scored = result.rows_affected
     status = "failed" if silent_skip_exceeds(vr.input_count, scored) else "satisfied"

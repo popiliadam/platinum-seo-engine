@@ -132,7 +132,10 @@ def _commit_union(
     schema_path: Path | str | None,
     state_root: Path | str | None,
     writer: str,
+    had_rows: bool,
 ) -> WriteResult:
+    # An empty union over an already-empty sheet loses nothing; over a populated
+    # sheet it would erase it, so committer's empty-commit refusal stays on (V-01).
     return committer.commit(
         xlsx_path,
         sheet,
@@ -142,6 +145,7 @@ def _commit_union(
         schema_path=schema_path,
         state_root=state_root,
         writer=writer,
+        allow_empty=not had_rows,
     )
 
 
@@ -194,6 +198,7 @@ def merge_prefixed_rows(
         xlsx_path, sheet, union,
         run_id=run_id, project_slug=project_slug,
         schema_path=schema_path, state_root=state_root, writer=writer,
+        had_rows=bool(existing),
     )
 
 
@@ -230,6 +235,7 @@ def merge_keyed_rows(
         xlsx_path, sheet, union,
         run_id=run_id, project_slug=project_slug,
         schema_path=schema_path, state_root=state_root, writer=writer,
+        had_rows=bool(existing),
     )
 
 
