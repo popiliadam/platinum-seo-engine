@@ -35,4 +35,5 @@ python3 scripts/production/indexing_submit.py status <project-slug> <url>
 - HTTP 200 = Google bildirimi aldı; **indekslendi demek değildir** (ölçüm: `verify-indexing`).
 - Kimlik: servis hesabı `GOOGLE_INDEXING_SA` (varsayılan `~/.config/seo-core/secrets/google-indexing.json`); `google-auth` paketi gerekir.
 - `--dry-run` hiçbir şey göndermez ve yazmaz; yalnız canlı kontrolü gösterir.
+- `--sitemap https://site/sitemap_index.xml` — her URL'nin sitemap'te olup olmadığını ve `<lastmod>` tarihini kontrol eder; eksikse rapora uyarı düşer (O-24).
 - Projelerde elle `_index_*.py` yazılmaz; eskileri `outputs/_archive/`'a taşınır.

@@ -43,7 +43,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from html.parser import HTMLParser
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Mapping
 from urllib.parse import urljoin, urlparse
 
 DAILY_CAP_DEFAULT = 200
@@ -186,6 +186,7 @@ def submit(
     cap: int = DAILY_CAP_DEFAULT,
     deletion_allowed: Callable[[str], bool] = lambda _u: False,
     dry_run: bool = False,
+    sitemap: Mapping[str, str | None] | None = None,
 ) -> RunResult:
     """Check, send within quota, queue the rest, and record the run."""
     if notification not in NOTIFICATION_TYPES:
@@ -212,6 +213,14 @@ def submit(
             continue
         check = live_check(url, status, html, headers, notification=notification, expect=expect)
         row["live_check"] = check.reason
+        if sitemap is not None and notification == "URL_UPDATED":
+            # O-24: a live page missing from the sitemap (or with a stale
+            # lastmod) is sent anyway but flagged in the report.
+            from scripts.production.post_publish_check import check as _sitemap_check
+            warnings = [w for w in _sitemap_check(url, status, sitemap, published_on=now.date())
+                        if not w.startswith("HTTP ")]
+            if warnings:
+                row["sitemap_warnings"] = warnings
         if not check.ok:
             row["skipped"] = check.reason
         elif not dry_run and publish is not None:
@@ -354,6 +363,21 @@ def _deletion_consent(slug: str) -> Callable[[str], bool]:
     return allowed
 
 
+def _load_sitemap(url: str) -> dict | None:
+    """Sitemap entries, or None when it could not be read — then the optional
+    O-24 check is skipped instead of flagging every URL or aborting the run."""
+    from scripts.production.post_publish_check import load_sitemap
+    try:
+        status = http_fetch(url)[0]
+        if status != 200:
+            print(f"sitemap check skipped: {url} answered HTTP {status}", file=sys.stderr)
+            return None
+        return load_sitemap(url, http_fetch)
+    except OSError as exc:
+        print(f"sitemap check skipped: {exc}", file=sys.stderr)
+        return None
+
+
 def main(argv: list[str]) -> int:
     p = argparse.ArgumentParser(prog="indexing_submit.py")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -364,6 +388,7 @@ def main(argv: list[str]) -> int:
     s.add_argument("--expect")
     s.add_argument("--cap", type=int, default=DAILY_CAP_DEFAULT)
     s.add_argument("--dry-run", action="store_true")
+    s.add_argument("--sitemap", help="sitemap (index) URL — warn when a URL is missing or stale (O-24)")
     st = sub.add_parser("status")
     st.add_argument("slug")
     st.add_argument("url")
@@ -381,7 +406,8 @@ def main(argv: list[str]) -> int:
         publish=None if args.dry_run else google_publisher(sa_path),
         indexnow=indexnow_pinger(key) if key else None, notification=args.type,
         expect=args.expect, cap=args.cap, deletion_allowed=_deletion_consent(args.slug),
-        dry_run=args.dry_run)
+        dry_run=args.dry_run,
+        sitemap=_load_sitemap(args.sitemap) if args.sitemap else None)
     for row in result.report["results"]:
         state = row.get("skipped") or f"HTTP {row['google_http']}"
         print(f"  {row['url']}  →  {state}")
