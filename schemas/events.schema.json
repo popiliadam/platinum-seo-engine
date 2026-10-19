@@ -477,6 +477,11 @@
       "type": "string",
       "description": "AUDIT-only. Identity that performed the action (user email, agent id, system process)."
     },
+    "session_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "AUDIT-only, optional. Claude session UUID that produced the event — lets a mis-attributed row be traced to its session (G-05). Absent on rows written before 2026-10-19."
+    },
     "workflow_action": {
       "type": "string",
       "description": "WORKFLOW-only (ADR-020). Workflow lifecycle transition. Logged by workflow_runner.py state machine into events.jsonl.",

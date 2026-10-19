@@ -494,7 +494,7 @@ def append_weekly_ledger(
     ledger = Path(ledger_path)
     existing: set[str] = set()
     if ledger.exists():
-        for line in ledger.read_text(encoding="utf-8").splitlines():
+        for line in ledger.read_text(encoding="utf-8").split("\n"):
             line = line.strip()
             if not line:
                 continue

@@ -19,7 +19,7 @@ def _boom() -> object:
 
 def test_gated_action_denied_when_workspace_resolution_raises() -> None:
     code, _msgs = gate.evaluate(
-        {"tool_name": "Bash", "tool_input": {"command": "git push origin main"},
+        {"tool_name": "Bash", "tool_input": {"command": "git push --force origin main"},
          "session_id": "sess-conflict"},
         workspace_fn=_boom,
     )

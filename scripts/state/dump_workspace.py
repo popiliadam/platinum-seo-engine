@@ -111,7 +111,7 @@ def _events_tail(events_path: Path, n: int) -> List[dict]:
         # named explicitly or a garbage-encoded events.jsonl crashes the
         # whole summary instead of degrading to the graceful [] shape.
         return []
-    for line in text.splitlines():
+    for line in text.split("\n"):
         line = line.strip()
         if not line:
             continue

@@ -9,6 +9,12 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/intent_router.py\"",
             "timeout": 10,
             "statusMessage": "AMO intent router…"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/consent_from_prompt.py\"",
+            "timeout": 10,
+            "statusMessage": "Onay mesajı kontrolü…"
           }
         ]
       }

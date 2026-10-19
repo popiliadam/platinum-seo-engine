@@ -188,7 +188,7 @@ def read_work_events_in_window(
     if not events_path.exists():
         return []
     out: list[dict[str, Any]] = []
-    for line in events_path.read_text(encoding="utf-8").splitlines():
+    for line in events_path.read_text(encoding="utf-8").split("\n"):
         line = line.strip()
         if not line:
             continue

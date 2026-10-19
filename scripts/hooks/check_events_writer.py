@@ -26,9 +26,9 @@ Deliberately asymmetric: only WRITES are caught. Reading the ledger — diagnosi
 monthly reporting, the migration's own classify pass — must never be blocked, so
 a read is allowed even when it names the ledger.
 
-Escape hatch (mirrors ``check_excel_writer.py``'s ``PSEO_EXCEL_WRITER``):
-set ``PSEO_EVENTS_WRITER=events_writer.py`` for an intentional
-migration/recovery write.
+Escape hatch: ``PSEO_EVENTS_WRITER=events_writer.py`` in the environment the
+operator starts Claude Code with (the hook process env — a command prefix
+cannot set it). The deny message does not advertise it (G-11).
 
 Exit codes:
     0  ALLOW — not a direct ledger write, or the escape hatch is set
@@ -64,16 +64,22 @@ _ANY_OPERAND_WRITERS = frozenset({"tee", "truncate"})
 _LAST_OPERAND_WRITERS = frozenset({"cp", "mv", "install"})
 
 
-def _is_ledger(raw: str) -> bool:
+def _is_ledger(raw: str, *, in_state: bool = False) -> bool:
     """True only for a live ``_state/events.jsonl``.
 
     ``events.jsonl.legacy`` and ``events.jsonl.bak`` are the migration's own
     outputs and do not end in ``events.jsonl``, so they fall out naturally.
+    G-11: a bare ``events.jsonl`` counts when the command already sits in a
+    ``_state`` dir (``in_state``), and so does one under a ``$VAR`` directory the
+    guard cannot resolve.
     """
     if not isinstance(raw, str) or not raw.strip():
         return False
     p = PurePath(os.path.expanduser(raw.strip().strip("\"'")))
-    return p.name == _LEDGER_NAME and p.parent.name == _STATE_DIR
+    if p.name != _LEDGER_NAME:
+        return False
+    parent = str(p.parent)
+    return p.parent.name == _STATE_DIR or "$" in parent or (in_state and parent in ("", "."))
 
 
 def _operands(tokens: list[str]) -> list[str]:
@@ -81,10 +87,10 @@ def _operands(tokens: list[str]) -> list[str]:
     return [t for t in tokens[1:] if not t.startswith("-")]
 
 
-def _classify_segment(segment: str) -> str | None:
+def _classify_segment(segment: str, *, in_state: bool = False) -> str | None:
     for match in _REDIRECT_RE.finditer(segment):
         target = match.group(1)
-        if _is_ledger(target):
+        if _is_ledger(target, in_state=in_state):
             return _clean(target)
 
     tokens = segment.split()
@@ -93,18 +99,33 @@ def _classify_segment(segment: str) -> str | None:
     bare = tokens[0].rsplit("/", 1)[-1]
     operands = _operands(tokens)
 
-    if bare in _ANY_OPERAND_WRITERS or (bare == "sed" and any(t.startswith("-i") for t in tokens[1:])):
+    in_place = (bare == "sed" and any(t.startswith("-i") for t in tokens[1:])) or (
+        bare == "perl" and any(t.startswith("-") and not t.startswith("--") and "i" in t[1:]
+                               for t in tokens[1:])
+    )
+    if bare in _ANY_OPERAND_WRITERS or in_place:
         for operand in operands:
-            if _is_ledger(operand):
+            if _is_ledger(operand, in_state=in_state):
                 return _clean(operand)
+        return None
+
+    if bare == "dd":  # dd of=<ledger>
+        for tok in tokens[1:]:
+            if tok.startswith("of=") and _is_ledger(tok[3:], in_state=in_state):
+                return _clean(tok[3:])
         return None
 
     # For cp/mv the ledger is only written when it is the DESTINATION; naming it
     # first is a backup, which must stay allowed.
-    if bare in _LAST_OPERAND_WRITERS and operands and _is_ledger(operands[-1]):
+    if bare in _LAST_OPERAND_WRITERS and operands and _is_ledger(operands[-1], in_state=in_state):
         return _clean(operands[-1])
 
     return None
+
+
+def _cd_target(segment: str) -> str | None:
+    tokens = segment.split()
+    return tokens[1] if len(tokens) >= 2 and tokens[0] == "cd" else None
 
 
 def _clean(raw: str) -> str:
@@ -326,8 +347,11 @@ def _python_ledger_write(code: str) -> str | None:
     return None
 
 
-def classify(tool_name: str, tool_input: dict) -> str | None:
-    """(tool_name, tool_input) -> the ledger path this call would WRITE, else None."""
+def classify(tool_name: str, tool_input: dict, cwd: str | None = None) -> str | None:
+    """(tool_name, tool_input) -> the ledger path this call would WRITE, else None.
+
+    ``cwd`` (the hook payload's) lets a bare ``events.jsonl`` count when the
+    session already sits in a ``_state`` dir; a ``cd …/_state`` segment does too."""
     if not isinstance(tool_input, dict):
         return None
 
@@ -339,8 +363,13 @@ def classify(tool_name: str, tool_input: dict) -> str | None:
         command = tool_input.get("command")
         if not isinstance(command, str) or not command.strip():
             return None
+        in_state = bool(cwd) and PurePath(cwd).name == _STATE_DIR
         for segment in _SEGMENT_SEP_RE.split(command):
-            hit = _classify_segment(segment)
+            moved = _cd_target(segment.strip())
+            if moved is not None:
+                in_state = PurePath(moved.strip("\"'").rstrip("/")).name == _STATE_DIR
+                continue
+            hit = _classify_segment(segment, in_state=in_state)
             if hit is not None:
                 return hit
         for source in _python_sources(command):
@@ -354,7 +383,7 @@ def evaluate(payload: dict) -> tuple[int, list[str]]:
     """Return ``(exit_code, messages)`` — 0 allows the tool, 2 denies it."""
     if not isinstance(payload, dict):
         return (0, [])
-    target = classify(payload.get("tool_name") or "", payload.get("tool_input"))
+    target = classify(payload.get("tool_name") or "", payload.get("tool_input"), payload.get("cwd"))
     if target is None:
         return (0, [])
     if os.getenv("PSEO_EVENTS_WRITER", "").strip() == "events_writer.py":
@@ -367,7 +396,7 @@ def evaluate(payload: dict) -> tuple[int, list[str]]:
         "  events_writer.append_work(project_id=..., event_type=..., task_id=...)",
         "events_writer append'ten ÖNCE events.schema.json'a karşı doğrular; elle "
         "yazılan satır bu kontrolü atlar (2026-07 drift'i böyle oluştu).",
-        "Bilerek migration/kurtarma yapıyorsan: PSEO_EVENTS_WRITER=events_writer.py",
+        "Migration/kurtarma gerekiyorsa kullanıcıya sor; bu kontrolü komut içinden açma.",
     ])
 
 

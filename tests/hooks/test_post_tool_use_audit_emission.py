@@ -80,8 +80,9 @@ def test_append_audit_failure_is_nonblocking(tmp_path: Path, monkeypatch, capsys
     hook still exits 0 (non-blocking) — it surfaces instead of breaking the tool."""
     ws = tmp_path / "ws"
     (ws / "shared").mkdir(parents=True)
-    (ws / "shared" / "active.json").write_text(
-        json.dumps({"active_project": "alpha"}), encoding="utf-8"
+    (ws / "shared" / "sessions").mkdir(parents=True)
+    (ws / "shared" / "sessions" / "S.json").write_text(
+        json.dumps({"active_project": "alpha", "session_id": "S"}), encoding="utf-8"
     )
     home = tmp_path / "home"
     home.mkdir()
@@ -95,7 +96,8 @@ def test_append_audit_failure_is_nonblocking(tmp_path: Path, monkeypatch, capsys
     monkeypatch.delenv("CLAUDE_CODE_SESSION_ID", raising=False)
     monkeypatch.setattr(
         sys, "stdin",
-        io.StringIO(json.dumps({"tool_name": "Edit", "tool_input": {"file_path": "/x.md"}})),
+        io.StringIO(json.dumps({"session_id": "S", "tool_name": "Edit",
+                                "tool_input": {"file_path": "/x.md"}})),
     )
     assert mod.main() == 0  # non-blocking
     assert "WARNING" in capsys.readouterr().err  # visible, not silently swallowed

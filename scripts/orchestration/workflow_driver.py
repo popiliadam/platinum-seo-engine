@@ -46,7 +46,9 @@ from pathlib import Path
 from typing import Callable
 
 from scripts.orchestration import committer, coverage
-from scripts.orchestration.run_step import StepSpec, run_step
+from scripts.orchestration.run_step import (
+    StepSpec, empty_commit_kwargs, isolated_step, precommit_rejects, run_step,
+)
 from scripts.orchestration.verify import verify_raw_drop
 from scripts.state.engine_version import engine_version as current_engine_version
 
@@ -149,6 +151,7 @@ def build_steps(
             expected_window=entry.get("window"),
             expected_tool=entry["tool"],
             observed_mcp=((entry["tool"],) if entry["tool"] else ()),
+            allow_empty=entry.get("allow_empty", False),
         )
         for entry in steps_table
     ]
@@ -166,7 +169,8 @@ def _run_attested_step(
     ADVISORY: an analysis transform that aggregates (per-URL findings -> per-category
     rows; query x page -> per-conflict; many keywords -> a small taxonomy)
     legitimately commits <50% of its raw input, so the ratio is recorded
-    (input_count/scored_count) but NEVER fails the step. Composes the frozen spine's
+    (input_count/scored_count) but NEVER fails the step. An EMPTY output is still
+    refused before the write unless the step declares ``allow_empty`` (V-01). Composes the frozen spine's
     public modules; run_step itself is unchanged.
     """
     vr = verify_raw_drop(
@@ -179,12 +183,20 @@ def _run_attested_step(
         status = "missing" if vr.reason == "missing_file" else "failed"
         return coverage.build_step(
             spec.name, spec.verification_class, status,
-            observed_mcp=list(spec.observed_mcp),
+            observed_mcp=list(spec.observed_mcp), reason=vr.reason,
         )
     rows_out = spec.transform(vr.rows)  # loader: model-produced output rows
+    rejected = precommit_rejects(spec, vr.input_count, rows_out, enforce_ratio=False)
+    if rejected:
+        return coverage.build_step(
+            spec.name, spec.verification_class, "failed",
+            observed_mcp=list(spec.observed_mcp),
+            input_count=vr.input_count, scored_count=len(rows_out), reason=rejected,
+        )
     result = commit_fn(
         workbook_path, spec.sheet, rows_out,
         run_id=run_id, project_slug=project_slug, schema_path=schema_path,
+        **empty_commit_kwargs(rows_out),
     )
     return coverage.build_step(
         spec.name, spec.verification_class, "satisfied",
@@ -288,11 +300,11 @@ def run_workflow(
     )
     specs = build_steps(steps_table, run_id, project_slug, workspace_root)
     steps = [
-        _run_one(
+        isolated_step(spec, lambda spec=spec: _run_one(
             spec, run_id=run_id, project_slug=project_slug,
             workspace_root=workspace_root, workbook_path=workbook_path,
             now_epoch=now_epoch, schema_path=schema_path, commit_fn=commit_fn,
-        )
+        ))
         for spec in specs
     ]
     if report_step_name is not None:

@@ -40,10 +40,12 @@ import pytest
 
 _ROOT = Path(__file__).resolve().parents[2]
 
-# The two commands whose arguments can carry a path/target containing spaces.
-# (command file, python module, argparse subcommand)
+# Commands whose arguments can carry a path containing spaces and are forwarded
+# to argparse. (command file, python module, argparse subcommand)
+# pseo-approve left this list with G-01: it no longer runs a block — the
+# UserPromptSubmit hook parses the user's message (tests/hooks/
+# test_consent_from_prompt.py::test_quoted_target_with_spaces_survives).
 _FORWARDERS = [
-    ("pseo-approve.md", "scripts.state.consent_ledger", "approve"),
     ("pseo-bind.md", "scripts.state.session_binding", "bind"),
 ]
 _NAMES = [n for n, _, _ in _FORWARDERS]
@@ -137,49 +139,6 @@ def test_unquoted_textsub_parses_quoted_path(shell: str) -> None:
     assert _parse_textsub("demo-furniture", shell) == ["demo-furniture"]
     # empty → no positionals (the MISSING_* preflight still fires)
     assert _parse_textsub("", shell) == []
-
-
-# --- end-to-end: the REAL approve block keeps a quoted target intact ----------
-
-@pytest.mark.skipif(not shutil.which("python3"), reason="python3 required")
-def test_real_approve_block_preserves_quoted_target_under_textsub(tmp_path: Path) -> None:
-    """Run the actual pseo-approve !`…` execute block under text substitution
-    against a throwaway workspace; the quoted multiword target must reach the
-    consent ledger intact (the production symptom was a truncated target /
-    "unknown action <leaked-target>"). Hermetic: HOME has no pseo config so the
-    env workspace wins, and everything is written under tmp_path.
-    """
-    block = _exec_block("pseo-approve.md", "scripts.state.consent_ledger", "approve")
-    home = tmp_path / "home"
-    ws = tmp_path / "ws"
-    (home / ".config" / "pseo").mkdir(parents=True)  # exists but NO config.json
-    (ws / "shared").mkdir(parents=True)
-    (ws / "shared" / "active.json").write_text(
-        json.dumps({"active_project": "testproj"}), encoding="utf-8"
-    )
-    env = {
-        "PATH": os.environ["PATH"],
-        "HOME": str(home),
-        "PSEO_WORKSPACE_ROOT": str(ws),
-        "CLAUDE_PLUGIN_ROOT": str(_ROOT),
-        # The block runs inside a Claude session, which always exports this; a
-        # session-less approve is refused (the gate could never match it).
-        "CLAUDE_CODE_SESSION_ID": "sess-textsub",
-    }
-    target = "/tmp/My Dir/sitemap.xml"  # < 48 chars → shown verbatim in banner
-    src = block.replace("$ARGUMENTS", f'r1 git_push "{target}"')
-    out = subprocess.run(["bash", "-c", src], env=env, capture_output=True, text=True)
-    combined = out.stdout + out.stderr
-    assert "unknown action" not in combined, (
-        f"valid action leaked the target into the action slot: {combined!r}"
-    )
-    assert target in combined, f"quoted target was mangled under text-sub: {combined!r}"
-    # Defence in depth: the persisted entry hashes the INTACT target.
-    from scripts.state.consent_ledger import target_hash
-    ledger = ws / "projects" / "testproj" / "_state" / "consent.jsonl"
-    assert ledger.exists(), f"no consent ledger written: {combined!r}"
-    entry = json.loads(ledger.read_text(encoding="utf-8").splitlines()[-1])
-    assert entry["target_hash"] == target_hash(target)
 
 
 # --- the module must resolve even when CLAUDE_PLUGIN_ROOT is UNSET -----------

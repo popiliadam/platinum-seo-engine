@@ -17,7 +17,7 @@ gated by allowed_writers; AFTER write emit provenance event via
 events_writer.append_provenance(operation="project_excel"). Plugin-
 agnostik (no slug literals).
 
-Public API: write/append/replace/update (no delete — rules/append-only-state.md).
+Public API: write/append/replace/merge/update (no delete — rules/append-only-state.md).
 `replace` is an idempotent in-sheet refresh (clears the data block below the
 schema header_row, re-lands at data_start_row); it is NOT a row delete — the
 append-only state ledger (events.jsonl) is untouched and a provenance event is
@@ -44,9 +44,9 @@ import sys
 import tempfile
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 from jsonschema import Draft7Validator
 from jsonschema.exceptions import ValidationError as _JSValidationError
@@ -66,7 +66,6 @@ _DEFAULT_SCHEMA_PATH = _REPO_ROOT / "schemas" / "master-excel.schema.json"
 
 _BACKUPS_KEEP = 7
 _EXCEL_CELL_MAX_CHARS = 32_767  # openpyxl/Excel hard limit
-_LOCK_STALE_SECONDS = 5 * 60  # 5 minutes
 # acquire_blocking=True bounds: wait at most _LOCK_BLOCKING_DEADLINE_SECONDS for a
 # concurrent holder to release, polling every _LOCK_POLL_INTERVAL_SECONDS. Fixed
 # cadence (NOT exponential backoff) — adequate for a single-operator tool, and the
@@ -156,6 +155,10 @@ class FormulaPolicyViolation(TransactionError):
 
 class CellValueTooLongError(TransactionError):
     """A cell value exceeds Excel's 32,767-character cap."""
+
+
+class EmptyMergeError(TransactionError):
+    """merge()'s fn returned 0 rows for a sheet that has rows (V-01 rule)."""
 
 
 class LockHeldError(TransactionError):
@@ -386,42 +389,6 @@ def _lock_path(workbook_path: Path) -> Path:
     return state / "excel.lock"
 
 
-def _read_sentinel(lock_path: Path) -> tuple[int | None, str | None]:
-    if not lock_path.exists():
-        return None, None
-    try:
-        raw = lock_path.read_text(encoding="utf-8").strip()
-        obj = json.loads(raw)
-        return obj.get("pid"), obj.get("ts")
-    except (OSError, json.JSONDecodeError, ValueError):
-        return None, None
-
-
-def _is_stale(pid: int | None, ts: str | None) -> bool:
-    if pid is None or ts is None:
-        # Corrupt sentinel = stale.
-        return True
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        # No process with that PID → stale.
-        return True
-    except PermissionError:
-        # Process exists but is not ours; not stale.
-        pid_alive = True
-    else:
-        pid_alive = True
-    if not pid_alive:  # pragma: no cover (ProcessLookupError handled above)
-        return True
-    # Age check.
-    try:
-        when = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-    except ValueError:
-        return True
-    age = (datetime.now(timezone.utc) - when).total_seconds()
-    return age > _LOCK_STALE_SECONDS
-
-
 def _flock_or_raise(
     fd: int,
     lock_path: Path,
@@ -475,15 +442,10 @@ def _acquire_lock(
     release, then raise LockTimeout. Opt-in parallel-write safety so a concurrent
     second writer waits its turn instead of silently losing its work.
     """
-    # First, stale reclaim. Sentinel content is informational; flock provides
-    # the actual mutual exclusion below.
-    pid, ts = _read_sentinel(lock_path)
-    if pid is not None and _is_stale(pid, ts):
-        try:
-            lock_path.unlink()
-        except FileNotFoundError:  # pragma: no cover
-            pass
-
+    # The sentinel is NEVER unlinked (V-02): flock lives on the inode, so deleting
+    # the file lets the next writer lock a fresh inode while the old holder still
+    # owns the old one. A dead holder's flock is dropped by the kernel; the pid/ts
+    # payload is informational only and never decides who may write.
     fd = os.open(str(lock_path), os.O_WRONLY | os.O_CREAT, 0o644)
     _flock_or_raise(
         fd, lock_path,
@@ -515,11 +477,8 @@ def _release_lock(fd: int, lock_path: Path) -> None:
         os.close(fd)
     except OSError:  # pragma: no cover
         pass
-    # Best-effort sentinel cleanup; OK if it lingers (next writer reclaims).
-    try:
-        lock_path.unlink()
-    except FileNotFoundError:  # pragma: no cover
-        pass
+    # The sentinel file stays (see _acquire_lock): unlinking it here would let a
+    # writer that already opened it and one that opens it next hold two inodes.
 
 
 # ---------------------------------------------------------------------------
@@ -626,20 +585,30 @@ def _atomic_save(wb: Workbook, target: Path) -> None:
         pass
 
 
+def _office_lockfile(target: Path) -> Path | None:
+    """The owner-lock sidecar of an open workbook, if any: Excel writes
+    ``~$<name>``, LibreOffice ``.~lock.<name>#`` (V-12)."""
+    for sidecar in (target.parent / f"~${target.name}",
+                    target.parent / f".~lock.{target.name}#"):
+        if sidecar.exists():
+            return sidecar
+    return None
+
+
 def _excel_lockfile_present(target: Path) -> bool:
-    """Detect Excel/LibreOffice owner-lock sidecar (~$Filename.xlsx)."""
-    sidecar = target.parent / f"~${target.name}"
-    return sidecar.exists()
+    """Detect an Excel/LibreOffice owner-lock sidecar next to ``target``."""
+    return _office_lockfile(target) is not None
 
 
 def _load_or_new(target: Path) -> Workbook:
     """Load an existing wb or create a new one. Wraps openpyxl exceptions."""
     if not target.exists():
         return Workbook()
-    if _excel_lockfile_present(target):
+    sidecar = _office_lockfile(target)
+    if sidecar is not None:
         raise WorkbookLockedByExcelError(
             f"workbook {target} appears open in Excel/LibreOffice "
-            f"(found ~${target.name})"
+            f"(found lock file {sidecar.name})"
         )
     try:
         return load_workbook(str(target))
@@ -700,6 +669,38 @@ def writer_registry_status(
 # ---------------------------------------------------------------------------
 # Internals — sheet I/O (header detection + row write)
 # ---------------------------------------------------------------------------
+
+def _normalized_cell(value: Any, ctype: str | None) -> Any:
+    """A cell value as the row schema expects it (V-10).
+
+    date/datetime → ISO text (``YYYY-MM-DD`` at midnight, else ``…THH:MM:SSZ``);
+    an integer column's whole float or digit string → int; a number column's
+    numeric string → float. Anything else is returned unchanged.
+    """
+    if isinstance(value, datetime):
+        if (value.hour, value.minute, value.second, value.microsecond) == (0, 0, 0, 0):
+            return value.date().isoformat()
+        return value.strftime("%Y-%m-%dT%H:%M:%SZ")
+    if isinstance(value, date):
+        return value.isoformat()
+    if ctype == "integer":
+        if isinstance(value, float) and value.is_integer():
+            return int(value)
+        if isinstance(value, str) and value.strip().lstrip("-").isdigit():
+            return int(value.strip())
+    if ctype == "number" and isinstance(value, str):
+        try:
+            return float(value)
+        except ValueError:
+            return value
+    return value
+
+
+def _normalized_cells(row: dict, columns: list[dict]) -> dict:
+    """A NEW row dict with every cell normalised for its column type."""
+    types = {c["name"]: c.get("type") for c in columns}
+    return {k: _normalized_cell(v, types.get(k)) for k, v in row.items()}
+
 
 def _ordered_columns(schema: dict, sheet: str) -> list[dict]:
     return list(schema["sheets"][sheet]["required_columns"])
@@ -862,6 +863,84 @@ def replace(
     )
 
 
+def merge(
+    workbook_path: Path | str,
+    sheet: str,
+    fn: Callable[[list[dict]], list[dict]],
+    project_slug: str,
+    *,
+    schema_path: Path | str | None = None,
+    state_root: Path | str | None = None,
+    writer: str | None = None,
+    allow_extra: bool = False,
+    acquire_blocking: bool = False,
+    owned_by_caller: Callable[[dict], bool] | None = None,
+) -> WriteResult:
+    """Read-modify-write ``sheet`` under ONE excel.lock hold (V-03).
+
+    Loads the workbook under the lock, passes the sheet's current data rows (new
+    dicts) to ``fn``, validates what ``fn`` returns, and replaces the data block
+    with it — all before the lock is released, so a concurrent writer can never
+    slip in between the read and the write. ``fn`` must be pure and quick (it
+    runs while every other writer waits). An empty result over a populated sheet
+    raises ``EmptyMergeError`` and leaves the sheet untouched — unless every
+    current row is the caller's own (``owned_by_caller``), i.e. a re-run that
+    legitimately found nothing. Rows read back are normalised like update()'s
+    (V-10) so an Excel-typed foreign cell cannot fail the merge. An invalid result
+    raises the usual schema errors, also before anything is saved.
+    """
+    workbook_path = Path(workbook_path)
+    schema_p = Path(schema_path) if schema_path else _DEFAULT_SCHEMA_PATH
+    schema = _load_schema(str(schema_p))
+    if sheet not in (schema.get("sheets") or {}):
+        raise SchemaSheetMismatchError(f"sheet {sheet!r} not in schema")
+    columns = _ordered_columns(schema, sheet)
+    _check_writer_scope(schema, sheet, writer)
+
+    state_dir = _state_dir(
+        Path(state_root) if state_root else None, workbook_path, project_slug
+    )
+    lock_path = _lock_path(workbook_path)
+    fd = _acquire_lock(lock_path, acquire_blocking=acquire_blocking)
+    try:
+        wb = _load_or_new(workbook_path)
+        _ensure_sheet_with_header(wb, sheet, columns, _header_row(schema, sheet))
+        ws = wb[sheet]
+        existing = [
+            _normalized_cells(row, columns)
+            for row in _read_data_rows(ws, columns, _data_start_row(schema, sheet))
+        ]
+        rows = fn(existing)
+        own_only = owned_by_caller is not None and all(owned_by_caller(r) for r in existing)
+        if not rows and existing and not own_only:
+            raise EmptyMergeError(
+                f"merge would empty {sheet!r} ({len(existing)} rows); refusing"
+            )
+        _check_rows(rows, schema, sheet, allow_extra=allow_extra)
+        _land_rows(ws, rows, columns, schema, sheet, mode="replace")
+        backup_path = _backup(workbook_path, state_dir)
+        _atomic_save(wb, workbook_path)
+        _rotate_backups(state_dir)
+    finally:
+        _release_lock(fd, lock_path)
+
+    event_id = _emit_provenance_or_anomaly(
+        project_slug=project_slug,
+        sheet=sheet,
+        rows_affected=len(rows),
+        state_dir=state_dir,
+        operation="project_excel",
+        workbook_path=workbook_path,
+    )
+    return WriteResult(
+        workbook_path=workbook_path,
+        sheet=sheet,
+        rows_affected=len(rows),
+        backup_path=backup_path,
+        event_id=event_id,
+    )
+
+
 def update(
     workbook_path: Path | str,
     sheet: str,
@@ -891,6 +970,13 @@ def update(
         raise SchemaSheetMismatchError(f"sheet {sheet!r} not in schema")
     columns = _ordered_columns(schema, sheet)
     _check_writer_scope(schema, sheet, writer)
+    # V-11: an empty where matches every row, and a non-column key reads as None
+    # on every row — either way one call would rewrite the whole sheet.
+    if not where:
+        raise RowSchemaError("update requires a non-empty where (it would match every row)")
+    unknown = sorted(set(where) - {c["name"] for c in columns})
+    if unknown:
+        raise RowSchemaError(f"unknown column(s) in where: {unknown}")
 
     # Lock + load.
     state_dir = _state_dir(
@@ -916,7 +1002,10 @@ def update(
                 for c in columns
             }
             if all(current.get(k) == v for k, v in where.items()):
-                merged = {**current, **set_}
+                # V-10: validate what the cells MEAN, not openpyxl's raw types —
+                # Excel turns a typed date into a datetime cell and numeric text
+                # into numbers, which used to block edits to any other column.
+                merged = {**_normalized_cells(current, columns), **set_}
                 affected_rows.append(merged)
                 # Validate the merged row before flushing.
                 validator = _build_row_validator(schema, sheet)
@@ -949,6 +1038,7 @@ def update(
         rows_affected=len(affected_rows),
         state_dir=state_dir,
         operation="project_excel",
+        workbook_path=workbook_path,
     )
     return WriteResult(
         workbook_path=workbook_path,
@@ -962,6 +1052,57 @@ def update(
 # ---------------------------------------------------------------------------
 # Internals — core write/append driver
 # ---------------------------------------------------------------------------
+
+def _check_rows(
+    rows: list[dict], schema: dict, sheet: str, *, allow_extra: bool
+) -> None:
+    """Schema-validate ``rows`` for ``sheet`` + formula policy + cell length cap."""
+    validator = _build_row_validator(schema, sheet, allow_extra=allow_extra)
+    if not isinstance(rows, list):
+        raise RowSchemaError("rows must be a list of dicts")
+    _validate_rows(rows, validator)
+    _check_formula_policy(rows)
+    _check_cell_lengths(rows)
+
+
+def _land_rows(
+    ws, rows: list[dict], columns: list[dict], schema: dict, sheet: str, *, mode: str
+) -> None:
+    """Write already-validated ``rows`` into ``ws`` (caller holds excel.lock).
+
+    append: bottom of existing data (byte-identical legacy behavior). replace:
+    clear the prior data block then re-land at the schema's data_start_row
+    (idempotent refresh).
+    """
+    if mode == "replace":
+        data_start = _data_start_row(schema, sheet)
+        if (ws.max_row or 0) >= data_start:
+            ws.delete_rows(data_start, ws.max_row - data_start + 1)
+        write_row = data_start
+    else:
+        write_row = _next_data_row(ws)
+
+    col_index = {c["name"]: idx for idx, c in enumerate(columns, start=1)}
+    for row in rows:
+        for k, v in row.items():
+            if k not in col_index:
+                # Validator allowed this key (additionalProperties:true);
+                # we still skip writing it because it has no column.
+                continue
+            ws.cell(row=write_row, column=col_index[k], value=v)
+        write_row += 1
+
+
+def _read_data_rows(ws, columns: list[dict], data_start: int) -> list[dict]:
+    """The sheet's data block as new dicts keyed by column name (blank rows skipped)."""
+    names = [c["name"] for c in columns]
+    rows: list[dict] = []
+    for raw in ws.iter_rows(min_row=data_start, max_col=len(names), values_only=True):
+        if raw is None or all(v is None for v in raw):
+            continue
+        rows.append({name: (raw[i] if i < len(raw) else None) for i, name in enumerate(names)})
+    return rows
+
 
 def _write_or_append(
     workbook_path: Path | str,
@@ -991,15 +1132,9 @@ def _write_or_append(
     # 2. Writer scope (master_task only, currently).
     _check_writer_scope(schema, sheet, writer)
 
-    # 3. Per-row schema validation. P1-09: unknown keys rejected unless allow_extra.
-    validator = _build_row_validator(schema, sheet, allow_extra=allow_extra)
-    if not isinstance(rows, list):
-        raise RowSchemaError("rows must be a list of dicts")
-    _validate_rows(rows, validator)
-
-    # 4. Formula policy + cell length cap.
-    _check_formula_policy(rows)
-    _check_cell_lengths(rows)
+    # 3+4. Per-row schema validation (P1-09: unknown keys rejected unless
+    # allow_extra), formula policy + cell length cap.
+    _check_rows(rows, schema, sheet, allow_extra=allow_extra)
 
     # 5. Lock + load + write under flock.
     state_dir = _state_dir(
@@ -1017,23 +1152,7 @@ def _write_or_append(
         # then re-land at the schema's data_start_row (idempotent refresh).
         # Rows are already schema-validated above (step 3), so a clear here is
         # only reached for a valid payload — a bad row raised before the lock.
-        if mode == "replace":
-            data_start = _data_start_row(schema, sheet)
-            if (ws.max_row or 0) >= data_start:
-                ws.delete_rows(data_start, ws.max_row - data_start + 1)
-            write_row = data_start
-        else:
-            write_row = _next_data_row(ws)
-
-        col_index = {c["name"]: idx for idx, c in enumerate(columns, start=1)}
-        for row in rows:
-            for k, v in row.items():
-                if k not in col_index:
-                    # Validator allowed this key (additionalProperties:true);
-                    # we still skip writing it because it has no column.
-                    continue
-                ws.cell(row=write_row, column=col_index[k], value=v)
-            write_row += 1
+        _land_rows(ws, rows, columns, schema, sheet, mode=mode)
 
         # 6. Backup → atomic save → rotation. Order matters: backup must
         # complete before save, save must complete before rotation prunes.
@@ -1054,6 +1173,7 @@ def _write_or_append(
         rows_affected=len(rows),
         state_dir=state_dir,
         operation="project_excel",
+        workbook_path=workbook_path,
     )
 
     return WriteResult(
@@ -1069,21 +1189,34 @@ def _write_or_append(
 # Internals — event emission helper
 # ---------------------------------------------------------------------------
 
+def _workspace_root_for(workbook_path: Path, project_slug: str, state_dir: Path) -> Path:
+    """The workspace root the provenance event belongs to.
+
+    Walks up from the workbook to its ``projects/<project_slug>`` ancestor (V-14):
+    a workbook kept deeper inside the project folder (outputs/, a scratch copy)
+    must still log to that project's real events.jsonl. Without such an ancestor
+    the legacy guess (two levels above ``_state``'s parent) is kept;
+    events_writer refuses it if it lands inside a project folder, and the write
+    records an anomaly instead of a hidden nested log.
+    """
+    for folder in Path(workbook_path).absolute().parents:
+        if folder.name == project_slug and folder.parent.name == "projects":
+            return folder.parent.parent
+    return state_dir.parent.parent.parent
+
+
 def _emit_provenance(
     *,
     project_slug: str,
     sheet: str,
     rows_affected: int,
-    state_root: Path,
+    workspace_root: Path,
     operation: str,
 ) -> str:
     """
     Emit a provenance event recording the write. The events_writer module
     resolves the events.jsonl path from {workspace_root}/projects/{slug}/_state/.
-    state_root here is the project directory — its parent is `projects/`,
-    grandparent is the workspace root expected by events_writer.
     """
-    workspace_root = state_root.parent.parent  # projects/<slug> → projects → workspace
     # source.kind enum (events.schema): manual | tool_computed | sf_csv | *_mcp.
     # An Excel projection by transaction.py is internally tool_computed —
     # it's the engine writing structured output, not a human key-by-key edit.
@@ -1106,6 +1239,7 @@ def _emit_provenance_or_anomaly(
     rows_affected: int,
     state_dir: Path,
     operation: str,
+    workbook_path: Path,
 ) -> str:
     """Emit provenance; on emit failure record a durable anomaly (operator D-B).
 
@@ -1125,7 +1259,7 @@ def _emit_provenance_or_anomaly(
             project_slug=project_slug,
             sheet=sheet,
             rows_affected=rows_affected,
-            state_root=state_dir.parent,  # _state lives at projects/{slug}/_state
+            workspace_root=_workspace_root_for(workbook_path, project_slug, state_dir),
             operation=operation,
         )
     except Exception as exc:
@@ -1163,6 +1297,7 @@ __all__: Iterable[str] = (
     "RowSchemaError",
     "FormulaPolicyViolation",
     "CellValueTooLongError",
+    "EmptyMergeError",
     "LockHeldError",
     "LockTimeout",
     "BackupDirUnwritableError",
@@ -1175,5 +1310,6 @@ __all__: Iterable[str] = (
     "write",
     "append",
     "replace",
+    "merge",
     "update",
 )

@@ -9,14 +9,14 @@ contamination of the append-only ``events.jsonl`` ledgers.
 
 ``scripts/hooks/audit_post_tool_use.py`` extracts that logic and attributes the
 event to THIS session's bound project via the batch-0b/0c binding primitive
-(session marker → ``shared/active.json`` fallback), preserving every other
+(session marker only — G-05 removed the active.json fallback), preserving every other
 behaviour byte-for-byte: the REDACTED audit_target, the audit_action mapping, and
 the NON-BLOCKING contract (always exit 0).
 
 Contract under test:
   1. session marker beats active.json (the H1 fix) — and the legacy emission
      fields (action / actor / workspace_root) are unchanged;
-  2. an UNBOUND session falls back to active.json (single-project: no regression);
+  2. an UNBOUND session writes no audit row (G-05 — active.json is never used);
   3. Bash targets stay REDACTED (no command args, secret or otherwise, leak);
   4. empty / garbage stdin is non-blocking (exit 0, no event, no traceback);
   5. no workspace, or unbound + no active.json, is a clean no-op (no event, no raise).
@@ -113,10 +113,10 @@ def test_session_marker_attribution_beats_active_json(tmp_path, monkeypatch, cap
 
 
 # ---------------------------------------------------------------------------
-# 2. Unbound session → active.json fallback (single-project: no regression)
+# 2. Unbound session → NO audit row (G-05: never active.json's project)
 # ---------------------------------------------------------------------------
 
-def test_unbound_session_falls_back_to_active_json(tmp_path, monkeypatch, capture):
+def test_unbound_session_writes_no_audit_row(tmp_path, monkeypatch, capture):
     ws = _workspace(tmp_path)
     home = tmp_path / "home"
     home.mkdir()
@@ -127,9 +127,8 @@ def test_unbound_session_falls_back_to_active_json(tmp_path, monkeypatch, captur
         "tool_input": {"file_path": str(tmp_path / "f.md")},
     }
     rc = _run_main(monkeypatch, json.dumps(payload), home=home, workspace=ws)
-    assert rc == 0
-    assert len(capture) == 1
-    assert capture[0]["project_id"] == "beta"  # today's behaviour preserved
+    assert rc == 0  # still non-blocking
+    assert capture == []  # active.json may be another session's project
 
 
 # ---------------------------------------------------------------------------

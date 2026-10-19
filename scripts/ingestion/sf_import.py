@@ -46,6 +46,19 @@ if str(_REPO_ROOT) not in sys.path:
 from scripts.excel import transaction  # noqa: E402
 from scripts.ingestion import sf_projection  # noqa: E402
 from scripts.state import events_writer  # noqa: E402
+from scripts.util import sheet_merge  # noqa: E402
+
+# robots_txt / redirect_404 are SHARED with the tech-SEO governance skills
+# (HF- / FN- / RP- findings) and migration-map (redirect plans), so sf-import
+# refreshes only its own rows there (V-04). Its robots rows are the R- id
+# namespace; its redirect rows carry an "3xx …"/"4xx …" action sentence, while
+# migration-map writes the bare action codes below.
+_SF_ROBOTS_PREFIX = "R-"
+_MIGRATION_MAP_ACTIONS = frozenset({"301", "410"})
+
+
+def _is_sf_redirect_row(row: dict) -> bool:
+    return str(row.get("action") or "").strip() not in _MIGRATION_MAP_ACTIONS
 
 
 # Tier registry (mirrors schemas/sf-required-reports.schema.json)
@@ -257,8 +270,10 @@ def project_and_write(
     Step 6 — ``sf_projection.project_all`` yields the six schema-valid sheet
     row lists; each is written via ``transaction.replace`` (clears the sheet's
     data block, then re-lands the rows), so re-running this refreshes rather
-    than duplicates. ``replace`` itself emits a ``tool_computed`` provenance
-    event per sheet.
+    than duplicates. The two sheets other writers share (``robots_txt``,
+    ``redirect_404``) go through ``sheet_merge`` instead, which refreshes only
+    sf-import's own rows under one lock (V-04). Each write emits a
+    ``tool_computed`` provenance event per sheet.
 
     Step 7 — a single ``sf_csv`` source-provenance event records the data
     lineage (``sf_csv → tool_computed``): ``source.source_folder`` is the raw
@@ -276,21 +291,29 @@ def project_and_write(
             relative ``source_folder``).
 
     Returns:
-        ``{sheet: rows_written}`` for the six projected sheets, in projection
-        key order.
+        ``{sheet: rows_projected}`` for the six projected sheets, in projection
+        key order (sf-import's own rows; foreign rows in shared sheets are
+        preserved, not counted).
     """
     projections = sf_projection.project_all(Path(raw_dir))
 
     counts: dict[str, int] = {}
     for sheet, rows in projections.items():
-        result = transaction.replace(
-            master_xlsx,
-            sheet,
-            rows,
-            project_slug,
-            writer="sf-import",
-        )
-        counts[sheet] = result.rows_affected
+        if sheet == "robots_txt":
+            sheet_merge.merge_prefixed_rows(
+                master_xlsx, sheet, rows, id_prefix=_SF_ROBOTS_PREFIX,
+                run_id="sf-import", project_slug=project_slug, writer="sf-import",
+            )
+        elif sheet == "redirect_404":
+            sheet_merge.replace_owned_rows(
+                master_xlsx, sheet, rows, owns=_is_sf_redirect_row,
+                run_id="sf-import", project_slug=project_slug, writer="sf-import",
+            )
+        else:
+            transaction.replace(
+                master_xlsx, sheet, rows, project_slug, writer="sf-import",
+            )
+        counts[sheet] = len(rows)
 
     total_rows = sum(counts.values())
     # run_id auto-allocated race-free under the append flock (P1-11) — the prior

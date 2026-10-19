@@ -32,9 +32,8 @@ shared JSON-atomic-writer exists in the engine today (transaction._atomic_save
 is Workbook-specific and private), so the canonical recipe is replicated here
 per the batch spec.
 
-This module has NO consumers yet: batch 0c wires dump_workspace
-(strict=True) and the content-gate hook (strict=False) onto
-``resolve_session_project``. It writes only marker files + the user config; it
+Append-only writers (consent ledger, audit hook) resolve with strict=True:
+marker only, no active.json fallback (G-05); read-only hooks use strict=False. It writes only marker files + the user config; it
 never touches active.json (that stays /pseo-active's job).
 
 Authority: ADR-035 PSEO_WORKSPACE_ROOT, schemas/session-marker.schema.json,
@@ -248,23 +247,28 @@ def resolve_session_project(
     """Resolve which project THIS context targets.
 
     Precedence: explicit ``arg`` → session marker (needs session_id AND
-    workspace_root) → shared/active.json → None. With ``strict`` a None result
-    raises FileNotFoundError (dump_workspace's command contract); without it,
-    None is returned (the content-gate hook's never-raise contract). Batch 0c
-    wires strict=True for commands, strict=False for hooks.
+    workspace_root) → shared/active.json → None.
+
+    ``strict`` is for WRITERS of append-only state (consent, audit): it accepts
+    only ``arg`` or THIS session's marker and raises FileNotFoundError otherwise —
+    never the workspace-global active.json, which another session may have
+    pointed at a different project (G-05: the row could not be taken back).
+    Without ``strict`` the active.json fallback stays (read-only routing hooks)
+    and None is returned instead of raising.
     """
     result: str | None = None
     if arg:
         result = arg
     elif session_id and workspace_root is not None:
         result = read_session_binding(session_id, workspace_root)
-    if result is None and workspace_root is not None:
-        result = read_active_project(workspace_root)
     if result is None and strict:
         raise FileNotFoundError(
-            "no project bound to this session and no shared/active.json fallback — "
-            "run /pseo-bind <slug> (this session) or /pseo-active <slug> (global)"
+            "this session is not bound to a project — run /pseo-bind <slug> first "
+            "(shared/active.json is not used for writes: another session may have "
+            "changed it)"
         )
+    if result is None and workspace_root is not None:
+        result = read_active_project(workspace_root)
     return result
 
 

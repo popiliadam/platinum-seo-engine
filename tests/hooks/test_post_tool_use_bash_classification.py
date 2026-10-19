@@ -24,6 +24,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 HOOK_PATH = REPO_ROOT / "hooks" / "post-tool-use.json"
 SLUG = "test-proj"
+SESSION = "sess-bash-classification"  # bound below: unbound sessions write no audit (G-05)
 
 
 def _hook_command() -> str:
@@ -38,6 +39,10 @@ def workspace(tmp_path: Path) -> Path:
         json.dumps({"active_project": SLUG}), encoding="utf-8"
     )
     (tmp_path / "projects" / SLUG / "_state").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "shared" / "sessions").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "shared" / "sessions" / f"{SESSION}.json").write_text(
+        json.dumps({"active_project": SLUG, "session_id": SESSION}), encoding="utf-8"
+    )
     return tmp_path
 
 
@@ -57,7 +62,7 @@ def _run_hook(workspace: Path, payload: dict) -> subprocess.CompletedProcess[str
         "CLAUDE_PLUGIN_ROOT": str(REPO_ROOT),
     }
     proc = subprocess.run(
-        cmd, shell=True, input=json.dumps(payload),
+        cmd, shell=True, input=json.dumps({"session_id": SESSION, **payload}),
         capture_output=True, text=True, timeout=30, env=env,
     )
     # The hook is non-blocking: it must always exit 0.

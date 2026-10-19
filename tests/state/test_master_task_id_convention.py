@@ -43,9 +43,9 @@ _LEGACY_W3W2B = re.compile(r"^MT-W[0-9]+W[0-9]+[A-Z]?-[0-9]+$")
 # suite green — a rise is new drift and is exactly what this gate exists for.
 KNOWN_DRIFT: dict[str, int] = {
     "bayder": 0,         # MT-NNN renamed 2026-08-20; owner made it permanent 2026-10-02
-    "bigcat-tr": 5,      # QW-NNN
-    "dentnotion": 64,    # T-NNN-NN, T-AAA-AAA-NN, MT-FIYAT-NN (19 of them)
-    "katrenur-tr": 1,    # T-0026-V
+    "bigcat-tr": 0,      # QW-NNN gone with the 2026-10-13/14 master rebuild
+    "dentnotion": 0,     # T-NNN-NN / MT-FIYAT-NN gone with the 2026-10-13/14 rebuild
+    "katrenur-tr": 0,    # T-0026-V gone with the 2026-10-13/14 rebuild
     "rkturizm-tr": 1,    # T-PIVOT-15G
 }
 

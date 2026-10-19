@@ -87,7 +87,7 @@ def _classify_lines(events_path: Path, validator: jsonschema.Draft7Validator):
     (line_number, original_line, joined_error_messages)."""
     pass_lines: list[str] = []
     fail_records: list[tuple[int, str, str]] = []
-    for lineno, raw in enumerate(events_path.read_text(encoding="utf-8").splitlines(), start=1):
+    for lineno, raw in enumerate(events_path.read_text(encoding="utf-8").split("\n"), start=1):
         line = raw.strip()
         if not line:
             continue

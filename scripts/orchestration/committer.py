@@ -16,6 +16,10 @@ from scripts.excel import transaction
 from scripts.excel.transaction import WriteResult
 
 
+class EmptyCommitError(ValueError):
+    """A 0-row commit was refused: ``replace`` would silently empty the sheet."""
+
+
 def commit(
     workbook_path: Path | str,
     sheet: str,
@@ -26,6 +30,7 @@ def commit(
     schema_path: Path | str | None = None,
     state_root: Path | str | None = None,
     writer: str = "orchestrator",
+    allow_empty: bool = False,
 ) -> WriteResult:
     """Idempotently commit ``rows`` to ``sheet`` via ``transaction.replace``.
 
@@ -34,7 +39,16 @@ def commit(
     run_id parameter (the whole-block replace is itself the idempotency), so it is
     not threaded further. Returns the transaction ``WriteResult`` unchanged —
     ``WriteResult.rows_affected`` is the step's scored_count.
+
+    An empty ``rows`` raises ``EmptyCommitError`` BEFORE the workbook is touched
+    unless the caller passes ``allow_empty=True`` (V-01): ``replace`` clears the
+    data block first, so an empty upstream result would otherwise erase the sheet.
     """
+    if not rows and not allow_empty:
+        raise EmptyCommitError(
+            f"refusing to replace sheet {sheet!r} with 0 rows (run {run_id}); "
+            f"pass allow_empty=True if an empty sheet is the intended result"
+        )
     return transaction.replace(
         workbook_path,
         sheet,

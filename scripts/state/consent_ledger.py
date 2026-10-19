@@ -59,6 +59,7 @@ import json
 import os
 import re
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
@@ -147,8 +148,11 @@ def compute_entry_hash(entry_without_entry_hash: dict) -> str:
 # Paths + validation
 # ---------------------------------------------------------------------------
 
-def consent_path(workspace_root: Path | str, project_slug: str) -> Path:
-    """Build {ws}/projects/{slug}/_state/consent.jsonl (mkdir -p the _state dir).
+def consent_path(
+    workspace_root: Path | str, project_slug: str, *, create: bool = True
+) -> Path:
+    """Build {ws}/projects/{slug}/_state/consent.jsonl (mkdir -p the _state dir
+    unless ``create=False`` — a READ must not create a project tree, G-11).
 
     Validates the slug against ^[a-z][a-z0-9-]*$ before any mkdir so a bad
     marker / typo cannot create a ghost project tree and an id with '..' or '/'
@@ -159,7 +163,8 @@ def consent_path(workspace_root: Path | str, project_slug: str) -> Path:
             f"project_slug must match ^[a-z][a-z0-9-]*$ (got {project_slug!r})"
         )
     state_dir = Path(workspace_root) / "projects" / project_slug / "_state"
-    state_dir.mkdir(parents=True, exist_ok=True)
+    if create:
+        state_dir.mkdir(parents=True, exist_ok=True)
     return state_dir / "consent.jsonl"
 
 
@@ -198,37 +203,13 @@ def _validate_entry(entry: dict, schema_path: Path | None = None) -> None:
 # Read + verify
 # ---------------------------------------------------------------------------
 
-def _read_last_entry(path: Path) -> dict | None:
-    """Return the last non-blank JSON entry, or None for a missing/empty file.
-
-    Called UNDER the append flock to learn the prior (seq, entry_hash). Raises
-    ConsentLedgerError on a corrupt tail line (the chain cannot be extended over
-    unparseable data).
-    """
-    if not path.exists():
-        return None
-    last: str | None = None
-    with path.open("r", encoding="utf-8") as fh:
-        for line in fh:
-            stripped = line.strip()
-            if stripped:
-                last = stripped
-    if last is None:
-        return None
-    try:
-        obj = json.loads(last)
-    except json.JSONDecodeError as exc:
-        raise ConsentLedgerError(f"corrupt consent ledger tail in {path}: {exc}") from exc
-    return obj if isinstance(obj, dict) else None
-
-
 def read_entries(workspace_root: Path | str, project_slug: str) -> list[dict]:
     """Parse every non-blank line of consent.jsonl into a list of dicts.
 
     A missing file returns [] (never raises). An existing-but-corrupt line
     raises ConsentLedgerError.
     """
-    path = consent_path(workspace_root, project_slug)
+    path = consent_path(workspace_root, project_slug, create=False)
     if not path.exists():
         return []
     entries: list[dict] = []
@@ -310,8 +291,17 @@ def append_consent(
         except OSError as exc:
             raise ConsentLedgerError(f"flock failed on {path}: {exc}") from exc
         try:
-            # Read the tail UNDER the lock so concurrent appenders never collide.
-            last = _read_last_entry(path)
+            # Read + verify the WHOLE chain UNDER the lock (V-07): the gate checks
+            # every entry, so extending a chain that is already broken would print
+            # "recorded" for a consent the gate can never honour.
+            existing = read_entries(workspace_root, project_slug)
+            intact, bad_index = verify_chain(existing)
+            if not intact:
+                raise ConsentLedgerError(
+                    f"consent chain broken at entry {bad_index} in {path}; re-chain it "
+                    f"(keeping each entry's facts) before appending"
+                )
+            last = existing[-1] if existing else None
             if last is None:
                 seq = 0
                 prev_hash = GENESIS_HASH
@@ -393,8 +383,14 @@ def has_session_consent(
     session_id: str,
     action: str,
     target_hash: str,
+    max_age_seconds: float | None = None,
+    now_epoch: float | None = None,
 ) -> bool:
     """True iff an INTACT chain holds an entry with this session_id + action + target_hash.
+
+    With ``max_age_seconds`` (G-09) an entry older than that — by its granted_at —
+    no longer authorizes: a consent is not a blank cheque for the rest of a long
+    session. ``now_epoch`` is injectable for tests (defaults to the wall clock).
 
     Per-session consent (the operator-chosen model, batch 2b): a consent only
     authorizes within the session that granted it. The 2a `/pseo-approve` writer
@@ -409,12 +405,27 @@ def has_session_consent(
     intact, _ = verify_chain(entries)
     if not intact:
         return False
+    now = time.time() if now_epoch is None else now_epoch
     return any(
         e.get("session_id") == session_id
         and e.get("action") == action
         and e.get("target_hash") == target_hash
+        and (max_age_seconds is None or _age_seconds(e.get("granted_at"), now) <= max_age_seconds)
         for e in entries
     )
+
+
+def _age_seconds(granted_at, now_epoch: float) -> float:
+    """Seconds since ``granted_at`` (ISO-8601, ``Z`` allowed); unparseable → infinite."""
+    if not isinstance(granted_at, str):
+        return float("inf")
+    try:
+        when = datetime.fromisoformat(granted_at.replace("Z", "+00:00"))
+    except ValueError:
+        return float("inf")
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    return now_epoch - when.timestamp()
 
 
 # ---------------------------------------------------------------------------
@@ -475,7 +486,7 @@ def _cmd_approve(
             file=sys.stderr,
         )
         return 2
-    # 3. Slug bound to THIS session (marker -> shared/active.json -> raise).
+    # 3. Slug bound to THIS session (marker only — never active.json, G-05).
     session_id = session_binding.current_session_id()
     if not session_id:
         # The gate matches consent per session (has_session_consent); an entry
@@ -515,7 +526,10 @@ def _cmd_approve(
         print(f"error: {exc}", file=sys.stderr)
         return 5
     shown = target if len(target) <= 48 else target[:48]
-    print(f"consent recorded: {action} on {shown} for {run_id}  (seq {entry['seq']})")
+    print(
+        f"consent recorded: {action} on {shown} for {run_id}  "
+        f"(project {slug}, seq {entry['seq']})"
+    )
     return 0
 
 

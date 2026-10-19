@@ -57,9 +57,6 @@ _LOAD_ASSIGN_RE = re.compile(r"([A-Za-z_]\w*)\s*=\s*(?:[\w.]+\.)?load_workbook\s
 _SAVE_CALL_RE = re.compile(r"(?:([A-Za-z_]\w*)\s*\.\s*)?save\s*\(\s*([^,)]*)")
 _TO_EXCEL_RE = re.compile(r"to_excel\s*\(\s*([^,)]*)")
 _READ_ONLY_RE = re.compile(r"read_only\s*=\s*True")
-_ESCAPE_ASSIGN_RE = re.compile(
-    r"(?:^|[;&|\n(]\s*|\bexport\s+|\benv\s+)" + re.escape(f"{_ESCAPE_ENV}={_ESCAPE_VALUE}") + r"(?=\s|;|$)"
-)
 _SCRIPT_RE = re.compile(
     r"\bpython(?:3(?:\.\d+)?)?((?:\s+-[A-Za-z]+)*)\s+([\"']?)([^\s;&|<>\"']+\.py)\2"
 )
@@ -131,8 +128,6 @@ def classify(tool_name: str, tool_input: object, cwd: str | None = None) -> str 
     command = tool_input.get("command")
     if not isinstance(command, str) or not command.strip():
         return None
-    if _ESCAPE_ASSIGN_RE.search(command):
-        return None
     if _code_writes_master(command):
         return "inline Python saves a master workbook"
     for script in _script_paths(command, cwd or os.getcwd()):
@@ -156,7 +151,7 @@ def evaluate(payload: dict) -> tuple[int, list[str]]:
         "Güvenli yol — scripts/excel/transaction.py:",
         "  from scripts.excel import transaction",
         "  transaction.append(wb_path, sheet, rows, project_slug)   # veya update()/replace()",
-        "Bilerek migration/kurtarma yapıyorsan: PSEO_EXCEL_WRITER=transaction.py",
+        "Migration/kurtarma gerekiyorsa kullanıcıya sor; bu kontrolü komut içinden açma.",
     ])
 
 

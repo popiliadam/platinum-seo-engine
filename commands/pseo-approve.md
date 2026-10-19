@@ -23,7 +23,7 @@ Bu komut aksiyonu **çalıştırmaz** — sadece izni KAYDEDER. Gate (batch 2b) 
 - `fs_delete` — `rm` / `unlink` / `rmdir` / `shred`
 - `net_post` — dışa-dönük `curl`/`wget` POST (exfil yüzeyi)
 - `mcp_submit` — bir MCP submit aracı (ör. `mcp__gsc__submit_sitemap`)
-- `index_update` — Google Indexing-API `URL_UPDATED` (Süleyman'ın sert onay şartı)
+- `index_update` — Google Indexing-API (`URL_UPDATED` serbest; yalnız `URL_DELETED` onay ister)
 - `dfs_oversized` — boyut sınırını aşan bir DataForSEO isteği
 
 ## 2. Argümanlar zorunlu
@@ -32,22 +32,22 @@ Bu komut aksiyonu **çalıştırmaz** — sadece izni KAYDEDER. Gate (batch 2b) 
 
 !`set -- $ARGUMENTS; if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then echo "MISSING_ARGS: usage /platinum-seo-engine:pseo-approve <run_id> <action> <target>"; echo "action ∈ {git_push, fs_delete, net_post, mcp_submit, index_update, dfs_oversized}"; echo "örnek: /platinum-seo-engine:pseo-approve demo-furniture-2026-06-06-ab12 index_update https://demo-furniture.example/sitemap.xml"; fi`
 
-## 3. Onay komutunu çalıştır
+## 3. Onay nasıl kaydedilir
 
-Üç argüman da verildiyse recorder CLI'yi çağır. CLI sırasıyla: action'ı doğrular, workspace root'u çözer (config → `$PSEO_WORKSPACE_ROOT`), session UUID'sini `$CLAUDE_CODE_SESSION_ID`'den alır, bu session'a bağlı projeyi çözer (`shared/sessions/<uuid>.json` → `shared/active.json`), sonra deftere atomik (O_APPEND + flock + fsync) bir satır ekler.
-
-!`R=""; for c in "$CLAUDE_PLUGIN_ROOT" "$CLAUDE_PROJECT_DIR" "$PWD" "$HOME"/.claude/plugins/*/*/*/* "$HOME"/.claude/plugins/*/*/*; do [ -n "$c" ] && [ -f "$c/scripts/state/__init__.py" ] && { R="$c"; break; }; done; [ -n "$R" ] || { echo "PLUGIN_ROOT_UNRESOLVED: scripts/state bulunamadı — CLAUDE_PLUGIN_ROOT ayarlayın ya da plugin kökünden çağırın"; exit 2; }; PYTHONPATH="$R" python3 -m scripts.state.consent_ledger approve $ARGUMENTS 2>&1`
-
-Başarılı çıktı tek satırlık banner'dır, örn:
+Bu mesajı **sen** yazdığın anda `UserPromptSubmit` hook'u (`scripts/hooks/consent_from_prompt.py`) onayı deftere kendisi ekledi; sonucu hook çıktısında tek satır olarak görürsün:
 
 ```
-consent recorded: index_update on https://demo-furniture.example/sitemap.xml for demo-furniture-2026-06-06-ab12  (seq 0)
+[onay] kaydedildi: git_push → --force origin main  (proje demo, seq 3). Eylem artık bu oturumda çalıştırılabilir.
 ```
 
-Hata durumları (non-zero exit) ve anlamı:
-- `unknown action` → `$2` 6 geçerli değerden biri değil; yukarıdaki listeden seç.
-- `no project bound to this session` → bu session bir projeye bağlı değil; önce `/pseo-bind <slug>` çalıştır.
-- `no workspace root` → `--workspace <path>` ile bir kez yol geç (ya da `$PSEO_WORKSPACE_ROOT` set et).
+Claude bu komutta **hiçbir şey çalıştırmaz** ve defteri kendisi yazamaz: kapı (outward_action_gate) modelin `consent.jsonl`'a ya da onay CLI'ına her dokunuşunu reddeder (G-01). Böylece onay yalnız kullanıcının kendi mesajından gelebilir. Kısa Türkçe biçim de kabul edilir: `onay: <action> <target>`.
+
+Hata satırları (`[onay] KAYDEDİLMEDİ: …`) ve anlamı:
+- `bu oturum bir projeye bağlı değil` → önce `/pseo-bind <slug>`; onay `shared/active.json`'a düşmez (G-05).
+- `unknown action` → `$2` geçerli değerlerden biri değil; yukarıdaki listeden seç.
+- `workspace bulunamadı` → `/pseo-bind <slug> --workspace <yol>` ile bir kez yol geç.
+
+Hangi eylemin onay istediği `scripts/hooks/consent_policy.json` tablosundadır (serbest / kayıtlı / onaylı); serbest ve kayıtlı eylemler bu komuta hiç ihtiyaç duymaz.
 
 ## 4. Notlar
 
@@ -55,5 +55,5 @@ Hata durumları (non-zero exit) ve anlamı:
 - Defter shape: `schemas/consent.schema.json` (seq + run_id + action + target_hash + granted_at + granted_by + prev_hash + entry_hash, additionalProperties:false).
 - Append-only LOG: O_APPEND + flock + fsync (events.jsonl disiplini); `os.replace` KULLANILMAZ — marker değil, defter.
 - Engine root `$CLAUDE_PLUGIN_ROOT`'tan alınır; cwd'den TÜRETME (batch 0a: güvenilmez).
-- Argüman aktarımı: `$ARGUMENTS` **tırnaksız** argparse'a verilir (`approve $ARGUMENTS`). Claude Code `$ARGUMENTS`'ı blok kaynağına metin-ikamesi (text substitution) yapar, böylece kullanıcının tırnakları gerçek shell tırnağı olur ve boşluklu bir hedef tek argüman kalır; argparse (run_id/action/target) parser'dır. `"$ARGUMENTS"` (çift tırnak) ya da `eval`+`shlex` `set --` reparse KULLANMA — bunlar yalnız env-var aktarımında doğrudur, text-sub altında tırnakları bozar (finding #13: üretimde `"origin main"` → "unknown action").
-- Kayıt yazıldıktan SONRA gate (batch 2b) aksiyona izin verir; bu komut tek başına aksiyonu çalıştırmaz.
+- Argüman ayrıştırma: hook mesajın İLK satırını `shlex` ile böler, yani kullanıcının tırnakları korunur ve boşluklu bir hedef (`"/tmp/My Dir/x.json"`) tek argüman kalır; tırnaksız çok kelimeli hedef (`origin main`) boşlukla birleştirilir — kapının hash'lediği hedefle aynı metin.
+- Kayıt yazıldıktan SONRA gate aksiyona izin verir; bu komut aksiyonu çalıştırmaz, defteri de yazmaz (hook yazar).
