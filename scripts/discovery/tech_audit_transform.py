@@ -5,7 +5,8 @@ on_page_content_parsing raw JSON → schema-shaped tech_seo rows.
 
 Reads two paid-MCP raw responses per URL:
   - mcp__dataforseo__on_page_lighthouse  (~5-10 credits/URL — Performance,
-    LCP, FID/INP, CLS, TBT, TTI, FCP audits)
+    LCP, CLS, TBT (lab proxy for INP), TTI, FCP audits — diagnostic; the
+    real-user CWV come from the CrUX API via crux_field.py, S-19)
   - mcp__dataforseo__on_page_content_parsing  (~2-3 credits/URL — title,
     meta description, H1 count, structured data presence, internal links,
     images alt coverage)
@@ -191,6 +192,7 @@ class RowSchemaError(TechAuditError):
 # semantic).
 # ---------------------------------------------------------------------------
 
+from scripts.discovery import crux_field  # noqa: E402
 from scripts.util.dfs_response import (  # noqa: E402  (sys.path mutation above)
     normalize_dfs_response as _normalize_dfs_response,
 )
@@ -614,10 +616,8 @@ def _performance_findings(sig: LighthouseSignal) -> list[_Finding]:
             url=sig.url,
         ))
     # I3 — responsiveness via Total Blocking Time. TBT is the Lighthouse LAB
-    # proxy for field INP (Web Vitals 2024: INP supersedes FID). We do NOT
-    # collect field INP here (that needs CrUX — out of scope; see SKILL.md
-    # deferred note), so the finding text is explicit that TBT is a lab proxy
-    # and never claims a real field-INP number. Thresholds: >600ms HIGH,
+    # proxy for INP. Field INP comes from CrUX (crux_raw, S-19) as its own
+    # finding; this lab finding never claims a field-INP number. Thresholds: >600ms HIGH,
     # 200<tbt<=600 MEDIUM (Lighthouse scoring guidance, desktop).
     if sig.tbt_ms is not None and sig.tbt_ms > 600:
         out.append(_Finding(
@@ -998,6 +998,7 @@ def transform(
     url_cap: int = DEFAULT_URL_CAP,
     live_findings: list[dict] | None = None,
     page_sizes: list[dict] | None = None,
+    crux_raw: list[dict] | None = None,
 ) -> dict:
     """
     Transform DFS Lighthouse + on_page_content_parsing payloads into
@@ -1029,6 +1030,10 @@ def transform(
         page_sizes: OPTIONAL SF ``internal_all`` rows (``Address``,
             ``Size (bytes)``, ``Content Type``) — HTML over 1.5 MB → MEDIUM,
             over 2 MB → HIGH (S-20, Googlebot's 2 MB read limit).
+        crux_raw: OPTIONAL list of CrUX ``records:queryRecord`` responses
+            (one per URL, mobile p75; origin record when the URL has none).
+            Field LCP/INP/CLS/TTFB above Google's bounds become findings
+            that name their source (S-19); lab stays diagnostic.
 
     Returns:
         {
@@ -1092,6 +1097,11 @@ def transform(
         _html_size_findings(page_sizes) if page_sizes else []
     )
 
+    field_signals = [s for s in (crux_field.parse_record(r) for r in (crux_raw or [])) if s]
+    findings = findings + [
+        _Finding(**f) for s in field_signals for f in crux_field.field_findings(s)
+    ]
+
     rows = _aggregate_to_rows(findings)
 
     return {
@@ -1100,6 +1110,7 @@ def transform(
             "lighthouse_url_count": len(lighthouse_signals),
             "content_parsing_url_count": len(content_signals),
             "live_findings_count": len(live_findings_findings),
+            "field_url_count": len(field_signals),
             "finding_count": len(findings),
             "row_count": len(rows),
             "url_cap": url_cap,
