@@ -31,10 +31,12 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements-lock.txt
 
-      # Step 1 — governance skill drift-check (master.xlsx invariants: 32 declared / 25 implemented cross-sheet rules)
-      # Phase 14 W3-W3-α strict mode (Q-CI-W3-03 RESOLVED runtime kanıt + 4 governance helper exec EXIT=0 4/4 zemin).
+      # Step 1 — cross-sheet invariants (K-01): runs validate_invariants on a copy of
+      # templates/master-excel.xlsx. Red on any FAIL or when the NOT_IMPLEMENTED set
+      # (7 of 32 declared today) changes. The old step ran SKILL.md blocks with a
+      # hard-coded GREEN and evaluated 0 rules.
       - name: 1. drift-check
-        run: python3 scripts/ci/run_skill_python.py skills/governance/drift-check/SKILL.md
+        run: python3 scripts/ci/drift_gate.py
         continue-on-error: false
 
       # Step 2 — governance skill schema-validate (jsonschema Draft7 all schemas + cross-sheet-invariants ≥20 rules (additive K-02))

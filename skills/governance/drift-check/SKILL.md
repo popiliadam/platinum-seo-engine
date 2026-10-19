@@ -168,9 +168,18 @@ workbook raise immediately.
 
 ```python
 from scripts.validation import validate_invariants
-# results = validate_invariants.evaluate_all(wb, project_slug)
-# results: list of {"id", "severity", "verdict", "evidence", ...}
-# (Documented invocation; helper exec leaves results bound from Step 1 init.)
+# K-01: evaluated for real when the workbook exists — never a placeholder.
+# results: list of {"id", "severity", "verdict", "evidence", ...}; declared
+# rules without a check function come back as NOT_IMPLEMENTED (never PASS).
+if wb_path.exists():
+    from openpyxl import load_workbook as _lw
+    _wb = _lw(str(wb_path), data_only=True, read_only=True)
+    try:
+        results = validate_invariants.evaluate_all(_wb, project_slug,
+                                                   workspace_root=workspace_root)
+    finally:
+        _wb.close()
+    results = results + validate_invariants.unimplemented_results()
 ```
 
 The 25 rules are partitioned:
@@ -184,14 +193,21 @@ The 25 rules are partitioned:
 ### Step 4 — `aggregate_verdict`
 
 ```python
-# agg = validate_invariants.aggregate_verdicts(results)
-# agg: {"overall": "GREEN|AMBER|RED",
-#       "fail_count": int, "warn_count": int, "pass_count": int,
-#       "manual_review_required": [...]}
-# Placeholder (orchestrator binds real aggregate at runtime):
-agg = {"overall": "GREEN", "fail_count": 0, "warn_count": 0,
-       "pass_count": 20, "manual_review_required": []}
+# agg: {"overall": "GREEN|AMBER|RED", "fail_count", "warn_count", "pass_count",
+#       "manual_review_required": [...], "not_implemented": [...]}
+# K-01: no hard-coded GREEN. Without a workbook the verdict is NOT_RUN — an
+# unevaluated check is never reported as passing.
+if results:
+    agg = validate_invariants.aggregate_verdicts(results)
+else:
+    agg = {"overall": "NOT_RUN", "fail_count": 0, "warn_count": 0,
+           "pass_count": 0, "manual_review_required": [],
+           "note": f"master.xlsx not found at {wb_path} — nothing evaluated"}
 ```
+
+CI step 1 runs the same validator through `scripts/ci/drift_gate.py` on a
+copy of `templates/master-excel.xlsx` (red on any FAIL or when the
+NOT_IMPLEMENTED set changes).
 
 §17.2: any FAIL with severity CRITICAL/HIGH → RED (except F-15 manual
 triage which routes to AMBER + `manual_review_required[]`); MEDIUM
