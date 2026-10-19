@@ -428,10 +428,15 @@ def transition(
     project_slug: str,
     workspace_root: Path | None = None,
     schema_path: Path | None = None,
+    step_patch: tuple[int, dict] | None = None,
     **context: Any,
 ) -> RunHandle:
     """Low-level transition: validates (from→to) and merges `context` into
-    the run dict before schema-validating + atomic write."""
+    the run dict before schema-validating + atomic write.
+
+    ``step_patch=(index, patch)`` updates that step in the SAME locked write
+    (V-08): a bad index raises before anything is written, so the status can
+    never change without its step (and its event)."""
     schema_p = schema_path or _DEFAULT_SCHEMA_PATH
     path = _run_path(run_id, project_slug, workspace_root)
 
@@ -439,6 +444,8 @@ def transition(
     try:
         data = _read_run(path)
         _check_transition(data["status"], new_status)
+        if step_patch is not None:
+            data["steps"] = _patched_steps(data.get("steps") or [], *step_patch)
         # Append-only merge: never delete existing keys (paused_at survives
         # resume per rules/append-only-state.md).
         for k, v in context.items():
@@ -479,21 +486,19 @@ def request_approval(
     if deadline:
         meta["deadline"] = deadline
 
-    handle = transition(
+    # The named step flips to awaiting_approval in the same write (V-08).
+    step_patch = (
+        (step_index, {"status": "awaiting_approval", "approval_prompt": prompt or subject})
+        if step_index is not None else None
+    )
+    return transition(
         run_id, "awaiting_approval",
         project_slug=project_slug,
         workspace_root=workspace_root,
         schema_path=schema_path,
+        step_patch=step_patch,
         approval_meta=meta,
     )
-    # Also flip the named step to awaiting_approval if requested.
-    if step_index is not None:
-        _patch_step(
-            run_id, project_slug, step_index,
-            patch={"status": "awaiting_approval", "approval_prompt": prompt or subject},
-            workspace_root=workspace_root, schema_path=schema_path,
-        )
-    return handle
 
 
 def _do(run_id: str, new_status: str, action: str, *,
@@ -593,16 +598,15 @@ def fail(run_id: str, *, project_slug: str, code: str, message: str,
         failure["step_index"] = step_index
     if external:
         failure["external"] = True
+    # The failed step is patched in the same write as the status (V-08).
+    step_patch = (
+        (step_index, {"status": "failed", "ended_at": _utc_iso_z(),
+                      **({"error": error_details} if error_details else {})})
+        if step_index is not None else None
+    )
     handle = transition(run_id, "failed", project_slug=project_slug,
                         workspace_root=workspace_root, schema_path=schema_path,
-                        failure_reason=failure)
-    if step_index is not None:
-        _patch_step(
-            run_id, project_slug, step_index,
-            patch={"status": "failed", "ended_at": _utc_iso_z(),
-                   **({"error": error_details} if error_details else {})},
-            workspace_root=workspace_root, schema_path=schema_path,
-        )
+                        step_patch=step_patch, failure_reason=failure)
     _emit_workflow_event(
         project_slug=project_slug, workflow_action="failed",
         workflow_run_id=run_id, workspace_root=workspace_root,
@@ -723,6 +727,19 @@ def list_runs(project_slug: str, *, workspace_root: Path | None = None,
 # Internals — step patcher
 # ---------------------------------------------------------------------------
 
+def _patched_steps(steps: list, step_index: int, patch: dict) -> list:
+    """A NEW steps list with ``patch`` merged into ``steps[step_index]``.
+    Raises ValidationError for an out-of-range index (nothing is changed)."""
+    if step_index < 0 or step_index >= len(steps):
+        raise ValidationError(
+            f"step_index {step_index} out of bounds (steps={len(steps)})"
+        )
+    return [
+        {**step, **patch} if i == step_index else step
+        for i, step in enumerate(steps)
+    ]
+
+
 def _patch_step(
     run_id: str,
     project_slug: str,
@@ -739,15 +756,7 @@ def _patch_step(
     fd = _acquire_run_lock(path)
     try:
         data = _read_run(path)
-        steps = data.get("steps") or []
-        if step_index < 0 or step_index >= len(steps):
-            raise ValidationError(
-                f"step_index {step_index} out of bounds (steps={len(steps)})"
-            )
-        step = dict(steps[step_index])
-        step.update(patch)
-        steps[step_index] = step
-        data["steps"] = steps
+        data["steps"] = _patched_steps(data.get("steps") or [], step_index, patch)
         if also_update:
             data.update(also_update)
         data["updated_at"] = _utc_iso_z()
