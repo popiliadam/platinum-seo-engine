@@ -70,3 +70,9 @@ def test_no_fid_left_in_tech_audit() -> None:
     skill = (root / "skills" / "discovery" / "tech-audit" / "SKILL.md").read_text(encoding="utf-8")
     assert "crux_raw" in skill and "CRUX_API_KEY" in skill
     assert "CrUX field-data\nintegration is deferred" not in skill
+
+
+def test_origin_fallback_finding_is_attributed_to_the_page() -> None:
+    resp = dict(_resp(scope="origin"), requested_url=URL)
+    out = tat.transform(lighthouse_raw=None, content_parsing_raw=None, crux_raw=[resp])
+    assert URL in out["tech_seo"][0]["affected_urls"]

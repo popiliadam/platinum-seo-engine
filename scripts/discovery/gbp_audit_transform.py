@@ -239,8 +239,8 @@ def normalize_listing(raw: dict | None) -> dict | None:
     }
     if "additional_categories" in raw:
         out["secondary_categories"] = list(raw.get("additional_categories") or [])
-    if "total_photos" in raw:
-        out["photo_count"] = raw.get("total_photos") or 0
+    if raw.get("total_photos") is not None:  # null = not reported = unknown
+        out["photo_count"] = raw["total_photos"]
     work_time = raw.get("work_time")
     if work_time is not None:
         out["business_hours"] = ((work_time or {}).get("work_hours") or {}).get("timetable")

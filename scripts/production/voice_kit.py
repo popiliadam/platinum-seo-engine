@@ -53,7 +53,7 @@ class VoiceKit:
 def _read_text(path: Path) -> str | None:
     try:
         return path.read_text(encoding="utf-8")
-    except OSError:
+    except (OSError, UnicodeDecodeError):  # unreadable = missing, never a crash
         return None
 
 
@@ -97,7 +97,9 @@ def load_voice_kit(project_dir: Path | str) -> VoiceKit:
     voice = text("voice.md")
     opinions = text("opinions.md")
     facts = items("facts.json", ("claim", "source"))
-    stories = items("stories.json", ("summary", "source"))
+    # a customer story may be told only with the customer's permission
+    stories = tuple(s for s in items("stories.json", ("summary", "source"))
+                    if s.get("consent") is True)
     banned_raw = text("banned-phrases.txt")
     authors = items("authors.json", ("name",))
     banned = tuple(line.strip() for line in banned_raw.split("\n") if line.strip())

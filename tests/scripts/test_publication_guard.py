@@ -89,3 +89,10 @@ def test_missing_record_is_not_ready() -> None:
 def test_blank_template_is_not_ready() -> None:
     ready, _ = pg.verification_status(pg.blank_verification_record())
     assert not ready
+
+
+def test_naive_now_and_aware_events_do_not_crash() -> None:
+    from datetime import datetime
+    from scripts.production.publication_guard import recent_publications
+    events = [{"event_kind": "work", "event_type": "content_new", "timestamp": "2026-10-18T10:00:00Z"}]
+    assert recent_publications(events, now=datetime(2026, 10, 19, 9, 0)) == 1

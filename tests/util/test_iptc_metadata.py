@@ -85,3 +85,36 @@ def test_unsupported_format_raises(tmp_path: Path) -> None:
     p = _make(tmp_path, "BMP")
     with pytest.raises(ValueError, match="BMP"):
         write_ai_image_disclosure(p)
+
+
+# --- review follow-ups: tagging must not degrade the image -------------------------
+
+def test_jpeg_keeps_quantization_and_subsampling(tmp_path: Path) -> None:
+    p = _make(tmp_path, "JPEG", quality=80, subsampling=0)
+    with Image.open(p) as before:
+        q_before = before.quantization
+    write_ai_image_disclosure(p)
+    with Image.open(p) as after:
+        assert after.quantization == q_before
+        from PIL import JpegImagePlugin
+        assert JpegImagePlugin.get_sampling(after) == 0
+
+
+@pytest.mark.parametrize("fmt", ["JPEG", "WEBP", "PNG"])
+def test_icc_profile_is_kept(tmp_path: Path, fmt: str) -> None:
+    from PIL import ImageCms
+    icc = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes()
+    p = _make(tmp_path, fmt, icc_profile=icc)
+    write_ai_image_disclosure(p)
+    with Image.open(p) as img:
+        assert img.info.get("icc_profile") == icc
+
+
+def test_animated_webp_keeps_all_frames(tmp_path: Path) -> None:
+    p = tmp_path / "anim.webp"
+    frames = [Image.new("RGB", (10, 10), c) for c in ((255, 0, 0), (0, 255, 0), (0, 0, 255))]
+    frames[0].save(p, format="WEBP", save_all=True, append_images=frames[1:], duration=100)
+    write_ai_image_disclosure(p)
+    with Image.open(p) as img:
+        assert getattr(img, "n_frames", 1) == 3
+    assert read_digital_source_type(p) == IRI

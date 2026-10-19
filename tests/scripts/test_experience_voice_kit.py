@@ -117,3 +117,16 @@ def test_template_renders_byline_and_person_for_every_real_author() -> None:
     assert "{{#IF_AUTHOR}}" in byline and "IF_PROFILE_YMYL" not in byline
     person = tpl[tpl.index('"@type": "Person"') - 120: tpl.index('"@type": "Person"')]
     assert "{{#IF_AUTHOR}}" in person and "IF_PROFILE_YMYL" not in person
+
+
+def test_story_without_consent_is_not_used(tmp_path: Path) -> None:
+    ok = {"summary": "Kombi 1 günde değişti", "source": "Google yorumu", "consent": True}
+    no = {"summary": "Gizli vaka", "source": "e-posta", "consent": False}
+    kit = vk.load_voice_kit(_kit_dir(tmp_path, stories=[ok, no]))
+    assert kit.stories == (ok,)
+
+
+def test_non_utf8_kit_file_is_reported_missing(tmp_path: Path) -> None:
+    d = _kit_dir(tmp_path)
+    (d / "voice" / "voice.md").write_bytes(b"\xff\xfe\x00bad")
+    assert "voice.md" in vk.load_voice_kit(d).missing

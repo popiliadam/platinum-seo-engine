@@ -29,7 +29,7 @@ import json
 import re
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 WEEKLY_PUBLISH_CAP_DEFAULT = 5
@@ -51,13 +51,16 @@ def _parse_ts(value) -> datetime | None:
     if not isinstance(value, str) or not value:
         return None
     try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        ts = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         return None
+    return ts if ts.tzinfo else ts.replace(tzinfo=timezone.utc)
 
 
 def recent_publications(events, *, now: datetime, days: int = 7) -> int:
     """New pages (content_new / pillar_launch work events) in the last ``days``."""
+    if now.tzinfo is None:  # naive == UTC; never compare naive with aware
+        now = now.replace(tzinfo=timezone.utc)
     since = now - timedelta(days=days)
     count = 0
     for event in events:

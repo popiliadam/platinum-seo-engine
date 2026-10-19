@@ -16,6 +16,7 @@ visible "AI-generated" text to the page (the visible-disclosure ban stays).
 
 from __future__ import annotations
 
+import io
 import re
 from pathlib import Path
 from typing import Union
@@ -74,21 +75,28 @@ def write_ai_image_disclosure(image_path: Union[Path, str]) -> None:
                 f"unsupported image format {fmt!r} for IPTC XMP; "
                 f"supported: {sorted(SUPPORTED_FORMATS)}"
             )
-        img = src.copy()
+        save_kw: dict = {"format": fmt}
         exif = src.info.get("exif")
-
-    save_kw: dict = {"format": fmt}
-    if exif:
-        save_kw["exif"] = exif
-    if fmt == "PNG":
-        info = PngInfo()
-        info.add_itxt(_PNG_XMP_KEY, _XMP_PACKET)
-        save_kw["pnginfo"] = info
-    else:
-        save_kw["xmp"] = _XMP_PACKET.encode("utf-8")
-    if fmt == "JPEG":
-        save_kw["quality"] = "keep" if getattr(img, "quantization", None) else 95
-    img.save(p, **save_kw)
+        if exif:
+            save_kw["exif"] = exif
+        icc = src.info.get("icc_profile")
+        if icc:  # the JPEG / WebP savers take it only as an argument
+            save_kw["icc_profile"] = icc
+        if fmt == "PNG":
+            info = PngInfo()
+            info.add_itxt(_PNG_XMP_KEY, _XMP_PACKET)
+            save_kw["pnginfo"] = info
+        else:
+            save_kw["xmp"] = _XMP_PACKET.encode("utf-8")
+        if fmt == "JPEG":
+            # "keep" reuses the original quantization tables and subsampling;
+            # it only works when saving from the opened JpegImageFile itself.
+            save_kw["quality"] = "keep"
+        if getattr(src, "n_frames", 1) > 1:
+            save_kw["save_all"] = True  # animated WebP / APNG keep every frame
+        buf = io.BytesIO()
+        src.save(buf, **save_kw)
+    p.write_bytes(buf.getvalue())
 
 
 def read_digital_source_type(image_path: Union[Path, str]) -> str | None:

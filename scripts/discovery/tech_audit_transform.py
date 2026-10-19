@@ -1097,7 +1097,7 @@ def transform(
         _html_size_findings(page_sizes) if page_sizes else []
     )
 
-    field_signals = [s for s in (crux_field.parse_record(r) for r in (crux_raw or [])) if s]
+    field_signals = [s for s in (crux_field.parse_record(r, url=r.get("requested_url")) for r in (crux_raw or [])) if s]
     findings = findings + [
         _Finding(**f) for s in field_signals for f in crux_field.field_findings(s)
     ]

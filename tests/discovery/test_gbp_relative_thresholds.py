@@ -58,3 +58,15 @@ def test_address_compare_ignores_order() -> None:
     observed = {"business_name": "Usta Kombi", "phone": "+902325551122",
                 "address": "Karşıyaka İzmir, Atatürk Cad. No 5", "source": "gbp_listing"}
     assert nap_consistency.compare_nap(CANON, observed) == []
+
+
+def test_street_number_swap_still_a_mismatch() -> None:
+    canon = dict(CANON, address="5 Sokak No:3 Karşıyaka İzmir")
+    observed = {"business_name": "Usta Kombi", "phone": "+902325551122",
+                "address": "3 Sokak No:5 Karşıyaka İzmir", "source": "gbp_listing"}
+    assert [f["field"] for f in nap_consistency.compare_nap(canon, observed)] == ["address"]
+
+
+def test_null_total_photos_is_unknown_not_zero() -> None:
+    rows = gbp._analyze_gaps(dict(DFS_ITEM, total_photos=None), {}, canonical_nap=CANON)
+    assert "photos" not in [r["category"] for r in rows]
