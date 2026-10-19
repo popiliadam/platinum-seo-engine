@@ -25,6 +25,7 @@ inputs:
   project_slug:        { type: string,  required: true,  description: "Workspace proje slug'ı (örn 'projeA'). projects/{slug}/ dizinine map edilir." }
   new_content_plan_id: { type: string,  required: true,  description: "master.xlsx[new_content_plan] row id reference (kolon A)." }
   mode:                { type: string,  required: false, default: "draft", description: "Output mode — 'draft' (review öncesi) veya 'publish' (immediate). Enum dışı değer DURUR #5." }
+  user_value:          { type: string,  required: true,  description: "R-154 (S-02): bu sayfanın mevcut sayfalara göre kullanıcıya ne eklediği (tek cümle, gerçek fark). Boşsa DURUR #10." }
 outputs:
   - "outputs/blog/{slug}/article.html"
   - "outputs/blog/{slug}/schema.jsonld"
@@ -354,6 +355,23 @@ R-152 → originality, R-153 → depth (`content-craft-discipline.md`).
 `master.xlsx[new_content_plan]` row read where
 `id == {input.new_content_plan_id}`. `master.xlsx[cluster_keywords]`
 filter where `assigned_url == new_content_plan.url_slug`.
+
+### Step 1b — `publication_guard` (R-154, S-02 — ölçekli içerik koruması)
+
+Yazmaya başlamadan önce (taslak metin hazır olunca Step 8'de tekrar):
+
+```python
+from scripts.production import publication_guard as pg
+n7 = pg.recent_publications(events_jsonl_rows, now=now_utc)          # content_new + pillar_launch
+existing = {url: visible_text for url, visible_text in project_articles}  # outputs/blog/*/article.html + canlı sayfalar
+result = pg.check_new_content(draft_text=draft, user_value=input.user_value,
+                              existing=existing, publications_last_7d=n7)
+```
+
+`result.ok == False` → **DURUR #10**: haftalık tavan doldu (gelecek haftaya
+planla), mevcut bir sayfanın neredeyse kopyası (o sayfayı iyileştir) ya da
+`user_value` boş. Tavan şimdilik motor varsayılanı (`WEEKLY_PUBLISH_CAP_DEFAULT`
+= 5 yeni sayfa / 7 gün); proje bazında ayar R-61 kapanınca project-config'e eklenir.
 `master.xlsx[topical_map]` filter where
 `pillar == new_content_plan.assigned_cluster` OR
 `cluster == new_content_plan.assigned_cluster`.
@@ -530,6 +548,14 @@ Principle 1).
   Twitter pack.
 - `outputs/blog/{slug}/upload-instructions.md` — Section A WordPress
   media library workflow (R-74).
+- `outputs/blog/{slug}/verification.json` — R-155 (S-03) insan doğrulama
+  kaydı, `publication_guard.blank_verification_record()` ile BOŞ başlar:
+  `{"human_verification": {"verified_by": "", "verified_at": null, "checked": []}}`.
+  Bir kişi metni, title'ı, meta description'ı, structured data'yı ve alt
+  text'leri kontrol edip doldurana kadar paket **hazır değildir**:
+  `python3 scripts/production/publication_guard.py verify outputs/blog/{slug}/verification.json`
+  exit 0 değilse yayın/deploy adımı başlamaz (`mode=publish` dahil). Kayıt
+  yalnız motorda tutulur; sayfaya görünür hiçbir ibare eklenmez.
 
 ### Step 12 — `emit_provenance`
 
@@ -545,7 +571,7 @@ Principle 1).
 | `timestamp`      | UTC ISO 8601                                   |
 | `mode`           | `input.mode` (`draft` / `publish`)             |
 
-## DURUR Conditions (9)
+## DURUR Conditions (11)
 
 | #  | Trigger                                               | Resolution                                           |
 |----|-------------------------------------------------------|------------------------------------------------------|
@@ -558,6 +584,8 @@ Principle 1).
 | 7  | meta pixel cap aşımı                                  | auto-correct fail ise manuel revise                  |
 | 8  | Schema Rich Results Test REJECT                       | JSON-LD `@graph` fix önce                            |
 | 9  | YMYL profili + reviewer adı yok (R-124 imza eksik)    | RED yayın bloklu; operatör reviewer adlandır + append_audit kaydı (reviewer+review_date+content_version) |
+| 10 | R-154 publication_guard RED (haftalık tavan / neredeyse kopya / user_value boş) | gelecek haftaya planla, mevcut sayfayı iyileştir ya da gerçek kullanıcı değerini yaz |
+| 11 | R-155 verification.json eksik (S-03 insan doğrulaması yok) | bir kişi 5 öğeyi kontrol edip kaydı doldurana kadar yayın yok |
 
 ## Cascade Fix W-F1 (Phase 10 EKSİĞİ Closure — Atomic Commit Içinde)
 
