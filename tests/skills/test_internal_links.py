@@ -238,9 +238,6 @@ def test_internal_links_orphan_page_detection(
         run_date="2026-05-01",
     )
     rows = out["master_task"]
-    orphans = [r for r in rows if "/orphan-page]" in r["note"] or
-               r["note"].startswith(f"{ilt.NOTE_PREFIX}/{ilt.KIND_ORPHAN}]")
-               and "orphan-page" in r["url"]]
     # Exactly one orphan (the /orphan-page URL).
     orphan_finding = [r for r in rows if r["url"] == "https://example.com/orphan-page"
                       and r["note"].startswith(f"{ilt.NOTE_PREFIX}/{ilt.KIND_ORPHAN}]")]

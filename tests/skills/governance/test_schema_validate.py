@@ -39,12 +39,10 @@ Discipline:
 
 from __future__ import annotations
 
-import hashlib
 import json
 import re
 from pathlib import Path
 
-import pytest
 import yaml
 from jsonschema import Draft7Validator
 

@@ -43,7 +43,6 @@ import json
 import re
 from pathlib import Path
 
-import pytest
 import yaml
 from jsonschema import Draft7Validator
 
@@ -313,7 +312,7 @@ def test_r58_robots_map_read_only_contract() -> None:
     # Documentation references like 'openpyxl Workbook.save → çağrılırsa fail'
     # use 'Workbook.save' (capital W) — those are sentinel docs, not invocations.
     assert not save_invocations, (
-        f"WRITE attempt advertised: workbook.save() invocation found in skill"
+        "WRITE attempt advertised: workbook.save() invocation found in skill"
     )
 
 

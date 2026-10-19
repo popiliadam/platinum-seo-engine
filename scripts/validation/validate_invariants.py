@@ -66,9 +66,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
-from urllib.parse import parse_qsl, quote, unquote, urlencode, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from jsonschema.exceptions import ValidationError as _JSValidationError
 
 # AMO batch 3-gov-driftF (F-27): reuse 3a's declared-tool parser and IMPORT the
 # 2b gate's single gated-MCP constant, so the drift rule can never diverge from

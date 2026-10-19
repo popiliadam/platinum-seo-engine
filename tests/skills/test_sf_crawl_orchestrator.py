@@ -411,7 +411,7 @@ def _run_orchestrator(
     workflow_runner.finish_step(handle.run_id, 5,
                                 project_slug=project_slug,
                                 workspace_root=workspace_root,
-                                output_ref=f"sf_import_exit=0")
+                                output_ref="sf_import_exit=0")
 
     # Step 8 — provenance + report.
     workflow_runner.start_step(handle.run_id, 6,
@@ -809,7 +809,7 @@ def test_sf_import_handoff_success(workspace: Path) -> None:
             )
         mock_sub.side_effect = _run_side_effect
 
-        result = _run_orchestrator(
+        _run_orchestrator(
             project_slug="test-proj",
             workspace_root=workspace,
             mcp=mcp,

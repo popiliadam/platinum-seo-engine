@@ -45,7 +45,6 @@ import json
 import re
 from pathlib import Path
 
-import pytest
 import yaml
 from jsonschema import Draft7Validator
 

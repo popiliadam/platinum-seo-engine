@@ -113,7 +113,7 @@ def test_cli_in_place_writes_bak(tmp_path: Path) -> None:
     """In-place write creates a .bak with the original content."""
     original = {"schema_version": "1.0", "project_id": "delta"}
     in_path = _write_input(tmp_path, original)
-    result = subprocess.run(
+    subprocess.run(
         [sys.executable, str(MIGRATION_PATH), "--in", str(in_path)],
         capture_output=True, text=True, check=True,
     )

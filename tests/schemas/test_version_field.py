@@ -29,7 +29,6 @@ def test_schema_version_coverage(schema_path):
     """schema_version MUST appear either top-level (instance doc) or in properties."""
     with schema_path.open() as f:
         data = json.load(f)
-    has_top_level = "schema_version" in data and not isinstance(data.get("properties"), dict) is None
     has_top_data = isinstance(data.get("schema_version"), str)
     has_property = "schema_version" in data.get("properties", {})
     assert has_top_data or has_property, (

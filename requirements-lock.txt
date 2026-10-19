@@ -37,3 +37,4 @@ pluggy==1.6.0
 pytest==9.0.3
 pytest-cov==7.1.0
 PyYAML==6.0.3
+ruff==0.14.0

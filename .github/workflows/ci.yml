@@ -64,6 +64,13 @@ jobs:
         run: pytest --tb=short -q --cov=scripts --cov-report=term --cov-fail-under=79
         continue-on-error: false
 
+      # Step 4b — lint (K-09): pyflakes-class errors only (unused imports and
+      # variables, undefined names, f-strings without placeholders). Fast and
+      # quiet; style rules are deliberately not enabled.
+      - name: 4b. ruff-lint
+        run: ruff check --select F scripts tests
+        continue-on-error: false
+
       # Step 4a — events.schema sanity (ADR-031: ensure schema is loadable; the
       # full per-row validation runs in tests/state/test_events_schema_compliance.py
       # which skips cleanly when PSEO_WORKSPACE_ROOT is unbound — this engine CI

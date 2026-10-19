@@ -59,7 +59,7 @@ def _install_banner_version() -> str:
 
 def _latest_release_notes_version() -> str:
     files = sorted((REPO / "docs").glob(RELEASE_NOTES_GLOB))
-    assert files, f"No RELEASE_NOTES_v*.md under docs/"
+    assert files, "No RELEASE_NOTES_v*.md under docs/"
     # files are sorted lexically; semver normally lexically sorts correctly for
     # MAJOR.MINOR.PATCH within the same major. For multi-major sort, take the
     # one whose embedded semver is lexically max (good enough for v1.x).

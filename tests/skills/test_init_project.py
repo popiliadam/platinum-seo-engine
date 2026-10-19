@@ -120,7 +120,7 @@ def _copy_master_xlsx(slug: str, ws: Path) -> tuple[Path, str, bool]:
     if target.exists():
         return target, _sha256(target), False
     assert TEMPLATE_XLSX.exists(), \
-        f"templates/master-excel.xlsx missing — bootstrap impossible"
+        "templates/master-excel.xlsx missing — bootstrap impossible"
     shutil.copyfile(TEMPLATE_XLSX, target)
     return target, _sha256(target), True
 

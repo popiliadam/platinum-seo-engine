@@ -53,7 +53,7 @@ from jsonschema import Draft7Validator
 from openpyxl import Workbook
 
 from scripts.meta import whats_next
-from scripts.state import events_writer, workflow_runner
+from scripts.state import workflow_runner
 
 
 # ---------------------------------------------------------------------------

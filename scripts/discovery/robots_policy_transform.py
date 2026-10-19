@@ -32,7 +32,6 @@ from __future__ import annotations
 
 import difflib
 from typing import Any, Iterable
-from urllib.parse import urlsplit
 from urllib.robotparser import RobotFileParser
 
 _DETAIL_CHAR_CAP = 300

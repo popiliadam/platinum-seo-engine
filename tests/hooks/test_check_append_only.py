@@ -9,7 +9,6 @@ Closes Q-V1.5-HOOK-SCRIPTS-MISSING-01 (option b — hook script + test deploy).
 from __future__ import annotations
 
 import os
-import shutil
 import subprocess
 from pathlib import Path
 

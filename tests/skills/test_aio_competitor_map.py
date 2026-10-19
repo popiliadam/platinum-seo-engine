@@ -30,7 +30,6 @@ import json
 import re
 from pathlib import Path
 
-import pytest
 import yaml
 from jsonschema import Draft7Validator
 
@@ -252,7 +251,6 @@ def test_master_xlsx_write_forbidden_invariant() -> None:
     # Explicit invariant statement
     assert "WRITE YASAK" in text or "WRITE YOK" in text or "staging-only" in text.lower()
     # No master.xlsx[*] write target
-    write_refs = re.findall(r"master\.xlsx\[[a-z_]+\]", text)
     # Allowed: discussion of future Phase 13+ master.xlsx[opportunity]
     # but not as an output target. Skill outputs frontmatter must NOT
     # carry any master.xlsx#* anchor.

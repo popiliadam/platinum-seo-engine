@@ -46,3 +46,12 @@ def test_ci_pytest_has_a_coverage_floor() -> None:
     assert "--cov-fail-under=" in step["run"]
     lock = (ROOT / "requirements-lock.txt").read_text(encoding="utf-8")
     assert "pytest-cov==" in lock and "coverage==" in lock
+
+
+def test_ci_has_a_lint_step() -> None:
+    """K-09: pyflakes-class lint runs in CI (README already claimed it)."""
+    cfg = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
+    step = next(s for s in cfg["jobs"]["ci"]["steps"] if s.get("name") == "4b. ruff-lint")
+    assert step["run"].strip() == "ruff check --select F scripts tests"
+    assert step.get("continue-on-error") is False
+    assert "ruff==" in (ROOT / "requirements-lock.txt").read_text(encoding="utf-8")

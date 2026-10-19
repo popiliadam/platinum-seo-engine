@@ -26,7 +26,6 @@ from pathlib import Path
 
 import pytest
 
-from scripts.ingestion import sf_crawl_orchestrator
 from scripts.ingestion.sf_crawl_orchestrator import (
     ProgressState,
     SfExportSpec,

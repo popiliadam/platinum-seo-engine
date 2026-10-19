@@ -76,6 +76,7 @@ def test_continue_on_error_all_steps_strict_mode():
         "3. glossary-audit",
         "4. pytest",
         "4a. events-schema-sanity",
+        "4b. ruff-lint",              # K-09
         "5. plugin-agnostik-grep",
         "6. secret-grep",
         "7. frontmatter-compile",

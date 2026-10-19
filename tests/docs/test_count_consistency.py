@@ -17,7 +17,6 @@ import json
 import re
 from pathlib import Path
 
-from scripts.validation import validate_invariants
 from tests._count_pins import (
     COMMAND_COUNT,
     CSR_DECLARED,
