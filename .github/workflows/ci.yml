@@ -112,7 +112,7 @@ jobs:
           fi
         continue-on-error: false
 
-      # Step 6 — secret-grep: the canonical scanner (33 classes, K-11) over the
+      # Step 6 — secret-grep: the canonical scanner (34 classes, K-11) over the
       # tree + a committed-literal git grep with explicit exit codes (K-08).
       - name: 6. secret-grep
         run: bash scripts/ci/check_secrets.sh

@@ -53,6 +53,7 @@ NEGATIVE = [
     "DATAFORSEO_PASSWORD=${DFS_PASSWORD}",
     "Authorization: Bearer <token>",
     "see 1/0 split and ya29 notes",
+    "task_live_" + "a1" * 12,                      # live-key shape inside a word
 ]
 
 

@@ -9,7 +9,7 @@
 # codex-hostile-audit #2 (2026-06-09): the wrapper now ALSO runs the CANONICAL
 # runtime scanner (scripts/security/check_secrets.sh) so CI's secret-class
 # inventory can NEVER be narrower than the runtime PreToolUse / event-redaction
-# inventory — a single source of truth (33 PATTERN_NAMES classes since K-11: Google AIza,
+# inventory — a single source of truth (34 PATTERN_NAMES classes since K-11: Google AIza,
 # OpenAI/Anthropic sk-, Slack xox, GCP service-account, PEM/RSA/OPENSSH headers,
 # GitHub ghp/gho/ghs/ghu + fine-grained, AWS, DataForSEO). On a clean CI
 # checkout the working tree == committed state, so full-mode IS the committed
@@ -24,7 +24,7 @@ set -euo pipefail
 _HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 _REPO_ROOT="$(cd "$_HERE/../.." && pwd)"
 
-# 1) CANONICAL shape-class inventory (single source of truth, 33 classes).
+# 1) CANONICAL shape-class inventory (single source of truth, 34 classes).
 #    A FAIL here aborts via set -e — the SAME gate the pending-write hook enforces.
 bash "$_REPO_ROOT/scripts/security/check_secrets.sh" "$_REPO_ROOT"
 

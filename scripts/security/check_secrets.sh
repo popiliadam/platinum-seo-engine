@@ -125,7 +125,7 @@ PATTERNS=(
   "-----BEGIN ENCRYPTED PRIVATE KEY-----"
   "-----BEGIN PGP PRIVATE KEY BLOCK-----"
   "eyJ[A-Za-z0-9_-]{10,}\\.eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}"
-  "(sk|rk)_live_[0-9A-Za-z]{24,}"
+  "(^|[^A-Za-z0-9])(sk|rk)_live_[0-9A-Za-z]{24,}"
   "DATAFORSEO_PASSWORD[[:space:]]*=[[:space:]]*[A-Za-z0-9]{12,}[[:space:]]*$"
   "[Aa]uthorization:[[:space:]]*Basic[[:space:]]+[A-Za-z0-9+/]{16,}={0,2}"
   "auth[[:space:]]*=[[:space:]]*\\([[:space:]]*[\"'][^\"']+[\"'][[:space:]]*,[[:space:]]*[\"'][^\"']{6,}[\"'][[:space:]]*\\)"

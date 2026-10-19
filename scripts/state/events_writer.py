@@ -82,7 +82,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_SCHEMA_PATH = _REPO_ROOT / "schemas" / "events.schema.json"
 
 # Secret VALUE patterns — a MIRROR of the canonical inventory in
-# scripts/security/check_secrets.sh (its 33 PATTERN_NAMES classes), so an event
+# scripts/security/check_secrets.sh (its 34 PATTERN_NAMES classes), so an event
 # can never persist a secret class the repo otherwise claims to detect (hostile
 # audit #3). Python redaction can't shell out per event, so the inventory is
 # mirrored here; the drift tripwire is tests/scripts/test_events_writer_secret_
@@ -138,7 +138,7 @@ _SECRET_VALUE_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"-----BEGIN (?:EC |ENCRYPTED )?PRIVATE KEY-----"),        # ec_/encrypted_private_key_header
     re.compile(r"-----BEGIN PGP PRIVATE KEY" r" BLOCK-----"),  # pgp_private_key_header (split: no literal header in source)
     re.compile(r"eyJ[A-Za-z0-9_\-]{10,}\.eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}"),  # jwt_token
-    re.compile(r"(?:sk|rk)_live_[0-9A-Za-z]{24,}"),                       # stripe_live_key
+    re.compile(r"(?<![A-Za-z0-9])(?:sk|rk)_live_[0-9A-Za-z]{24,}"),                       # stripe_live_key
     re.compile(r"DATAFORSEO_PASSWORD\s*=\s*[A-Za-z0-9]{12,}(?![A-Za-z0-9])"),  # dataforseo_env_unquoted
     re.compile(r"[Aa]uthorization:\s*Basic\s+[A-Za-z0-9+/]{16,}={0,2}"),  # http_basic_auth_header
     re.compile(r"auth\s*=\s*\(\s*[\"'][^\"']+[\"']\s*,\s*[\"'][^\"']{6,}[\"']\s*\)"),  # python_auth_tuple_literal

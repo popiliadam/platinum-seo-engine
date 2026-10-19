@@ -25,9 +25,9 @@ def _header_row(sheet: str) -> int:
 
 
 def test_template_passes_with_the_known_unimplemented_rules() -> None:
-    rc, report = dg.run_gate(TEMPLATE)
+    rc, report = dg.run_gate(TEMPLATE, seed=True)
     assert rc == 0, report
-    assert report["overall"] == "AMBER" and report["evaluated"] >= dg.MIN_EVALUATED
+    assert report["overall"] == "AMBER" and report["decided"] >= dg.MIN_DECIDED
     assert set(report["not_implemented"]) == dg.EXPECTED_NOT_IMPLEMENTED
 
 
@@ -45,6 +45,28 @@ def test_duplicate_task_id_turns_the_gate_red(tmp_path: Path) -> None:
     rc, report = dg.run_gate(broken)
     assert rc == 1 and report["overall"] == "RED", report
     assert any("F-09" in p for p in report["problems"]), report
+
+
+def test_manual_triage_fail_also_turns_the_gate_red(tmp_path: Path) -> None:
+    """Review of K-01: D-03 FAIL aggregates to AMBER, but on the engine's own
+    fixture any FAIL is a defect — the gate must still go red."""
+    broken = tmp_path / "fixture-raw-url.xlsx"
+    shutil.copyfile(TEMPLATE, broken)
+    wb = load_workbook(broken)
+    ws = wb["gsc_performance"]
+    hr = _header_row("gsc_performance")
+    headers = [c.value for c in ws[hr]]
+    ws.cell(row=hr + 1, column=headers.index("url") + 1, value="https://Example.test/kombi/")
+    wb.save(broken)
+    rc, report = dg.run_gate(broken)
+    assert rc == 1 and report["overall"] == "AMBER" and "D-03" in report["problems"][0], report
+
+
+def test_skipping_checks_cannot_keep_the_gate_green(monkeypatch) -> None:
+    """Review of K-01: SKIP is not 'evaluated'."""
+    monkeypatch.setattr(dg, "MIN_DECIDED", 99)
+    rc, report = dg.run_gate(TEMPLATE, seed=True)
+    assert rc == 1 and "reached PASS/FAIL" in report["problems"][-1]
 
 
 def test_ci_step_1_runs_the_gate() -> None:
