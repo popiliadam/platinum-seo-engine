@@ -54,3 +54,20 @@ def test_one_failed_task_among_many_is_not_dropped_silently() -> None:
     raw = {"tasks": [_task(2792, "tr", ["kombi"]), _task(2792, "tr", [], code=50000, msg="Internal Error.")]}
     with pytest.raises(dr.DFSTaskError, match="50000"):
         dr.normalize_dfs_response(raw)
+
+
+def test_missing_volume_is_none_not_zero() -> None:
+    raw = {"tasks": [_task(2792, "tr", ["kombi"])]}
+    raw["tasks"][0]["result"][0]["items"][0].pop("search_volume")
+    row = dp.transform(raw, project_slug="demo")["keyword_overview"]["rows"][0]
+    assert row["search_volume"] is None and row["cpc"] is None
+
+
+def test_gsc_missing_position_does_not_drag_mean_and_first_run_is_new() -> None:
+    from scripts.ingestion import gsc_pull as gp
+    raw = {"rows": [
+        {"keys": ["https://x.test/a"], "clicks": 5, "impressions": 100, "position": 8.0},
+        {"keys": ["https://x.test/a"], "clicks": 1, "impressions": 100},
+    ]}
+    row = gp.transform(raw)["gsc_performance"][0]
+    assert row["position_recent"] == 8.0 and row["note"] == "new"

@@ -670,9 +670,10 @@ def _build_overview_rows(
         partial = {
             "id": next_id,
             "keyword": str(kw),
-            "search_volume": volume if volume is not None else 0,
-            "cpc": cpc if cpc is not None else 0.0,
-            "competition": competition if competition is not None else 0.0,
+            # D-12: missing stays None — "no data" is not "zero demand".
+            "search_volume": volume,
+            "cpc": cpc,
+            "competition": competition,
             "competition_level": comp_level,
             "search_intent": _intent_label(it.get("search_intent_info")),
             "language_code": row_lang,
@@ -722,9 +723,9 @@ def _build_volume_rows(
         partial = {
             "id": next_id,
             "keyword": str(kw),
-            "search_volume": volume if volume is not None else 0,
-            "cpc": cpc if cpc is not None else 0.0,
-            "competition": competition if competition is not None else 0.0,
+            "search_volume": volume,  # D-12: None = no data, not zero demand
+            "cpc": cpc,
+            "competition": competition,
             "competition_level": comp_level,
             "language_code": row_lang,
             "location_code": int(row_loc),

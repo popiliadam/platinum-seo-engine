@@ -122,6 +122,9 @@ class _PageMetrics:
     # ctr is recomputed downstream from clicks/impressions; we keep the raw
     # weighted-position aggregate for accurate page-level position mean.
     position_weighted_sum: float
+    # D-12: impressions of rows that actually carried a position; a missing
+    # position is unknown, not 0.0 (which dragged the mean toward 1).
+    position_weight: float = 0.0
 
 
 def _safe_int(v: Any) -> int | None:
@@ -192,23 +195,27 @@ def _aggregate_window(payload: dict | None) -> dict[str, _PageMetrics]:
 
         clicks = _safe_int(entry.get("clicks")) or 0
         impressions = _safe_int(entry.get("impressions")) or 0
-        position = _safe_float(entry.get("position")) or 0.0
+        position = _safe_float(entry.get("position"))
 
         slot = bucket.setdefault(url_n, {
             "clicks": 0,
             "impressions": 0,
             "pos_w_sum": 0.0,
+            "pos_weight": 0.0,
         })
         slot["clicks"] += clicks
         slot["impressions"] += impressions
-        # Position weighted by impressions for accurate page-level mean.
-        slot["pos_w_sum"] += position * impressions
+        # Position weighted by impressions; rows without a position are skipped.
+        if position is not None and position > 0:
+            slot["pos_w_sum"] += position * impressions
+            slot["pos_weight"] += impressions
 
     return {
         url_n: _PageMetrics(
             clicks=int(v["clicks"]),
             impressions=int(v["impressions"]),
             position_weighted_sum=float(v["pos_w_sum"]),
+            position_weight=float(v["pos_weight"]),
         )
         for url_n, v in bucket.items()
     }
@@ -231,9 +238,10 @@ def _delta_pct(recent: int, previous: int) -> float:
 
 
 def _avg_position(metrics: _PageMetrics) -> float:
-    if metrics.impressions <= 0:
+    weight = metrics.position_weight
+    if weight <= 0:
         return 0.0
-    return round(metrics.position_weighted_sum / metrics.impressions, 2)
+    return round(metrics.position_weighted_sum / weight, 2)
 
 
 def _avg_ctr_pct(metrics: _PageMetrics) -> float:
@@ -310,7 +318,9 @@ def transform(
 
         # Note column carries a short trend hint; deterministic from the
         # delta values, no creativity, sheet-template friendly.
-        if clicks_delta_pct > 20:
+        if not previous:
+            note = "new"   # D-12: first run has no baseline — never "rising"
+        elif clicks_delta_pct > 20:
             note = "rising"
         elif clicks_delta_pct < -20:
             note = "decay"
