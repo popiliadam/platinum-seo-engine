@@ -1,8 +1,9 @@
 """tests/hooks/test_pre_tool_use_secret_scan_invocation.py — secret scan hook contract.
 
 Coverage:
-  1. Second hook entry must invoke ${CLAUDE_PLUGIN_ROOT}/scripts/security/check_secrets.sh
-  2. Hook arg is ${CLAUDE_PROJECT_DIR:-.} (plugin agnostik path resolution)
+  1. K-12: the post-hoc tree scan is NOT a PreToolUse hook (too slow, ran before
+     the write, could not block); the pending-bytes scan is wired instead
+  2. (removed with 1)
   3. check_secrets.sh on a clean tmp tree returns 0 (subprocess invocation)
   4. check_secrets.sh on a tree with synthetic ghp_-like secret returns 1
   5. check_secrets.sh on a tree with sk- prefix returns 1
@@ -20,39 +21,25 @@ HOOK_PATH = REPO_ROOT / "hooks" / "pre-tool-use.json"
 CHECK_SECRETS = REPO_ROOT / "scripts" / "security" / "check_secrets.sh"
 
 
-def _secret_scan_handler() -> dict:
+def _pre_tool_use_commands() -> list[str]:
     spec = json.loads(HOOK_PATH.read_text(encoding="utf-8"))
-    handlers = spec["hooks"]["PreToolUse"][0]["hooks"]
-    assert len(handlers) >= 2, "PreToolUse must have at least 2 hooks (Excel lock + secret scan)"
-    return handlers[1]
+    return [h["command"] for block in spec["hooks"]["PreToolUse"] for h in block["hooks"]]
 
 
-def test_secret_scan_hook_present() -> None:
-    handler = _secret_scan_handler()
-    assert handler["type"] == "command"
-    assert "check_secrets.sh" in handler["command"]
+def test_post_hoc_tree_scan_is_not_a_pre_tool_use_hook() -> None:
+    """K-12: the ``--changed-since`` tree scan ran BEFORE the write it was meant
+    to catch (so it never saw it), exited 1 (non-blocking) on a finding, and took
+    90 s+ on the workspace against a 60 s timeout — every tool call waited.
+    """
+    assert not any("check_secrets.sh" in c and "--changed-since" in c
+                   for c in _pre_tool_use_commands())
 
 
-def test_secret_scan_uses_plugin_root_path() -> None:
-    """Plugin agnostik discipline (F-16): hook resolves script via $CLAUDE_PLUGIN_ROOT."""
-    handler = _secret_scan_handler()
-    assert "CLAUDE_PLUGIN_ROOT" in handler["command"], (
-        "Plugin agnostik path resolution required (F-16 invariant)"
-    )
-
-
-def test_secret_scan_passes_project_dir_arg() -> None:
-    """Hook passes ${CLAUDE_PROJECT_DIR:-.} so scan scope follows project boundary."""
-    handler = _secret_scan_handler()
-    assert "CLAUDE_PROJECT_DIR" in handler["command"]
-
-
-def test_secret_scan_timeout_sane() -> None:
-    """Timeout must allow large workspace scan (>=30s)."""
-    handler = _secret_scan_handler()
-    assert handler.get("timeout", 0) >= 30, (
-        f"timeout must be >=30s for large workspace tolerance; got {handler.get('timeout')}"
-    )
+def test_pending_bytes_scan_stays_wired() -> None:
+    """The blocking gate is scan_pending_secret.py (pending Write/Edit bytes,
+    exit 2), resolved through $CLAUDE_PLUGIN_ROOT (plugin-agnostic)."""
+    cmds = [c for c in _pre_tool_use_commands() if "scan_pending_secret.py" in c]
+    assert cmds and all("CLAUDE_PLUGIN_ROOT" in c for c in cmds)
 
 
 def test_check_secrets_clean_tree_exits_zero(tmp_path: Path) -> None:

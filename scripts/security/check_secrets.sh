@@ -109,6 +109,26 @@ PATTERNS=(
   # all-alphanumeric base64 value is regex-indistinguishable from an identifier and
   # is intentionally NOT flagged — see the base64 note in rules/secrets-management.md.
   "([Kk][Ee][Yy]|[Tt][Oo][Kk][Ee][Nn]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Cc][Rr][Ee][Dd][Ee][Nn][Tt][Ii][Aa][Ll])[\"']?[[:space:]]*[:=][[:space:]]*[\"'][A-Za-z0-9+/]{24,}={1,2}[\"']"
+
+  # K-11 (2026-10): formats the scanner missed — each has a positive and a
+  # negative test in tests/ci/test_secret_formats_k11.py.
+  "ASIA[0-9A-Z]{16}"
+  "AWS_SECRET_ACCESS_KEY[\"']?[[:space:]]*[:=][[:space:]]*[\"']?[A-Za-z0-9/+=]{40}"
+  "github_pat_[0-9A-Za-z_]{22,}"
+  "ghr_[A-Za-z0-9]{36}"
+  "GOCSPX-[A-Za-z0-9_-]{20,}"
+  "(^|[^0-9A-Za-z])1//0[A-Za-z0-9_-]{30,}"
+  "ya29\\.[0-9A-Za-z_-]{30,}"
+  "xapp-[0-9]-[A-Za-z0-9-]{10,}"
+  "hooks\\.slack\\.com/services/T[A-Z0-9]+/B[A-Z0-9]+/[A-Za-z0-9]{20,}"
+  "-----BEGIN EC PRIVATE KEY-----"
+  "-----BEGIN ENCRYPTED PRIVATE KEY-----"
+  "-----BEGIN PGP PRIVATE KEY BLOCK-----"
+  "eyJ[A-Za-z0-9_-]{10,}\\.eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}"
+  "(sk|rk)_live_[0-9A-Za-z]{24,}"
+  "DATAFORSEO_PASSWORD[[:space:]]*=[[:space:]]*[A-Za-z0-9]{12,}[[:space:]]*$"
+  "[Aa]uthorization:[[:space:]]*Basic[[:space:]]+[A-Za-z0-9+/]{16,}={0,2}"
+  "auth[[:space:]]*=[[:space:]]*\\([[:space:]]*[\"'][^\"']+[\"'][[:space:]]*,[[:space:]]*[\"'][^\"']{6,}[\"'][[:space:]]*\\)"
 )
 
 # Parallel array: human-readable labels for each PATTERNS entry (same index).
@@ -132,6 +152,23 @@ PATTERN_NAMES=(
   "slack_token_xox"
   "dataforseo_env_hardcoded_literal"
   "base64_high_entropy_secret_assignment"
+  "aws_temporary_key_asia"
+  "aws_secret_access_key_env"
+  "github_pat_fine_grained"
+  "github_refresh_token_ghr"
+  "google_oauth_client_secret"
+  "google_oauth_refresh_token"
+  "google_oauth_access_token"
+  "slack_app_token_xapp"
+  "slack_webhook_url"
+  "ec_private_key_header"
+  "encrypted_private_key_header"
+  "pgp_private_key_header"
+  "jwt_token"
+  "stripe_live_key"
+  "dataforseo_env_unquoted"
+  "http_basic_auth_header"
+  "python_auth_tuple_literal"
 )
 
 # ----------------------------------------------------------------------------

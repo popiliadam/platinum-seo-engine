@@ -91,8 +91,14 @@ jobs:
           # + adstark for refresh-audit). xquik removed 2026-09-17.
           test "$(jq '.mcpServers | keys | length' .mcp.json)" = "5"
           # Repo-wide client-slug grep (pattern from repo secret; -I skips binaries)
+          # K-08: explicit exit code — 0 = slug found (FAIL), 1 = clean,
+          # anything else = grep failed (e.g. a broken pattern) → FAIL, not PASS.
           if [ -n "$CLIENT_SLUG_PATTERN" ]; then
-            ! grep -rIEn "$CLIENT_SLUG_PATTERN" . --exclude-dir=.git
+            set +e
+            grep -rIEn "$CLIENT_SLUG_PATTERN" . --exclude-dir=.git
+            rc=$?
+            set -e
+            [ "$rc" -eq 1 ] || { echo "client-slug grep: FAIL (exit $rc)"; exit 1; }
           fi
         continue-on-error: false
 

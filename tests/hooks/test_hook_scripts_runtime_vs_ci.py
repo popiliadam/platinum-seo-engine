@@ -30,8 +30,8 @@ RUNTIME_HOOK_SCRIPTS = {
     "validate_content_write.py",
     # codex-hostile-audit #1 PreToolUse pending-bytes secret gate — wired into
     # hooks/pre-tool-use.json (matcher "Edit|Write|NotebookEdit|Bash") as the
-    # command right AFTER the post-hoc check_secrets.sh --changed-since scan
-    # (which it keeps as an ADDITIONAL incremental backstop). It extracts a
+    # blocking secret gate (the post-hoc check_secrets.sh --changed-since scan
+    # was removed from PreToolUse in K-12). It extracts a
     # Write/Edit/NotebookEdit payload's literal pending content (and a
     # write-shaped Bash command) and pipes it to check_secrets.sh --scan-stdin
     # <file_path>, blocking (exit 2) BEFORE a secret-bearing write lands on disk.

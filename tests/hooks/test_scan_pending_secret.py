@@ -254,11 +254,13 @@ def test_hook_wired_into_pre_tool_use() -> None:
     )
 
 
-def test_changed_since_scan_retained_as_additional() -> None:
-    """#1 expected fix: keep --changed-since as an ADDITIONAL incremental scan,
-    not replace it."""
+def test_changed_since_scan_no_longer_in_pre_tool_use() -> None:
+    """K-12 supersedes #1's "keep --changed-since as an additional scan": it ran
+    before the write (could not see it), exited 1 (non-blocking) and blew the
+    60 s hook timeout on the workspace. The pending-bytes scan is the gate; CI
+    step 6 still scans the whole committed tree."""
     blob = json.dumps(_pre_tool_use())
-    assert "--changed-since" in blob, "post-hoc --changed-since scan was dropped"
+    assert "--changed-since" not in blob
 
 
 def test_matcher_covers_pending_write_tools() -> None:
