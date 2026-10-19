@@ -394,7 +394,7 @@ def _seed(ws: Path, *, action: str, target: str, session_id: str) -> None:
 
 
 def test_evaluate_allows_with_matching_session_consent(bound_ws: Path) -> None:
-    cmd = "git push origin main"
+    cmd = "git push --force origin main"
     action, target = gate.classify("Bash", {"command": cmd})  # parity by construction
     _seed(bound_ws, action=action, target=target, session_id=SID)
     code, msgs = gate.evaluate(
@@ -406,7 +406,7 @@ def test_evaluate_allows_with_matching_session_consent(bound_ws: Path) -> None:
 def test_evaluate_consent_from_other_session_is_denied(bound_ws: Path) -> None:
     # PER-SESSION: same action+target, but consent granted under a DIFFERENT
     # session_id, must NOT authorize THIS session.
-    cmd = "git push origin main"
+    cmd = "git push --force origin main"
     action, target = gate.classify("Bash", {"command": cmd})
     _seed(bound_ws, action=action, target=target, session_id="some-other-session")
     code, _ = gate.evaluate(
@@ -416,25 +416,25 @@ def test_evaluate_consent_from_other_session_is_denied(bound_ws: Path) -> None:
 
 
 def test_evaluate_no_consent_emits_copy_paste_approve_line(bound_ws: Path) -> None:
-    cmd = "git push origin main"
+    cmd = "git push --force origin main"
     code, msgs = gate.evaluate(
         {"tool_name": "Bash", "tool_input": {"command": cmd}, "session_id": SID}
     )
     assert code == 2
     assert len(msgs) == 2
-    assert msgs[0].startswith("BLOCKED: git_push → origin main")
+    assert msgs[0].startswith("BLOCKED: git_push → --force origin main")
     assert "(bu oturumda onay yok)" in msgs[0]
     # the operator copies THIS exact line — same action + target the gate hashed,
     # under the NAMESPACED command name (bare /pseo-approve is "Unknown command")
     # and single-quoted (see test_pseo_approve_roundtrip.py).
     assert (
-        f"/platinum-seo-engine:pseo-approve sess-{SID8} git_push 'origin main'"
+        f"/platinum-seo-engine:pseo-approve sess-{SID8} git_push '--force origin main'"
         in msgs[1]
     )
 
 
 def test_evaluate_tampered_chain_is_denied(bound_ws: Path) -> None:
-    cmd = "git push origin main"
+    cmd = "git push --force origin main"
     action, target = gate.classify("Bash", {"command": cmd})
     _seed(bound_ws, action=action, target=target, session_id=SID)
     # tamper the genuine entry (mutate 'target' without recomputing entry_hash):
@@ -454,7 +454,7 @@ def test_evaluate_unbound_session_is_denied(bound_ws: Path) -> None:
     # a session with no marker and no shared/active.json fallback -> slug None ->
     # cannot verify -> fail-closed deny.
     code, _ = gate.evaluate(
-        {"tool_name": "Bash", "tool_input": {"command": "git push origin main"},
+        {"tool_name": "Bash", "tool_input": {"command": "git push --force origin main"},
          "session_id": "ghost-session-no-marker"}
     )
     assert code == 2
@@ -484,7 +484,7 @@ def test_evaluate_consent_check_raise_denies_fail_closed(bound_ws: Path) -> None
         raise cl.ConsentLedgerError("ledger unreadable")
 
     code, msgs = gate.evaluate(
-        {"tool_name": "Bash", "tool_input": {"command": "git push origin main"},
+        {"tool_name": "Bash", "tool_input": {"command": "git push --force origin main"},
          "session_id": SID},
         has_consent_fn=_boom,
     )
@@ -498,7 +498,7 @@ def test_evaluate_corrupt_consent_ledger_denies_with_note(bound_ws: Path) -> Non
     path = cl.consent_path(bound_ws, "demo")
     path.write_text("{not valid json\n", encoding="utf-8")
     code, msgs = gate.evaluate(
-        {"tool_name": "Bash", "tool_input": {"command": "git push origin main"},
+        {"tool_name": "Bash", "tool_input": {"command": "git push --force origin main"},
          "session_id": SID}
     )
     assert code == 2
@@ -509,7 +509,7 @@ def test_evaluate_no_consent_has_no_corrupt_note(bound_ws: Path) -> None:
     # regression: the normal "no consent entry" deny (has_session_consent returns
     # False WITHOUT raising) must NOT carry the corrupt-ledger note.
     code, msgs = gate.evaluate(
-        {"tool_name": "Bash", "tool_input": {"command": "git push origin main"},
+        {"tool_name": "Bash", "tool_input": {"command": "git push --force origin main"},
          "session_id": SID}
     )
     assert code == 2
@@ -536,7 +536,7 @@ def _run_gate(stdin: str, env_extra: dict | None = None) -> subprocess.Completed
 def test_main_gated_no_consent_exits_2_with_fix(tmp_path: Path) -> None:
     payload = json.dumps({
         "tool_name": "Bash",
-        "tool_input": {"command": "git push origin main"},
+        "tool_input": {"command": "git push --force origin main"},
         "session_id": "abcdef01-deny",
     })
     proc = _run_gate(payload, {"HOME": str(tmp_path / "home")})

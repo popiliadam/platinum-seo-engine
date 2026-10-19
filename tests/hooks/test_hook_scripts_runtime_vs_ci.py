@@ -51,6 +51,12 @@ RUNTIME_HOOK_SCRIPTS = {
     # supersedes any stale intent. Re-emits the `PSEO context:` line.
     # See scripts/hooks/README.md §1.
     "intent_router.py",
+    # G-01 consent recorder — wired into hooks/user-prompt-submit.json as the 2nd
+    # command. Writes a consent entry ONLY from the user's own approval message
+    # (`/pseo-approve …` or `onay: …`), for THIS session's bound project; the
+    # outward gate denies every model write to the ledger. Always exits 0.
+    # See scripts/hooks/README.md §1.
+    "consent_from_prompt.py",
     # AMO batch-2c Stop denetçi — wired into hooks/stop.json as the 2nd Stop
     # command (stop_validation.py stays FIRST). At turn end it READS the intent
     # marker (1c) + the freshest coverage record (1a) and, if a declared workflow

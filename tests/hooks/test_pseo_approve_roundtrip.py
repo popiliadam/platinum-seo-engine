@@ -19,6 +19,11 @@ Live evidence (transcripts 2026-07-20 · 2026-08-08 · 2026-09-17 · 2026-09-18)
   5. The command was MODEL-invocable: on 2026-08-08 the model itself called
      ``Skill(platinum-seo-engine:pseo-approve, "sess-… git_push origin main")``.
      Consent must only ever come from the human.
+  6. (G-01) The model could also run the recorder CLI from Bash. Consent is now
+     written by the UserPromptSubmit hook from the user's own message, and the
+     gate denies every model write to the ledger. The examples below use
+     consent-tier actions (a plain push to main or a single file delete no
+     longer needs consent at all).
 
 Security invariant for (2): stripping redirections must leave EXACTLY the argv
 the shell passes to the command — proven here against real bash — so a consent
@@ -28,7 +33,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -36,6 +40,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from scripts.hooks import consent_from_prompt
 from scripts.hooks import outward_action_gate as gate
 from scripts.state import consent_ledger as cl
 from scripts.state import session_binding as sb
@@ -54,13 +59,6 @@ def _frontmatter() -> dict:
     text = _CMD_FILE.read_text(encoding="utf-8")
     end = text.find("---", 3)
     return yaml.safe_load(text[3:end])
-
-
-def _exec_block() -> str:
-    for body in re.findall(r"!`([^`]+)`", _CMD_FILE.read_text(encoding="utf-8")):
-        if "-m scripts.state.consent_ledger approve" in body:
-            return body
-    raise AssertionError("no consent_ledger approve block in pseo-approve.md")
 
 
 @pytest.fixture()
@@ -86,7 +84,7 @@ def _deny_hint(cmd: str) -> str:
 # ---------------------------------------------------------------------------
 
 def test_hint_uses_the_namespaced_plugin_command(bound_ws: Path) -> None:
-    hint = _deny_hint("git push origin main")
+    hint = _deny_hint("git push --force origin main")
     expected = f"/{_plugin_name()}:{_CMD_FILE.stem} "
     assert expected in hint, hint
     assert " /pseo-approve " not in hint, (
@@ -96,7 +94,7 @@ def test_hint_uses_the_namespaced_plugin_command(bound_ws: Path) -> None:
 
 def test_hint_says_chat_not_terminal(bound_ws: Path) -> None:
     # Users pasted the line into zsh 26× ("no such file or directory: /pseo-approve").
-    hint = _deny_hint("git push origin main")
+    hint = _deny_hint("git push --force origin main")
     assert "sohbet" in hint.lower()
 
 
@@ -181,65 +179,46 @@ def test_target_equals_real_shell_argv(cmd: str, tmp_path: Path) -> None:
 
 def test_consent_for_a_does_not_cover_a_quoted_redirect_char(bound_ws: Path) -> None:
     # Approve the redirect-carrying command's object ("a")...
-    _, target = gate.classify("Bash", {"command": "rm a 2>/dev/null"})
+    _, target = gate.classify("Bash", {"command": "rm -r a 2>/dev/null"})
     cl.append_consent(
         workspace_root=bound_ws, project_slug="demo", run_id="r", action="fs_delete",
         target=target, granted_by="operator", now_iso="2026-06-06T10:00:00Z",
         session_id=SID,
     )
-    allowed = {"tool_name": "Bash", "tool_input": {"command": "rm a 2>/dev/null"},
+    allowed = {"tool_name": "Bash", "tool_input": {"command": "rm -r a 2>/dev/null"},
                "session_id": SID}
     assert gate.evaluate(allowed)[0] == 0
     # ...but NOT a command that deletes "a", ">" and "b".
-    for other in ('rm a ">" b', "rm a '2>/dev/null'", "rm a b 2>/dev/null"):
+    for other in ('rm -r a ">" b', "rm -r a '2>/dev/null'", "rm -r a b 2>/dev/null"):
         payload = {"tool_name": "Bash", "tool_input": {"command": other},
                    "session_id": SID}
         assert gate.evaluate(payload)[0] == 2, other
 
 
 # ---------------------------------------------------------------------------
-# (3)+(1)+(4) end to end: hint -> real command block -> ledger -> gate ALLOWS
+# (3)+(1)+(6) end to end: hint -> user's chat message -> hook -> ledger -> gate ALLOWS
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("shell", ["bash", "zsh"])
 @pytest.mark.parametrize("cmd", [
-    "git push origin main 2>&1",
+    "git push --force origin main 2>&1",
     "rm -rf $T 2>/dev/null",
     "rm -rf ~/Library/Caches/com.example/* 2>/dev/null",
-    "rm \"/tmp/My Dir/it's.txt\"",
+    "rm -r \"My Dir/it's\"",
     'curl -sS -X POST "$U" -H \'content-type: application/json\' -d \'{"a":1}\'',
 ])
-def test_hint_roundtrip_through_real_command_block(
-    cmd: str, shell: str, bound_ws: Path, tmp_path: Path
+def test_hint_roundtrip_through_user_message(
+    cmd: str, bound_ws: Path, monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture,
 ) -> None:
-    if not shutil.which(shell):
-        pytest.skip(f"{shell} not available")
     hint = _deny_hint(cmd)
     prefix = f"/{_plugin_name()}:{_CMD_FILE.stem} "
     assert prefix in hint, hint
-    argstr = hint.split(prefix, 1)[1]
+    message = prefix + hint.split(prefix, 1)[1]  # what the user pastes into chat
 
-    # The plugin is installed under HOME the way Claude Code lays it out (zsh
-    # aborts the block on a plugin glob with no match, so model the real install).
-    install = (Path(os.environ["HOME"]) / ".claude" / "plugins" / "cache"
-               / "platinum-seo-marketplace" / "platinum-seo-engine" / "2.1.0")
-    install.parent.mkdir(parents=True, exist_ok=True)
-    install.symlink_to(_ROOT, target_is_directory=True)
-
-    # The harness text-substitutes $ARGUMENTS into the block and runs it in the
-    # session, where CLAUDE_CODE_SESSION_ID is set.
-    src = _exec_block().replace("$ARGUMENTS", argstr)
-    out = subprocess.run(
-        [shell, "-c", src], cwd=str(tmp_path), capture_output=True, text=True,
-        env={
-            "PATH": os.environ["PATH"],
-            "HOME": os.environ["HOME"],
-            "PSEO_WORKSPACE_ROOT": str(bound_ws),
-            "CLAUDE_PLUGIN_ROOT": str(_ROOT),
-            "CLAUDE_CODE_SESSION_ID": SID,
-        },
-    )
-    assert out.returncode == 0, out.stdout + out.stderr
+    payload = {"session_id": SID, "prompt": message, "hook_event_name": "UserPromptSubmit"}
+    monkeypatch.setattr("sys.stdin", __import__("io").StringIO(json.dumps(payload)))
+    assert consent_from_prompt.main() == 0
+    assert "[onay] kaydedildi" in capsys.readouterr().out
 
     code, msgs = gate.evaluate(
         {"tool_name": "Bash", "tool_input": {"command": cmd}, "session_id": SID}

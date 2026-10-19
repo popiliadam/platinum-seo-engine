@@ -50,6 +50,8 @@ import os
 import re
 import shlex
 import sys
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -65,6 +67,7 @@ from scripts.state.consent_ledger import (  # noqa: E402
     has_session_consent,
     target_hash,
 )
+from scripts.state.outward_log import append_outward  # noqa: E402
 from scripts.state.session_binding import (  # noqa: E402
     current_session_id,
     resolve_session_project,
@@ -178,6 +181,27 @@ _GIT_GLOBAL_ARG_FLAGS = frozenset({
 # gated action that is NOT the leading token (`cd x && git push`) is still caught.
 # `||` MUST precede `|` in the alternation so the two-char operator wins.
 _SEGMENT_SEP_RE = re.compile(r"&&|\|\||;|\n|\|")
+
+# G-01 tier table (data, not code): which gated actions run freely, which run and
+# are logged, which need a consent the USER typed. See consent_policy.json.
+_POLICY = json.loads(
+    Path(__file__).with_name("consent_policy.json").read_text(encoding="utf-8")
+)
+_DESTRUCTIVE_PUSH_FLAGS = frozenset(_POLICY["destructive_push_flags"])
+
+TIER_FREE = "serbest"
+TIER_LOGGED = "kayitli"
+TIER_CONSENT = "onayli"
+_TIER_RANK = {TIER_FREE: 0, TIER_LOGGED: 1, TIER_CONSENT: 2}
+
+
+@dataclass(frozen=True)
+class Hit:
+    """One gated action found in a tool call, with its consent tier."""
+
+    action: str
+    target: str
+    tier: str
 
 
 # ---------------------------------------------------------------------------
@@ -400,9 +424,25 @@ def _git_push_target(tokens: list[str]) -> str | None:
             continue
         if tok != "push":                 # first non-flag token is the subcommand
             return None
-        operands = [x for x in tokens[i + 1:] if not x.startswith("-")]
-        return " ".join(operands) if operands else "origin"
+        rest = tokens[i + 1:]
+        # Destructive flags stay IN the target (G-09): consent for a plain
+        # `git push origin main` must not also cover `--force` / `--delete`.
+        destructive = [x for x in rest if _is_destructive_push_flag(x)]
+        operands = [x for x in rest if not x.startswith("-")]
+        target = " ".join(operands) if operands else "origin"
+        return " ".join([*destructive, target]) if destructive else target
     return None
+
+
+def _is_destructive_push_flag(tok: str) -> bool:
+    """--force / --delete / --mirror …, their ``=value`` forms, and short ``-f``/``-d``
+    even when combined (``-uf``)."""
+    if tok in _DESTRUCTIVE_PUSH_FLAGS or tok.split("=", 1)[0] in _DESTRUCTIVE_PUSH_FLAGS:
+        return True
+    return (
+        tok.startswith("-") and not tok.startswith("--") and len(tok) > 2
+        and any(ch in tok[1:] for ch in "fd")
+    )
 
 
 def _first_command_anchor(region: list[str]) -> int:
@@ -555,26 +595,234 @@ def classify(tool_name: str, tool_input: dict) -> tuple[str, str] | None:
     """(tool_name, tool_input) -> (action, target) for a CLEARLY gated action, else None.
 
     CONSERVATIVE — ambiguity / a non-gated tool returns None so the non-gated path
-    never bricks a command. The MCP sitemap-submit tool is ALWAYS gated (it is an
-    outward submission to Google); its target is the feedpath (the sitemap being
-    submitted), falling back to siteUrl.
+    never bricks a command. The MCP sitemap-submit tool is ALWAYS classified (it is
+    an outward submission to Google); its target is the feedpath (the sitemap being
+    submitted), falling back to siteUrl. Returns the FIRST gated action; ``assess_all``
+    returns every one with its tier.
     """
     if _is_mcp_submit_tool(tool_name):
         ti = tool_input if isinstance(tool_input, dict) else {}
         return ("mcp_submit", ti.get("feedpath") or ti.get("siteUrl") or "")
-    if tool_name == "Bash":
-        if not isinstance(tool_input, dict):
-            return None
-        command = tool_input.get("command")
-        if not isinstance(command, str) or not command.strip():
-            return None
-        return _classify_bash(command)
-    return None
+    command = _bash_command(tool_name, tool_input)
+    return _classify_bash(command) if command else None
+
+
+def _bash_command(tool_name: str, tool_input) -> str | None:
+    if tool_name != "Bash" or not isinstance(tool_input, dict):
+        return None
+    command = tool_input.get("command")
+    return command if isinstance(command, str) and command.strip() else None
+
+
+# ---------------------------------------------------------------------------
+# PURE tiering (G-01) — consent_policy.json decides; no IO beyond that table
+# ---------------------------------------------------------------------------
+
+def _host_matches(host: str, suffixes) -> bool:
+    return any(host == sfx or host.endswith("." + sfx) for sfx in suffixes)
+
+
+def _post_tier(action: str, target: str, text: str) -> str:
+    """index_update / net_post: IndexNow + Indexing URL_UPDATED free, known SEO APIs
+    logged, URL_DELETED and every other host need consent."""
+    if any(marker in text for marker in _POLICY["consent_body_markers"]):
+        return TIER_CONSENT
+    host = (urlparse(target).hostname or "").lower() if "://" in target else ""
+    if _host_matches(host, _POLICY["free_post_host_suffixes"]):
+        return TIER_FREE
+    if _host_matches(host, _POLICY["logged_post_host_suffixes"]):
+        return TIER_LOGGED
+    return TIER_CONSENT
+
+
+def _push_tier(target: str) -> str:
+    """Destructive flags / ``+ref`` / ``:ref`` need consent; a push that is or may
+    be to a protected branch (bare push, remote only) is logged; others are free."""
+    parts = target.split()
+    if any(_is_destructive_push_flag(x) for x in parts):
+        return TIER_CONSENT
+    refspecs = parts[1:]  # parts[0] is the remote
+    if any(r.startswith(("+", ":")) for r in refspecs):
+        return TIER_CONSENT
+    if not refspecs:
+        return TIER_LOGGED  # current branch unknown — could be main
+    protected = set(_POLICY["protected_branches"])
+    if any(r.rsplit(":", 1)[-1].removeprefix("refs/heads/") in protected for r in refspecs):
+        return TIER_LOGGED
+    return TIER_FREE
+
+
+def _path_segments(path: str) -> list[str]:
+    return [seg for seg in path.split("/") if seg not in ("", ".")]
+
+
+def _is_protected_path(path: str) -> bool:
+    """master.xlsx / ledgers / _state / backups / a projects/<slug> folder itself."""
+    segs = _path_segments(path)
+    if not segs:
+        return False
+    name = segs[-1]
+    if name in _POLICY["protected_names"] or name.endswith(
+        tuple(_POLICY["protected_name_suffixes"])
+    ):
+        return True
+    for i, seg in enumerate(segs):
+        if seg == "_state":
+            nxt = segs[i + 1] if i + 1 < len(segs) else None
+            if nxt not in _POLICY["temp_state_subdirs"]:
+                return True
+        elif seg == "backups":
+            return True
+    # the project folder itself (…/projects/<slug>), or the projects/ dir
+    return segs[-1] == "projects" or (len(segs) >= 2 and segs[-2] == "projects")
+
+
+def _is_temp_path(path: str) -> bool:
+    if path.startswith(tuple(_POLICY["temp_path_prefixes"])):
+        return True
+    if path.endswith(tuple(_POLICY["temp_suffixes"])):
+        return True
+    segs = _path_segments(path)
+    if any(seg in _POLICY["temp_path_segments"] for seg in segs):
+        return True
+    return any(
+        seg == "_state" and i + 1 < len(segs) and segs[i + 1] in _POLICY["temp_state_subdirs"]
+        for i, seg in enumerate(segs)
+    )
+
+
+def _is_recursive_delete(tokens: list[str]) -> bool:
+    return any(
+        tok == "--recursive"
+        or (tok.startswith("-") and not tok.startswith("--") and ("r" in tok or "R" in tok))
+        for tok in tokens[1:]
+    )
+
+
+def _delete_tier(tokens: list[str]) -> str:
+    """Protected data needs consent; temp/output paths are free; any other bulk
+    (recursive) delete needs consent; a single other file is logged."""
+    operands = _operands(tokens, 1)
+    if any(_is_protected_path(op) for op in operands):
+        return TIER_CONSENT
+    if operands and all(_is_temp_path(op) for op in operands):
+        return TIER_FREE
+    if _is_recursive_delete(tokens):
+        return TIER_CONSENT
+    return TIER_LOGGED
+
+
+def _segment_hit(segment: str) -> Hit | None:
+    hit = _classify_segment(segment)
+    if hit is None:
+        return None
+    action, target = hit
+    if action == "fs_delete":
+        tokens = _unwrap_wrappers(_tokenize(_strip_redirections(segment)))
+        return Hit(action, target, _delete_tier(tokens))
+    if action == "git_push":
+        return Hit(action, target, _push_tier(target))
+    return Hit(action, target, _post_tier(action, target, segment))
+
+
+def assess_all(tool_name: str, tool_input) -> list[Hit]:
+    """EVERY gated action in the call, each with its tier (G-01).
+
+    A command is judged by all of its gated segments: a free first segment must
+    never wave through a critical one chained behind it.
+    """
+    if _is_mcp_submit_tool(tool_name):
+        action, target = classify(tool_name, tool_input)
+        return [Hit(action, target, TIER_FREE)]
+    command = _bash_command(tool_name, tool_input)
+    if command is None:
+        return []
+    hits: list[Hit] = []
+    interp = _classify_interpreter_net_write(command)
+    if interp is not None:
+        hits.append(Hit(*interp, _post_tier(*interp, command)))
+    for segment in _split_segments(command):
+        hit = _segment_hit(segment)
+        if hit is not None:
+            hits.append(hit)
+    return hits
+
+
+def assess(tool_name: str, tool_input) -> Hit | None:
+    """The single highest-tier gated action of the call (or None)."""
+    hits = assess_all(tool_name, tool_input)
+    return max(hits, key=lambda h: _TIER_RANK[h.tier]) if hits else None
+
+
+# ---------------------------------------------------------------------------
+# Consent forgery (G-01): the model may READ the ledger, never write it
+# ---------------------------------------------------------------------------
+
+_LEDGER_NAME = "consent.jsonl"
+_READ_ONLY_TOKENS = frozenset({
+    "cat", "head", "tail", "less", "more", "grep", "rg", "wc", "jq", "ls", "stat",
+    "file", "sha256sum", "shasum", "md5", "md5sum", "diff", "cmp", "echo", "printf",
+})
+_LEDGER_REDIRECT_RE = re.compile(r">\s*\S*" + re.escape(_LEDGER_NAME))
+_FILE_EDIT_TOOLS = frozenset({"Write", "Edit", "MultiEdit", "NotebookEdit"})
+
+
+def is_consent_forgery(tool_name: str, tool_input) -> bool:
+    """True when the call would write consent itself instead of the user granting it.
+
+    Covers the recorder CLI / ``append_consent`` from any shell, any non-read-only
+    command or redirect touching ``consent.jsonl``, and the file-edit tools on it.
+    """
+    ti = tool_input if isinstance(tool_input, dict) else {}
+    if tool_name in _FILE_EDIT_TOOLS:
+        path = ti.get("file_path") or ti.get("notebook_path") or ""
+        return isinstance(path, str) and Path(path).name == _LEDGER_NAME
+    command = _bash_command(tool_name, tool_input)
+    if command is None:
+        return False
+    if "consent_ledger" in command and ("approve" in command or "append_consent" in command):
+        return True
+    if _LEDGER_NAME not in command:
+        return False
+    if _LEDGER_REDIRECT_RE.search(command):
+        return True
+    for segment in _split_segments(command):
+        if _LEDGER_NAME not in segment:
+            continue
+        tokens = _unwrap_wrappers(_tokenize(segment))
+        if tokens and tokens[0].rsplit("/", 1)[-1] not in _READ_ONLY_TOKENS:
+            return True
+    return False
+
+
+_FORGERY_MESSAGES = [
+    "BLOCKED: onay defterine (consent.jsonl) model yazamaz.",
+    "Onay yalnız Claude sohbetine SENİN yazdığın mesajla kaydedilir:  "
+    f"{_APPROVE_COMMAND} <run_id> <action> <target>   ya da   onay: <action> <target>",
+]
 
 
 # ---------------------------------------------------------------------------
 # Decision (IO via injected resolvers; fail-OPEN non-gated, fail-CLOSED gated)
 # ---------------------------------------------------------------------------
+
+def _log_logged_hits(
+    hits: list[Hit], *, workspace, session_id: str | None, log_fn, slug_fn,
+) -> None:
+    """Best-effort outward.jsonl lines for the logged-tier hits — never raises, and
+    writes nothing for an unbound session (G-05: never active.json's project)."""
+    logged = [h for h in hits if h.tier == TIER_LOGGED]
+    if not logged or workspace is None or not session_id:
+        return
+    try:
+        slug = slug_fn(workspace, session_id=session_id, strict=True)
+        now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+        for hit in logged:
+            log_fn(workspace, slug, session_id=session_id, action=hit.action,
+                   target=hit.target, now_iso=now_iso)
+    except Exception as exc:  # a log hiccup must never block a logged action
+        _emit(f"WARNING outward log not written: {exc!r}")
+
 
 def evaluate(
     payload: dict,
@@ -583,20 +831,25 @@ def evaluate(
     session_id_fn=current_session_id,
     workspace_fn=resolve_workspace_root,
     slug_fn=resolve_session_project,
+    log_fn=append_outward,
 ) -> tuple[int, list[str]]:
     """Return ``(exit_code, messages)`` — 0 allows the tool, 2 denies it.
 
-    Non-gated (classify None) -> (0, []) BEFORE any resolution, so a plain command
-    is never bricked. Gated -> allowed iff THIS session's bound project consented
-    to (action, target); otherwise DENY (fail-closed) with the copy-paste fix. An
-    unresolvable session/workspace/slug cannot prove consent -> deny.
+    Consent forgery -> DENY. No gated action -> (0, []) BEFORE any resolution, so a
+    plain command is never bricked. Otherwise every gated action is tiered (G-01):
+    free ones pass, logged ones pass and get an outward.jsonl line, and each
+    consent-tier one passes only if THIS session's bound project holds a matching
+    consent; the first without one is DENIED (fail-closed) with the copy-paste fix.
     """
     if not isinstance(payload, dict):
         return (0, [])
-    gated = classify(payload.get("tool_name") or "", payload.get("tool_input"))
-    if gated is None:
+    tool_name = payload.get("tool_name") or ""
+    tool_input = payload.get("tool_input")
+    if is_consent_forgery(tool_name, tool_input):
+        return (2, list(_FORGERY_MESSAGES))
+    hits = assess_all(tool_name, tool_input)
+    if not hits:
         return (0, [])  # not gated -> ALLOW
-    action, target = gated
 
     session_id = session_id_fn(payload)
     try:
@@ -606,10 +859,28 @@ def evaluate(
         # cannot prove consent → treat as no workspace so a DETECTED gated action
         # fails-CLOSED (deny) below, never escaping to main()'s fail-OPEN except.
         workspace = None
+
+    for hit in hits:
+        if hit.tier == TIER_CONSENT:
+            denied = _consent_denial(
+                hit, workspace=workspace, session_id=session_id,
+                has_consent_fn=has_consent_fn, slug_fn=slug_fn,
+            )
+            if denied is not None:
+                return (2, denied)
+    _log_logged_hits(hits, workspace=workspace, session_id=session_id,
+                     log_fn=log_fn, slug_fn=slug_fn)
+    return (0, [])
+
+
+def _consent_denial(
+    hit: Hit, *, workspace, session_id: str | None, has_consent_fn, slug_fn,
+) -> list[str] | None:
+    """None if THIS session consented to ``hit``; else the deny messages."""
     slug = None
     if workspace is not None and session_id:
         slug = slug_fn(workspace, session_id=session_id, strict=False)
-    th = target_hash(target)
+    th = target_hash(hit.target)
     # Fail-CLOSED consent check: a DETECTED gated action whose consent cannot be
     # VERIFIED must DENY. has_consent_fn reads the ledger and RAISES (e.g.
     # ConsentLedgerError on a corrupt consent.jsonl line); that exception must NOT
@@ -617,32 +888,30 @@ def evaluate(
     # unreadable ledger. The resolvers above return None (never raise), so wrapping
     # only the consent lookup is sufficient + precise.
     consent_error = False
-    consented = False
     if workspace is not None and slug is not None and session_id:
         try:
-            consented = has_consent_fn(
-                workspace, slug, session_id=session_id, action=action, target_hash=th
-            )
+            if has_consent_fn(
+                workspace, slug, session_id=session_id, action=hit.action, target_hash=th
+            ):
+                return None  # consented THIS session -> ALLOW
         except Exception:  # ledger unreadable/corrupt -> consent UNVERIFIABLE
             consent_error = True
-    if consented:
-        return (0, [])  # consented THIS session -> ALLOW
 
     run_label = "sess-" + (session_id[:8] if session_id else "unknown")
     # The target is shell-quoted (single quotes) because the command text-substitutes
     # it into a shell block: inside "…" a `$T` would expand and a `"` would split it,
     # so the recorded hash would no longer be the one the gate checks.
     messages = [
-        f"BLOCKED: {action} → {target}  (bu oturumda onay yok)",
+        f"BLOCKED: {hit.action} → {hit.target}  (bu oturumda onay yok)",
         f"İzin vermek için Claude sohbetine yaz (terminale değil):  "
-        f"{_APPROVE_COMMAND} {run_label} {action} {shlex.quote(target)}",
+        f"{_APPROVE_COMMAND} {run_label} {hit.action} {shlex.quote(hit.target)}",
     ]
     if consent_error:
         messages.append(
             "⚠️ consent defteri okunamadı/bozuk — onay DOĞRULANAMADI, "
             "güvenli tarafta REDDEDİLDİ."
         )
-    return (2, messages)
+    return messages
 
 
 # ---------------------------------------------------------------------------

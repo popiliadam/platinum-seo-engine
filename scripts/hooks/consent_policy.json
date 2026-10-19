@@ -1,0 +1,23 @@
+{
+  "_doc": "G-01 consent tiers, read by outward_action_gate.py. serbest = runs freely; kayitli = runs and is logged to _state/outward.jsonl; onayli = needs a consent the USER typed in chat. Edit these lists to move an action between tiers; tests/hooks/test_consent_tiers.py pins the intended table.",
+  "protected_branches": ["main", "master"],
+  "destructive_push_flags": [
+    "--force", "-f", "--force-with-lease", "--force-if-includes",
+    "--delete", "-d", "--mirror", "--prune"
+  ],
+  "free_post_host_suffixes": ["indexnow.org", "indexing.googleapis.com"],
+  "logged_post_host_suffixes": [
+    "dataforseo.com", "bing.com", "api.typesafe.ai"
+  ],
+  "consent_body_markers": ["URL_DELETED"],
+  "temp_path_segments": ["outputs", "scratchpad", "tmp", "__pycache__", ".pytest_cache"],
+  "temp_path_prefixes": ["/tmp/", "/private/tmp/", "/var/folders/"],
+  "temp_state_subdirs": ["staging", "inbox"],
+  "temp_suffixes": [".bak", ".tmp", ".pyc"],
+  "protected_names": [
+    "master.xlsx", "consent.jsonl", "events.jsonl", "cost_ledger.jsonl",
+    "outward.jsonl", "project.config.json"
+  ],
+  "protected_name_suffixes": ["-master.xlsx", "_MASTER.xlsx"],
+  "protected_path_segments": ["_state", "backups", "projects"]
+}
