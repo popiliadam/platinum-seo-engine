@@ -59,11 +59,12 @@ def _merge(
     writer: str,
     schema_path: Path | str | None,
     state_root: Path | str | None,
+    owns: Callable[[dict], bool] | None = None,
 ) -> WriteResult:
     return transaction.merge(
         xlsx_path, sheet, fn, project_slug,
         schema_path=schema_path, state_root=state_root, writer=writer,
-        acquire_blocking=True,
+        acquire_blocking=True, owned_by_caller=owns,
     )
 
 
@@ -98,16 +99,15 @@ def merge_prefixed_rows(
         for seq, row in enumerate(new_rows, start=1)
     ]
 
+    def own(row: dict) -> bool:
+        return str(row.get(id_column) or "").startswith(id_prefix)
+
     def union(existing: list[dict]) -> list[dict]:
-        kept = [
-            row for row in existing
-            if not str(row.get(id_column) or "").startswith(id_prefix)
-        ]
-        return kept + renumbered
+        return [row for row in existing if not own(row)] + renumbered
 
     return _merge(
         xlsx_path, sheet, union, project_slug=project_slug, writer=writer,
-        schema_path=schema_path, state_root=state_root,
+        schema_path=schema_path, state_root=state_root, owns=own,
     )
 
 
@@ -172,7 +172,7 @@ def replace_owned_rows(
 
     return _merge(
         xlsx_path, sheet, union, project_slug=project_slug, writer=writer,
-        schema_path=schema_path, state_root=state_root,
+        schema_path=schema_path, state_root=state_root, owns=owns,
     )
 
 

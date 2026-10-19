@@ -874,6 +874,7 @@ def merge(
     writer: str | None = None,
     allow_extra: bool = False,
     acquire_blocking: bool = False,
+    owned_by_caller: Callable[[dict], bool] | None = None,
 ) -> WriteResult:
     """Read-modify-write ``sheet`` under ONE excel.lock hold (V-03).
 
@@ -882,7 +883,10 @@ def merge(
     with it — all before the lock is released, so a concurrent writer can never
     slip in between the read and the write. ``fn`` must be pure and quick (it
     runs while every other writer waits). An empty result over a populated sheet
-    raises ``EmptyMergeError`` and leaves the sheet untouched; an invalid result
+    raises ``EmptyMergeError`` and leaves the sheet untouched — unless every
+    current row is the caller's own (``owned_by_caller``), i.e. a re-run that
+    legitimately found nothing. Rows read back are normalised like update()'s
+    (V-10) so an Excel-typed foreign cell cannot fail the merge. An invalid result
     raises the usual schema errors, also before anything is saved.
     """
     workbook_path = Path(workbook_path)
@@ -902,9 +906,13 @@ def merge(
         wb = _load_or_new(workbook_path)
         _ensure_sheet_with_header(wb, sheet, columns, _header_row(schema, sheet))
         ws = wb[sheet]
-        existing = _read_data_rows(ws, columns, _data_start_row(schema, sheet))
+        existing = [
+            _normalized_cells(row, columns)
+            for row in _read_data_rows(ws, columns, _data_start_row(schema, sheet))
+        ]
         rows = fn(existing)
-        if not rows and existing:
+        own_only = owned_by_caller is not None and all(owned_by_caller(r) for r in existing)
+        if not rows and existing and not own_only:
             raise EmptyMergeError(
                 f"merge would empty {sheet!r} ({len(existing)} rows); refusing"
             )

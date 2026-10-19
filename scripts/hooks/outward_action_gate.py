@@ -351,6 +351,16 @@ def _interpreter_net_write(text: str) -> bool:
     return any(verb in text for verb in _NET_WRITE_VERBS_CS)
 
 
+def _host(url: str) -> str:
+    """Lower-cased host of ``url``, or "" when it cannot be parsed (``http://[``):
+    an unknown host is never loopback and never on a free/logged list, so a
+    malformed URL fails CLOSED instead of crashing the gate into an allow."""
+    try:
+        return (urlparse(url).hostname or "").lower()
+    except ValueError:
+        return ""
+
+
 def _is_loopback_host(host: str) -> bool:
     """True iff ``host`` addresses THIS machine — a loopback request never leaves
     it, so it is not an OUTWARD action (#12): ``localhost`` / ``*.localhost``
@@ -381,8 +391,12 @@ _BODY_FLAGS = frozenset({"--json", "--upload-file", "-T", "--body-data", "--body
 
 def _has_post_flag(tokens: list[str]) -> bool:
     """True iff the tokens send a body or use a write method (curl/wget) — incl.
-    combined short flags (``-sd``), ``--json``, uploads, and PUT/PATCH/DELETE (G-02)."""
+    combined short flags (``-sd``), ``--json``, uploads, and PUT/PATCH/DELETE (G-02).
+    Short-flag rules are curl's: for wget ``-T`` is a timeout and ``-d`` debug."""
+    is_curl = bool(tokens) and tokens[0].rsplit("/", 1)[-1] == "curl"
     for i, tok in enumerate(tokens):
+        if not is_curl and tok.startswith("-") and not tok.startswith("--"):
+            continue  # wget's short flags never carry a body
         nxt = tokens[i + 1].upper() if i + 1 < len(tokens) else ""
         if tok in _POST_DATA_FLAGS or tok in _BODY_FLAGS:
             return True
@@ -578,11 +592,11 @@ def _classify_segment(segment: str) -> tuple[str, str] | None:
         # Every URL counts (G-02): a loopback URL placed first must not hide a
         # public one behind it.
         urls = [t for t in tokens if t.startswith(("http://", "https://"))]
-        public = [u for u in urls if not _is_loopback_host((urlparse(u).hostname or "").lower())]
+        public = [u for u in urls if not _is_loopback_host(_host(u))]
         if urls and not public:
             return None  # loopback only (#12); Indexing/IndexNow hosts are never loopback
         url = public[0] if public else None
-        host = (urlparse(url).hostname or "").lower() if url else ""
+        host = _host(url) if url else ""
         is_indexing = host == _INDEXING_HOST
         is_indexnow = host.endswith("indexnow.org")
         # Loopback carve-out (#12): a request to THIS machine never leaves it, so a
@@ -668,11 +682,11 @@ def _classify_interpreter_net_write(command: str) -> tuple[str, str] | None:
     if not leads_interpreter or not _interpreter_net_write(command):
         return None
     urls = _URL_IN_TEXT_RE.findall(command)
-    public = [u for u in urls if not _is_loopback_host((urlparse(u).hostname or "").lower())]
+    public = [u for u in urls if not _is_loopback_host(_host(u))]
     if urls and not public:
         return None  # loopback only (#12)
     url = public[0] if public else None
-    host = (urlparse(url).hostname or "").lower() if url else ""
+    host = _host(url) if url else ""
     is_indexing = host == _INDEXING_HOST
     is_indexnow = host.endswith("indexnow.org")
     # Loopback carve-out (#12) applies EQUALLY to interpreter net-writes (D-C
@@ -696,6 +710,37 @@ _WHICH_RE = re.compile(
 )
 _SHELLS = frozenset({"bash", "sh", "zsh", "dash", "ksh"})
 _MAX_NESTING = 3
+_BLOCK_KEYWORDS = frozenset({"do", "then", "else", "elif", "if", "while", "until", "time", "!"})
+
+
+def _substitutions(text: str) -> list[str]:
+    """Bodies of ``$( … )`` and backtick command substitutions (not ``$(( ))``
+    arithmetic, nothing inside single quotes)."""
+    found: list[str] = []
+    i = 0
+    while i < len(text):
+        if text.startswith("$(", i) and not text.startswith("$((", i):
+            j = _span_end(text, i)
+            found.append(text[i + 2:j - 1])
+            i = j
+        elif text[i] == "`":
+            j = _span_end(text, i)
+            found.append(text[i + 1:j - 1])
+            i = j
+        elif text[i] == "'":
+            i = _span_end(text, i)
+        else:
+            i += 1
+    return found
+
+
+def _strip_block_keywords(segment: str) -> str:
+    """``do rm -rf x`` / ``then git push`` → the command after the keyword."""
+    words = segment.split(None, 1)
+    while words and words[0] in _BLOCK_KEYWORDS:
+        segment = words[1] if len(words) > 1 else ""
+        words = segment.split(None, 1)
+    return segment
 
 
 def _nested_script(segment: str) -> str | None:
@@ -719,13 +764,16 @@ def _expanded_segments(command: str, depth: int = 0) -> list[str]:
     ``bash -c`` / ``sh -c`` / ``eval`` (recursively, bounded). Expanding only ever
     EXPOSES a gated command; it can never hide one."""
     out: list[str] = []
+    if depth < _MAX_NESTING:  # what $( … ) / backticks would run (review #3)
+        for inner in _substitutions(_WHICH_RE.sub(lambda m: m.group(1) or m.group(2), command)):
+            out.extend(_expanded_segments(inner, depth + 1))
     for segment in _split_segments(command):
         seg = _WHICH_RE.sub(lambda m: m.group(1) or m.group(2), segment).strip()
         if seg.startswith("("):
             seg = seg[1:].strip()
             if seg.endswith(")"):
                 seg = seg[:-1].strip()
-        seg = seg.lstrip("{!").strip()
+        seg = _strip_block_keywords(seg.lstrip("{!").strip())
         seg = _ENV_PREFIX_RE.sub("", seg)
         if not seg:
             continue
@@ -802,7 +850,7 @@ def _post_tier(action: str, target: str, text: str) -> str:
     logged, URL_DELETED and every other host need consent."""
     if any(marker in text for marker in _POLICY["consent_body_markers"]):
         return TIER_CONSENT
-    host = (urlparse(target).hostname or "").lower() if "://" in target else ""
+    host = _host(target) if "://" in target else ""
     if _host_matches(host, _POLICY["free_post_host_suffixes"]):
         return TIER_FREE
     if _host_matches(host, _POLICY["logged_post_host_suffixes"]):
@@ -904,7 +952,7 @@ def _delete_tier(tokens: list[str]) -> str:
     return TIER_LOGGED
 
 
-def _segment_hit(segment: str) -> Hit | None:
+def _segment_hit(segment: str, command: str | None = None) -> Hit | None:
     hit = _classify_segment(segment)
     if hit is None:
         return None
@@ -920,19 +968,72 @@ def _segment_hit(segment: str) -> Hit | None:
     if action == "git_push":
         return Hit(action, target, _push_tier(target))
     tokens = _tokenize(_strip_redirections(segment))
-    return _strictest_url_hit(action, target, segment,
-                              [t for t in tokens if t.startswith(("http://", "https://"))])
+    body, body_unknown = _request_bodies(tokens, command or segment)
+    return _strictest_url_hit(action, target, segment + "\n" + body,
+                              [t for t in tokens if t.startswith(("http://", "https://"))],
+                              body_unknown=body_unknown)
 
 
-def _strictest_url_hit(action: str, target: str, text: str, urls: list[str]) -> Hit:
+_BODY_FILE_FLAGS = frozenset({"-d", "--data", "--data-binary", "--data-ascii",
+                              "--data-urlencode", "--json", "-T", "--upload-file",
+                              "--post-file", "--body-file"})
+_BODY_MAX_BYTES = 1_000_000
+
+
+def _request_bodies(tokens: list[str], command: str) -> tuple[str, bool]:
+    """(text of the bodies the request sends from files / stdin, unknown?).
+
+    ``-d @file`` / ``--data-binary @file`` / ``-T file`` … are read so a
+    ``URL_DELETED`` inside them is seen; ``@-`` (stdin, e.g. a heredoc) yields the
+    whole command text. ``unknown`` is True when a body file cannot be read."""
+    texts: list[str] = []
+    unknown = False
+    for i, tok in enumerate(tokens):
+        value = None
+        if tok in _BODY_FILE_FLAGS and i + 1 < len(tokens):
+            value = tokens[i + 1]
+        elif "=" in tok and tok.split("=", 1)[0] in _BODY_FILE_FLAGS:
+            value = tok.split("=", 1)[1]
+        elif tok.startswith("-d@"):
+            value = tok[2:]
+        if value is None:
+            continue
+        is_file_flag = tok.split("=", 1)[0] in ("-T", "--upload-file", "--post-file", "--body-file")
+        if not (value.startswith("@") or is_file_flag):
+            continue  # an inline body: already part of the segment text
+        name = value[1:] if value.startswith("@") else value
+        if name == "-":
+            texts.append(command)
+            continue
+        try:
+            path = Path(os.path.expanduser(name))
+            if path.stat().st_size > _BODY_MAX_BYTES:
+                unknown = True
+                continue
+            texts.append(path.read_text(encoding="utf-8", errors="replace"))
+        except OSError:
+            unknown = True
+    return "\n".join(texts), unknown
+
+
+def _strictest_url_hit(
+    action: str, target: str, text: str, urls: list[str], *, body_unknown: bool = False,
+) -> Hit:
     """One request may go to several URLs (curl sends to each): tier EVERY public
-    one and keep the strictest, naming that URL as the consent target."""
-    public = [u for u in urls if not _is_loopback_host((urlparse(u).hostname or "").lower())]
+    one and keep the strictest, naming that URL as the consent target. A body the
+    gate could not read, sent to the Indexing API, may be a URL_DELETED: consent."""
+    public = [u for u in urls if not _is_loopback_host(_host(u))]
     if not public:
         return Hit(action, target, _post_tier(action, target, text))
-    tiered = [(_post_tier(action, u, text), u) for u in public]
+
+    def tier_of(url: str) -> str:
+        if body_unknown and _host(url) == _INDEXING_HOST:
+            return TIER_CONSENT
+        return _post_tier(action, url, text)
+
+    tiered = [(tier_of(u), u) for u in public]
     tier, url = max(tiered, key=lambda tu: _TIER_RANK[tu[0]])
-    if action == "index_update" and (urlparse(url).hostname or "").lower() != _INDEXING_HOST:
+    if action == "index_update" and _host(url) != _INDEXING_HOST:
         action = "net_post"
     return Hit(action, url, tier)
 
@@ -957,7 +1058,7 @@ def assess_all(tool_name: str, tool_input) -> list[Hit]:
     if deleting is not None:
         hits.append(deleting)
     for segment in _expanded_segments(command):
-        hit = _segment_hit(segment)
+        hit = _segment_hit(segment, command)
         if hit is not None:
             hits.append(hit)
     return hits
@@ -1287,6 +1388,21 @@ def _emit(message: str) -> None:
             pass
 
 
+_GATED_WORDS = _DELETE_TOKENS | _HTTP_TOKENS | {"git", "find", "rsync", "mv", "eval"}
+
+
+def _names_gated_tool(payload) -> bool:
+    """Whether the raw command text names any tool the gate classifies."""
+    if not isinstance(payload, dict):
+        return False
+    ti = payload.get("tool_input")
+    text = (ti.get("command") or ti.get("input")) if isinstance(ti, dict) else None
+    if not isinstance(text, str):
+        return False
+    words = {w.rsplit("/", 1)[-1] for w in re.split(r"[\s;&|()`$\"']+", text) if w}
+    return bool(words & _GATED_WORDS)
+
+
 def main() -> int:
     """Read the PreToolUse stdin payload and emit the gate decision.
 
@@ -1296,11 +1412,18 @@ def main() -> int:
     computed first and the deny code is returned even if message emission fails, so
     the gated path stays fail-CLOSED.
     """
+    payload = None
     try:
         payload = json.loads(sys.stdin.read() or "{}")
         reason, hits = _gated(payload) if isinstance(payload, dict) else (None, [])
         critical = reason is not None or any(h.tier == TIER_CONSENT for h in hits)
-    except Exception as exc:  # no confirmed gated action -> allow + a loud warning
+    except Exception as exc:
+        # A parser crash on a command that names a gated tool must not become an
+        # ALLOW for whatever is chained after it (review #1); anything else stays
+        # fail-open so a gate bug never bricks plain work.
+        if _names_gated_tool(payload):
+            _emit(f"BLOCKED: komut çözümlenemedi ({exc!r}) — güvenli tarafta reddedildi")
+            return 2
         _emit(f"WARNING internal error, allowing (fail-open): {exc!r}")
         return 0
     try:
