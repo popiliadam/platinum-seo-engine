@@ -17,7 +17,7 @@ gated by allowed_writers; AFTER write emit provenance event via
 events_writer.append_provenance(operation="project_excel"). Plugin-
 agnostik (no slug literals).
 
-Public API: write/append/replace/update (no delete — rules/append-only-state.md).
+Public API: write/append/replace/merge/update (no delete — rules/append-only-state.md).
 `replace` is an idempotent in-sheet refresh (clears the data block below the
 schema header_row, re-lands at data_start_row); it is NOT a row delete — the
 append-only state ledger (events.jsonl) is untouched and a provenance event is
@@ -46,7 +46,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 from jsonschema import Draft7Validator
 from jsonschema.exceptions import ValidationError as _JSValidationError
@@ -155,6 +155,10 @@ class FormulaPolicyViolation(TransactionError):
 
 class CellValueTooLongError(TransactionError):
     """A cell value exceeds Excel's 32,767-character cap."""
+
+
+class EmptyMergeError(TransactionError):
+    """merge()'s fn returned 0 rows for a sheet that has rows (V-01 rule)."""
 
 
 class LockHeldError(TransactionError):
@@ -817,6 +821,75 @@ def replace(
     )
 
 
+def merge(
+    workbook_path: Path | str,
+    sheet: str,
+    fn: Callable[[list[dict]], list[dict]],
+    project_slug: str,
+    *,
+    schema_path: Path | str | None = None,
+    state_root: Path | str | None = None,
+    writer: str | None = None,
+    allow_extra: bool = False,
+    acquire_blocking: bool = False,
+) -> WriteResult:
+    """Read-modify-write ``sheet`` under ONE excel.lock hold (V-03).
+
+    Loads the workbook under the lock, passes the sheet's current data rows (new
+    dicts) to ``fn``, validates what ``fn`` returns, and replaces the data block
+    with it — all before the lock is released, so a concurrent writer can never
+    slip in between the read and the write. ``fn`` must be pure and quick (it
+    runs while every other writer waits). An empty result over a populated sheet
+    raises ``EmptyMergeError`` and leaves the sheet untouched; an invalid result
+    raises the usual schema errors, also before anything is saved.
+    """
+    workbook_path = Path(workbook_path)
+    schema_p = Path(schema_path) if schema_path else _DEFAULT_SCHEMA_PATH
+    schema = _load_schema(str(schema_p))
+    if sheet not in (schema.get("sheets") or {}):
+        raise SchemaSheetMismatchError(f"sheet {sheet!r} not in schema")
+    columns = _ordered_columns(schema, sheet)
+    _check_writer_scope(schema, sheet, writer)
+
+    state_dir = _state_dir(
+        Path(state_root) if state_root else None, workbook_path, project_slug
+    )
+    lock_path = _lock_path(workbook_path)
+    fd = _acquire_lock(lock_path, acquire_blocking=acquire_blocking)
+    try:
+        wb = _load_or_new(workbook_path)
+        _ensure_sheet_with_header(wb, sheet, columns, _header_row(schema, sheet))
+        ws = wb[sheet]
+        existing = _read_data_rows(ws, columns, _data_start_row(schema, sheet))
+        rows = fn(existing)
+        if not rows and existing:
+            raise EmptyMergeError(
+                f"merge would empty {sheet!r} ({len(existing)} rows); refusing"
+            )
+        _check_rows(rows, schema, sheet, allow_extra=allow_extra)
+        _land_rows(ws, rows, columns, schema, sheet, mode="replace")
+        backup_path = _backup(workbook_path, state_dir)
+        _atomic_save(wb, workbook_path)
+        _rotate_backups(state_dir)
+    finally:
+        _release_lock(fd, lock_path)
+
+    event_id = _emit_provenance_or_anomaly(
+        project_slug=project_slug,
+        sheet=sheet,
+        rows_affected=len(rows),
+        state_dir=state_dir,
+        operation="project_excel",
+    )
+    return WriteResult(
+        workbook_path=workbook_path,
+        sheet=sheet,
+        rows_affected=len(rows),
+        backup_path=backup_path,
+        event_id=event_id,
+    )
+
+
 def update(
     workbook_path: Path | str,
     sheet: str,
@@ -918,6 +991,57 @@ def update(
 # Internals — core write/append driver
 # ---------------------------------------------------------------------------
 
+def _check_rows(
+    rows: list[dict], schema: dict, sheet: str, *, allow_extra: bool
+) -> None:
+    """Schema-validate ``rows`` for ``sheet`` + formula policy + cell length cap."""
+    validator = _build_row_validator(schema, sheet, allow_extra=allow_extra)
+    if not isinstance(rows, list):
+        raise RowSchemaError("rows must be a list of dicts")
+    _validate_rows(rows, validator)
+    _check_formula_policy(rows)
+    _check_cell_lengths(rows)
+
+
+def _land_rows(
+    ws, rows: list[dict], columns: list[dict], schema: dict, sheet: str, *, mode: str
+) -> None:
+    """Write already-validated ``rows`` into ``ws`` (caller holds excel.lock).
+
+    append: bottom of existing data (byte-identical legacy behavior). replace:
+    clear the prior data block then re-land at the schema's data_start_row
+    (idempotent refresh).
+    """
+    if mode == "replace":
+        data_start = _data_start_row(schema, sheet)
+        if (ws.max_row or 0) >= data_start:
+            ws.delete_rows(data_start, ws.max_row - data_start + 1)
+        write_row = data_start
+    else:
+        write_row = _next_data_row(ws)
+
+    col_index = {c["name"]: idx for idx, c in enumerate(columns, start=1)}
+    for row in rows:
+        for k, v in row.items():
+            if k not in col_index:
+                # Validator allowed this key (additionalProperties:true);
+                # we still skip writing it because it has no column.
+                continue
+            ws.cell(row=write_row, column=col_index[k], value=v)
+        write_row += 1
+
+
+def _read_data_rows(ws, columns: list[dict], data_start: int) -> list[dict]:
+    """The sheet's data block as new dicts keyed by column name (blank rows skipped)."""
+    names = [c["name"] for c in columns]
+    rows: list[dict] = []
+    for raw in ws.iter_rows(min_row=data_start, max_col=len(names), values_only=True):
+        if raw is None or all(v is None for v in raw):
+            continue
+        rows.append({name: (raw[i] if i < len(raw) else None) for i, name in enumerate(names)})
+    return rows
+
+
 def _write_or_append(
     workbook_path: Path | str,
     sheet: str,
@@ -946,15 +1070,9 @@ def _write_or_append(
     # 2. Writer scope (master_task only, currently).
     _check_writer_scope(schema, sheet, writer)
 
-    # 3. Per-row schema validation. P1-09: unknown keys rejected unless allow_extra.
-    validator = _build_row_validator(schema, sheet, allow_extra=allow_extra)
-    if not isinstance(rows, list):
-        raise RowSchemaError("rows must be a list of dicts")
-    _validate_rows(rows, validator)
-
-    # 4. Formula policy + cell length cap.
-    _check_formula_policy(rows)
-    _check_cell_lengths(rows)
+    # 3+4. Per-row schema validation (P1-09: unknown keys rejected unless
+    # allow_extra), formula policy + cell length cap.
+    _check_rows(rows, schema, sheet, allow_extra=allow_extra)
 
     # 5. Lock + load + write under flock.
     state_dir = _state_dir(
@@ -972,23 +1090,7 @@ def _write_or_append(
         # then re-land at the schema's data_start_row (idempotent refresh).
         # Rows are already schema-validated above (step 3), so a clear here is
         # only reached for a valid payload — a bad row raised before the lock.
-        if mode == "replace":
-            data_start = _data_start_row(schema, sheet)
-            if (ws.max_row or 0) >= data_start:
-                ws.delete_rows(data_start, ws.max_row - data_start + 1)
-            write_row = data_start
-        else:
-            write_row = _next_data_row(ws)
-
-        col_index = {c["name"]: idx for idx, c in enumerate(columns, start=1)}
-        for row in rows:
-            for k, v in row.items():
-                if k not in col_index:
-                    # Validator allowed this key (additionalProperties:true);
-                    # we still skip writing it because it has no column.
-                    continue
-                ws.cell(row=write_row, column=col_index[k], value=v)
-            write_row += 1
+        _land_rows(ws, rows, columns, schema, sheet, mode=mode)
 
         # 6. Backup → atomic save → rotation. Order matters: backup must
         # complete before save, save must complete before rotation prunes.
@@ -1118,6 +1220,7 @@ __all__: Iterable[str] = (
     "RowSchemaError",
     "FormulaPolicyViolation",
     "CellValueTooLongError",
+    "EmptyMergeError",
     "LockHeldError",
     "LockTimeout",
     "BackupDirUnwritableError",
@@ -1130,5 +1233,6 @@ __all__: Iterable[str] = (
     "write",
     "append",
     "replace",
+    "merge",
     "update",
 )

@@ -212,12 +212,16 @@ Envelope shape (written by `build_envelope`):
 
 ### Stage F — `write_excel` (per-sheet, idempotent replace)
 
-Six `transaction.replace` calls — one per sheet — over the projections
-returned by `sf_projection.project_all(raw_dir)`. `replace` (NOT `append`)
-clears each sheet's data block then re-lands the rows, so **re-importing the
-same batch refreshes rather than duplicates** (idempotent). Each call goes
-through the single approved write path with backup, lock, schema validation,
-and post-write `tool_computed` provenance emission. The 6 sheets and their
+One write per sheet over the projections returned by
+`sf_projection.project_all(raw_dir)`. Four sheets use `transaction.replace`
+(NOT `append`): it clears the sheet's data block then re-lands the rows, so
+**re-importing the same batch refreshes rather than duplicates** (idempotent).
+`robots_txt` and `redirect_404` are shared with hreflang/facet-nav/robots-policy
+audits and migration-map, so sf-import refreshes only ITS rows there via
+`scripts/util/sheet_merge.py` (`R-` id prefix; SF-shaped `3xx`/`4xx` redirect
+rows), keeping `HF-`/`FN-`/`RP-` findings and `301`/`410` migration plans under
+one lock. Every write goes through the approved path with backup, lock, schema
+validation, and post-write `tool_computed` provenance emission. The 6 sheets and their
 CSV → row projections (inline mapping; the formal `staging-to-excel-map.json`
 arrives in Phase 6):
 

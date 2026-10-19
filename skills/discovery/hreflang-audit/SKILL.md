@@ -123,7 +123,7 @@ Mirrors tech-audit's shape minus the budget pre-flight (this skill is free).
    master.xlsx#robots_txt'ye yazalım mı?"); skill EXIT awaiting_approval.
 5. **write_excel** — on approve, `sheet_merge.merge_prefixed_rows(master_xlsx,
    "robots_txt", out["robots_txt_rows"], id_prefix="HF-", run_id=..., project_slug=...,
-   writer="hreflang-audit")` (single idempotent committer.commit path).
+   writer="hreflang-audit")` (read-merge-write under one excel.lock via `transaction.merge`).
 6. **render_report** — `render_template.py templates/reports/hreflang-audit.template.md`
    → `outputs/reports/{date}-hreflang-audit.md`.
 7. **provenance event** — `append_provenance(source.kind="sf_csv", operation="project_excel", target_excel_sheet="robots_txt", rows_written=len(rows))`.

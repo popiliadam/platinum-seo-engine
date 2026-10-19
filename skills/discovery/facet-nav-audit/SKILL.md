@@ -144,7 +144,7 @@ Mirrors tech-audit's shape minus the budget pre-flight (this skill is free).
    master.xlsx#robots_txt'ye yazalım mı?"); skill EXIT awaiting_approval.
 5. **write_excel** — on approve, `sheet_merge.merge_prefixed_rows(master_xlsx,
    "robots_txt", out["robots_txt_rows"], id_prefix="FN-", run_id=..., project_slug=...,
-   writer="facet-nav-audit")` (single idempotent committer.commit path).
+   writer="facet-nav-audit")` (read-merge-write under one excel.lock via `transaction.merge`).
 6. **render_report** — `render_template.py templates/reports/facet-nav-audit.template.md`
    → `outputs/reports/{date}-facet-nav-audit.md` (includes the proposed robots.txt
    block as recommendation text).
