@@ -59,6 +59,12 @@ def test_additions_are_fine() -> None:
     assert compare(LIVE, new, site_host=HOST).ok
 
 
+def test_dropped_video_or_embed_is_detected() -> None:
+    live = LIVE.replace("</article>", '<video src="/v.mp4"></video><embed src="/x.swf"></article>')
+    missing = compare(live, LIVE, site_host=HOST).missing
+    assert any(m.startswith("iframe / embed / video") for m in missing), missing
+
+
 def test_revise_and_merge_flows_run_the_gate() -> None:
     from pathlib import Path
     root = Path(__file__).resolve().parents[2] / "skills" / "production"

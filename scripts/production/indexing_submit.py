@@ -41,8 +41,10 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from html.parser import HTMLParser
 from pathlib import Path
 from typing import Callable
+from urllib.parse import urljoin, urlparse
 
 DAILY_CAP_DEFAULT = 200
 NOTIFICATION_TYPES = ("URL_UPDATED", "URL_DELETED")
@@ -52,9 +54,6 @@ INDEXNOW_ENDPOINT = "https://api.indexnow.org/indexnow"
 SA_PATH_DEFAULT = "~/.config/seo-core/secrets/google-indexing.json"
 GOOGLEBOT_UA = "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"
 
-_CANONICAL_RE = re.compile(r"""(?is)<link[^>]+rel=["']canonical["'][^>]*href=["']([^"']+)""")
-_CANONICAL_RE_REV = re.compile(r"""(?is)<link[^>]+href=["']([^"']+)["'][^>]*rel=["']canonical["']""")
-_ROBOTS_RE = re.compile(r"""(?is)<meta[^>]+name=["'](?:robots|googlebot)["'][^>]+content=["']([^"']+)""")
 
 Fetch = Callable[[str], tuple[int, str, dict]]
 Publish = Callable[[str, str], tuple[int, dict]]
@@ -68,8 +67,30 @@ class LiveCheck:
     reason: str
 
 
-def _norm(url: str) -> str:
-    return url.strip().rstrip("/")
+class _HeadSignals(HTMLParser):
+    """robots meta + canonical link, in any attribute order (review fix)."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.robots: list[str] = []
+        self.canonical: str | None = None
+
+    def handle_starttag(self, tag, attrs):
+        a = {k.lower(): (v or "") for k, v in attrs}
+        if tag == "meta" and a.get("name", "").lower() in ("robots", "googlebot"):
+            self.robots.append(a.get("content", "").lower())
+        elif (tag == "link" and "canonical" in a.get("rel", "").lower().split()
+              and self.canonical is None):
+            self.canonical = a.get("href", "").strip()
+
+    handle_startendtag = handle_starttag
+
+
+def _norm(url: str, base: str | None = None) -> str:
+    """Absolute URL, lower-case host, no trailing slash (canonical comparison)."""
+    p = urlparse(urljoin(base or url, url.strip()))
+    query = f"?{p.query}" if p.query else ""
+    return f"{p.scheme.lower()}://{p.netloc.lower()}{p.path.rstrip('/')}{query}"
 
 
 def live_check(url: str, status: int, html: str, headers: dict | None = None, *,
@@ -80,13 +101,14 @@ def live_check(url: str, status: int, html: str, headers: dict | None = None, *,
         return LiveCheck(url, ok, "gone" if ok else f"still answers HTTP {status} — not deleted")
     if status != 200:
         return LiveCheck(url, False, f"HTTP {status}")
-    robots = " ".join(m.group(1) for m in _ROBOTS_RE.finditer(html or "")).lower()
+    head = _HeadSignals()
+    head.feed(html or "")
+    robots = " ".join(head.robots)
     x_robots = str((headers or {}).get("x-robots-tag", "")).lower()
     if "noindex" in robots or "noindex" in x_robots:
         return LiveCheck(url, False, "noindex")
-    m = _CANONICAL_RE.search(html or "") or _CANONICAL_RE_REV.search(html or "")
-    if m and _norm(m.group(1)) != _norm(url):
-        return LiveCheck(url, False, f"canonical points elsewhere: {m.group(1)}")
+    if head.canonical and _norm(head.canonical, base=url) != _norm(url):
+        return LiveCheck(url, False, f"canonical points elsewhere: {head.canonical}")
     if expect and expect not in (html or ""):
         return LiveCheck(url, False, "new content not live yet (expected text missing)")
     return LiveCheck(url, True, "live")
@@ -174,6 +196,7 @@ def submit(
                                 used_today=used_today(project_dir, day), cap=cap)
     results: list[dict] = []
     sent: list[str] = []
+    retry: list[str] = []
     for url in send:
         row: dict = {"url": url, "google_http": None}
         if notification == "URL_DELETED" and not deletion_allowed(url):
@@ -181,16 +204,26 @@ def submit(
                               f"/pseo-approve <run_id> index_update {url}")
             results.append(row)
             continue
-        status, html, headers = fetch(url)
+        try:
+            status, html, headers = fetch(url)
+        except OSError as exc:  # URLError, timeout, reset: keep going, keep the record
+            row["skipped"] = f"fetch error: {exc}"
+            results.append(row)
+            continue
         check = live_check(url, status, html, headers, notification=notification, expect=expect)
         row["live_check"] = check.reason
         if not check.ok:
             row["skipped"] = check.reason
         elif not dry_run and publish is not None:
-            code, payload = publish(url, notification)
+            try:
+                code, payload = publish(url, notification)
+            except OSError as exc:
+                code, payload = 0, {"error": f"send error: {exc}"}
             row["google_http"], row["google_response"] = code, payload
             if code == 200:
                 sent.append(url)
+            else:
+                retry.append(url)  # 429 / 5xx / network: try again next run
         results.append(row)
     indexnow_http = None
     if sent and indexnow is not None and not dry_run:
@@ -202,20 +235,24 @@ def submit(
         "dry_run": dry_run,
         "results": results,
         "indexnow_http": indexnow_http,
-        "queued_for_next_day": overflow,
+        **({"queued_for_next_day": retry + overflow} if notification == "URL_UPDATED"
+           else {"not_sent_rerun_tomorrow": retry + overflow}),
         "note": "HTTP 200 means Google received the notification, not that the page is indexed.",
     }
     report_path = None
     if not dry_run:
-        report_path = reports_dir(project_dir) / f"{day}-{now.strftime('%H%M%S')}-submission.json"
+        report_path = reports_dir(project_dir) / f"{day}-{now.strftime('%H%M%S%f')}-submission.json"
         _atomic_write_json(report_path, report)
         if notification == "URL_UPDATED":
-            _atomic_write_json(queue_path(project_dir), {"urls": overflow, "updated_at": report["sent_at"]})
-    return RunResult(report, report_path, overflow)
+            _atomic_write_json(queue_path(project_dir),
+                               {"urls": retry + overflow, "updated_at": report["sent_at"]})
+    # URL_DELETED is never queued (it needs a fresh consent): the report lists
+    # what to rerun instead of claiming it was queued.
+    queued = retry + overflow if notification == "URL_UPDATED" and not dry_run else []
+    return RunResult(report, report_path, queued)
 
 
 def urlparse_host(url: str) -> str:
-    from urllib.parse import urlparse
     return urlparse(url).hostname or ""
 
 
@@ -226,6 +263,8 @@ def http_fetch(url: str) -> tuple[int, str, dict]:
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
             headers = {k.lower(): v for k, v in r.headers.items()}
+            # a repeated X-Robots-Tag must not lose its first value
+            headers["x-robots-tag"] = ", ".join(r.headers.get_all("X-Robots-Tag") or [])
             return r.status, r.read().decode("utf-8", "ignore"), headers
     except urllib.error.HTTPError as e:
         return e.code, "", {k.lower(): v for k, v in (e.headers or {}).items()}
@@ -347,7 +386,10 @@ def main(argv: list[str]) -> int:
         state = row.get("skipped") or f"HTTP {row['google_http']}"
         print(f"  {row['url']}  →  {state}")
     if result.queued:
-        print(f"queued for tomorrow (daily cap {args.cap}): {len(result.queued)}")
+        print(f"queued for the next run (daily cap {args.cap}): {len(result.queued)}")
+    rerun = result.report.get("not_sent_rerun_tomorrow")
+    if rerun:
+        print(f"NOT sent and NOT queued (URL_DELETED needs a fresh consent), rerun: {len(rerun)}")
     if result.report_path:
         print(f"report: {result.report_path}")
     ok = all(r.get("google_http") == 200 or args.dry_run and not r.get("skipped")

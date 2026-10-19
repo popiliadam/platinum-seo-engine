@@ -41,7 +41,8 @@ class _Collector(HTMLParser):
     def __init__(self, site_host: str) -> None:
         super().__init__(convert_charrefs=True)
         self.site_host = site_host.lower()
-        self.counts = {"table": 0, "form": 0, "iframe": 0, "img": 0}
+        self.counts = {"table": 0, "form": 0, "iframe": 0, "img": 0,
+                       "video": 0, "embed": 0, "object": 0}
         self.links: set[str] = set()
         self.h2: list[str] = []
         self.jsonld: list[str] = []
@@ -111,7 +112,8 @@ def inventory(html: str, *, site_host: str) -> Inventory:
     c.feed(html or "")
     c.close()
     return Inventory(
-        tables=c.counts["table"], forms=c.counts["form"], iframes=c.counts["iframe"],
+        tables=c.counts["table"], forms=c.counts["form"],
+        iframes=sum(c.counts[k] for k in ("iframe", "video", "embed", "object")),
         images=c.counts["img"], internal_links=len(c.links), h2=tuple(c.h2),
         jsonld_types=_jsonld_types(c.jsonld),
     )
@@ -134,7 +136,7 @@ class DiffResult:
         )
 
 
-_COUNTED = (("table", "tables"), ("form", "forms"), ("iframe / embed", "iframes"),
+_COUNTED = (("table", "tables"), ("form", "forms"), ("iframe / embed / video", "iframes"),
             ("image", "images"), ("internal link", "internal_links"))
 
 

@@ -113,3 +113,48 @@ def test_command_and_skill_point_at_the_official_path() -> None:
     skill = (root / "skills" / "publishing" / "indexing-ping" / "SKILL.md").read_text(encoding="utf-8")
     assert "indexing_submit.py" in skill
     assert "yalnızca JobPosting/BroadcastEvent sayfaları için uygundur" not in skill
+
+
+# --- review follow-ups ----------------------------------------------------------
+
+def test_meta_robots_attribute_order_and_relative_canonical() -> None:
+    u = "https://x.test/a/"
+    rev = '<html><head><meta content="noindex,follow" name="robots"></head></html>'
+    assert ix.live_check(u, 200, rev).reason == "noindex"
+    rel = '<html><head><link href="/a/" rel="canonical"></head><body>x</body></html>'
+    assert ix.live_check(u, 200, rel).ok
+    host_case = '<link rel="canonical" href="https://X.test/a">'
+    assert ix.live_check(u, 200, host_case).ok
+
+
+def test_network_error_on_one_url_does_not_lose_the_record(tmp_path: Path) -> None:
+    urls = [f"https://x.test/p{i}/" for i in range(3)]
+    fake = Fake({u: (200, _page(u)) for u in urls})
+
+    def flaky(url):
+        if url == urls[1]:
+            raise OSError("timed out")
+        return fake.fetch(url)
+
+    project = _project(tmp_path)
+    res = ix.submit(urls, project_dir=project, now=NOW, fetch=flaky, publish=fake.publish)
+    assert len(fake.posted) == 2 and "fetch error" in res.report["results"][1]["skipped"]
+    assert ix.used_today(project, "2026-10-19") == 2
+
+
+def test_failed_google_responses_are_requeued(tmp_path: Path) -> None:
+    u = "https://x.test/a/"
+    fake = Fake({u: (200, _page(u))})
+    project = _project(tmp_path)
+    res = ix.submit([u], project_dir=project, now=NOW, fetch=fake.fetch,
+                    publish=lambda url, kind: (429, {"error": "quota"}))
+    assert ix.read_queue(project) == [u] and res.queued == [u]
+
+
+def test_url_deleted_overflow_is_not_claimed_as_queued(tmp_path: Path) -> None:
+    urls = ["https://x.test/g1/", "https://x.test/g2/"]
+    fake = Fake({u: (410, "") for u in urls})
+    res = ix.submit(urls, project_dir=_project(tmp_path), now=NOW, fetch=fake.fetch,
+                    publish=fake.publish, notification="URL_DELETED", cap=1,
+                    deletion_allowed=lambda _u: True)
+    assert res.queued == [] and res.report["not_sent_rerun_tomorrow"] == urls[1:]
