@@ -76,6 +76,7 @@ if str(_REPO_ROOT) not in sys.path:
 # StagingSchemaError are owned by scripts.ingestion.dfs_pull. We REUSE them
 # so any future shape / error-class evolution is inherited automatically.
 # KOPYA YASAK is enforced by the import-discipline identity test.
+from scripts.util.text_fold import lower_tr  # noqa: E402  (D-06)
 from scripts.ingestion.dfs_pull import (   # noqa: E402  (sys.path mutation above)
     _normalize_dfs_response,
     StagingSchemaError,
@@ -329,7 +330,7 @@ def make_url_slug(keyword: str) -> str:
         raise ValueError(
             f"keyword must be a string, got {type(keyword).__name__}"
         )
-    s = keyword.strip().lower()
+    s = lower_tr(keyword.strip())  # D-06: İ/I mapped before lower()
     if not s:
         return ""
     # Turkish fold (deterministic char-by-char).

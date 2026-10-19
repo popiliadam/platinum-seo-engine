@@ -49,6 +49,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from scripts.util.text_fold import fold_key  # noqa: E402  (D-06)
 from scripts.util.url_normalize import (  # noqa: E402  (sys.path mutation)
     URLNormalizeError as _URLNormalizeError,
     normalize_url as _canonical_normalize_url,
@@ -359,10 +360,10 @@ def _is_brand_query(target_query: str, brand_tokens: Sequence[str] | None) -> bo
     """
     if not target_query or not brand_tokens:
         return False
-    q_lower = target_query.casefold()
+    q_lower = fold_key(target_query)  # D-06
     q_tokens = set(re.findall(r"[^\W_]+", q_lower, flags=re.UNICODE))
     for bt in brand_tokens:
-        bt = str(bt).strip().casefold()
+        bt = fold_key(str(bt).strip())
         if not bt:
             continue
         bt_words = re.findall(r"[^\W_]+", bt, flags=re.UNICODE)
