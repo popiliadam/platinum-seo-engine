@@ -127,7 +127,7 @@ def product_missing_required_payload() -> dict:
 
 @pytest.fixture
 def conflicting_types_payload() -> dict:
-    """Mixed top-level @type list → status=BLOCKED."""
+    """Multi-type @type list → checked against BOTH types' requirements (S-14)."""
     blob = json.dumps({
         "@context": "https://schema.org",
         "@type": ["Product", "Article"],
@@ -164,7 +164,7 @@ def malformed_jsonld_payload() -> dict:
 
 @pytest.fixture
 def mixed_status_payload() -> dict:
-    """Mixed payload exercising DONE / TODO / EXISTS / BLOCKED in one go."""
+    """Mixed payload exercising DONE / TODO / EXISTS in one go (multi-type → TODO, S-14)."""
     article_ok = json.dumps({
         "@type": "Article",
         "headline": "h",
@@ -336,15 +336,16 @@ def test_product_missing_aggregate_rating_exists(
 # Test 6 — Conflicting top-level types → status=BLOCKED
 # ---------------------------------------------------------------------------
 
-def test_conflicting_types_blocked(conflicting_types_payload: dict) -> None:
+def test_multi_type_checked_against_union(conflicting_types_payload: dict) -> None:
+    # S-14: schema.org allows several @types; Google reads each. The node is
+    # checked against the union of Product + Article requirements, not BLOCKED.
     out = sat.transform(conflicting_types_payload)
     rows = out["schema"]
     assert len(rows) == 1
     row = rows[0]
-    assert row["status"] == "BLOCKED"
-    # remaining_work mentions the conflict.
-    assert "conflicting" in row["remaining_work"].lower() \
-        or "@type" in row["remaining_work"]
+    assert row["status"] == "TODO"
+    for prop in ("image", "offers", "headline", "author", "datePublished"):
+        assert prop in row["remaining_work"]
 
 
 # ---------------------------------------------------------------------------
@@ -390,7 +391,7 @@ def test_status_enum_coverage(mixed_status_payload: dict) -> None:
     out = sat.transform(mixed_status_payload)
     rows = out["schema"]
     statuses = {r["status"] for r in rows}
-    assert {"DONE", "TODO", "EXISTS", "BLOCKED"}.issubset(statuses)
+    assert {"DONE", "TODO", "EXISTS"}.issubset(statuses)
     # Every emitted status must be in the canonical 7-value enum.
     allowed = {"TODO", "ONGOING", "EXISTS", "DONE",
                "BLOCKED", "DEFERRED", "CANCELED"}
