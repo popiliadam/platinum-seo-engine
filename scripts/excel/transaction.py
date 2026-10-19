@@ -880,6 +880,7 @@ def merge(
         rows_affected=len(rows),
         state_dir=state_dir,
         operation="project_excel",
+        workbook_path=workbook_path,
     )
     return WriteResult(
         workbook_path=workbook_path,
@@ -977,6 +978,7 @@ def update(
         rows_affected=len(affected_rows),
         state_dir=state_dir,
         operation="project_excel",
+        workbook_path=workbook_path,
     )
     return WriteResult(
         workbook_path=workbook_path,
@@ -1111,6 +1113,7 @@ def _write_or_append(
         rows_affected=len(rows),
         state_dir=state_dir,
         operation="project_excel",
+        workbook_path=workbook_path,
     )
 
     return WriteResult(
@@ -1126,21 +1129,34 @@ def _write_or_append(
 # Internals — event emission helper
 # ---------------------------------------------------------------------------
 
+def _workspace_root_for(workbook_path: Path, project_slug: str, state_dir: Path) -> Path:
+    """The workspace root the provenance event belongs to.
+
+    Walks up from the workbook to its ``projects/<project_slug>`` ancestor (V-14):
+    a workbook kept deeper inside the project folder (outputs/, a scratch copy)
+    must still log to that project's real events.jsonl. Without such an ancestor
+    the legacy guess (two levels above ``_state``'s parent) is kept;
+    events_writer refuses it if it lands inside a project folder, and the write
+    records an anomaly instead of a hidden nested log.
+    """
+    for folder in Path(workbook_path).absolute().parents:
+        if folder.name == project_slug and folder.parent.name == "projects":
+            return folder.parent.parent
+    return state_dir.parent.parent.parent
+
+
 def _emit_provenance(
     *,
     project_slug: str,
     sheet: str,
     rows_affected: int,
-    state_root: Path,
+    workspace_root: Path,
     operation: str,
 ) -> str:
     """
     Emit a provenance event recording the write. The events_writer module
     resolves the events.jsonl path from {workspace_root}/projects/{slug}/_state/.
-    state_root here is the project directory — its parent is `projects/`,
-    grandparent is the workspace root expected by events_writer.
     """
-    workspace_root = state_root.parent.parent  # projects/<slug> → projects → workspace
     # source.kind enum (events.schema): manual | tool_computed | sf_csv | *_mcp.
     # An Excel projection by transaction.py is internally tool_computed —
     # it's the engine writing structured output, not a human key-by-key edit.
@@ -1163,6 +1179,7 @@ def _emit_provenance_or_anomaly(
     rows_affected: int,
     state_dir: Path,
     operation: str,
+    workbook_path: Path,
 ) -> str:
     """Emit provenance; on emit failure record a durable anomaly (operator D-B).
 
@@ -1182,7 +1199,7 @@ def _emit_provenance_or_anomaly(
             project_slug=project_slug,
             sheet=sheet,
             rows_affected=rows_affected,
-            state_root=state_dir.parent,  # _state lives at projects/{slug}/_state
+            workspace_root=_workspace_root_for(workbook_path, project_slug, state_dir),
             operation=operation,
         )
     except Exception as exc:

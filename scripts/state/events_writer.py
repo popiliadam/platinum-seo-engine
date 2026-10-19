@@ -279,13 +279,40 @@ def _resolve_workspace_root(workspace_root: Path | None) -> Path:
 _SLUG_RE = re.compile(r"[a-z][a-z0-9-]*")
 
 
+def _enclosing_project_dir(ws: Path) -> Path | None:
+    """The ``projects/<slug>`` folder that ``ws`` sits in (or is), else None.
+
+    A folder counts as a project only if it is directly under a ``projects/``
+    dir AND carries a project marker (``project.config.json`` or ``_state/``) —
+    so a workspace kept at e.g. ``~/projects/seo-workspace`` is not mistaken
+    for one.
+    """
+    for folder in (ws, *ws.parents):
+        if folder.parent.name == "projects" and (
+            (folder / "project.config.json").is_file() or (folder / "_state").is_dir()
+        ):
+            return folder
+    return None
+
+
 def _events_path(project_id: str, workspace_root: Path | None) -> Path:
-    """Build the events.jsonl path: {ws}/projects/{project_id}/_state/events.jsonl."""
+    """Build the events.jsonl path: {ws}/projects/{project_id}/_state/events.jsonl.
+
+    Refuses a workspace root that lies inside a project folder (V-14): it would
+    create ``projects/<slug>/projects/<slug>/_state/events.jsonl``, a log no
+    report or drift check ever reads.
+    """
     if not isinstance(project_id, str) or not _SLUG_RE.fullmatch(project_id):
         raise EventPathError(
             f"project_id must match ^[a-z][a-z0-9-]*$ (got {project_id!r})"
         )
     ws = _resolve_workspace_root(workspace_root)
+    enclosing = _enclosing_project_dir(Path(ws))
+    if enclosing is not None:
+        raise EventPathError(
+            f"workspace_root {ws} is inside project folder {enclosing}; pass the "
+            f"workspace root ({enclosing.parent.parent}) instead"
+        )
     state_dir = ws / "projects" / project_id / "_state"
     state_dir.mkdir(parents=True, exist_ok=True)
     return state_dir / "events.jsonl"
