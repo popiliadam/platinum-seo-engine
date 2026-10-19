@@ -419,6 +419,52 @@ def _has_post_flag(tokens: list[str]) -> bool:
     return False
 
 
+# curl / wget options that take a value: that value is never the request URL.
+_HTTP_ARG_FLAGS = frozenset({
+    "-o", "--output", "-H", "--header", "-A", "--user-agent", "-e", "--referer",
+    "-u", "--user", "-b", "--cookie", "-c", "--cookie-jar", "-X", "--request",
+    "-d", "--data", "--data-raw", "--data-binary", "--data-ascii", "--data-urlencode",
+    "--json", "-F", "--form", "-T", "--upload-file", "-w", "--write-out",
+    "-m", "--max-time", "--connect-timeout", "-r", "--range", "-K", "--config",
+    "--cacert", "--cert", "-E", "--key", "-x", "--proxy", "--resolve",
+    "-O", "--output-document", "--output-file", "-t", "--tries", "--timeout",
+    "--post-data", "--post-file", "--body-data", "--body-file", "--method",
+    "-P", "--directory-prefix", "-U", "-a", "--append-output", "-i", "--input-file",
+})
+_SCHEME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*://")
+_HOSTLIKE_RE = re.compile(r"^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+(:\d+)?(/\S*)?$")
+
+
+def _request_urls(tokens: list[str]) -> list[str]:
+    """Every URL a curl / wget call would contact, normalised to carry a scheme.
+
+    Positional operands count even without ``http(s)://`` (curl and wget both
+    accept ``host/path``), the scheme is matched case-insensitively, and
+    ``--url`` values count; values of options that take an argument (``-o
+    file``, ``-H header``, ``-d data``) are skipped. ``wget -O out.html`` and
+    ``-o page.html`` therefore stay files, not hosts.
+    """
+    urls: list[str] = []
+    pending: str | None = None  # "url" = next token is a URL, "skip" = an option value
+    for tok in tokens[1:]:
+        if pending is not None:
+            if pending == "url":
+                urls.append(tok)
+            pending = None
+            continue
+        if tok == "--url":
+            pending = "url"
+        elif tok.startswith("--url="):
+            urls.append(tok.split("=", 1)[1])
+        elif tok.startswith("-"):
+            # a separate value follows (`-o file`, `-T 30`); glued forms carry it inline
+            if tok in _HTTP_ARG_FLAGS:
+                pending = "skip"
+        elif _SCHEME_RE.match(tok) or _HOSTLIKE_RE.match(tok):
+            urls.append(tok)
+    return [u if _SCHEME_RE.match(u) else "http://" + u for u in urls if u]
+
+
 def _operands(tokens: list[str], start: int) -> list[str]:
     """Non-flag tokens from ``start`` onward (the path / remote / refspec operands)."""
     return [tok for tok in tokens[start:] if not tok.startswith("-")]
@@ -591,7 +637,7 @@ def _classify_segment(segment: str) -> tuple[str, str] | None:
     if first in _HTTP_TOKENS:
         # Every URL counts (G-02): a loopback URL placed first must not hide a
         # public one behind it.
-        urls = [t for t in tokens if t.startswith(("http://", "https://"))]
+        urls = _request_urls(tokens)
         public = [u for u in urls if not _is_loopback_host(_host(u))]
         if urls and not public:
             return None  # loopback only (#12); Indexing/IndexNow hosts are never loopback
@@ -969,9 +1015,9 @@ def _segment_hit(segment: str, command: str | None = None) -> Hit | None:
         return Hit(action, target, _push_tier(target))
     tokens = _tokenize(_strip_redirections(segment))
     body, body_unknown = _request_bodies(tokens, command or segment)
+    unwrapped = _unwrap_wrappers(tokens)
     return _strictest_url_hit(action, target, segment + "\n" + body,
-                              [t for t in tokens if t.startswith(("http://", "https://"))],
-                              body_unknown=body_unknown)
+                              _request_urls(unwrapped), body_unknown=body_unknown)
 
 
 _BODY_FILE_FLAGS = frozenset({"-d", "--data", "--data-binary", "--data-ascii",
