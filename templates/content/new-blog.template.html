@@ -28,13 +28,13 @@
     <!-- R-28 EEAT updated date (zorunlu, tüm profile'larda) -->
     <p class="pse-meta">
       <time class="pse-date-modified" datetime="{{DATE_MODIFIED_ISO_8601}}">{{DATE_MODIFIED_HUMAN_TR}}</time>
-      <!-- {{!-- R-28 + R-82 author byline conditional: profiles ⊇ {ymyl} → render; else skip --}} -->
-      {{#IF_PROFILE_YMYL}}
+      <!-- {{!-- R-28 + R-82 + S-16: real author byline on EVERY post (voice/authors.json); no author → new-blog DURUR, never invented --}} -->
+      {{#IF_AUTHOR}}
       <address class="pse-author">
         <span class="pse-author__name">{{AUTHOR_NAME}}</span>,
         <span class="pse-author__title">{{AUTHOR_TITLE}}</span>
       </address>
-      {{/IF_PROFILE_YMYL}}
+      {{/IF_AUTHOR}}
     </p>
 
     <!-- R-31 TOC strategy (project-config[content_settings.toc_strategy] enum) -->
@@ -157,7 +157,7 @@
       "logo": "{{LOGO_URL}}",
       "sameAs": {{SAME_AS_URLS_ARRAY}}
     },
-    {{#IF_PROFILE_YMYL}}
+    {{#IF_AUTHOR}}
     {
       "@type": "Person",
       "@id": "{{AUTHOR_URL}}#person",
@@ -166,7 +166,7 @@
       "url": "{{AUTHOR_URL}}",
       "sameAs": {{AUTHOR_SAME_AS_ARRAY}}
     },
-    {{/IF_PROFILE_YMYL}}
+    {{/IF_AUTHOR}}
     {
       "@type": "BreadcrumbList",
       "itemListElement": {{BREADCRUMB_ITEMS_ARRAY}}

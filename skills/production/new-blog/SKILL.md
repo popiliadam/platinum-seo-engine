@@ -398,6 +398,24 @@ note`. `page_type` enum: `[pillar, cluster, supporting]`.
 
 **DURUR #1.** master.xlsx eksik → init-project skill önce çalışmalı.
 
+### Step 2b — `read_voice_kit` (S-26 deneyim + S-16 yazar)
+
+```python
+from scripts.production import voice_kit
+kit = voice_kit.load_voice_kit(f"{workspace}/projects/{slug}")
+brief["experience"] = kit.brief_block()      # facts / stories / banned_phrases
+author = kit.authors[0] if kit.authors else None
+```
+
+- `kit.authors` boş → **DURUR #12** (gerçek yazar yok; uydurma yazar profili
+  yasak — operatör `voice/authors.json`'a gerçek kişiyi ekler). Şablon
+  `{{#IF_AUTHOR}}` byline + Person düğümünü bu kişiyle basar.
+- Yazarken en az bir `facts`/`stories` öğesi kullanılır ve
+  `data-experience="fact|story"` + `data-source="..."` ile işaretlenir; kit boşsa
+  uydurulmaz → `<!-- experience-missing: <neden> -->`. Ses için `voice.md` +
+  `opinions.md` okunur. `kit.missing` raporda listelenir.
+- Kapı motoru `experience` kapısı bunu ölçer (yasaklı kalıp = 0).
+
 ### Step 2 — `read_project_config` (Profile-Aware Switch)
 
 `projects/{slug}/project.config.json` parse. Singular `profile` field
@@ -571,7 +589,7 @@ Principle 1).
 | `timestamp`      | UTC ISO 8601                                   |
 | `mode`           | `input.mode` (`draft` / `publish`)             |
 
-## DURUR Conditions (11)
+## DURUR Conditions (12)
 
 | #  | Trigger                                               | Resolution                                           |
 |----|-------------------------------------------------------|------------------------------------------------------|
@@ -586,6 +604,7 @@ Principle 1).
 | 9  | YMYL profili + reviewer adı yok (R-124 imza eksik)    | RED yayın bloklu; operatör reviewer adlandır + append_audit kaydı (reviewer+review_date+content_version) |
 | 10 | R-154 publication_guard RED (haftalık tavan / neredeyse kopya / user_value boş) | gelecek haftaya planla, mevcut sayfayı iyileştir ya da gerçek kullanıcı değerini yaz |
 | 11 | R-155 verification.json eksik (S-03 insan doğrulaması yok) | bir kişi 5 öğeyi kontrol edip kaydı doldurana kadar yayın yok |
+| 12 | `voice/authors.json` boş (S-16 gerçek yazar yok)      | operatör gerçek yazarı ekler; uydurma yazar yok       |
 
 ## Cascade Fix W-F1 (Phase 10 EKSİĞİ Closure — Atomic Commit Içinde)
 

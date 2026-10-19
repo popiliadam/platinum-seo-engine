@@ -1,6 +1,6 @@
 """Tests for scripts/production/quality_gates.py — CCE Gate Engine (B2).
 
-Hermetic golden tests: a known-good article passes all 8 gates; a known-bad
+Hermetic golden tests: a known-good article passes all 9 gates; a known-bad
 (thin / generic / AI-signature) article fails. Each gate has at least one
 dedicated test. No live MCP — fixtures only.
 
@@ -71,8 +71,8 @@ def test_run_all_contract_shape():
     assert isinstance(res["rewrite_feedback"], list)
     expected_gates = {
         "p0_truthfulness", "gap", "structure", "depth",
-        "aeo", "voice", "originality", "schema_visual",
-    }
+        "aeo", "voice", "originality", "experience", "schema_visual",
+    }  # experience = S-26
     assert {g["gate"] for g in res["gates"]} == expected_gates
     for g in res["gates"]:
         assert set(g.keys()) == {"gate", "status", "detail", "missing"}
@@ -376,4 +376,4 @@ def test_schema_visual_pass_with_jsonld_and_hero():
 def test_run_all_tolerates_minimal_brief():
     res = qg.run_all("<article><p>kısa</p></article>", {})
     assert res["overall"] in {"PASS", "RED"}
-    assert len(res["gates"]) == 8
+    assert len(res["gates"]) == 9  # + experience (S-26)

@@ -298,6 +298,14 @@ DURUR #3 trigger: multi-signal threshold satisfied değil → revize
 gereksiz, master_task sync close request emit (READ-ONLY contract
 — bu skill kendisi master_task'a yazmaz).
 
+### Step 2b: Voice Kit Read (S-26)
+
+`scripts.production.voice_kit.load_voice_kit(project_dir)` — revize edilen
+bölümlere en az bir kaynaklı deneyim öğesi (`data-experience` + `data-source`,
+`facts.json` / `stories.json`'dan) eklenir; kit boşsa uydurulmaz,
+`<!-- experience-missing: ... -->`. `banned-phrases.txt` kalıpları metinde 0.
+SEO düzeltmesi marka tonunu (`voice.md`) bozmaz.
+
 ### Step 3: project-config Read (Profile-Aware Switch — Principle 2)
 
 `projects/{slug}/project.config.json` parse → `profile` field read

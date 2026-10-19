@@ -58,6 +58,8 @@ Her craft kuralı, B2 kapı motorunun (`scripts/production/quality_gates.py` §6
 
 **Failure mode.** Jenerik / marka-dışı ton veya blocklist kelime sızması → voice kapısı RED → humanize pass → 2x AMBER → terminal RED.
 
+**Ses ve deneyim kiti (S-26).** Marka sesinin kaynağı yalnız config alanları değil, proje klasöründeki `voice/` kitidir: `voice.md` (nasıl konuşur), `opinions.md` (neyi savunur), `facts.json` (kaynaklı kendi sayıları), `stories.json` (izinli müşteri vakaları), `banned-phrases.txt`, `authors.json`. Kaynak: müşteri görüşmeleri, e-postalar, Google yorumları, sosyal medya. Her yazı en az bir **kaynaklı** deneyim öğesi taşır (`data-experience` + `data-source`); kitte malzeme yoksa uydurulmaz, `<!-- experience-missing: ... -->` ile dürüstçe işaretlenir. Ölçüm: kapı motorunun **experience** kapısı (yasaklı kalıp 0).
+
 **Cross-link.** → R-118 (AI signature humanize — stilistik yasak karşılığı), R-23 / R-60 (profile-aware CSS), [content-quality](content-quality.md#foundational-principles) (Principle 2 ton tablosu), schema `brand_identity` (`formality` / `pronoun_preference` / `anglicism_tolerance` / `tone_phrases_blocklist`).
 
 ### R-152: Rakip-Üstü Özgün Değer (Originality)

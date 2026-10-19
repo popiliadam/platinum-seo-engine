@@ -256,13 +256,13 @@ Bu doc Phase 10 SEO disiplinini tanımlar (heading, internal link, FAQ, keyword,
 
 ### R-82: Author Schema (Profile-Aware)
 
-**Statement.** YMYL profile'ında `Person` schema author `@type:"Person"` + `name` + `url` (author bio sayfası) + `sameAs` (LinkedIn vb.). e-commerce'te skip (R-28).
+**Statement.** **Tüm blog içeriğinde** gerçek bir yazar ya da editör (marka adına yazan kişi) görünür byline + `Person` schema (`name`, `url` bio sayfası, `sameAs`) taşır (S-16). Kaynak: `projects/<slug>/voice/authors.json`. Uydurma yazar profili **asla**; yazar yoksa new-blog durur (DURUR #12). YMYL'de ek olarak R-124 uzman imzası şarttır. Ürün/kategori sayfaları (e-commerce) byline taşımaz (R-28).
 
-**Rationale.** Principle 2 + EEAT (Authoritativeness/Trustworthiness).
+**Rationale.** E-E-A-T doğrudan bir sıralama faktörü değil; ama "kim yazdı / nasıl / neden" Google'ın insan odaklı içerik sorularının parçası ve okurun güvenini doğrudan etkiler.
 
-**Enforcement.** Profile-aware. YMYL author missing → RED.
+**Enforcement.** new-blog Step 2b (`voice_kit.load_voice_kit`): `authors` boş → DURUR #12; şablon `{{#IF_AUTHOR}}` byline + Person düğümü.
 
-**Failure mode.** YMYL'da RED.
+**Failure mode.** Yazar yok → RED (üretim durur).
 
 ### R-83: JSON-LD Only (@graph)
 

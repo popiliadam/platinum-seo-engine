@@ -3,7 +3,7 @@
 quality_gates.py — Competitive Content Engine (CCE) Bileşen C: Kapı Motoru.
 
 Üretilen içerik HTML'ini B1'in ürettiği **Brief Paketi**'ne karşı ölçer ve
-8 kapının her biri için PASS/RED verir. İçerik ÜRETMEZ — yalnızca DEĞERLENDİRİR.
+9 kapının her biri için PASS/RED verir. İçerik ÜRETMEZ — yalnızca DEĞERLENDİRİR.
 Çıktı: hangi kapılar geçti/kaldı + Claude'a re-write feedback'i.
 
 Spec: docs/superpowers/specs/2026-06-22-competitive-content-engine-design.md §6.
@@ -15,7 +15,7 @@ Saf transform disiplini (emsal: scripts/planning/new_content_plan_transform.py):
   - state mutasyonu yok; MCP çağrısı yok.
   - HTML parse stdlib ``html.parser`` ile (proje stdlib-only; bs4 dependency DEĞİL).
 
-8 kapı (P0 hepsinin üstünde; her zaman önce değerlendirilir):
+9 kapı (P0 hepsinin üstünde; her zaman önce değerlendirilir):
 
   p0_truthfulness  Her sayısal/quote claim'in yanında kaynak işareti (<a href> /
                    <cite> / parantez) var mı.
@@ -29,6 +29,9 @@ Saf transform disiplini (emsal: scripts/planning/new_content_plan_transform.py):
   voice            AI-imza blocklist yoğunluğu ≤ 1/1000 kelime; klişe açılış yok.
   originality      rakip entities/questions kümesinde OLMAYAN ≥1 özgün öğe
                    (data-original="true" işaretli blok).
+  experience       ≥1 kaynaklı deneyim öğesi (data-experience + data-source;
+                   voice kit'ten gerçek sayı/hikâye) ya da kit boşsa
+                   <!-- experience-missing --> işareti; yasaklı kalıp 0 (S-26).
   schema_visual    <script type="application/ld+json"> parse-edilebilir + hero
                    görsel (<img>/<picture>).
 
@@ -89,6 +92,7 @@ GATE_ORDER = [
     "aeo",
     "voice",
     "originality",
+    "experience",
     "schema_visual",
 ]
 
@@ -107,6 +111,15 @@ VOICE_MAX_PER_1000 = 1        # AI-imza yoğunluğu tavanı (kelime başına)
 
 # AI-imza blocklist (R-118 ailesi) — yoğunluk ölçülür.
 AI_SIGNATURE_PHRASES = ["aslında", "sonuç olarak", "özetle", "bilindiği gibi"]
+
+# Hiçbir metinde olmaması gereken hazır kalıplar (S-26); proje kendi listesini
+# voice/banned-phrases.txt ile ekler (brief.experience.banned_phrases).
+DEFAULT_BANNED_PHRASES = [
+    "günümüzün hızlı dünyasında",
+    "günümüzün dijital dünyasında",
+    "in today's fast-paced world",
+    "in today's digital age",
+]
 
 # Klişe açılışlar — intro bunlardan biriyle BAŞLAMAMALI.
 CLICHE_OPENINGS = [
@@ -611,6 +624,50 @@ def gate_originality(toks, brief) -> GateResult:
     )
 
 
+def _experience_elements(toks: list[tuple]) -> tuple[int, int]:
+    """(sourced, unsourced) count of ``data-experience`` elements."""
+    sourced = unsourced = 0
+    for t in toks:
+        if t[0] in ("start", "startend") and "data-experience" in t[2]:
+            if str(t[2].get("data-source") or "").strip():
+                sourced += 1
+            else:
+                unsourced += 1
+    return sourced, unsourced
+
+
+def gate_experience(toks, brief) -> GateResult:
+    """S-26: the business's own experience, never invented.
+
+    PASS needs zero banned phrases AND either ≥1 ``data-experience`` element with
+    a ``data-source`` (a real story / own number from the voice kit) or — only
+    when the kit has no facts or stories — an honest
+    ``<!-- experience-missing: ... -->`` marker. An experience element without a
+    source is RED (that is how invented "experience" looks).
+    """
+    exp = brief.get("experience") or {}
+    kit_has_material = bool(exp.get("facts") or exp.get("stories"))
+    banned = [*DEFAULT_BANNED_PHRASES, *(exp.get("banned_phrases") or [])]
+    text_norm = _norm(_visible_text(toks))
+    hits = sorted({p for p in banned if _norm(p).strip() and _norm(p).strip() in text_norm})
+    sourced, unsourced = _experience_elements(toks)
+    marked_missing = any(
+        t[0] == "comment" and "experience-missing" in t[1].lower() for t in toks
+    )
+    reasons: list[str] = []
+    if hits:
+        reasons.append("yasaklı kalıp: " + ", ".join(hits))
+    if unsourced:
+        reasons.append(f"{unsourced} deneyim öğesinin kaynağı yok (data-source)")
+    if kit_has_material and not sourced:
+        reasons.append("voice kit'te gerçek sayı/hikâye var ama metinde kaynaklı deneyim öğesi yok")
+    if not kit_has_material and not sourced and not marked_missing:
+        reasons.append("deneyim öğesi yok ve <!-- experience-missing: ... --> işareti yok")
+    if reasons:
+        return GateResult("experience", "RED", "deneyim: " + "; ".join(reasons), reasons)
+    return GateResult("experience", "PASS", "kaynaklı deneyim öğesi var / dürüstçe eksik işaretli", [])
+
+
 def gate_schema_visual(toks, brief) -> GateResult:
     ld_blocks = _ldjson_blocks(toks)
     valid_ld = False
@@ -662,6 +719,7 @@ def run_all(content_html: str, brief: dict) -> dict:
         gate_aeo(toks, blocks, text_norm, brief),
         gate_voice(toks, blocks, brief),
         gate_originality(toks, brief),
+        gate_experience(toks, brief),
         gate_schema_visual(toks, brief),
     ]
     # Sözleşme sırasını garanti et.
