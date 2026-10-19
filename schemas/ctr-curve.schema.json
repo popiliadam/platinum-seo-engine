@@ -6,7 +6,13 @@
   "schema_version": "1.0",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "curve_version", "sources", "positions", "aio_discount"],
+  "required": [
+    "schema_version",
+    "curve_version",
+    "sources",
+    "positions",
+    "aio_discount"
+  ],
   "properties": {
     "schema_version": {
       "const": "1.0",
@@ -24,12 +30,29 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["name", "url", "retrieved", "covers"],
+        "required": [
+          "name",
+          "url",
+          "retrieved",
+          "covers"
+        ],
         "properties": {
-          "name": { "type": "string", "minLength": 1 },
-          "url": { "type": "string", "minLength": 8 },
-          "retrieved": { "type": "string", "minLength": 8 },
-          "covers": { "type": "string", "minLength": 1 }
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "url": {
+            "type": "string",
+            "minLength": 8
+          },
+          "retrieved": {
+            "type": "string",
+            "minLength": 8
+          },
+          "covers": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
     },
@@ -40,7 +63,11 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["position", "ctr", "provenance"],
+        "required": [
+          "position",
+          "ctr",
+          "provenance"
+        ],
         "properties": {
           "position": {
             "type": "integer",
@@ -55,7 +82,10 @@
           },
           "provenance": {
             "type": "string",
-            "enum": ["first_page_sage_2026", "engine_estimate"],
+            "enum": [
+              "first_page_sage_2026",
+              "engine_estimate"
+            ],
             "description": "Where this CTR value came from. 'engine_estimate' marks fallback-only 11-20 values."
           }
         }
@@ -63,13 +93,19 @@
     },
     "interpolation": {
       "type": "string",
-      "enum": ["linear_between_listed_positions"],
+      "enum": [
+        "linear_between_listed_positions"
+      ],
       "description": "Interpolation contract between listed positions (loader implements exactly this)."
     },
     "aio_discount": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["default", "by_position", "fallback_11_20"],
+      "required": [
+        "default",
+        "by_position",
+        "fallback_11_20"
+      ],
       "description": "Multiplicative CTR discount applied ONLY when an AI Overview is present (R-140). Factor in (0,1]; 1.0 would mean no discount.",
       "properties": {
         "default": {
@@ -96,6 +132,39 @@
           "exclusiveMinimum": 0,
           "maximum": 1,
           "description": "Discount factor for target positions 11-20 (rarely reached — scorer targets page 1)."
+        },
+        "by_citation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "cited",
+            "not_cited"
+          ],
+          "description": "S-18: factor for an AIO-present SERP split by whether the own domain is cited (Seer: cited 2.07% / not cited 0.94% vs 3.35% without AIO).",
+          "properties": {
+            "cited": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1
+            },
+            "not_cited": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1
+            }
+          }
+        }
+      }
+    },
+    "aio_rate_by_market": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "S-18: share of searches showing an AI Overview, per market (ISO country code). Prices an AIO-unchecked query as (1 - rate) + rate × present-discount. Markets without a sourced rate are omitted (no discount).",
+      "patternProperties": {
+        "^[A-Z]{2}$": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
         }
       }
     }

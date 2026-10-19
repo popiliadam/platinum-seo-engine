@@ -43,6 +43,9 @@ class Curve:
     aio_default: float
     aio_fallback_11_20: float
     curve_version: str
+    aio_cited: float | None = None          # S-18: AIO present, own domain cited
+    aio_not_cited: float | None = None      # S-18: AIO present, own domain not cited
+    aio_rate_by_market: tuple[tuple[str, float], ...] = ()  # share of searches with AIO
 
     def expected_ctr(self, position: float) -> float:
         """Expected organic CTR at ``position`` (clean SERP).
@@ -64,15 +67,39 @@ class Curve:
                 return c0 + frac * (c1 - c0)
         return pts[-1][1]  # unreachable (clamped above)
 
-    def aio_factor(self, position: float, aio_presence: str) -> float:
-        """Multiplicative CTR discount for an AIO-``present`` target position.
+    def aio_factor(
+        self,
+        position: float,
+        aio_presence: str,
+        *,
+        own_cited: bool | None = None,
+        market: str | None = None,
+    ) -> float:
+        """Multiplicative CTR factor for the AIO state of a target position (S-18).
 
-        ``not_detected`` / ``unchecked`` → ``1.0`` (no discount): an
-        unproven/unknown AIO is flagged, never penalised (R-140). Factor is
-        always in ``(0, 1]``.
+        * ``present`` + ``own_cited`` True/False → the citation factor (Seer);
+          citation unknown → the per-position discount.
+        * ``not_detected`` → ``1.0``.
+        * ``unchecked`` → for a market with a known AIO rate ``r``, the expected
+          factor ``(1 − r) + r × present-discount``; otherwise ``1.0`` (an
+          unknown AIO is flagged, never invented — R-140).
+
+        Always in ``(0, 1]``.
         """
-        if aio_presence != "present":
-            return 1.0
+        if aio_presence == "present":
+            if own_cited is True and self.aio_cited is not None:
+                return self.aio_cited
+            if own_cited is False and self.aio_not_cited is not None:
+                return self.aio_not_cited
+            return self._present_discount(position)
+        if aio_presence == "unchecked" and market:
+            rate = dict(self.aio_rate_by_market).get(market.upper())
+            if rate is not None:
+                return (1.0 - rate) + rate * self._present_discount(position)
+        return 1.0
+
+    def _present_discount(self, position: float) -> float:
+        """Per-position discount for an AIO-present SERP, citation unknown."""
         p = int(round(float(position)))
         if p < 1:
             p = 1
@@ -124,6 +151,17 @@ def build_curve(data: Any) -> Curve:
         if not (0.0 < value <= 1.0):
             raise CurveLoadError(f"aio {label} factor out of range (0,1]: {value}")
 
+    by_citation = aio.get("by_citation") or {}
+    cited = by_citation.get("cited")
+    not_cited = by_citation.get("not_cited")
+    rates = {str(k).upper(): float(v) for k, v in (data.get("aio_rate_by_market") or {}).items()}
+    for label, value in (("cited", cited), ("not_cited", not_cited)):
+        if value is not None and not (0.0 < float(value) <= 1.0):
+            raise CurveLoadError(f"aio by_citation.{label} out of range (0,1]: {value}")
+    for market, rate in rates.items():
+        if not (0.0 <= rate <= 1.0):
+            raise CurveLoadError(f"aio_rate_by_market.{market} out of range [0,1]: {rate}")
+
     version = str(data.get("curve_version") or "").strip()
     if not version:
         raise CurveLoadError("ctr-curve missing curve_version")
@@ -134,6 +172,9 @@ def build_curve(data: Any) -> Curve:
         aio_default=default,
         aio_fallback_11_20=fallback,
         curve_version=version,
+        aio_cited=float(cited) if cited is not None else None,
+        aio_not_cited=float(not_cited) if not_cited is not None else None,
+        aio_rate_by_market=tuple(sorted(rates.items())),
     )
 
 
