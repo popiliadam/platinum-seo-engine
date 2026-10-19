@@ -24,6 +24,7 @@
 # none do (the dfs-pull SKILL.md `import requests` is an illustrative snippet;
 # the engine HTTP client is httpx, scripts/util/sf_mcp_client.py).
 attrs==26.1.0
+coverage==7.13.5
 h11==0.16.0
 httpcore==1.0.9
 httpx==0.28.1
@@ -34,4 +35,5 @@ packaging==26.1
 pillow==12.2.0
 pluggy==1.6.0
 pytest==9.0.3
+pytest-cov==7.1.0
 PyYAML==6.0.3

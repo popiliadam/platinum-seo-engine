@@ -1,5 +1,6 @@
 jsonschema>=4.0
 pytest>=7.0
+pytest-cov>=5.0  # K-15: coverage floor in CI
 openpyxl>=3.1
 pyyaml>=6.0
 Pillow>=11.3  # XMP on JPEG (11.0) + AVIF (11.2) for R-123 IPTC

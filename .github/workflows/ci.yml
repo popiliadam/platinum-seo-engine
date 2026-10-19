@@ -58,7 +58,8 @@ jobs:
         env:
           # Feeds tests/ci/test_client_scrub_guard.py; absent on forks → guard skips.
           CLIENT_SLUG_PATTERN: ${{ secrets.CLIENT_SLUG_PATTERN }}
-        run: pytest --tb=short -q
+        # K-15: coverage floor — 80 % measured 2026-10-19; fail-under 79 blocks a drop.
+        run: pytest --tb=short -q --cov=scripts --cov-report=term --cov-fail-under=79
         continue-on-error: false
 
       # Step 4a — events.schema sanity (ADR-031: ensure schema is loadable; the

@@ -37,3 +37,12 @@ def test_ci_step_5_reads_the_exit_code() -> None:
     cfg = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
     step = next(s for s in cfg["jobs"]["ci"]["steps"] if s.get("name") == "5. plugin-agnostik-grep")
     assert "! grep" not in step["run"] and 'rc=$?' in step["run"]
+
+
+def test_ci_pytest_has_a_coverage_floor() -> None:
+    """K-15: a coverage drop below the floor fails CI step 4."""
+    cfg = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
+    step = next(s for s in cfg["jobs"]["ci"]["steps"] if s.get("name") == "4. pytest")
+    assert "--cov-fail-under=" in step["run"]
+    lock = (ROOT / "requirements-lock.txt").read_text(encoding="utf-8")
+    assert "pytest-cov==" in lock and "coverage==" in lock
