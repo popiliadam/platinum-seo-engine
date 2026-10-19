@@ -9,13 +9,19 @@ created_at). Extracted from the inline read-modify-write in
 when two parallel `init-project` runs raced: each read the same pre-state, each
 appended only its own slug, and the second write clobbered the first.
 
-Discipline (mirrors scripts/state/events_writer.py's fcntl.flock contract):
-  - The ENTIRE read-modify-write runs under ONE blocking exclusive lock
-    (fcntl.flock LOCK_EX) on the file, so concurrent registrars serialize and
-    no update is ever lost. Each call opens its own fd → its own open file
-    description → flock conflicts even across threads in one process.
-  - Open O_RDWR|O_CREAT (not O_APPEND — this is a read-modify-write, not an
-    append): read the whole JSON, rebuild it immutably, ftruncate + rewrite.
+Discipline:
+  - The ENTIRE read-modify-write runs under ONE blocking exclusive flock on a
+    separate, never-unlinked sentinel ``shared/portfolio.json.lock``, so
+    concurrent registrars serialize and no update is ever lost. Each call opens
+    its own fd → its own open file description → flock conflicts even across
+    threads in one process.
+  - Crash-safe (V-06): the new JSON goes to a temp file in ``shared/`` (fsync),
+    then ``os.replace`` swaps it in and the dir is fsynced. This is a mutable
+    registry, not a log, so a rename is right here — the old in-place
+    truncate+rewrite left a 0-byte file on a crash/full disk.
+  - A MISSING file is a first registration; an EXISTING empty file is an error
+    (it means a crash ate the registry — re-registering one project would
+    silently drop every other one).
   - Immutability: a NEW portfolio dict is built each time; the parsed structure
     is never mutated in place.
   - Idempotent dedup on slug: an absent slug is appended; an already-present
@@ -41,12 +47,12 @@ import fcntl
 import json
 import os
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
 _SCHEMA_VERSION = "1.0"
-_READ_CHUNK = 65536
 
 
 class PortfolioWriterError(Exception):
@@ -58,25 +64,15 @@ def _empty_portfolio() -> dict[str, Any]:
     return {"schema_version": _SCHEMA_VERSION, "active_projects": []}
 
 
-def _read_all(fd: int) -> bytes:
-    """Read the whole file behind `fd`, starting from offset 0."""
-    os.lseek(fd, 0, os.SEEK_SET)
-    chunks: list[bytes] = []
-    while True:
-        chunk = os.read(fd, _READ_CHUNK)
-        if not chunk:
-            break
-        chunks.append(chunk)
-    return b"".join(chunks)
-
-
-def _parse_or_empty(raw: bytes) -> dict[str, Any]:
-    """Parse the existing registry, or return a fresh empty one when the file is
-    empty/whitespace (the O_CREAT first-write case). Raise on malformed content
-    rather than silently dropping a corrupt registry."""
+def _parse(raw: bytes) -> dict[str, Any]:
+    """Parse the existing registry. Raise on empty or malformed content rather
+    than silently replacing it with a one-project registry."""
     text = raw.decode("utf-8").strip()
     if not text:
-        return _empty_portfolio()
+        raise PortfolioWriterError(
+            "portfolio.json exists but is empty — restore it from a backup "
+            "before registering (an empty file is never treated as a new registry)"
+        )
     try:
         data = json.loads(text)
     except json.JSONDecodeError as exc:
@@ -111,7 +107,7 @@ def register_project(
     """Register `slug` in {workspace_root}/shared/portfolio.json, append-only.
 
     The whole read-modify-write — read current registry, dedup, append, write —
-    runs while holding fcntl.flock(LOCK_EX) on the file, so two concurrent
+    runs while holding fcntl.flock(LOCK_EX) on the lock sentinel, so two concurrent
     registrations can never observe the same pre-state and lose an update.
     Creates the shared/ dir and the file if missing. Returns the registry path.
 
@@ -122,24 +118,44 @@ def register_project(
     shared_dir.mkdir(parents=True, exist_ok=True)
     path = shared_dir / "portfolio.json"
 
-    fd = os.open(str(path), os.O_RDWR | os.O_CREAT, 0o644)
+    lock_fd = os.open(str(shared_dir / "portfolio.json.lock"), os.O_RDWR | os.O_CREAT, 0o644)
     try:
-        fcntl.flock(fd, fcntl.LOCK_EX)
+        fcntl.flock(lock_fd, fcntl.LOCK_EX)
         try:
-            data = _parse_or_empty(_read_all(fd))
+            data = _parse(path.read_bytes()) if path.exists() else _empty_portfolio()
             new_data = _with_project(data, slug, domain, market, created_at)
             payload = (
                 json.dumps(new_data, ensure_ascii=False, indent=2) + "\n"
             ).encode("utf-8")
-            os.lseek(fd, 0, os.SEEK_SET)
-            os.ftruncate(fd, 0)
-            os.write(fd, payload)
-            os.fsync(fd)
+            _atomic_replace(path, payload)
         finally:
-            fcntl.flock(fd, fcntl.LOCK_UN)
+            fcntl.flock(lock_fd, fcntl.LOCK_UN)
     finally:
-        os.close(fd)
+        os.close(lock_fd)
     return path
+
+
+def _atomic_replace(path: Path, payload: bytes) -> None:
+    """temp file in the same dir → fsync → os.replace → dir fsync. On any failure
+    the temp file is removed and the old registry is untouched."""
+    tmp_fd, tmp_name = tempfile.mkstemp(prefix=".portfolio-", suffix=".tmp", dir=str(path.parent))
+    try:
+        try:
+            view = memoryview(payload)
+            while view:
+                view = view[os.write(tmp_fd, view):]
+            os.fsync(tmp_fd)
+        finally:
+            os.close(tmp_fd)
+        os.replace(tmp_name, path)
+    except BaseException:
+        Path(tmp_name).unlink(missing_ok=True)
+        raise
+    dir_fd = os.open(str(path.parent), os.O_RDONLY)
+    try:
+        os.fsync(dir_fd)
+    finally:
+        os.close(dir_fd)
 
 
 # ---------------------------------------------------------------------------
