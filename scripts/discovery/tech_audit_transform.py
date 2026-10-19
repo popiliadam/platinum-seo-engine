@@ -130,6 +130,11 @@ CATEGORY_LAYOUT = "Layout Stability"
 CATEGORY_META = "Meta Tags"
 CATEGORY_STRUCTURED_DATA = "Structured Data"
 
+#: S-20: Googlebot (Search) reads the first 2 MB of an uncompressed HTML file;
+#: anything after the cut-off is not indexed. Warn before the limit.
+HTML_SIZE_WARN_BYTES = int(1.5 * 1024 * 1024)
+HTML_SIZE_LIMIT_BYTES = 2 * 1024 * 1024
+
 #: Cap on affected_urls cell length (Excel friendliness — anything past this
 #: is collapsed to a count + first-N sample).
 AFFECTED_URLS_CHAR_CAP = 480
@@ -744,6 +749,33 @@ def _detect_findings(
     return findings
 
 
+def _html_size_findings(page_sizes: Sequence[dict]) -> list[_Finding]:
+    """S-20: HTML pages near / over Googlebot's 2 MB read limit, from SF
+    ``internal_all`` rows (``Address``, ``Size (bytes)``, ``Content Type``)."""
+    out: list[_Finding] = []
+    for row in page_sizes:
+        clean = {_clean_key(k).lower(): v for k, v in row.items()}
+        content_type = _safe_str(clean.get("content type")).lower()
+        if content_type and "html" not in content_type:
+            continue
+        size = _safe_int(clean.get("size (bytes)") or clean.get("size"))
+        url = _safe_str(clean.get("address") or clean.get("url"))
+        if size is None or not url or size <= HTML_SIZE_WARN_BYTES:
+            continue
+        over = size > HTML_SIZE_LIMIT_BYTES
+        out.append(_Finding(
+            category=CATEGORY_PERFORMANCE,
+            label=(f"{size / (1024 * 1024):.1f} MB HTML — "
+                   + ("over Googlebot's 2 MB read limit (the rest is not indexed)"
+                      if over else "close to Googlebot's 2 MB read limit")),
+            severity=SEVERITY_HIGH if over else SEVERITY_MEDIUM,
+            resolution="Move inline scripts/styles/data out of the HTML, paginate "
+                       "or lazy-load long lists, keep key content in the first 2 MB",
+            url=url,
+        ))
+    return out
+
+
 def _sf_priority_to_severity(priority: Any) -> str:
     """Map an SF 'Issue Priority' string to the strict severityEnum.
 
@@ -965,6 +997,7 @@ def transform(
     content_parsing_raw: dict | None,
     url_cap: int = DEFAULT_URL_CAP,
     live_findings: list[dict] | None = None,
+    page_sizes: list[dict] | None = None,
 ) -> dict:
     """
     Transform DFS Lighthouse + on_page_content_parsing payloads into
@@ -993,6 +1026,9 @@ def transform(
             findings, so an Issue Name colliding with a DFS-derived
             category de-dupes by max severity, and the merge guarantees
             ``rowcount(with live_findings) >= rowcount(without)``.
+        page_sizes: OPTIONAL SF ``internal_all`` rows (``Address``,
+            ``Size (bytes)``, ``Content Type``) — HTML over 1.5 MB → MEDIUM,
+            over 2 MB → HIGH (S-20, Googlebot's 2 MB read limit).
 
     Returns:
         {
@@ -1052,7 +1088,9 @@ def transform(
     live_findings_findings = (
         _live_findings_to_findings(live_findings) if live_findings else []
     )
-    findings = findings + live_findings_findings
+    findings = findings + live_findings_findings + (
+        _html_size_findings(page_sizes) if page_sizes else []
+    )
 
     rows = _aggregate_to_rows(findings)
 

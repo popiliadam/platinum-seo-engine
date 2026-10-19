@@ -502,6 +502,10 @@ result = tech_audit_transform.transform(
     content_parsing_raw=raw_content_parsing,
     url_cap=url_cap,
     live_findings=(live_findings or None),
+    # S-20: SF internal_all rows (Address, Size (bytes), Content Type) from the
+    # latest sf-exports/{date}/raw/internal_all.csv — HTML > 1.5 MB = MEDIUM,
+    # > 2 MB = HIGH (Googlebot reads only the first 2 MB). None → no size check.
+    page_sizes=(internal_all_rows or None),
 )
 ```
 
