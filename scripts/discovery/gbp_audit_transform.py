@@ -27,14 +27,22 @@ Severity matrix (per category, applied in `_analyze_gaps`):
                            schemas/local-nap.schema.json; single NAP source
                            of truth per rules/local-seo-discipline.md)
   - categories     HIGH    no primary category
-  - categories     MEDIUM  < 2 secondary categories
-  - photos         HIGH    < 3 photos
-  - photos         MEDIUM  < 10 photos (but >= 3)
+  - categories     MEDIUM  fewer secondary categories than the competitor
+                           median (only when competitors were measured)
+  - photos         HIGH    < half the competitor median photo count
+  - photos         MEDIUM  below the competitor median; without competitor
+                           data only 0 photos is a finding
   - hours          HIGH    regular business hours missing
   - hours          MEDIUM  holiday hours missing
   - attributes     MEDIUM  profile-relevant attribute empty
   - posts          LOW     no GBP posts in last 30 days
-  - qa             LOW     no Q&A engagement
+
+S-22: Google publishes no photo/category counts, so fixed ">= 3 / >= 10 photos"
+and ">= 2 secondary categories" were replaced by the competitor median. A field
+the source did not report (DFS has no holiday hours, posts or review-response
+rate) is unknown and produces no finding. The Q&A seeding rule was dropped
+(Google retired Q&A on Business Profiles). DFS ``business_listings_search``
+items are mapped by ``normalize_listing``.
   - reviews        MEDIUM  response rate < 50%
   - reviews        MEDIUM  average rating < 4.0
 
@@ -165,7 +173,8 @@ def run(
         canonical_nap = json.loads(nap_path.read_text("utf-8"))
 
     # Step 6 — pure-compute gap analysis.
-    gap_rows = _analyze_gaps(listing, config, canonical_nap=canonical_nap)
+    gap_rows = _analyze_gaps(listing, config, canonical_nap=canonical_nap,
+                             competitors=_fetch_competitors(config))
 
     return {
         "status": "success",
@@ -193,6 +202,13 @@ def _fetch_listing(config: dict) -> dict | None:
     return None
 
 
+def _fetch_competitors(config: dict) -> list[dict] | None:
+    """Stub — production invokes ``business_listings_search`` for the same
+    category + city and passes the top local competitors (S-22 medians).
+    None → no relative thresholds."""
+    return None
+
+
 def _scrapling_fallback(config: dict) -> dict | None:
     """Stub — production invokes ``mcp__ScraplingServer__fetch`` against
     a Google Maps place URL. Returns None at module level; tests
@@ -204,10 +220,79 @@ def _scrapling_fallback(config: dict) -> dict | None:
 # Gap analysis (pure compute — no I/O)
 # ---------------------------------------------------------------------------
 
+# DFS business_listings_search item field → internal listing field (S-22).
+def normalize_listing(raw: dict | None) -> dict | None:
+    """Map a DFS ``business_listings_search`` item to the internal listing keys.
+
+    Already-internal listings pass through. Only fields DFS really returns are
+    set; everything else stays absent (= unknown, no finding).
+    """
+    if not raw:
+        return raw
+    if not any(k in raw for k in ("title", "total_photos", "additional_categories", "work_time")):
+        return raw
+    out: dict = {
+        "business_name": raw.get("title"),
+        "address": raw.get("address"),
+        "phone": raw.get("phone"),
+        "primary_category": raw.get("category"),
+    }
+    if "additional_categories" in raw:
+        out["secondary_categories"] = list(raw.get("additional_categories") or [])
+    if "total_photos" in raw:
+        out["photo_count"] = raw.get("total_photos") or 0
+    work_time = raw.get("work_time")
+    if work_time is not None:
+        out["business_hours"] = ((work_time or {}).get("work_hours") or {}).get("timetable")
+    rating = raw.get("rating")
+    if isinstance(rating, dict) and rating.get("value") is not None:
+        out["avg_rating"] = rating["value"]
+    attributes = raw.get("attributes")
+    if attributes is not None:
+        out["attributes"] = (attributes or {}).get("available_attributes") or {}
+    return out
+
+
+def _median(values: list[float]) -> float | None:
+    vals = sorted(v for v in values if isinstance(v, (int, float)))
+    if not vals:
+        return None
+    mid = len(vals) // 2
+    return float(vals[mid]) if len(vals) % 2 else (vals[mid - 1] + vals[mid]) / 2
+
+
+def _competitor_medians(competitors: list[dict] | None) -> dict:
+    comps = [normalize_listing(c) or {} for c in (competitors or [])]
+    return {
+        "photos": _median([c["photo_count"] for c in comps if "photo_count" in c]),
+        "secondary": _median([len(c["secondary_categories"]) for c in comps
+                              if "secondary_categories" in c]),
+    }
+
+
+def _photo_rows(listing: dict, medians: dict) -> list[dict]:
+    if "photo_count" not in listing:
+        return []
+    count, median = listing.get("photo_count") or 0, medians.get("photos")
+    if median is None:
+        if count == 0:
+            return [_row("photos", "MEDIUM", "No photos (competitor median not measured)",
+                         "Add real photos of the premises, team and work")]
+        return []
+    if count < median / 2:
+        return [_row("photos", "HIGH", f"{count} photos vs competitor median {median:.0f}",
+                     "Add real photos to reach at least the competitor median")]
+    if count < median:
+        return [_row("photos", "MEDIUM", f"{count} photos vs competitor median {median:.0f}",
+                     "Add real photos to reach the competitor median")]
+    return []
+
+
 def _analyze_gaps(
     listing: dict | None,
     config: dict,
     canonical_nap: dict | None = None,
+    competitors: list[dict] | None = None,
 ) -> list[dict]:
     """Per-category gap analysis returning master.xlsx[gbp_audit] rows.
 
@@ -238,6 +323,9 @@ def _analyze_gaps(
             "Create or claim a Google Business Profile listing for the business",
         ))
         return rows
+
+    listing = normalize_listing(listing) or {}
+    medians = _competitor_medians(competitors)
 
     # nap — canonical source of truth comparison (GAP-A2; the matrix
     # declared this branch since v1.7 Phase 5 without implementing it).
@@ -280,36 +368,27 @@ def _analyze_gaps(
             "Primary category missing",
             "Set the primary GBP category from the GBP dashboard",
         ))
-    if len(listing.get("secondary_categories", [])) < 2:
+    secondary_median = medians.get("secondary")
+    if ("secondary_categories" in listing and secondary_median is not None
+            and len(listing["secondary_categories"]) < secondary_median):
         rows.append(_row(
             "categories", "MEDIUM",
-            "Fewer than 2 secondary categories",
-            "Add at least 2 relevant secondary categories",
+            f"{len(listing['secondary_categories'])} secondary categories vs "
+            f"competitor median {secondary_median:.0f}",
+            "Add the relevant secondary categories competitors use",
         ))
 
-    # photos
-    photo_count = listing.get("photo_count", 0)
-    if photo_count < 3:
-        rows.append(_row(
-            "photos", "HIGH",
-            f"Only {photo_count} photos",
-            "Add at least 3 high-quality photos (exterior, interior, team)",
-        ))
-    elif photo_count < 10:
-        rows.append(_row(
-            "photos", "MEDIUM",
-            f"Only {photo_count} photos",
-            "Add photos to reach 10+ for a healthy GBP listing",
-        ))
+    # photos — relative to competitors (S-22)
+    rows.extend(_photo_rows(listing, medians))
 
     # hours
-    if not listing.get("business_hours"):
+    if "business_hours" in listing and not listing.get("business_hours"):
         rows.append(_row(
             "hours", "HIGH",
             "Regular business hours missing",
             "Add regular business hours in the GBP dashboard",
         ))
-    if not listing.get("holiday_hours"):
+    if "holiday_hours" in listing and not listing.get("holiday_hours"):
         rows.append(_row(
             "hours", "MEDIUM",
             "No holiday hours configured",
@@ -317,7 +396,7 @@ def _analyze_gaps(
         ))
 
     # attributes
-    if listing.get("attributes") in (None, [], {}):
+    if "attributes" in listing and listing.get("attributes") in (None, [], {}):
         rows.append(_row(
             "attributes", "MEDIUM",
             "Profile-relevant attributes empty",
@@ -325,19 +404,11 @@ def _analyze_gaps(
         ))
 
     # posts
-    if listing.get("post_count_30d", 0) == 0:
+    if "post_count_30d" in listing and listing.get("post_count_30d") == 0:
         rows.append(_row(
             "posts", "LOW",
             "No GBP posts in last 30 days",
             "Publish at least 1 GBP post (update / offer / event)",
-        ))
-
-    # qa
-    if listing.get("qa_count", 0) == 0:
-        rows.append(_row(
-            "qa", "LOW",
-            "No Q&A engagement",
-            "Seed Q&A with FAQ-aligned questions and authoritative answers",
         ))
 
     # reviews

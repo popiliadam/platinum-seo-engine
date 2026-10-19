@@ -62,7 +62,7 @@ SKILL_MD = REPO_ROOT / "skills" / "discovery" / "gbp-audit" / "SKILL.md"
 @pytest.fixture
 def mock_dfs_business_data_partial(monkeypatch: pytest.MonkeyPatch) -> None:
     """DFS returns a partial business listing: primary category missing,
-    only 2 photos, no holiday hours, no posts last 30d. Drives gap rows
+    no photos, no holiday hours, no posts last 30d. Drives gap rows
     in categories / photos / hours / posts."""
     monkeypatch.setattr(
         gbp_audit_transform,
@@ -73,7 +73,7 @@ def mock_dfs_business_data_partial(monkeypatch: pytest.MonkeyPatch) -> None:
             ),
             "primary_category": None,
             "secondary_categories": ["Service A"],   # only 1 secondary
-            "photo_count": 2,                        # < 3 → HIGH
+            "photo_count": 0,                        # none → MEDIUM (S-22: counts are judged vs competitors)
             "business_hours": {"mon": "9-17"},
             "holiday_hours": None,                   # → MEDIUM
             "post_count_30d": 0,                     # → LOW
@@ -142,7 +142,7 @@ def test_gap_rows_emitted_per_missing_field(
     assert result["status"] == "success"
     gap_categories = {row["category"] for row in result["gap_rows"]}
     assert "categories" in gap_categories  # primary missing → HIGH
-    assert "photos" in gap_categories      # 2 < 3 → HIGH
+    assert "photos" in gap_categories      # 0 photos → MEDIUM
     assert "hours" in gap_categories       # holiday missing → MEDIUM
     assert "posts" in gap_categories       # none last 30d → LOW
 

@@ -178,8 +178,11 @@ def compare_nap(canonical: dict, observed: dict) -> list[dict]:
             same = normalize_phone(canonical_value, default_country) == \
                 normalize_phone(observed_value, default_country)
         elif field == "address":
-            same = normalize_address_tokens(canonical_value) == \
-                normalize_address_tokens(observed_value)
+            # S-22: GBP and the site write the same address in different
+            # orders ("Atatürk Cd. No:5 Kadıköy" vs "Kadıköy, Atatürk Cd. 5") —
+            # compare the token multiset, not the sequence.
+            same = sorted(normalize_address_tokens(canonical_value)) == \
+                sorted(normalize_address_tokens(observed_value))
         else:
             same = _name_tokens(str(canonical_value)) == \
                 _name_tokens(str(observed_value))

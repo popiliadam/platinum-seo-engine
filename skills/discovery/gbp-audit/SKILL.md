@@ -284,16 +284,26 @@ blocking finding:
 | nap         | NAP mismatch vs `local/nap.json` (one row per mismatched field) | HIGH | Sync the field across GBP + site footer + LocalBusiness JSON-LD to match the canonical (R-144) |
 | nap         | canonical NAP file missing   | MEDIUM   | Create `local/nap.json` per `schemas/local-nap.schema.json`, re-run |
 | categories  | primary missing              | HIGH     | Set primary category in GBP dashboard                 |
-| categories  | < 2 secondary                | MEDIUM   | Add at least 2 relevant secondary categories          |
-| photos      | < 3 photos                   | HIGH     | Add ≥ 3 high-quality photos                           |
-| photos      | < 10 photos                  | MEDIUM   | Add photos to reach 10+ for healthy listing           |
+| categories  | fewer secondary than competitor median | MEDIUM | Add the relevant secondary categories competitors use |
+| photos      | < half the competitor median | HIGH     | Add real photos to reach the competitor median        |
+| photos      | < competitor median (no competitor data: only 0 photos) | MEDIUM | Add real photos of premises, team and work |
 | hours       | regular hours missing        | HIGH     | Add regular business hours                            |
 | hours       | holiday hours missing        | MEDIUM   | Add upcoming holiday hours                            |
 | attributes  | profile-relevant attr empty  | MEDIUM   | Fill profile-relevant GBP attributes                  |
 | posts       | none last 30d                | LOW      | Publish ≥ 1 GBP post (update / offer / event)         |
-| qa          | no Q&A engagement            | LOW      | Seed Q&A with FAQ-aligned questions                   |
 | reviews     | response rate < 50 %         | MEDIUM   | Respond to outstanding reviews                        |
 | reviews     | avg rating < 4.0             | MEDIUM   | Address negative-review themes via service ops        |
+
+**S-22 — relative, not invented thresholds.** Google publishes no photo or
+category counts, so the audit compares with the local competitors
+(`_fetch_competitors`: `business_listings_search` for the same category + city)
+and uses their median. DFS items are mapped by `normalize_listing`
+(`title`, `category`, `additional_categories`, `total_photos`,
+`work_time.work_hours.timetable`, `rating.value`,
+`attributes.available_attributes`); a field the source did not return is
+unknown and produces **no** finding. The Q&A seeding row was dropped (Google
+retired Q&A on Business Profiles). Addresses are compared as token sets, so
+word order does not create a NAP mismatch.
 
 Each row is one `master.xlsx[gbp_audit]` entry with:
 - `audit_id` = `gbp-<uuid8>` (the transform owns ID generation)
