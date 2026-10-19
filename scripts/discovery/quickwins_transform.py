@@ -57,6 +57,7 @@ if str(_REPO_ROOT) not in sys.path:
 # Direct re-export: quickwins previously raised bare ValueError;
 # URLNormalizeError(ValueError) preserves that contract (K-01 dedup,
 # v1.5-Phase-1 Tier 1).
+from scripts.util import gsc_window  # noqa: E402  (D-01 truncation flag)
 from scripts.util.profile_aware_defaults import (  # noqa: E402
     cascade_default,
 )
@@ -461,6 +462,7 @@ def transform(
     top_n: int = 50,
     threshold_position_max: int = 20,
     dedup_by_url: bool = True,
+    threshold_position_min: float | None = None,
     curve: "_ctr_curve.Curve | None" = None,
     aio_presence: dict[str, dict] | None = None,
     market: str | None = None,
@@ -551,6 +553,11 @@ def transform(
         if position is None or impressions is None:
             # Cannot score without these; skip silently rather than crash —
             # caller can audit raw JSON for sparse rows.
+            continue
+        # D-16: re-check the band here — the MCP filter (and its hidden 2%
+        # CTR default) is not trusted to have applied it.
+        if position > threshold_position_max or (
+                threshold_position_min is not None and position < threshold_position_min):
             continue
 
         # Legacy headroom score — retained as the v2 ranking tiebreaker and as
@@ -673,6 +680,7 @@ def transform(
         "opportunity": opportunity_rows,
         "control_cohort": control_cohort,
         "meta": {
+            "gsc_truncation": gsc_window.truncation(raw),
             "input_count": len(items),
             "scored_count": len(scored),
             "top_n_applied": len(quick_wins_rows),
@@ -713,6 +721,9 @@ def _parse_args(argv: Iterable[str]) -> argparse.Namespace:
                    help=f"Position ceiling for scoring (inline default: "
                         f"{_DEFAULT_THRESHOLD_POSITION_MAX}; profile "
                         f"override via Y-06 cascade_default).")
+    p.add_argument("--threshold-position-min", type=float, default=None,
+                   help="Lower band bound re-checked in the transform (D-16); "
+                        "the skill passes threshold_position_min (11).")
     p.add_argument("--output-dir", default=None,
                    help="If set, write quick_wins.json + opportunity.json here.")
     p.add_argument("--ctr-curve", default=str(_REPO_ROOT / "ctr-curve.json"),
@@ -776,6 +787,7 @@ def main(argv: list[str]) -> int:
             enriched=enriched,
             top_n=top_n,
             threshold_position_max=threshold_position_max,
+            threshold_position_min=args.threshold_position_min,
             curve=curve,
             aio_presence=aio_presence,
             market=args.market,

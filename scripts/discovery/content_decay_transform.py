@@ -53,6 +53,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from scripts.util import gsc_window  # noqa: E402  (D-01 truncation flag)
 from scripts.util.url_normalize import (  # noqa: E402  (sys.path mutation)
     URLNormalizeError as _URLNormalizeError,
     normalize_url as _canonical_normalize_url,
@@ -514,6 +515,8 @@ def transform(
         )
 
     base_meta = {
+        "gsc_truncation": {"recent": gsc_window.truncation(recent or {}),
+                           "previous": gsc_window.truncation(previous or {})},
         "comparison_mode": comparison_mode,
         "clicks_threshold": clicks_thr,
         "position_threshold": position_thr,

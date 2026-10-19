@@ -49,6 +49,10 @@ from typing import Any
 
 __all__ = [
     "DFSResponseError",
+    "DFSTaskError",
+    "task_errors",
+    "check_tasks",
+    "response_cost",
     "normalize_dfs_response",
     "safe_int",
     "safe_float",
@@ -69,6 +73,81 @@ class DFSResponseError(ValueError):
     work.  Domain-specific call-sites wrap this into their own exception
     class via the import-adapter pattern (paterni K-01 reuse).
     """
+
+
+class DFSTaskError(DFSResponseError):
+    """A DataForSEO task (or the whole request) reported a non-20000 status.
+
+    D-08: HTTP 200 does not mean success — every task carries its own
+    ``status_code``. A failed task used to be dropped silently (multi-task) or
+    surface as "unrecognised response shape" (single task, e.g. 40200).
+    """
+
+    def __init__(self, errors: list[tuple[int, str]]):
+        self.errors = errors
+        code, msg = errors[0]
+        hint = _STATUS_HINTS.get(code)
+        text = f"DataForSEO task error {code}: {msg}" + (f" ({hint})" if hint else "")
+        if len(errors) > 1:
+            text += f" — and {len(errors) - 1} more failed task(s)"
+        super().__init__(text)
+
+
+DFS_OK = 20000
+_STATUS_HINTS = {
+    40200: "payment required — top up the DataForSEO balance",
+    40100: "authentication failed — check DATAFORSEO credentials",
+    40501: "invalid field in the request",
+    50000: "DataForSEO internal error — retry later",
+}
+
+
+def _code(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def task_errors(raw: Any) -> list[tuple[int, str]]:
+    """Every (status_code, status_message) that is not 20000 — envelope and tasks."""
+    if not isinstance(raw, dict):
+        return []
+    errors: list[tuple[int, str]] = []
+    top = _code(raw.get("status_code"))
+    if top is not None and top != DFS_OK:
+        errors.append((top, str(raw.get("status_message") or "")))
+    for task in raw.get("tasks") or []:
+        if not isinstance(task, dict):
+            continue
+        code = _code(task.get("status_code"))
+        if code is not None and code != DFS_OK:
+            errors.append((code, str(task.get("status_message") or "")))
+    return errors
+
+
+def check_tasks(raw: Any) -> None:
+    """Raise :class:`DFSTaskError` when any task failed (never drop it silently)."""
+    errors = task_errors(raw)
+    if errors:
+        raise DFSTaskError(errors)
+
+
+def response_cost(raw: Any) -> float | None:
+    """The USD cost DataForSEO reports for this response (D-13), or None.
+
+    The REST envelope carries ``cost`` at the top and per task; the top-level
+    value is the request total. Flat MCP wrappers drop it — then None
+    (unknown), never 0.
+    """
+    if not isinstance(raw, dict):
+        return None
+    top = raw.get("cost")
+    if isinstance(top, (int, float)) and not isinstance(top, bool):
+        return float(top)
+    task_costs = [t.get("cost") for t in raw.get("tasks") or [] if isinstance(t, dict)]
+    task_costs = [c for c in task_costs if isinstance(c, (int, float)) and not isinstance(c, bool)]
+    return float(sum(task_costs)) if task_costs else None
 
 
 # ---------------------------------------------------------------------------
@@ -92,6 +171,7 @@ def normalize_dfs_response(
             "Unrecognized DFS response shape: top-level must be a dict, "
             f"got {type(raw).__name__}"
         )
+    check_tasks(raw)  # D-08: a failed task is an error, not "no data"
 
     include_keyword_inline = endpoint_type in (None, "keyword")
     include_lighthouse_inline = endpoint_type in (None, "lighthouse")

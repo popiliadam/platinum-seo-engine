@@ -50,6 +50,8 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from scripts.util.text_fold import fold_key, fold_tokens  # noqa: E402  (D-06)
+from scripts.util import gsc_window  # noqa: E402  (D-01 truncation flag)
 from scripts.util.profile_aware_defaults import (  # noqa: E402  (sys.path mutation)
     cascade_default,
 )
@@ -245,10 +247,10 @@ def _is_brand_query(query: str, brand_tokens: Sequence[str] | None) -> bool:
     """
     if not brand_tokens:
         return False
-    q_lower = query.lower()
-    q_tokens = _tokenize(query)
+    q_lower = fold_key(query)  # D-06
+    q_tokens = fold_tokens(query)
     for bt in brand_tokens:
-        bt = str(bt).strip().lower()
+        bt = fold_key(str(bt).strip())
         if not bt:
             continue
         bt_words = re.findall(r"[^\W_]+", bt, flags=re.UNICODE)
@@ -563,6 +565,7 @@ def transform(
     return {
         "cannibalization": cannibalization_rows,
         "meta": {
+            "gsc_truncation": gsc_window.truncation(raw),
             "input_row_count": len(page_rows),
             "queries_seen": len(grouped),
             "candidate_count": len(candidate_queries),

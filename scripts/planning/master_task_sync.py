@@ -100,6 +100,9 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from scripts.util.url_normalize import normalize_url  # noqa: E402  (D-07)
+from scripts.util.coerce import to_int  # noqa: E402  (D-17)
+
 
 # ---------------------------------------------------------------------------
 # Constants — schema-aligned column tuple
@@ -363,19 +366,7 @@ def _to_int(v: Any) -> int:
     """Best-effort integer coercion for volume-style cells. Non-numeric /
     blank → 0 (treated as below any positive threshold). Handles "5,400",
     "5400", 5400, 5400.0, "" gracefully."""
-    if v is None:
-        return 0
-    if isinstance(v, bool):
-        return 0
-    if isinstance(v, (int, float)):
-        return int(v)
-    s = str(v).strip().replace(",", "").replace(" ", "")
-    if not s:
-        return 0
-    try:
-        return int(float(s))
-    except ValueError:
-        return 0
+    return to_int(v, default=0)  # D-17: shared parser ("5.400" → 5400)
 
 
 def _cluster_keywords_actionable(row: Mapping[str, Any]) -> tuple[bool, str]:
@@ -424,7 +415,7 @@ SOURCE_DEFS: tuple[SourceDef, ...] = (
         sheet="tech_seo",
         primary_source="tech_fix",
         url_col=None,                       # affected_urls is multi-URL
-        signature_cols=("issue_category", "detail"),
+        signature_cols=("issue_category",),  # D-07: one row per category; detail carries counts
         related_source_key="tech_seo",
         skill_name="tech-audit",
     ),
@@ -486,11 +477,51 @@ def _safe_str(v: Any) -> str:
     return str(v).strip()
 
 
+# D-07: only COUNT phrases are volatile ("12 finding(s)", "4 URLs"). Digits
+# anywhere else name the thing itself ("iphone 15", "/p/2") and must stay —
+# masking them merged distinct tasks (review finding).
+_COUNT_PHRASE_RE = re.compile(r"\b\d+(?:[.,]\d+)*(?=\s*(?:URLs?\b|findings?\b|finding\(s\)))",
+                              re.IGNORECASE)
+_URL_RE = re.compile(r"https?://[^\s|,]+", re.IGNORECASE)
+
+
+# Signature columns before D-07, per sheet (only where they changed) — used to
+# find T-ids allocated under the old key.
+_LEGACY_SIGNATURE_COLS: dict[str, tuple[str, ...]] = {
+    "tech_seo": ("issue_category", "detail"),
+}
+
+
+def _norm_url_text(match: "re.Match[str]") -> str:
+    try:
+        return normalize_url(match.group(0))
+    except ValueError:
+        return match.group(0)
+
+
+def _stable_part(value: Any) -> str:
+    """D-07: the part of a cell that names the PROBLEM, not its current size.
+
+    Every URL inside the text (also in "query :: url1 | url2" pairs) goes
+    through the shared normalizer; only a count before "URL(s)" /
+    "finding(s)" is masked, so "4 URLs" / "5 URLs" are one task while
+    "iphone 15" / "iphone 16" stay two.
+    """
+    s = _URL_RE.sub(_norm_url_text, _safe_str(value))
+    return _COUNT_PHRASE_RE.sub("#", s)
+
+
 def _row_signature(row: Mapping[str, Any], cols: Sequence[str]) -> str:
     """Stable, deterministic signature joining the per-source signature
-    columns. Empty values stay as "" — the join fingerprint differs
-    based on which columns are populated, which is the desired behaviour.
+    columns (numbers masked, URLs normalized — D-07). Empty values stay as
+    "" — the join fingerprint differs based on which columns are populated,
+    which is the desired behaviour.
     """
+    return "|".join(_stable_part(row.get(c)) for c in cols)
+
+
+def _legacy_row_signature(row: Mapping[str, Any], cols: Sequence[str]) -> str:
+    """The pre-D-07 signature (raw text) — only to find already-allocated ids."""
     return "|".join(_safe_str(row.get(c)) for c in cols)
 
 
@@ -740,6 +771,7 @@ class _ExtractedSig:
     related_source_key: str
     source_sheet: str      # diagnostic only; not written to row
     raw_signature: str     # the joined signature_cols value (collision guard)
+    legacy_signatures: tuple[str, ...] = ()  # pre-D-07 keys: reuse their T-ids
 
 
 def _extract_signature(
@@ -756,8 +788,17 @@ def _extract_signature(
         return None
     primary_source = source_def.derive_primary_source(row)
     _ensure_primary_source_enum(primary_source)
-    url = _safe_str(row.get(source_def.url_col)) if source_def.url_col else ""
+    raw_url = _safe_str(row.get(source_def.url_col)) if source_def.url_col else ""
+    url = _stable_part(raw_url) if raw_url else ""
     content_signature = _content_signature(primary_source, url, sig)
+    legacy = tuple(dict.fromkeys(
+        _content_signature(primary_source, raw_url, legacy_sig)
+        for legacy_sig in (
+            _legacy_row_signature(row, source_def.signature_cols),
+            _legacy_row_signature(row, _LEGACY_SIGNATURE_COLS.get(source_def.sheet,
+                                                                  source_def.signature_cols)),
+        )
+    ))
     return _ExtractedSig(
         content_signature=content_signature,
         primary_source=primary_source,
@@ -765,6 +806,7 @@ def _extract_signature(
         related_source_key=source_def.related_source_key,
         source_sheet=source_def.sheet,
         raw_signature=sig,
+        legacy_signatures=legacy,
     )
 
 
@@ -910,13 +952,21 @@ def aggregate(
     # present in master_task OR the registry so new IDs never collide.
     counter = _next_counter(existing_master_task, working_map)
 
-    def _allocate(content_sig: str) -> str:
+    def _allocate(content_sig: str, legacy: Sequence[str] = ()) -> str:
         """Resolve a canonical task_id for a content_signature. Registry hit
-        → re-use (idempotent). Miss → allocate next T-NNNNN, record it."""
+        → re-use (idempotent). A pre-D-07 key in the registry → re-use that
+        T-id under the new key (no duplicate task after the key change).
+        Miss → allocate next T-NNNNN, record it."""
         nonlocal counter
         tid = working_map.get(content_sig)
         if tid is not None:
             return tid
+        for old_sig in legacy:
+            tid = working_map.get(old_sig)
+            if tid is not None:
+                working_map[content_sig] = tid
+                new_allocations[content_sig] = tid
+                return tid
         tid = _canonical_task_id(counter)
         counter += 1
         working_map[content_sig] = tid
@@ -960,7 +1010,7 @@ def aggregate(
             seen_payload_by_sig[sig.content_signature] = full_payload
 
             # Resolve the canonical task_id via the registry (allocate if new).
-            task_id = _allocate(sig.content_signature)
+            task_id = _allocate(sig.content_signature, sig.legacy_signatures)
 
             existing_row = existing_index.get(task_id)
             if existing_row is None:

@@ -154,15 +154,14 @@ def test_resource_isolation(tmp_path: Path) -> None:
 # confirm / release guards (validate-before-write; no double-free)
 # ---------------------------------------------------------------------------
 
-def test_confirm_over_reserved_raises_nothing_written(tmp_path: Path) -> None:
+def test_confirm_over_reserved_records_the_real_spend(tmp_path: Path) -> None:
+    """D-11: reserved 10, spent 11 -> the ledger shows 11 and names the overspend
+    (it used to refuse the write and keep the reserved 10)."""
     r = _reserve(tmp_path, amount=10, ceiling=100)
-    before = cl.read_entries(tmp_path)
-    with pytest.raises(cl.CostValidationError):
-        cl.confirm(tmp_path, reservation_id=r["reservation_id"], amount=11,
-                   run_id="run-1", project_id="proj", now_iso=_NOW)
-    assert cl.read_entries(tmp_path) == before
-    # the reservation is still OPEN -> effective stays the reserved 10
-    assert cl.usage(tmp_path, resource="gsc_calls", period=_DAY) == 10
+    entry = cl.confirm(tmp_path, reservation_id=r["reservation_id"], amount=11,
+                       run_id="run-1", project_id="proj", now_iso=_NOW)
+    assert "overspend" in (entry.get("note") or "")
+    assert cl.usage(tmp_path, resource="gsc_calls", period=_DAY) == 11
 
 
 def test_confirm_unknown_reservation_raises(tmp_path: Path) -> None:

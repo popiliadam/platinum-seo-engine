@@ -703,3 +703,12 @@ Expected: schema_version `"1.2"`, profile.enum array of 5 strings.
 This skill is `status: wip` until Phase 11 Wave 2 acceptance gate;
 `active` bump deferred to the post-Wave 1 closeout. Manager owns the
 status flip + governance audit.
+
+## GSC row limit and window (D-01 / D-04)
+
+Every `mcp__gsc__search_analytics` / `mcp__gsc__enhanced_search_analytics` call
+passes `rowLimit=gsc_window.GSC_ROW_LIMIT` (25,000 — the tool default is 1,000
+and it cannot page) and takes its dates from `scripts/util/gsc_window.py`
+(`recent_window` / `comparison_windows`: end = today-3, windows never overlap).
+A response whose row count sits on a cap (`gsc_window.truncation(raw)`) is cut:
+narrow the window or add a page/query filter before using it.

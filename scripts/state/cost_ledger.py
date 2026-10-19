@@ -496,11 +496,15 @@ def confirm(
     note: str | None = None,
     schema_path: Path | None = None,
 ) -> dict:
-    """Record the ACTUAL spend (amount <= reserved) for an OPEN reservation.
+    """Record the ACTUAL spend for an OPEN reservation — also above the reserve.
 
-    Raises CostValidationError (nothing written) if the reservation is unknown,
-    already confirmed/released, or amount exceeds the reserved amount. Carries
-    the reservation's resource/period so replay needs no back-reference.
+    D-11: a run that reserved 100 and spent 400 used to be refused (or clamped
+    to 100 by the caller), so the ledger under-counted real spend. The actual
+    amount is recorded; an overspend is named in the entry's note.
+
+    Raises CostValidationError (nothing written) if the reservation is unknown
+    or already confirmed/released. Carries the reservation's resource/period so
+    replay needs no back-reference.
     """
     amount = _coerce_amount(amount)
     path = cost_ledger_path(workspace_root)
@@ -509,10 +513,8 @@ def confirm(
         entries = _locked_read_verify(path)
         reservation = _resolve_open(entries, reservation_id)
         if amount > reservation["reserved"]:
-            raise CostValidationError(
-                f"confirm amount {amount} exceeds reserved "
-                f"{reservation['reserved']} for {reservation_id!r}"
-            )
+            over = f"overspend: {amount} > reserved {reservation['reserved']}"
+            note = f"{note}; {over}" if note else over
         seq, prev_hash = _next_links(entries)
         entry = _make_entry(
             op="confirm", seq=seq, resource=reservation["resource"],

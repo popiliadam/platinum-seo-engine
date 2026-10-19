@@ -78,6 +78,8 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from scripts.util.dfs_response import check_tasks  # noqa: E402  (D-08)
+
 # Soft import — budget pre-flight is REQUIRED at runtime but we want the
 # transform module itself to be importable even if the budget script's
 # CLI isn't on sys.path during tests. The check is invoked through
@@ -201,6 +203,7 @@ def _normalize_dfs_response(
             "Unrecognized DFS response shape: top-level must be a dict, "
             f"got {type(raw).__name__}"
         )
+    check_tasks(raw)  # D-08: a failed task (e.g. 40200) is an error, not "no data"
 
     # 1. REST envelope: tasks[0].result[0].items (preferred — closest to
     #    the upstream DataForSEO REST contract).
@@ -402,6 +405,24 @@ def detect_response_locale(payload: dict) -> tuple[int | None, str | None]:
     return served_loc, served_lang
 
 
+def served_task_locales(payload: dict) -> list[tuple[int | None, str | None]]:
+    """(location_code, language_code) served by EVERY task (D-02).
+
+    ``detect_response_locale`` looks at tasks[0] only, so a second task served
+    for another country slipped through the TR check.
+    """
+    if not isinstance(payload, dict):
+        return []
+    tasks = payload.get("tasks")
+    if not isinstance(tasks, list) or not tasks:
+        return [detect_response_locale(payload)]
+    out: list[tuple[int | None, str | None]] = []
+    for task in tasks:
+        if isinstance(task, dict):
+            out.append(detect_response_locale({"tasks": [task]}))
+    return out
+
+
 def response_honors_tr(
     payload: dict,
     *,
@@ -414,13 +435,18 @@ def response_honors_tr(
     The skill calls this on every fetched payload and DURUR-routes to
     workaround B (alt endpoint) or C (HTTP bypass) when False.
     """
-    loc, lang = detect_response_locale(payload)
-    if loc is None and lang is None:
+    locales = served_task_locales(payload)
+    if not locales or all(loc is None and lang is None for loc, lang in locales):
         # Empty / malformed — treat as not honoring (caller decides).
         return False
-    loc_ok = (loc == expected_location)
-    lang_ok = (isinstance(lang, str) and lang.lower() == expected_language.lower())
-    return loc_ok and lang_ok
+    for loc, lang in locales:  # D-02: every task, not just the first
+        if loc is None and lang is None:
+            continue
+        if loc != expected_location:
+            return False
+        if not (isinstance(lang, str) and lang.lower() == expected_language.lower()):
+            return False
+    return True
 
 
 def filter_to_tr_heuristic(
@@ -600,6 +626,7 @@ def _build_overview_rows(
     fetched_at: str,
     expected_location: int,
     expected_language: str,
+    strict_locale: bool = True,
 ) -> list[dict]:
     """
     Project DataForSEO keyword_overview items into the staging shape.
@@ -636,13 +663,17 @@ def _build_overview_rows(
         row_loc = _safe_int(it.get("location_code"))
         if row_loc is None:
             row_loc = expected_location
+        if strict_locale and (row_loc != expected_location
+                              or row_lang.lower() != expected_language.lower()):
+            continue  # D-02: another country's row is never stamped as ours
 
         partial = {
             "id": next_id,
             "keyword": str(kw),
-            "search_volume": volume if volume is not None else 0,
-            "cpc": cpc if cpc is not None else 0.0,
-            "competition": competition if competition is not None else 0.0,
+            # D-12: missing stays None — "no data" is not "zero demand".
+            "search_volume": volume,
+            "cpc": cpc,
+            "competition": competition,
             "competition_level": comp_level,
             "search_intent": _intent_label(it.get("search_intent_info")),
             "language_code": row_lang,
@@ -662,6 +693,7 @@ def _build_volume_rows(
     fetched_at: str,
     expected_location: int,
     expected_language: str,
+    strict_locale: bool = True,
 ) -> list[dict]:
     """
     Project Google Ads search_volume items into the staging shape.
@@ -684,13 +716,16 @@ def _build_volume_rows(
         row_loc = _safe_int(it.get("location_code"))
         if row_loc is None:
             row_loc = expected_location
+        if strict_locale and (row_loc != expected_location
+                              or row_lang.lower() != expected_language.lower()):
+            continue  # D-02: another country's row is never stamped as ours
 
         partial = {
             "id": next_id,
             "keyword": str(kw),
-            "search_volume": volume if volume is not None else 0,
-            "cpc": cpc if cpc is not None else 0.0,
-            "competition": competition if competition is not None else 0.0,
+            "search_volume": volume,  # D-12: None = no data, not zero demand
+            "cpc": cpc,
+            "competition": competition,
             "competition_level": comp_level,
             "language_code": row_lang,
             "location_code": int(row_loc),
@@ -861,6 +896,7 @@ def transform(
             fetched_at=ts,
             expected_location=location_code,
             expected_language=language_code,
+            strict_locale=not skip_tr_check,  # signed-off override keeps the real code
         )
         overview_payload = _staging_table_dict(
             tool="keyword_overview",
@@ -880,6 +916,15 @@ def transform(
         # honouring even in 2.8.9 (per workaround B); we do not gate it
         # on response_honors_tr (and the brief notes the wrapper flattens
         # this endpoint too — the normaliser handles both shapes).
+        mismatched = [
+            (loc, lang) for loc, lang in served_task_locales(raw_volume)
+            if loc is not None and loc != location_code
+        ]
+        if mismatched and not skip_tr_check:
+            raise TrWorkaroundFailed(
+                f"raw_volume: a task was served for location_code={mismatched[0][0]}/"
+                f"lang={mismatched[0][1]}, not {location_code}/{language_code} (D-02)"
+            )
         items = _normalize_dfs_response(
             raw_volume, expected_endpoint="keywords_data_google_ads_search_volume"
         )
@@ -888,6 +933,7 @@ def transform(
             fetched_at=ts,
             expected_location=location_code,
             expected_language=language_code,
+            strict_locale=not skip_tr_check,  # signed-off override keeps the real code
         )
         volume_payload = _staging_table_dict(
             tool="search_volume",

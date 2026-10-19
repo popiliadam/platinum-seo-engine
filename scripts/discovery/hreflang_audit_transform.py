@@ -35,6 +35,7 @@ from __future__ import annotations
 import re
 from typing import Any, Iterable
 from urllib.parse import urlsplit
+from scripts.util.url_normalize import normalize_url  # noqa: E402  (D-14)
 
 _DETAIL_CHAR_CAP = 300
 _OFFENDER_SAMPLE = 5
@@ -90,7 +91,12 @@ def _finding(level: str, issue: str, detail: str, resolution: str, cap: int) -> 
 
 
 def _nurl(url: Any) -> str:
-    return str(url or "").strip()
+    """Shared URL normalizer (D-14: /en/ and /en are the same page)."""
+    raw = str(url or "").strip()
+    try:
+        return normalize_url(raw)
+    except ValueError:
+        return raw
 
 
 def _is_absolute(url: str) -> bool:

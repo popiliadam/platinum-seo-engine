@@ -363,9 +363,20 @@ events_writer.append_provenance(
     rows_written=overview_staging_payload["row_count"],
     cost={"provider": "dataforseo",
           "credits": float(estimate),
+          # D-13: the response's own cost (USD) when the envelope carries it;
+          # omitted (never 0) when a flat wrapper dropped it.
+          **({"currency": "USD", "amount": usd}
+             if (usd := dfs_response.response_cost(raw_overview)) is not None else {}),
           "budget_key": "project.config.dataforseo.budget_credits_per_day"},
 )
 ```
+
+**Cost honesty (D-10/D-13).** `check_budget.usage_last_24h` counts every
+event whose `source.kind` is `dataforseo_mcp` OR whose `cost.provider` is
+`dataforseo`, sums credits and USD separately, and reports DFS events with no
+cost as `unknown_cost_events` (usage is then known to be under-counted — the
+pre-flight logs it). Moving the daily budget itself to USD needs a
+project-config field and waits for R-61.
 
 `render_template.py templates/reports/dfs-pull.template.md data.json`
 → `outputs/reports/{date}-dfs-pull.md`. Variables: `$project_slug`,

@@ -298,3 +298,12 @@ Faz 1-5 sheet'lerinden master_task SSoT topla (auto satır, D-only merge; manuel
 
 TÜM çıktılar Türkçe. Önce oku/doğrula, sonra (alt skill'ler + consent'li task yazımı, dry_run değilse) yaz.
 Kanıtsız "tamamlandı" deme. Boş MCP'de sayı UYDURMA. Eksik audit'i "tam" gibi raporlama.
+
+## GSC row limit and window (D-01 / D-04)
+
+Every `mcp__gsc__search_analytics` / `mcp__gsc__enhanced_search_analytics` call
+passes `rowLimit=gsc_window.GSC_ROW_LIMIT` (25,000 — the tool default is 1,000
+and it cannot page) and takes its dates from `scripts/util/gsc_window.py`
+(`recent_window` / `comparison_windows`: end = today-3, windows never overlap).
+A response whose row count sits on a cap (`gsc_window.truncation(raw)`) is cut:
+narrow the window or add a page/query filter before using it.

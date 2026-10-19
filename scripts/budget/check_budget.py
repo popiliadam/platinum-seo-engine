@@ -52,28 +52,64 @@ def _parse_ts(raw: str) -> datetime | None:
     return dt
 
 
+def _is_dfs_event(event: dict) -> bool:
+    """A DataForSEO spend: provenance from the DFS MCP OR a cost tagged
+    provider=dataforseo (D-10: HTTP-bypass and transform-written events used
+    to be invisible because only source.kind was checked)."""
+    if event.get("event_kind") != "provenance":
+        return False
+    src = event.get("source") if isinstance(event.get("source"), dict) else {}
+    cost = event.get("cost") if isinstance(event.get("cost"), dict) else {}
+    return src.get("kind") == "dataforseo_mcp" or cost.get("provider") == "dataforseo"
+
+
 def _extract_credits(event: dict) -> float:
-    """Return credit cost of a DataForSEO event, or 0 if unrelated."""
-    src = event.get("source") or {}
-    cost = event.get("cost") or {}
-    if (
-        event.get("event_kind") == "provenance"
-        and isinstance(src, dict)
-        and src.get("kind") == "dataforseo_mcp"
-        and isinstance(cost, dict)
-    ):
-        credits = cost.get("credits")
-        if isinstance(credits, (int, float)):
-            return float(credits)
-    return 0.0
+    """Return credit cost of a DataForSEO event, or 0 if unrelated/unknown."""
+    if not _is_dfs_event(event):
+        return 0.0
+    credits = (event.get("cost") or {}).get("credits")
+    return float(credits) if isinstance(credits, (int, float)) else 0.0
+
+
+def usage_last_24h(events_path: Path, now: datetime) -> dict:
+    """DFS spend in the last 24 h, with what is NOT known said out loud (D-10).
+
+    ``credits`` — sum of cost.credits; ``usd`` — sum of cost.amount where the
+    currency is USD (the response's own cost field); ``unknown_cost_events`` —
+    DFS events carrying neither, which are NOT counted as 0 silently: the
+    pre-flight reports them so the budget is known to be under-counted.
+    """
+    out = {"credits": 0.0, "usd": 0.0, "dfs_events": 0, "unknown_cost_events": 0}
+    for event in _events_last_24h(events_path, now):
+        if not _is_dfs_event(event):
+            continue
+        out["dfs_events"] += 1
+        cost = event.get("cost") if isinstance(event.get("cost"), dict) else {}
+        credits, amount = cost.get("credits"), cost.get("amount")
+        has_credits = isinstance(credits, (int, float))
+        has_usd = isinstance(amount, (int, float)) and str(cost.get("currency", "")).upper() == "USD"
+        if has_credits:
+            out["credits"] += float(credits)
+        if has_usd:
+            out["usd"] += float(amount)
+        if not has_credits and not has_usd:
+            out["unknown_cost_events"] += 1
+    return out
 
 
 def _sum_last_24h(events_path: Path, now: datetime) -> float:
+    usage = usage_last_24h(events_path, now)
+    if usage["unknown_cost_events"]:
+        _log(f"{usage['unknown_cost_events']} DataForSEO event(s) in the last 24h carry no "
+             "cost — usage is UNDER-counted (D-10)")
+    return usage["credits"]
+
+
+def _events_last_24h(events_path: Path, now: datetime):
     if not events_path.exists():
         _log(f"events file missing ({events_path}); treating usage as 0")
-        return 0.0
+        return
     cutoff = now - timedelta(hours=24)
-    total = 0.0
     with events_path.open("r", encoding="utf-8") as fh:
         for lineno, raw in enumerate(fh, start=1):
             line = raw.strip()
@@ -84,11 +120,12 @@ def _sum_last_24h(events_path: Path, now: datetime) -> float:
             except json.JSONDecodeError:
                 _log(f"skipping malformed JSON at {events_path}:{lineno}")
                 continue
+            if not isinstance(event, dict):
+                continue
             ts = _parse_ts(event.get("timestamp", ""))
             if ts is None or ts < cutoff:
                 continue
-            total += _extract_credits(event)
-    return total
+            yield event
 
 
 class BudgetGateError(RuntimeError):

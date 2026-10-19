@@ -60,6 +60,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from scripts.util import gsc_window  # noqa: E402  (D-01 truncation flag)
 from scripts.util.url_normalize import (  # noqa: E402  (sys.path mutation)
     URLNormalizeError as _URLNormalizeError,
     normalize_url as _canonical_normalize_url,
@@ -121,6 +122,9 @@ class _PageMetrics:
     # ctr is recomputed downstream from clicks/impressions; we keep the raw
     # weighted-position aggregate for accurate page-level position mean.
     position_weighted_sum: float
+    # D-12: impressions of rows that actually carried a position; a missing
+    # position is unknown, not 0.0 (which dragged the mean toward 1).
+    position_weight: float = 0.0
 
 
 def _safe_int(v: Any) -> int | None:
@@ -191,23 +195,27 @@ def _aggregate_window(payload: dict | None) -> dict[str, _PageMetrics]:
 
         clicks = _safe_int(entry.get("clicks")) or 0
         impressions = _safe_int(entry.get("impressions")) or 0
-        position = _safe_float(entry.get("position")) or 0.0
+        position = _safe_float(entry.get("position"))
 
         slot = bucket.setdefault(url_n, {
             "clicks": 0,
             "impressions": 0,
             "pos_w_sum": 0.0,
+            "pos_weight": 0.0,
         })
         slot["clicks"] += clicks
         slot["impressions"] += impressions
-        # Position weighted by impressions for accurate page-level mean.
-        slot["pos_w_sum"] += position * impressions
+        # Position weighted by impressions; rows without a position are skipped.
+        if position is not None and position > 0:
+            slot["pos_w_sum"] += position * impressions
+            slot["pos_weight"] += impressions
 
     return {
         url_n: _PageMetrics(
             clicks=int(v["clicks"]),
             impressions=int(v["impressions"]),
             position_weighted_sum=float(v["pos_w_sum"]),
+            position_weight=float(v["pos_weight"]),
         )
         for url_n, v in bucket.items()
     }
@@ -230,9 +238,10 @@ def _delta_pct(recent: int, previous: int) -> float:
 
 
 def _avg_position(metrics: _PageMetrics) -> float:
-    if metrics.impressions <= 0:
+    weight = metrics.position_weight
+    if weight <= 0:
         return 0.0
-    return round(metrics.position_weighted_sum / metrics.impressions, 2)
+    return round(metrics.position_weighted_sum / weight, 2)
 
 
 def _avg_ctr_pct(metrics: _PageMetrics) -> float:
@@ -309,7 +318,9 @@ def transform(
 
         # Note column carries a short trend hint; deterministic from the
         # delta values, no creativity, sheet-template friendly.
-        if clicks_delta_pct > 20:
+        if not previous:
+            note = "new"   # D-12: first run has no baseline — never "rising"
+        elif clicks_delta_pct > 20:
             note = "rising"
         elif clicks_delta_pct < -20:
             note = "decay"
@@ -345,6 +356,7 @@ def transform(
     return {
         "gsc_performance": gsc_perf_rows,
         "meta": {
+            "gsc_truncation": gsc_window.truncation(raw),
             "recent_url_count": len(recent),
             "previous_url_count": len(previous),
             "merged_url_count": len(gsc_perf_rows),
@@ -400,7 +412,9 @@ def aggregate_iso_weeks(daily_rows: Iterable[dict], today: Any) -> list[dict]:
             {"keys": ["2026-06-01"], "clicks": N, "impressions": M, "position": p}.
         today: anchor date (frozen arg; rules/time-discipline.md). The week
             containing `today` is excluded, AND any week whose Sunday is within
-            `_GSC_DATA_LAG_DAYS` of `today` is excluded (data-lag guard).
+            `_GSC_DATA_LAG_DAYS` of `today` is excluded (data-lag guard), and a
+            week that starts before the first day of the series (a mid-week
+            cold start) is excluded too (D-09: only complete ISO weeks).
 
     Returns weekly dicts (newest-week LAST, ascending iso_week) shaped for the
     ledger: {iso_week, week_start, week_end, clicks, impressions, ctr,
@@ -410,6 +424,7 @@ def aggregate_iso_weeks(daily_rows: Iterable[dict], today: Any) -> list[dict]:
     cutoff = today_d - timedelta(days=_GSC_DATA_LAG_DAYS)
 
     buckets: dict[str, dict] = {}
+    series_start: date | None = None
     for row in daily_rows:
         if not isinstance(row, dict):
             continue
@@ -420,6 +435,7 @@ def aggregate_iso_weeks(daily_rows: Iterable[dict], today: Any) -> list[dict]:
             d = _as_date(keys[0])
         except (ValueError, TypeError):
             continue
+        series_start = d if series_start is None or d < series_start else series_start
         clicks = _safe_int(row.get("clicks")) or 0
         impressions = _safe_int(row.get("impressions")) or 0
         position = _safe_float(row.get("position")) or 0.0
@@ -437,6 +453,10 @@ def aggregate_iso_weeks(daily_rows: Iterable[dict], today: Any) -> list[dict]:
     for label in sorted(buckets):
         b = buckets[label]
         if not (b["sunday"] < cutoff):   # week not fully elapsed past the lag → skip
+            continue
+        if series_start is not None and b["monday"] < series_start:
+            # D-09: the pull started mid-week (e.g. a Thursday cold start) —
+            # a partial week in an append-only ledger is a permanent fake dip.
             continue
         impressions = b["impressions"]
         ctr = round(b["clicks"] / impressions, 4) if impressions > 0 else 0.0
