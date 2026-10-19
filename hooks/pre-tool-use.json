@@ -43,7 +43,7 @@
         ]
       },
       {
-        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit|mcp__.*gsc__submit_sitemap",
+        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit|mcp__.*gsc__submit_sitemap|mcp__.*__(start_process|interact_with_process|run_in_terminal|execute_command|write_file|edit_block|move_file)",
         "hooks": [
           {
             "type": "command",

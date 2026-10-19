@@ -1070,6 +1070,59 @@ _FORGERY_MESSAGES = {
 
 
 # ---------------------------------------------------------------------------
+# Other shell / file tools (G-06) — mapped onto the Bash / Write / Edit classifiers
+# ---------------------------------------------------------------------------
+
+# tool-name suffix -> (canonical tool, field holding the command / path)
+_SHELL_TOOL_FIELDS = {
+    "__start_process": "command",
+    "__run_in_terminal": "command",
+    "__execute_command": "command",
+}
+_FILE_TOOL_FIELDS = {
+    "__write_file": ("Write", "path"),
+    "__edit_block": ("Edit", "file_path"),
+    "__move_file": ("Write", "destination"),
+}
+
+
+def _tool_variants(tool_name: str, tool_input) -> list[tuple[str, dict]]:
+    """The (tool, input) pairs to judge for one call.
+
+    Built-in tools pass through. Desktop Commander / terminal shell tools become
+    a Bash call; their file tools become Write / Edit on the path they touch. A
+    REPL input (``interact_with_process``) is judged both as a shell line and as
+    Python code, since the process behind it is usually ``python3 -i``.
+    """
+    ti = tool_input if isinstance(tool_input, dict) else {}
+    if isinstance(tool_name, str) and tool_name.startswith("mcp__"):
+        for suffix, field in _SHELL_TOOL_FIELDS.items():
+            if tool_name.endswith(suffix) and isinstance(ti.get(field), str):
+                return [("Bash", {"command": ti[field]})]
+        if tool_name.endswith("__interact_with_process") and isinstance(ti.get("input"), str):
+            code = ti["input"]
+            return [("Bash", {"command": code}),
+                    ("Bash", {"command": "python3 -c " + shlex.quote(code)})]
+        for suffix, (canonical, field) in _FILE_TOOL_FIELDS.items():
+            if tool_name.endswith(suffix) and isinstance(ti.get(field), str):
+                return [(canonical, {"file_path": ti[field]})]
+    return [(tool_name, tool_input)]
+
+
+def _gated(payload: dict) -> tuple[str | None, list[Hit]]:
+    """(forgery reason, every gated hit) for the call, across its tool variants."""
+    tool_name = payload.get("tool_name") or ""
+    variants = _tool_variants(tool_name, payload.get("tool_input"))
+    reason = None
+    for name, ti in variants:
+        reason = forgery_reason(name, ti, payload.get("cwd"))
+        if reason is not None:
+            break
+    hits = [hit for name, ti in variants for hit in assess_all(name, ti)]
+    return reason, hits
+
+
+# ---------------------------------------------------------------------------
 # Decision (IO via injected resolvers; fail-OPEN non-gated, fail-CLOSED gated)
 # ---------------------------------------------------------------------------
 
@@ -1110,12 +1163,9 @@ def evaluate(
     """
     if not isinstance(payload, dict):
         return (0, [])
-    tool_name = payload.get("tool_name") or ""
-    tool_input = payload.get("tool_input")
-    reason = forgery_reason(tool_name, tool_input, payload.get("cwd"))
+    reason, hits = _gated(payload)
     if reason is not None:
         return (2, list(_FORGERY_MESSAGES[reason]))
-    hits = assess_all(tool_name, tool_input)
     if not hits:
         return (0, [])  # not gated -> ALLOW
 
@@ -1212,11 +1262,8 @@ def main() -> int:
     """
     try:
         payload = json.loads(sys.stdin.read() or "{}")
-        tool_name = payload.get("tool_name") or "" if isinstance(payload, dict) else ""
-        tool_input = payload.get("tool_input") if isinstance(payload, dict) else None
-        critical = forgery_reason(tool_name, tool_input) is not None or any(
-            h.tier == TIER_CONSENT for h in assess_all(tool_name, tool_input)
-        )
+        reason, hits = _gated(payload) if isinstance(payload, dict) else (None, [])
+        critical = reason is not None or any(h.tier == TIER_CONSENT for h in hits)
     except Exception as exc:  # no confirmed gated action -> allow + a loud warning
         _emit(f"WARNING internal error, allowing (fail-open): {exc!r}")
         return 0
