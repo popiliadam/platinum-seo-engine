@@ -656,8 +656,18 @@ def _path_segments(path: str) -> list[str]:
     return [seg for seg in path.split("/") if seg not in ("", ".")]
 
 
+def _is_unresolvable(path: str) -> bool:
+    """A path the gate cannot know before the shell expands it."""
+    return path.startswith("~") or any(ch in path for ch in "$`")
+
+
 def _is_protected_path(path: str) -> bool:
-    """master.xlsx / ledgers / _state / backups / a projects/<slug> folder itself."""
+    """master.xlsx / ledgers / _state / backups / a projects/<slug> folder itself —
+    judged on the raw operand AND its normalised form (``outputs/../_state``)."""
+    return any(_is_protected_form(form) for form in {path, os.path.normpath(path)})
+
+
+def _is_protected_form(path: str) -> bool:
     segs = _path_segments(path)
     if not segs:
         return False
@@ -678,6 +688,13 @@ def _is_protected_path(path: str) -> bool:
 
 
 def _is_temp_path(path: str) -> bool:
+    """Temp/output location, judged AFTER normalisation; a path that climbs out of
+    its start (``outputs/../..``) or that the shell would expand is never temp."""
+    if _is_unresolvable(path):
+        return False
+    path = os.path.normpath(path)
+    if path == ".." or path.startswith("../"):
+        return False
     if path.startswith(tuple(_POLICY["temp_path_prefixes"])):
         return True
     if path.endswith(tuple(_POLICY["temp_suffixes"])):
@@ -767,39 +784,112 @@ _LEDGER_REDIRECT_RE = re.compile(r">\s*\S*" + re.escape(_LEDGER_NAME))
 _FILE_EDIT_TOOLS = frozenset({"Write", "Edit", "MultiEdit", "NotebookEdit"})
 
 
-def is_consent_forgery(tool_name: str, tool_input) -> bool:
-    """True when the call would write consent itself instead of the user granting it.
+_SCRIPT_RUNNERS = _INTERPRETER_TOKENS | frozenset({"bash", "sh", "zsh"})
+_ENV_ASSIGN_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
+_LEDGER_WRITE_MARKERS = ("'a'", '"a"', "'w'", '"w"', "write(", ">>", "O_APPEND", "O_WRONLY")
+_SCRIPT_SCAN_MAX_BYTES = 1_000_000
+
+
+def _writes_ledger(text: str) -> bool:
+    """Source text that appends consent: the writer API, the recorder CLI, or a
+    write-mode use of consent.jsonl."""
+    if "append_consent" in text:
+        return True
+    if "consent_ledger" in text and "approve" in text:
+        return True
+    return _LEDGER_NAME in text and any(m in text for m in _LEDGER_WRITE_MARKERS)
+
+
+def _script_files(segment: str, cwd: str | None) -> list[Path]:
+    """Files an interpreter/shell segment would execute (``python3 x.py``)."""
+    tokens = _unwrap_wrappers(_tokenize(segment))
+    while tokens and _ENV_ASSIGN_RE.match(tokens[0]):  # PYTHONPATH=. python3 x.py
+        tokens = tokens[1:]
+    if not tokens or tokens[0].rsplit("/", 1)[-1] not in _SCRIPT_RUNNERS:
+        return []
+    found: list[Path] = []
+    for tok in tokens[1:]:
+        if tok.startswith("-"):
+            if tok in ("-c", "-m", "-e"):  # inline code / module: no file to read
+                return found
+            continue
+        cand = Path(os.path.expanduser(tok))
+        if not cand.is_absolute() and cwd:
+            cand = Path(cwd) / cand
+        if cand.is_file():
+            found.append(cand)
+        break  # the first operand is the script; the rest are its arguments
+    return found
+
+
+def _is_installed_plugin_path(path: str) -> bool:
+    """A file inside the INSTALLED plugin (the gate, its policy, the hooks)."""
+    root = os.path.realpath(_PLUGIN_ROOT)
+    if "/plugins/cache/" not in root + "/":
+        return False  # running from a dev checkout: editing it is normal work
+    target = os.path.realpath(os.path.expanduser(path))
+    return target == root or target.startswith(root + os.sep)
+
+
+def forgery_reason(tool_name: str, tool_input, cwd: str | None = None) -> str | None:
+    """Why this call would let the model grant itself consent, or None.
 
     Covers the recorder CLI / ``append_consent`` from any shell, any non-read-only
-    command or redirect touching ``consent.jsonl``, and the file-edit tools on it.
+    command or redirect touching ``consent.jsonl``, a script FILE that writes the
+    ledger, the file-edit tools on the ledger, and edits to the installed plugin
+    (the gate and its policy). This is a guardrail against a model approving its
+    own action, not a sandbox: a process running as the same user can always
+    find another path, which is why consent itself is taken only from the user's
+    chat message (consent_from_prompt.py).
     """
     ti = tool_input if isinstance(tool_input, dict) else {}
     if tool_name in _FILE_EDIT_TOOLS:
         path = ti.get("file_path") or ti.get("notebook_path") or ""
-        return isinstance(path, str) and Path(path).name == _LEDGER_NAME
+        if not isinstance(path, str) or not path:
+            return None
+        if Path(path).name == _LEDGER_NAME:
+            return "ledger"
+        return "plugin" if _is_installed_plugin_path(path) else None
     command = _bash_command(tool_name, tool_input)
     if command is None:
-        return False
+        return None
     if "consent_ledger" in command and ("approve" in command or "append_consent" in command):
-        return True
-    if _LEDGER_NAME not in command:
-        return False
-    if _LEDGER_REDIRECT_RE.search(command):
-        return True
+        return "ledger"
+    if _LEDGER_NAME in command and _LEDGER_REDIRECT_RE.search(command):
+        return "ledger"
     for segment in _split_segments(command):
-        if _LEDGER_NAME not in segment:
-            continue
-        tokens = _unwrap_wrappers(_tokenize(segment))
-        if tokens and tokens[0].rsplit("/", 1)[-1] not in _READ_ONLY_TOKENS:
-            return True
-    return False
+        if _LEDGER_NAME in segment:
+            tokens = _unwrap_wrappers(_tokenize(segment))
+            if tokens and tokens[0].rsplit("/", 1)[-1] not in _READ_ONLY_TOKENS:
+                return "ledger"
+        for script in _script_files(segment, cwd):
+            try:
+                if script.stat().st_size <= _SCRIPT_SCAN_MAX_BYTES and _writes_ledger(
+                    script.read_text(encoding="utf-8", errors="replace")
+                ):
+                    return "ledger"
+            except OSError:
+                continue
+    return None
 
 
-_FORGERY_MESSAGES = [
-    "BLOCKED: onay defterine (consent.jsonl) model yazamaz.",
+def is_consent_forgery(tool_name: str, tool_input, cwd: str | None = None) -> bool:
+    """True when the call would let the model write its own consent (see forgery_reason)."""
+    return forgery_reason(tool_name, tool_input, cwd) is not None
+
+
+_CONSENT_HOW = (
     "Onay yalnız Claude sohbetine SENİN yazdığın mesajla kaydedilir:  "
-    f"{_APPROVE_COMMAND} <run_id> <action> <target>   ya da   onay: <action> <target>",
-]
+    f"{_APPROVE_COMMAND} <run_id> <action> <target>   ya da   onay: <action> <target>"
+)
+_FORGERY_MESSAGES = {
+    "ledger": ["BLOCKED: onay defterine (consent.jsonl) model yazamaz.", _CONSENT_HOW],
+    "plugin": [
+        "BLOCKED: kurulu eklentinin dosyaları (onay kapısı, kademe tablosu, hook'lar) "
+        "model tarafından değiştirilemez; değişiklik repo'da yapılıp eklenti yeniden kurulur.",
+        _CONSENT_HOW,
+    ],
+}
 
 
 # ---------------------------------------------------------------------------
@@ -845,8 +935,9 @@ def evaluate(
         return (0, [])
     tool_name = payload.get("tool_name") or ""
     tool_input = payload.get("tool_input")
-    if is_consent_forgery(tool_name, tool_input):
-        return (2, list(_FORGERY_MESSAGES))
+    reason = forgery_reason(tool_name, tool_input, payload.get("cwd"))
+    if reason is not None:
+        return (2, list(_FORGERY_MESSAGES[reason]))
     hits = assess_all(tool_name, tool_input)
     if not hits:
         return (0, [])  # not gated -> ALLOW
