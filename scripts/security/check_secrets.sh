@@ -336,6 +336,26 @@ for i in "${!PATTERNS[@]}"; do
       --exclude="test_ci_yaml.py" \
       --exclude="OPEN_QUESTIONS.md" 2>/dev/null || true)
   fi
+  # Policy (header): a GITIGNORED local .env / .env.* (not .env.example) is the
+  # sanctioned local-secrets store — a pattern hit there is a WARN, never a FAIL,
+  # exactly as in --scan-stdin mode. The K-11 unquoted-DFS pattern made the
+  # operator's real workspace .env fail a full scan without this.
+  if [ -n "$FILES" ]; then
+    KEPT=""
+    while IFS= read -r f; do
+      [ -z "$f" ] && continue
+      case "$(basename "$f")" in
+        .env.example) ;;
+        .env|.env.*)
+          if git -C "$(dirname "$f")" check-ignore -q -- "$f" 2>/dev/null; then
+            echo "WARN: $name in gitignored local $(basename "$f") ($f) — local credentials, no leak"
+            continue
+          fi ;;
+      esac
+      KEPT="${KEPT}${f}"$'\n'
+    done <<< "$FILES"
+    FILES="${KEPT%$'\n'}"
+  fi
   if [ -n "$FILES" ]; then
     echo ""
     echo "FAIL pattern: $name"
@@ -382,7 +402,9 @@ if [ -n "$ENV_FILES" ]; then
   FAIL_FILES=""
   while IFS= read -r env_file; do
     [ -z "$env_file" ] && continue
-    if git check-ignore -q "$env_file" 2>/dev/null; then
+    # -C: ask the repo that holds the file, not the caller's cwd (a scan of another
+    # tree used to call every gitignored .env "NOT gitignored").
+    if git -C "$(dirname "$env_file")" check-ignore -q -- "$env_file" 2>/dev/null; then
       WARN_FILES="$WARN_FILES $env_file"
     else
       FAIL_FILES="$FAIL_FILES $env_file"
