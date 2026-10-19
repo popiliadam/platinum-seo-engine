@@ -44,7 +44,7 @@ import sys
 import tempfile
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
@@ -585,20 +585,30 @@ def _atomic_save(wb: Workbook, target: Path) -> None:
         pass
 
 
+def _office_lockfile(target: Path) -> Path | None:
+    """The owner-lock sidecar of an open workbook, if any: Excel writes
+    ``~$<name>``, LibreOffice ``.~lock.<name>#`` (V-12)."""
+    for sidecar in (target.parent / f"~${target.name}",
+                    target.parent / f".~lock.{target.name}#"):
+        if sidecar.exists():
+            return sidecar
+    return None
+
+
 def _excel_lockfile_present(target: Path) -> bool:
-    """Detect Excel/LibreOffice owner-lock sidecar (~$Filename.xlsx)."""
-    sidecar = target.parent / f"~${target.name}"
-    return sidecar.exists()
+    """Detect an Excel/LibreOffice owner-lock sidecar next to ``target``."""
+    return _office_lockfile(target) is not None
 
 
 def _load_or_new(target: Path) -> Workbook:
     """Load an existing wb or create a new one. Wraps openpyxl exceptions."""
     if not target.exists():
         return Workbook()
-    if _excel_lockfile_present(target):
+    sidecar = _office_lockfile(target)
+    if sidecar is not None:
         raise WorkbookLockedByExcelError(
             f"workbook {target} appears open in Excel/LibreOffice "
-            f"(found ~${target.name})"
+            f"(found lock file {sidecar.name})"
         )
     try:
         return load_workbook(str(target))
@@ -659,6 +669,38 @@ def writer_registry_status(
 # ---------------------------------------------------------------------------
 # Internals — sheet I/O (header detection + row write)
 # ---------------------------------------------------------------------------
+
+def _normalized_cell(value: Any, ctype: str | None) -> Any:
+    """A cell value as the row schema expects it (V-10).
+
+    date/datetime → ISO text (``YYYY-MM-DD`` at midnight, else ``…THH:MM:SSZ``);
+    an integer column's whole float or digit string → int; a number column's
+    numeric string → float. Anything else is returned unchanged.
+    """
+    if isinstance(value, datetime):
+        if (value.hour, value.minute, value.second, value.microsecond) == (0, 0, 0, 0):
+            return value.date().isoformat()
+        return value.strftime("%Y-%m-%dT%H:%M:%SZ")
+    if isinstance(value, date):
+        return value.isoformat()
+    if ctype == "integer":
+        if isinstance(value, float) and value.is_integer():
+            return int(value)
+        if isinstance(value, str) and value.strip().lstrip("-").isdigit():
+            return int(value.strip())
+    if ctype == "number" and isinstance(value, str):
+        try:
+            return float(value)
+        except ValueError:
+            return value
+    return value
+
+
+def _normalized_cells(row: dict, columns: list[dict]) -> dict:
+    """A NEW row dict with every cell normalised for its column type."""
+    types = {c["name"]: c.get("type") for c in columns}
+    return {k: _normalized_cell(v, types.get(k)) for k, v in row.items()}
+
 
 def _ordered_columns(schema: dict, sheet: str) -> list[dict]:
     return list(schema["sheets"][sheet]["required_columns"])
@@ -920,6 +962,13 @@ def update(
         raise SchemaSheetMismatchError(f"sheet {sheet!r} not in schema")
     columns = _ordered_columns(schema, sheet)
     _check_writer_scope(schema, sheet, writer)
+    # V-11: an empty where matches every row, and a non-column key reads as None
+    # on every row — either way one call would rewrite the whole sheet.
+    if not where:
+        raise RowSchemaError("update requires a non-empty where (it would match every row)")
+    unknown = sorted(set(where) - {c["name"] for c in columns})
+    if unknown:
+        raise RowSchemaError(f"unknown column(s) in where: {unknown}")
 
     # Lock + load.
     state_dir = _state_dir(
@@ -945,7 +994,10 @@ def update(
                 for c in columns
             }
             if all(current.get(k) == v for k, v in where.items()):
-                merged = {**current, **set_}
+                # V-10: validate what the cells MEAN, not openpyxl's raw types —
+                # Excel turns a typed date into a datetime cell and numeric text
+                # into numbers, which used to block edits to any other column.
+                merged = {**_normalized_cells(current, columns), **set_}
                 affected_rows.append(merged)
                 # Validate the merged row before flushing.
                 validator = _build_row_validator(schema, sheet)
