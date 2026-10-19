@@ -469,7 +469,9 @@ def test_qw_report_filename_canonical() -> None:
 def test_qw_aio_inputs_present() -> None:
     fm = _qw_frontmatter()
     assert fm["inputs"]["aio_check"]["type"] == "boolean"
-    assert fm["inputs"]["aio_check"]["default"] is False
+    # S-18: AIO is checked by default for the top aio_top_k priority queries
+    assert fm["inputs"]["aio_check"]["default"] is True
+    assert fm["budget"]["uses_paid_mcp"] is True
     assert fm["inputs"]["aio_top_k"]["type"] == "integer"
     assert fm["inputs"]["aio_top_k"]["default"] == 20
 

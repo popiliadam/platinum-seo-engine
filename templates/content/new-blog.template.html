@@ -9,7 +9,7 @@
   - R-39 WCAG 2.1 AA (contrast, alt, heading linear)
   - R-78..R-84 schema markup JSON-LD @graph ONLY (R-83 — microdata/RDFa YASAK)
   - R-29 H2 cevap-önce, R-101 self-contained intro, R-102 AI summary footer
-  - R-09 FAQ talep-güdümlü 3-6, hard cap 10, statik visible (R-43 accordion yasak), R-79 FAQPage @graph
+  - R-09 FAQ talep-güdümlü 3-6, hard cap 10, statik visible (R-43 accordion yasak); R-79: FAQPage JSON-LD otomatik eklenmez (S-05)
   - R-26 CTA doğal akış, R-05 "Sonuç" başlığı yasak
   - Principle 1 truth-verifiable + Principle 2 profile-aware + Principle 3 anti-cheap-content
 -->
@@ -28,13 +28,13 @@
     <!-- R-28 EEAT updated date (zorunlu, tüm profile'larda) -->
     <p class="pse-meta">
       <time class="pse-date-modified" datetime="{{DATE_MODIFIED_ISO_8601}}">{{DATE_MODIFIED_HUMAN_TR}}</time>
-      <!-- {{!-- R-28 + R-82 author byline conditional: profiles ⊇ {ymyl} → render; else skip --}} -->
-      {{#IF_PROFILE_YMYL}}
+      <!-- {{!-- R-28 + R-82 + S-16: real author byline on EVERY post (voice/authors.json); no author → new-blog DURUR, never invented --}} -->
+      {{#IF_AUTHOR}}
       <address class="pse-author">
         <span class="pse-author__name">{{AUTHOR_NAME}}</span>,
         <span class="pse-author__title">{{AUTHOR_TITLE}}</span>
       </address>
-      {{/IF_PROFILE_YMYL}}
+      {{/IF_AUTHOR}}
     </p>
 
     <!-- R-31 TOC strategy (project-config[content_settings.toc_strategy] enum) -->
@@ -117,13 +117,12 @@
 </article>
 
 <!-- ============================================================================
-     META TAGS (R-58 lifecycle robots + R-103 content version)
+     META TAGS (R-58 lifecycle robots; R-103 sürüm motorda — sayfaya yazılmaz)
      Note: skill output `<meta>` tag'ı `<head>` injection için ayrı slot.
      Custom-block paste workflow'unda manuel head append (R-22 header dokunmaz).
      ============================================================================ -->
 <!--
 <meta name="robots" content="{{ROBOTS_DIRECTIVE}}">  R-58 lifecycle map
-<meta name="content-version" content="v{{CONTENT_VERSION}}">  R-103 major revise
 <link rel="canonical" href="{{CANONICAL_URL}}">  R-89 immutable on revise
 -->
 
@@ -157,7 +156,7 @@
       "logo": "{{LOGO_URL}}",
       "sameAs": {{SAME_AS_URLS_ARRAY}}
     },
-    {{#IF_PROFILE_YMYL}}
+    {{#IF_AUTHOR}}
     {
       "@type": "Person",
       "@id": "{{AUTHOR_URL}}#person",
@@ -166,14 +165,10 @@
       "url": "{{AUTHOR_URL}}",
       "sameAs": {{AUTHOR_SAME_AS_ARRAY}}
     },
-    {{/IF_PROFILE_YMYL}}
+    {{/IF_AUTHOR}}
     {
       "@type": "BreadcrumbList",
       "itemListElement": {{BREADCRUMB_ITEMS_ARRAY}}
-    },
-    {
-      "@type": "FAQPage",
-      "mainEntity": {{FAQ_ITEMS_ARRAY}}
     }
   ]
 }

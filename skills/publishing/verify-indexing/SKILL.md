@@ -224,9 +224,10 @@ YASAK.
 **Gate kuralları:**
 - target_urls dedup (canonical normalize: trailing slash, protocol,
   case-fold host) — aynı URL'i iki kez sorgulayıp credit harcamamak.
-- Per-run cap: max 200 URL (GSC URL Inspection 200/day default
-  quota). Cap aşımı AMBER warning + truncate, audit'a yazılır
-  (DURUR #4 partial result paterni).
+- Per-run cap: `index_inspection.run_cap(n, used_today=…)` — URL
+  Inspection API kotası mülk başına günde 2,000 (dakikada 600; S-21).
+  Cap aşımı AMBER warning + truncate, audit'a yazılır (DURUR #4 partial
+  result paterni).
 - Wildcard pattern (`*`, `?`) input olarak REJECT.
 - GSC raw response yoksa coverage row üretilmez — empty rather than
   hallucinated; bu kural "AI hayali coverage YASAK" garantisidir.
@@ -286,19 +287,23 @@ Search Console URL Inspection API docs):
 # Pseudocode — actual impl uses mcp__gsc__index_inspect tool call
 for url in validated_urls:
     raw = mcp_gsc_index_inspect(url=url, site_url=domain_property_url)
-    actual_status = raw.get("inspectionResult", {}) \
-                       .get("indexStatusResult", {}) \
-                       .get("coverageState", "unknown")
+    # S-21: verdict first (PASS = indexed); coverageState only separates
+    # "Crawled - currently not indexed". The raw sentence is never compared
+    # with the enum directly.
+    inspection = index_inspection.classify(raw)
+    actual_status = inspection.status          # indexed / not_indexed / crawled_not_indexed / unknown
     coverage.append({
         "url": url,
         "actual_status": actual_status,
+        "coverage_state": inspection.coverage_state,
+        "reason": inspection.reason,
         "expected_status": expected_status,
         "mismatch_bool": (actual_status != expected_status),
         "gsc_response_raw": raw,
     })
 ```
 
-Expected response: 200 success per URL. 429 quota → DURUR #4 AMBER
+Expected response: HTTP 200 success per URL. 429 quota → DURUR #4 AMBER
 partial result; remaining URLs skipped, partial flag in event.
 401 / auth fail → DURUR #1 ABORT.
 
@@ -310,8 +315,8 @@ result + event payload `quota_partial_flag=true`.
 Per-URL coverage list build:
 - `match_count` — `actual_status == expected_status`.
 - `mismatch_count` — diff.
-- `unknown_count` — actual_status="unknown" (GSC raw response missing
-  coverageState — counts as mismatch, separate flag).
+- `unknown_count` — actual_status="unknown" (no indexStatusResult or
+  verdict unspecified — counts as mismatch, separate flag).
 - `rejected_urls[]` — Step 3 reject.
 - `quota_partial_flag` — true if DURUR #4 fired mid-run.
 - `durations_ms` — per-step elapsed time.
@@ -385,7 +390,7 @@ Phase 11 lesson 29: report shape locked here so downstream consumers
 | 1  | GSC API auth fail (.env credentials missing veya 401)         | ABORT — RED, çıktı yok, audit-only event with audit_action=accessed + audit_target=gsc:index_inspect:auth_failure.          |
 | 2  | target_urls boş + completed_work auto-populate de boş         | SKIP — info severity, audit append, output report yine yazılır (empty coverage[], match_count=0, mismatch_count=0).         |
 | 3  | All URLs not_indexed (expected indexed → all mismatch)        | AMBER + escalate (`escalation_recommended=true` raporda, manuel inceleme).                                                  |
-| 4  | GSC URL Inspection quota exceeded (200/day default) mid-run   | AMBER + partial result; kalan URL'ler skipped; event payload `quota_partial_flag=true`.                                     |
+| 4  | GSC URL Inspection quota exceeded (2,000/day per property) mid-run   | AMBER + partial result; kalan URL'ler skipped; event payload `quota_partial_flag=true`.                                     |
 
 ## master.xlsx WRITE YASAK (F-1 + W-G1 paterni reuse)
 

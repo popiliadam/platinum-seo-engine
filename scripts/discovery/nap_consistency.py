@@ -19,9 +19,10 @@ Normalization notes
   ``İ->i`` and ``I->ı`` explicitly BEFORE ``str.lower()``, then fold Turkish
   diacritics to ASCII so ``Atatürk == ataturk`` and
   ``İstiklal == ISTIKLAL == istiklal``.
-* Address comparison is ORDER-SENSITIVE token equality after abbreviation
-  expansion: a sorted-set comparison would wrongly equate
-  ``"5 Sokak No:3"`` with ``"3 Sokak No:5"`` (street-number swap).
+* Address comparison is order-free over UNITS after abbreviation expansion
+  (S-22: GBP and the site order the parts differently). A number token is
+  bound to the word before it, so ``"5 Sokak No:3"`` still differs from
+  ``"3 Sokak No:5"`` (street-number swap).
 * Phone comparison normalizes both sides to E.164 with a trunk-zero rule;
   the dial-prefix country defaults to the canonical address country
   (fallback ``TR``). ``normalize_phone`` is a comparison aid, NOT a
@@ -125,6 +126,17 @@ def normalize_address_tokens(raw: str | dict) -> list[str]:
     return [_ABBREVIATIONS.get(token, token) for token in tokens]
 
 
+def _address_units(tokens: list[str]) -> list[str]:
+    """Group tokens into units: each numeric token joins the word before it."""
+    units: list[str] = []
+    for tok in tokens:
+        if any(ch.isdigit() for ch in tok) and units and not any(ch.isdigit() for ch in units[-1]):
+            units[-1] = f"{units[-1]} {tok}"
+        else:
+            units.append(tok)
+    return units
+
+
 def compare_nap(canonical: dict, observed: dict) -> list[dict]:
     """Compare an observed NAP surface (e.g. a fetched GBP listing) against
     the canonical ``local/nap.json`` doc.
@@ -178,8 +190,12 @@ def compare_nap(canonical: dict, observed: dict) -> list[dict]:
             same = normalize_phone(canonical_value, default_country) == \
                 normalize_phone(observed_value, default_country)
         elif field == "address":
-            same = normalize_address_tokens(canonical_value) == \
-                normalize_address_tokens(observed_value)
+            # S-22: GBP and the site write the same address in different
+            # orders ("Atatürk Cd. No:5 Kadıköy" vs "Kadıköy, Atatürk Cd. 5") —
+            # compare address UNITS order-free; a number stays bound to the
+            # word before it, so a street-number swap still differs.
+            same = sorted(_address_units(normalize_address_tokens(canonical_value))) == \
+                sorted(_address_units(normalize_address_tokens(observed_value)))
         else:
             same = _name_tokens(str(canonical_value)) == \
                 _name_tokens(str(observed_value))

@@ -254,15 +254,15 @@ def test_verify_indexing_durur_3_all_not_indexed() -> None:
 # ---------------------------------------------------------------------------
 
 def test_verify_indexing_durur_4_quota_partial() -> None:
-    """DURUR #4: GSC quota exceeded (200/day default) → AMBER + partial
+    """DURUR #4: GSC quota exceeded (2,000/day per property, S-21) → AMBER + partial
     result (kalan URL'ler skipped, event payload partial flag)."""
     text = _skill_text()
     assert "DURUR #4" in text
     assert "quota" in text.lower()
     assert "AMBER" in text
     assert "partial" in text.lower()
-    # Default quota cap referenced.
-    assert "200" in text
+    # Real URL Inspection API quota referenced (S-21).
+    assert "2,000" in text
 
 
 # ---------------------------------------------------------------------------

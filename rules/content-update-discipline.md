@@ -39,9 +39,11 @@ Bu doc Phase 10 content lifecycle (decay → revise → sunset/prune) disiplinin
 
 ### R-85: Decay Multi-Signal Threshold
 
-**Statement.** Content decay multi-signal threshold:
+**Statement.** Content decay multi-signal threshold — **TEK TANIM** (S-23; content-decay, revise-content ve content-remediation bunu cite eder, yeniden tanımlamaz; kod: `content_decay_transform._trend_label`):
 - GSC clicks delta < -30% (90 day vs prior 90) **AND** position delta > +5 (kötüleşme), **VEYA**
-- Impressions delta < -40% **AND** ranking trend negative.
+- Impressions delta < -40% **AND** ranking trend negative (pozisyon kötüleşmiş).
+- **Hacim tabanı:** önceki pencerede < 10 tıklama olan URL decay sayılmaz (3 → 1 tıklama gürültüdür); proje bazında `decay_min_previous_clicks`.
+- Profil `project.config.profiles` listesinden okunur; profil yoksa varsayılan eşik kullanılır ve bu rapor meta'sında yazılır (sessiz varsayılan yok).
 
 Profile-aware:
 - YMYL: decay threshold daha sıkı (-20% clicks, +3 position).
@@ -78,9 +80,9 @@ Profile-aware:
 
 **Statement.** Sahte güncellik yasak: dateModified update edip içeriği değiştirmemek (sadece tarih bump) **YASAK**. Genuine content change zorunlu.
 
-**Rationale.** Principle 3 (AI imza paterni preempt) + Google freshness theater detection (Helpful Content Update penalty).
+**Rationale.** Principle 3 (AI imza paterni preempt) + sahte tazelik (yalnız tarih değiştirmek) Google'ın insan odaklı içerik ölçütlerine aykırıdır; çekirdek sıralama sistemleri değerlendirir.
 
-**Enforcement.** revise-content skill change_summary boş veya word diff < 50 word → AMBER → 2x AMBER → RED. dateModified update'i content diff olmadan reject.
+**Enforcement.** TEK TANIM (S-23): `abs(word_delta) < 50 AND claim_delta == 0 AND NOT structure_changed` → RED (dateModified bump yok, çıktı discard); `claim_delta == 0 AND NOT structure_changed` ama `abs(word_delta) >= 50` → AMBER (manuel review); diğer her durum PASS. revise-content Step 6 bunu uygular.
 
 **Failure mode.** RED.
 
@@ -107,9 +109,11 @@ Profile-aware:
 ### R-91: Silinen URL 301/410 Decision Tree
 
 **Statement.** Sunsetted/pruned URL decision tree:
-- Cluster relevance gone + low traffic → **410 Gone** (Google permanent removal signal).
-- Cluster relevance partial + redirect target var → **301 Permanent Redirect** (link equity transfer).
-- Decision: `master.xlsx[redirect_404].action` enum (`301`, `410`); user override.
+- **Kod vetosu önce (S-25):** 600+ kelime, son 16 ayda tıklama veya dış link olan sayfa silinemez / 410 verilemez → 301 ile birleştir ya da yeniden yaz (`scripts/production/remediation_guard.py`; bilinmeyen sinyal = veto). Budama filtresi: 90 günde 0 tıklama, < 50 gösterim, son 3 ayda yayınlanmamış.
+- Cluster relevance gone + low traffic + veto yok → **410 Gone** (Google permanent removal signal). 410 verilen URL robots.txt'te **açık kalır** (Disallow eklenmez — R-133; aksi hâlde 410 görülmez).
+- Cluster relevance partial + redirect target var → **301 Permanent Redirect** (link equity transfer / birleştirme).
+- Kullanıcıya gerekli ama aramada değersiz sayfa → **noindex,follow** (sayfa kalır; Disallow yok).
+- Decision: `master.xlsx[redirect_404].action` enum (`301`, `410`); user override yalnız veto sınırları içinde.
 
 **Rationale.** 301 vs 410 SEO impact farklı; 410 hızlı deindex, 301 link equity korur.
 

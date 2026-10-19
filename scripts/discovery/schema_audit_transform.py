@@ -109,7 +109,7 @@ _REQUIRED_PROPS: dict[str, frozenset[str]] = {
     "BlogPosting":     frozenset({"headline", "author", "datePublished"}),
     "Product":         frozenset({"name", "image", "offers"}),
     "Organization":    frozenset({"name", "url"}),
-    "LocalBusiness":   frozenset({"name", "address", "telephone"}),
+    "LocalBusiness":   frozenset({"name", "address"}),
     "BreadcrumbList":  frozenset({"itemListElement"}),
     "FAQPage":         frozenset({"mainEntity"}),
     "Recipe":          frozenset({"name", "recipeIngredient", "recipeInstructions"}),
@@ -117,14 +117,92 @@ _REQUIRED_PROPS: dict[str, frozenset[str]] = {
     "Person":          frozenset({"name"}),
     "WebSite":         frozenset({"name", "url"}),
     "WebPage":         frozenset({"name"}),
+    "VideoObject":     frozenset({"name", "thumbnailUrl", "uploadDate"}),
 }
 
 # Optional-but-recommended props — presence-as-recommendation only.
 _RECOMMENDED_PROPS: dict[str, frozenset[str]] = {
-    "Product":         frozenset({"aggregateRating", "review", "brand"}),
+    # 2026 additions (S-14): Product category + hasAdultConsideration.
+    "Product":         frozenset({"aggregateRating", "review", "brand",
+                                  "category", "hasAdultConsideration"}),
     "Article":         frozenset({"image", "publisher"}),
+    # pseudo-prop set by extraction when every ListItem carries a position
     "BreadcrumbList":  frozenset({"itemListElement.position"}),
+    "LocalBusiness":   frozenset({"telephone", "url", "openingHoursSpecification"}),
+    "VideoObject":     frozenset({"creator", "description", "contentUrl", "duration"}),
 }
+
+# schema.org subtypes are checked with their parent's Google requirements
+# (S-14): a Dentist is a LocalBusiness, an OnlineStore an Organization.
+_PARENT_TYPES: dict[str, str] = {
+    **{t: "LocalBusiness" for t in (
+        "Dentist", "MedicalBusiness", "MedicalClinic", "Physician", "Optician",
+        "Pharmacy", "TravelAgency", "Restaurant", "CafeOrCoffeeShop", "Bakery",
+        "Store", "FurnitureStore", "HomeGoodsStore", "ElectronicsStore",
+        "ClothingStore", "PetStore", "AutoPartsStore", "TireShop", "AutoRepair",
+        "AutoDealer", "HomeAndConstructionBusiness", "HVACBusiness", "Plumber",
+        "Electrician", "RoofingContractor", "GeneralContractor", "HousePainter",
+        "Locksmith", "MovingCompany", "LegalService", "Attorney", "Notary",
+        "RealEstateAgent", "FinancialService", "AccountingService", "InsuranceAgency",
+        "BeautySalon", "HairSalon", "DaySpa", "HealthClub", "LodgingBusiness",
+        "Hotel", "ProfessionalService", "ChildCare", "DryCleaningOrLaundry",
+        "EmploymentAgency", "EntertainmentBusiness",
+    )},
+    **{t: "Organization" for t in (
+        "Corporation", "OnlineStore", "NGO", "EducationalOrganization",
+        "MedicalOrganization", "SportsOrganization", "GovernmentOrganization",
+        "NewsMediaOrganization",
+    )},
+}
+
+#: Types whose OWN review stars are self-serving (S-13).
+_SELF_SERVING_REVIEW_TYPES = frozenset({"LocalBusiness", "Organization"})
+
+#: Wording that signals an incentivised review (S-13, review policy 2026-07-24).
+_INCENTIVE_MARKERS = (
+    "yorum yap kazan", "yorum yaz kazan", "yorum karşılığı", "yorum karsiligi",
+    "indirim karşılığı", "hediye karşılığı", "review and win", "write a review and get",
+    "in exchange for a review", "in exchange for an honest review",
+    "incentivized review", "incentivised review", "free product for review",
+)
+
+
+def _rules_type(schema_type: str) -> str:
+    """The type whose Google requirements apply (parent for a known subtype)."""
+    return _PARENT_TYPES.get(schema_type, schema_type)
+
+
+def _review_texts(node: dict) -> list[str]:
+    reviews = node.get("review")
+    if isinstance(reviews, dict):
+        reviews = [reviews]
+    texts: list[str] = []
+    for review in reviews if isinstance(reviews, list) else []:
+        if isinstance(review, dict):
+            for key in ("reviewBody", "description", "name"):
+                value = review.get(key)
+                if isinstance(value, str):
+                    texts.append(value)
+    return texts
+
+
+def _node_flags(node: dict, types: tuple[str, ...]) -> frozenset[str]:
+    """Policy flags read from the JSON-LD node itself (S-13 / S-14)."""
+    flags: set[str] = set()
+    rule_types = {_rules_type(t) for t in types}
+    if rule_types & _SELF_SERVING_REVIEW_TYPES and (
+        "aggregateRating" in node or "review" in node
+    ):
+        flags.add("self_serving_rating")
+    text = " ".join(_review_texts(node)).lower()
+    if any(marker in text for marker in _INCENTIVE_MARKERS):
+        flags.add("incentive_review_text")
+    items = node.get("itemListElement")
+    if isinstance(items, list) and items and all(
+        isinstance(i, dict) and "position" in i for i in items
+    ):
+        flags.add("breadcrumb_positions")
+    return frozenset(flags)
 
 
 # ---------------------------------------------------------------------------
@@ -196,18 +274,13 @@ class _SchemaInstance:
     schema_type: str
     props: frozenset
     raw_type_value: str = ""
+    types: tuple[str, ...] = ()
+    flags: frozenset = frozenset()
 
     @property
-    def is_conflicting(self) -> bool:
-        """Multi-type with mixed top-level types is treated as conflict."""
-        if not self.raw_type_value:
-            return False
-        # If the raw @type was a list with ≥2 distinct non-empty entries,
-        # mark as conflicting. We compare against the chosen schema_type.
-        if "|" in self.raw_type_value:
-            parts = [p.strip() for p in self.raw_type_value.split("|") if p.strip()]
-            return len(set(parts)) >= 2
-        return False
+    def all_types(self) -> tuple[str, ...]:
+        """Every @type of the node (schema.org allows several; S-14)."""
+        return self.types or (self.schema_type,)
 
 
 def _flatten_jsonld(node: Any) -> list[dict]:
@@ -303,10 +376,15 @@ def _extract_schema_instances(
             schema_type = _coerce_type(t_raw)
             if not schema_type:
                 continue
+            types = tuple(
+                _safe_str(x) for x in (t_raw if isinstance(t_raw, list) else [t_raw])
+                if _safe_str(x)
+            )
+            flags = _node_flags(node, types)
             props = frozenset(
                 k for k in node.keys()
                 if isinstance(k, str) and not k.startswith("@")
-            )
+            ) | ({"itemListElement.position"} if "breadcrumb_positions" in flags else set())
             # Encode multi-type info into raw_type_value for conflict detection.
             if isinstance(t_raw, list) and len(t_raw) >= 2:
                 raw_type_value = "|".join(_safe_str(x) for x in t_raw if _safe_str(x))
@@ -317,6 +395,8 @@ def _extract_schema_instances(
                 schema_type=schema_type,
                 props=props,
                 raw_type_value=raw_type_value,
+                types=types,
+                flags=flags,
             ))
 
     # --- Path B: presence-only types list (fallback when no blob) ---------
@@ -360,7 +440,9 @@ def _derive_status_and_work(
 ) -> tuple[str, str]:
     """Map a parsed schema instance + DFS confirmation flag → (status, remaining_work).
 
-    - Conflicting top-level @type → BLOCKED.
+    - Several @types are checked together (union of their requirements); a
+      subtype uses its parent's (Dentist → LocalBusiness). A type with no tracked
+      Google requirements is EXISTS "not validated", never DONE (S-14).
     - Required props missing → TODO; remaining_work names the missing props.
     - Required all present, recommended missing → EXISTS; remaining_work names
       the recommended gap.
@@ -369,14 +451,16 @@ def _derive_status_and_work(
     DFS confirmation only enriches `remaining_work` (e.g. "(DFS confirmed)" /
     "(DFS missing live)"); it never silently downgrades a TODO to DONE.
     """
-    if instance.is_conflicting:
+    rule_types = [_rules_type(t) for t in instance.all_types]
+    known = [t for t in rule_types if t in _REQUIRED_PROPS or t in _RECOMMENDED_PROPS]
+    if not known:
         note = (
-            f"resolve conflicting @type ({instance.raw_type_value}); "
-            "schema.org allows multi-type but mixed top-level types break rich results"
+            f"{instance.schema_type}: not validated — no Google rich-result "
+            "requirements tracked for this type; check it in the Rich Results Test"
         )
-        return "BLOCKED", _decorate_dfs(note, dfs_confirmed)
+        return "EXISTS", _decorate_dfs(note, dfs_confirmed)
 
-    required = _REQUIRED_PROPS.get(instance.schema_type, frozenset())
+    required = frozenset().union(*(_REQUIRED_PROPS.get(t, frozenset()) for t in known))
     missing_required = sorted(required - instance.props)
     if required and not instance.props:
         # Presence-only fallback (no blob) — we know the type exists but
@@ -396,7 +480,7 @@ def _derive_status_and_work(
         )
         return "TODO", _decorate_dfs(note, dfs_confirmed)
 
-    recommended = _RECOMMENDED_PROPS.get(instance.schema_type, frozenset())
+    recommended = frozenset().union(*(_RECOMMENDED_PROPS.get(t, frozenset()) for t in known))
     missing_recommended = sorted(recommended - instance.props)
     if missing_recommended:
         note = (
@@ -406,6 +490,31 @@ def _derive_status_and_work(
         return "EXISTS", _decorate_dfs(note, dfs_confirmed)
 
     return "DONE", _decorate_dfs("schema complete", dfs_confirmed)
+
+
+_POLICY_NOTES = {
+    "self_serving_rating": (
+        "self-serving review markup (aggregateRating/review) on a LocalBusiness/"
+        "Organization about itself: Google shows no review stars for it and the "
+        "review-snippet policy disallows it — remove, or mark up third-party reviews only"
+    ),
+    "incentive_review_text": (
+        "incentivised review wording in review markup ('yorum yap kazan' / 'in "
+        "exchange for a review'): undisclosed incentivised reviews breach Google's "
+        "review policy (2026-07-24) — disclose the incentive or drop those reviews"
+    ),
+}
+
+
+def _policy_candidates(inst: "_SchemaInstance") -> list["_Candidate"]:
+    """One TODO row per review-policy flag on the node (S-13)."""
+    return [
+        _Candidate(
+            schema_type=inst.schema_type, status="TODO", location=inst.url,
+            scope="page-level", remaining_work=_POLICY_NOTES[flag],
+        )
+        for flag in sorted(inst.flags) if flag in _POLICY_NOTES
+    ]
 
 
 def _decorate_dfs(note: str, dfs_confirmed: bool | None) -> str:
@@ -683,6 +792,7 @@ def transform(
                 scope="page-level",
                 remaining_work=remaining,
             ))
+            candidates.extend(_policy_candidates(inst))
 
     schema_rows = _aggregate(candidates)
 

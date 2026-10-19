@@ -68,7 +68,7 @@ Bu 3 prensip Phase 10 content rules setinin **üst-prensibidir**. Hiçbir alt-ru
 
 **Statement.** AI'ın doğal davranışını (cheap content padding, signature words, multi-list inflation) **preempt** et. Kalite > hacim.
 
-**Rationale.** Generic LLM çıktısı 3 sinyalde patlar: (a) H2'leri başlık olarak basıp tek paragraf yazar, derinlik yok; (b) "Aslında", "Önemli olan", "Sonuç olarak", "Özetle" gibi imza kelimeleri tekrarlar; (c) listeler ile word-count şişirir (multi-list per H2). AIO/AI Overview citation alma şansı bu cheap content'te sıfırdır; ranking penalty kuvvetli (Helpful Content Update sinyali).
+**Rationale.** Generic LLM çıktısı 3 sinyalde patlar: (a) H2'leri başlık olarak basıp tek paragraf yazar, derinlik yok; (b) "Aslında", "Önemli olan", "Sonuç olarak", "Özetle" gibi imza kelimeleri tekrarlar; (c) listeler ile word-count şişirir (multi-list per H2). AIO/AI Overview citation alma şansı bu cheap content'te sıfırdır; çekirdek sıralama sistemlerinin insan odaklı içerik değerlendirmesinde zayıf kalır.
 
 **Enforcement patterns.**
 - **H3 zorunluluk gate** — H2 word count > 200 → min 2 H3 (R-30; AI H2 basıp geçmesin).
@@ -117,15 +117,15 @@ Bu 3 prensip Phase 10 content rules setinin **üst-prensibidir**. Hiçbir alt-ru
 
 **Failure mode.** RED.
 
-### R-32: Parasite SEO Yasak
+### R-32: Site İtibarı Politikası (Site Reputation Policy)
 
-**Statement.** 3rd-party domain (Medium, LinkedIn, Substack, Reddit) üzerinden hızlı ranking için içerik yayınlama yasak. Tüm content kendi domain'inde, kendi schema'sıyla.
+**Statement.** Müşterinin alan adında, **yeterli editoryal denetim olmadan** barındırılan üçüncü taraf içerik (sponsorlu bölümler, kupon/indirim alt dizinleri, reklam veren makaleleri, ortaklık "partner" sayfaları) sitenin sıralama sinyallerinden yararlanmak için kullanılamaz. Böyle bir bölüm varsa motor bunu bulgu olarak raporlar; üçüncü taraf içerik ya ana içerikle aynı editoryal denetimden geçer ya da dizine eklenmez (`noindex`). Motorun ürettiği içerik müşterinin kendi alan adındadır (`new_content_plan.assigned_url` host == project_domain).
 
-**Rationale.** Parasite SEO Google 2024 sonrası policy'sinde manuel action riski; domain reputation 3rd-party'ye bağımlı; replay/audit imkansız (3rd-party platform değiştirebilir).
+**Rationale.** Google spam politikası, site itibarı bölümü (https://developers.google.com/search/docs/essentials/spam-policies#site-reputation), **2026-08-28**'de yeniden yazıldı; adı "site reputation policy", ölçütü barındıran sitenin üçüncü taraf içerik üzerindeki editoryal denetimi. Müşterinin Medium/LinkedIn gibi platformlarda kendi adıyla yayın yapması bu politikanın konusu DEĞİLDİR (eski metin bunu yanlış olarak "parazit SEO" sayıyordu); motor bunu yalnız ölçüm ve tekrar üretilebilirlik nedeniyle tercih etmez.
 
-**Enforcement.** `master.xlsx[new_content_plan].assigned_url` kontrol — host == project_domain olmalı; aksi halde content plan FAIL.
+**Enforcement.** (1) `new_content_plan.assigned_url` host kontrolü; (2) site denetiminde `/sponsored`, `/kupon`, `/coupon`, `/partner`, `/advertorial` benzeri üçüncü taraf bölümler için editoryal denetim sorusu (insan kontrol listesi).
 
-**Failure mode.** RED.
+**Failure mode.** (1) RED; (2) AMBER bulgu.
 
 ### R-44: Source Verification 3-Katman
 
@@ -233,7 +233,7 @@ Bu 3 prensip Phase 10 content rules setinin **üst-prensibidir**. Hiçbir alt-ru
 
 **Statement.** Yayın öncesi content uniqueness skoru ≥ 70% (paragraph-level shingling vs. SERP top-10). Düşük skor AI-generated paraphrase sinyali.
 
-**Rationale.** Principle 3. Generic AI çıktısı SERP top-10 ile %50+ overlap üretir; uniqueness check Helpful Content Update sinyali.
+**Rationale.** Principle 3. Generic AI çıktısı SERP top-10 ile %50+ overlap üretir; uniqueness check insan odaklı içerik (people-first) ölçütünün parçası; çekirdek sıralama sistemleri değerlendirir.
 
 **Enforcement.** `project.config.json[content_settings.external_uniqueness_check]` boolean ON ise pre-publish check; threshold altı AMBER.
 
@@ -253,7 +253,7 @@ Bu 3 prensip Phase 10 content rules setinin **üst-prensibidir**. Hiçbir alt-ru
 
 **Statement.** "Birinci el deneyim" claim'i (kullandım, denedim, ölçtüm) → bank-driven (`project.config.json[content_settings.experience_database]`). Skill kendi adına first-hand iddia etmez.
 
-**Rationale.** Principle 1 + EEAT (Experience). Uydurma deneyim "uzmanlık tiyatrosu" — Helpful Content Update penalty.
+**Rationale.** Principle 1 + EEAT (Experience). Uydurma deneyim "uzmanlık tiyatrosu" — güvenilirlik ve insan odaklı içerik ölçütlerine aykırı; ayrıca yanıltıcıdır.
 
 **Enforcement.** First-person experience pattern detect → bank lookup → eşleşme yoksa cümle restructure ("kullanıcılar X yapıyor" gibi 3rd-person).
 

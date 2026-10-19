@@ -343,24 +343,23 @@ img.save(f"outputs/images/{slug}-{kind}.jpg",  format="JPEG", quality=88)
 
 ### Step 5b — `r123_iptc_disclosure_write` (R-123 AI Image Disclosure)
 
-Format cascade tamamlandıktan sonra (Step 5), WebP + JPG outputs IPTC
-`DigitalSourceType=TrainedAlgorithmicMedia` metadata ile patch edilir
-(Google Merchant Center AI-image disclosure policy + 2026-05-15 AI
-Optimization Guide reaffirmation). AVIF silent skip — piexif format
-desteklemez (R-123 failure_mode AMBER, R-76 cascade'in WebP + JPG
-çıktıları metadata garantisi sağlar).
+Format cascade tamamlandıktan sonra (Step 5), AVIF + WebP + JPG çıktılarının
+HEPSİ XMP içinde gerçek IPTC `Iptc4xmpExt:DigitalSourceType =
+http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia`
+(TrainedAlgorithmicMedia) ile işaretlenir (Google gen-AI içerik kılavuzu
+2026-10-01 + Merchant Center). Etiket görünmez metadata'dır; sayfaya görünür
+"AI" ibaresi eklemez. Format atlanmaz (AVIF artık skip değil).
 
 ```python
-from scripts.util.iptc_metadata import write_ai_image_disclosure
+from scripts.util.iptc_metadata import read_digital_source_type, write_ai_image_disclosure
 
-# AVIF skip — piexif unsupported (documented R-123 failure_mode)
-for output_path in [webp_path, jpg_path]:
+for output_path in [avif_path, webp_path, jpg_path]:
     write_ai_image_disclosure(output_path)
+    assert read_digital_source_type(output_path)  # verify before upload
 ```
 
 R-123 enforcement (`rules/content-html-discipline.md`). Utility:
-`scripts/util/iptc_metadata.write_ai_image_disclosure` (5/5 unit test
-PASS — round-trip + idempotent + missing-file + WebP + constant-format).
+`scripts/util/iptc_metadata` (Pillow XMP; exiftool/piexif gerekmez).
 
 ### Step 6 — `r75_picture_tag_lcp` (LCP Optimization)
 

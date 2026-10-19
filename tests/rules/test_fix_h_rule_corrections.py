@@ -95,7 +95,7 @@ def test_h3_r25_no_phantom_internal_links_sheet():
 # --- H4: R-35 single canonical title/desc authority ------------------------
 def test_h4_r35_single_authority_with_heuristic_note():
     block = _rule_block(_read("content-html-discipline.md"), "R-35")
-    assert "580" in block and "990" in block, "R-35 canonical px caps: title 580 / desc 990"
+    assert "580" in block and "920" in block, "R-35 canonical px caps: title 580 / desc 920"
     low = block.lower()
     assert "tek otorite" in low or "single authority" in low, "R-35 must declare itself the single authority"
     assert "60/160" in block, "char counts (60/160) must be named as the tech-audit heuristic"
@@ -157,9 +157,14 @@ def test_h8_cadence_variation_instruction():
     for rid, src in [("R-06", seo), ("R-07", seo), ("R-30", seo), ("R-106", llm)]:
         block = _rule_block(src, rid)
         low = block.lower()
-        assert ("varyasyon" in low or "örnekle" in low or "birebir" in low or "identical" in low), (
-            f"{rid} must convert its fixed cadence to a range with an explicit "
-            f"per-post variation instruction (no identical structural cadence across posts)"
+        # H8 turned fixed cadences into ranges. S-04 (2026-10-19) removed the
+        # "vary it across posts to avoid a fingerprint" justification: the
+        # range stays, the count follows from the page's own question.
+        assert ("aralık" in low or "range" in low or "ihtiyac" in low or "sonucu" in low), (
+            f"{rid} must keep a range / need-driven count, not a fixed cadence"
+        )
+        assert "parmak izi" not in low and "fingerprint" not in low, (
+            f"{rid} must not justify structure by hiding a pattern (S-04)"
         )
 
 

@@ -32,13 +32,18 @@ Bu doc Phase 10 LLM/AIO görünürlük disiplinini tanımlar (LLMs.txt, per-bot 
 
 ### R-99: Per-Bot LLM Allow
 
-**Statement.** `robots.txt` per-bot LLM allow/disallow rule'ları (`GPTBot`, `ClaudeBot`, `Google-Extended`, `PerplexityBot`, `CCBot`). `project.config.json[ai_bots]` array consume.
+**Statement.** `robots.txt` per-bot LLM allow/disallow rule'ları üç sınıfta ele alınır (2026):
+- **Eğitim** (model eğitimi — müşteri kararı): `GPTBot`, `ClaudeBot`, `Google-Extended`, `CCBot`, `Applebot-Extended`, `Bytespider`.
+- **Arama** (AI cevap/arama dizini — engellemek siteyi o cevaplardan çıkarır): `OAI-SearchBot`, `PerplexityBot`, `Claude-SearchBot`.
+- **Kullanıcı** (bir kişi asistana sorunca yapılan getirme): `ChatGPT-User`, `Claude-User`, `Perplexity-User`.
+
+Varsayılan öneri: arama ve kullanıcı botlarına izin; eğitim botları müşteri kararı. `Claude-Web` kullanımdan kalktı (kural yazmak işe yaramaz). `project.config.json[ai_bots]` = müşterinin izin verdiği ajanlar; robots-policy-audit bunu okur (izinli ama engellenmiş ajan = MEDIUM, engellenmiş arama/kullanıcı botu = HIGH). Sınıf listesinin tek kaynağı: `scripts/discovery/robots_policy_transform.py::AI_BOT_CLASSES`.
 
 **Rationale.** Principle 2. Per-project LLM training opt-in/opt-out kararı. **Önemli düzeltme:** `Google-Extended` yalnızca **Gemini uygulamaları ve Vertex AI** için training + grounding erişimini kontrol eder; Google **Arama sıralamasını VEYA AI Overview (AIO) kapsamını ETKİLEMEZ** (AIO, Googlebot taraması + snippet kontrolleriyle —`nosnippet`/`max-snippet`/`data-nosnippet`— yönetilir). Bu iki mekanizma ayrıdır; Google-Extended'i bloklamak AIO/Arama görünürlüğünü etkilemez.
 
-**Enforcement.** init-project + content-remediation skill robots.txt patch; ai_bots array per-bot directive render.
+**Enforcement.** robots-policy-audit (`AI_BOT_CLASSES` + `ai_bots` okunur, öneri müşterinin bilinçli bot engelini korur); init-project varsayılan `ai_bots` = klasik arama + AI arama + kullanıcı ajanları.
 
-**Failure mode.** Silent (default empty allow-all).
+**Failure mode.** Arama botu engeli = HIGH bulgu; config/dosya uyuşmazlığı = MEDIUM.
 
 ### R-101: Self-Contained Intro + H2 Cevap-Önce (LLM-Friendly)
 
@@ -62,17 +67,17 @@ Bu doc Phase 10 LLM/AIO görünürlük disiplinini tanımlar (LLMs.txt, per-bot 
 
 ### R-103: Content Versioning Marker (Major Revise)
 
-**Statement.** Major revise (R-87 section-targeted bilinen, > 30% content değişimi) → content versioning marker `<meta name="content-version" content="v{{N}}">` head'de. v1 default; v2+ revise sonrası increment.
+**Statement.** Major revise (`claim_delta > 5` VEYA `structure_changed` VEYA profil değişimi — revise-content Step 7 tek tanım) → içerik sürümü artar (v1 → v2). Sürüm **motorda** tutulur: `outputs/blog/{slug}/version.json` + change_summary geçmişi. Sayfaya standart dışı `<meta name="content-version">` etiketi YAZILMAZ (S-23: hiçbir arama motoru okumaz); sayfadaki tazelik sinyali gerçek değişiklikle birlikte güncellenen `dateModified`'dır (R-88).
 
-**Rationale.** AIO/LLM bot freshness signal; major revise re-citation şansı.
+**Rationale.** Hangi revizyonun ne değiştirdiği izlenebilir kalır; sayfaya anlamsız işaret eklenmez.
 
-**Enforcement.** revise-content skill change_summary > 30% → version increment.
+**Enforcement.** revise-content Step 7 version.json'u günceller.
 
 **Failure mode.** Silent.
 
 ### R-106: Citation Patterns (Universal)
 
-**Statement.** Citation pattern universal (Principle 3): per 500 word **min 1 max 2 citation** (aralık). Aralık içinde örnekle; post'lar arası birebir aynı citation kadansını üretme (mekanik parmak izi önleme). Format: `<a href="URL" rel="external noopener">Source Name</a>` veya inline parenthetical "(Source, 2024)".
+**Statement.** Citation pattern universal (Principle 3): per 500 word **min 1 max 2 citation** (aralık). Kaynak, iddianın olduğu yerde verilir; sayı bu ihtiyacın sonucudur. Format: `<a href="URL" rel="external noopener">Source Name</a>` veya inline parenthetical "(Source, 2024)".
 
 **Rationale.** Principle 3 (UX overload önleme) + AIO citation density signal.
 

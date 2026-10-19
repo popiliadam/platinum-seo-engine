@@ -95,11 +95,10 @@ def test_frontmatter_required_fields_present() -> None:
     assert fm["budget"]["uses_paid_mcp"] is False
     assert fm["budget"]["estimated_credits"] == 0
     assert fm["autonomy"]["confidence"] == "HIGH"
-    # A Google Indexing API URL_UPDATED submit is consent-gated: it requires
-    # explicit operator approval each run and is never autonomous (2026-06-04
-    # deep audit — aligns the skill with the indexing-api-consent rule).
-    assert fm["autonomy"]["requires_approval"] is True
-    assert fm["autonomy"]["safe_auto_execute"] is False
+    # S-01 (owner decision 2026-10-13): URL_UPDATED runs without consent through
+    # the official path; only URL_DELETED is consent-gated (inside the helper).
+    assert fm["autonomy"]["requires_approval"] is False
+    assert fm["autonomy"]["safe_auto_execute"] is True
 
 
 # ---------------------------------------------------------------------------
@@ -500,61 +499,16 @@ def test_report_artifact_json_shape_documented() -> None:
 # Test 17 — FIX-K K6: Google Indexing API URL_UPDATED eligibility hard-gate
 # ---------------------------------------------------------------------------
 
-def test_url_updated_eligibility_hard_gate() -> None:
-    """FIX-K K6 (policy-critical): the per-URL Google Indexing API
-    (`URL_UPDATED`) is NOT a generic indexing channel. Per Google's documented
-    restriction it accepts ONLY pages carrying JobPosting or BroadcastEvent
-    structured data; everything else is a spam-policy violation. The skill
-    contract must therefore:
-      (a) name both eligible structured-data types,
-      (b) require a deterministic eligibility hard-gate (JSON-LD @type check)
-          before any future URL_UPDATED,
-      (c) document the ineligible-page REFUSAL path,
-      (d) keep sitemap-submit + IndexNow as the generic channels, and
-      (e) keep the operator-consent gate as necessary-but-NOT-sufficient.
-    The audit#2 F4 semantics guard (no call_type=URL_UPDATED on the wired
-    sitemap path) must survive."""
+def test_per_url_indexing_runs_through_the_official_path() -> None:
+    """S-01 replaces FIX-K K6. The owner decided (2026-10-13) to use the Indexing
+    API for every page, knowing Google documents it for JobPosting /
+    BroadcastEvent only. The skill must say so, route every per-URL send through
+    scripts/production/indexing_submit.py (live check, daily quota, record),
+    keep consent for URL_DELETED, and keep the audit#2 F4 guard."""
     text = _skill_text()
-
-    # (a) Both eligible structured-data types named.
-    assert "JobPosting" in text, "K6: JobPosting eligibility type missing"
-    assert "BroadcastEvent" in text, "K6: BroadcastEvent eligibility type missing"
-
-    # (b) Deterministic eligibility hard-gate tying URL_UPDATED to JSON-LD.
-    assert "eligibility" in text.lower(), "K6: eligibility gate language missing"
-    assert "hard-gate" in text.lower() or "hard gate" in text.lower(), (
-        "K6: the eligibility check must be framed as a hard-gate"
-    )
-    assert (
-        re.search(r"(JobPosting|BroadcastEvent).{0,400}(JSON-LD|@type|structured data)",
-                  text, re.IGNORECASE | re.DOTALL)
-        or re.search(r"(JSON-LD|@type|structured data).{0,400}(JobPosting|BroadcastEvent)",
-                     text, re.IGNORECASE | re.DOTALL)
-    ), "K6: eligibility pre-check must tie JobPosting/BroadcastEvent to JSON-LD"
-
-    # (c) Refusal path for ineligible pages.
-    assert "REFUSE" in text or "refuse" in text.lower(), (
-        "K6: ineligible-page refusal verb missing"
-    )
-    assert re.search(r"(ineligible|uygun değil)", text, re.IGNORECASE), (
-        "K6: ineligible-page refusal path must be documented"
-    )
-
-    # (d) Indexing API is NOT a generic channel; generic = sitemap + IndexNow.
-    assert "NOT a generic channel" in text, (
-        "K6: must state the per-URL Indexing API is NOT a generic channel"
-    )
-    assert "IndexNow" in text and "sitemap" in text.lower(), (
-        "K6: sitemap-submit + IndexNow must remain the generic channels"
-    )
-
-    # (e) Operator-consent gate is necessary but NOT sufficient.
-    assert re.search(r"necessary but NOT sufficient", text), (
-        "K6: consent gate must be documented as necessary-but-not-sufficient"
-    )
-
-    # audit#2 F4 semantics guard preserved: no call_type=URL_UPDATED literal.
-    assert re.search(r"call_type`?\s*=\s*`?URL_UPDATED", text) is None, (
-        "K6 must not regress the audit#2 F4 fix (call_type=URL_UPDATED on "
-        "the wired sitemap path)"
-    )
+    assert "2026-10-13" in text and "JobPosting" in text and "BroadcastEvent" in text
+    assert "indexing_submit.py" in text and "/pseo-index" in text
+    assert "Live check first" in text and "Daily quota" in text
+    assert "URL_DELETED" in text and "/pseo-approve" in text
+    assert "_index_*.py" in text
+    assert re.search(r"call_type`?\s*=\s*`?URL_UPDATED", text) is None

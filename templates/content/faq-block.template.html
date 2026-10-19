@@ -5,7 +5,7 @@
   Rules consumed:
   - R-09 FAQ talep-güdümlü 3-6, hard cap 10
   - R-43 accordion YASAK — statik visible
-  - R-79 FAQPage schema @graph inline
+  - R-79 FAQPage JSON-LD otomatik eklenmez (rich result 2026-05-07'den beri yok; S-05)
   - R-21 semantic HTML5 (h3, p)
   - R-39 WCAG 2.1 AA (heading hierarchy, focus-visible)
   - R-61 pse- prefix BEM
@@ -13,7 +13,7 @@
 
   Rendering note:
   - Skill render time her FAQ için <div class="pse-faq-item"> repeat.
-  - FAQPage schema {{FAQ_ITEMS_ARRAY}} array → new-blog.template.html @graph içine inject.
+  - Yalnız görünür SSS bloğu üretilir; JSON-LD eşi yoktur.
 -->
 
 <!-- ============================================================================
@@ -23,7 +23,7 @@
 
   {{!-- Repeat the demand-driven FAQ items (3-6, hard cap 10).
         Skill yields one <div class="pse-faq-item"> per Q&A.
-        Schema @graph below renders parallel JSON-LD entries (R-79 + R-83). --}}
+        No JSON-LD counterpart (R-79 / S-05). --}}
 
   <div class="pse-faq-item">
     <h3 class="pse-faq-item__question">{{QUESTION_1}}</h3>
@@ -43,52 +43,3 @@
   </div>
 
 </div>
-
-<!-- ============================================================================
-     FAQPage SCHEMA — JSON-LD @graph inline (R-79 + R-83)
-     Skill render time @graph node, parent <script type="application/ld+json">
-     içine append. Bu fragment standalone değil — new-blog.template.html
-     @graph array'inin bir node'u.
-     ============================================================================ -->
-<!--
-{
-  "@type": "FAQPage",
-  "mainEntity": [
-    {
-      "@type": "Question",
-      "name": "{{QUESTION_1}}",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "{{ANSWER_1}}"
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "{{QUESTION_2}}",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "{{ANSWER_2}}"
-      }
-    },
-    ...
-    {
-      "@type": "Question",
-      "name": "{{QUESTION_N}}",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "{{ANSWER_N}}"
-      }
-    }
-  ]
-}
--->
-
-<!-- ============================================================================
-     CONSTRAINTS REFERENCE (skill validation)
-     - count: demand-driven 3-6 where evidence exists, hard cap 10 (R-09)
-     - each Q ≤ 100 char (snippet truncation, R-108)
-     - each A 40-50 word (definition snippet, R-107)
-     - no `:` or `-` in Question text (R-04)
-     - no JS accordion / `<details>` / `display:none` (R-43)
-     - WCAG: heading h3 (parent h2), focus-visible (R-39)
-     ============================================================================ -->

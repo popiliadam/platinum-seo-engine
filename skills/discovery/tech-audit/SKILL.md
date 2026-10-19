@@ -260,6 +260,8 @@ runs the per-URL findings rules:
 | TBT (responsiveness, INP proxy) | > 600ms          | HIGH     | Performance        |
 | TBT (responsiveness, INP proxy) | 200–600ms        | MEDIUM   | Performance        |
 | CLS                             | > 0.1            | MEDIUM   | Layout Stability   |
+| Field LCP / INP / CLS / TTFB p75 (CrUX) | > 2.5s / 200ms / 0.1 / 0.8s | MEDIUM | Performance / Layout Stability |
+| Field LCP / INP / CLS / TTFB p75 (CrUX) | > 4s / 500ms / 0.25 / 1.8s  | HIGH   | Performance / Layout Stability |
 | Title length                    | > 60 chars       | LOW      | Meta Tags          |
 | Meta description missing        | empty            | MEDIUM   | Meta Tags          |
 | Meta description length         | > 160 chars      | MEDIUM   | Meta Tags          |
@@ -277,10 +279,17 @@ Vitals 2024 retired FID in favour of **INP** (Interaction to Next Paint).
 This audit reads Lighthouse **Total Blocking Time (TBT)** from
 `on_page_lighthouse`, which is a *lab* proxy for INP — it is NOT the field
 INP number (which requires real-user CrUX data). Finding text says so
-explicitly and never reports a fabricated INP value. **CrUX field-data
-integration is deferred** (out of scope here): wiring `on_page_lighthouse`
-field-data or the CrUX API to surface real-user INP/LCP/CLS percentiles is
-a follow-up enhancement, tracked separately. Multiple-H1 findings are LOW
+explicitly and never reports a fabricated INP value.
+
+**Field data is the primary source (S-19).** Google ranks on real-user CWV:
+the Chrome UX Report p75 over 28 days, **mobile** first. With `CRUX_API_KEY`
+set, the skill calls `crux_field.fetch_record(key, url)` for each audited URL
+(phone form factor; falls back to the origin record when the URL has too
+little traffic) and passes the responses as `crux_raw`. Field findings name
+their source ("Field INP 310ms (needs improvement; CrUX url-level p75,
+phone)"); Lighthouse lab numbers stay as diagnosis. No key → AMBER, lab only,
+and the report says field data was not collected.
+Multiple-H1 findings are LOW
 (house-style/structure hygiene), not a Google ranking defect.
 
 ### Step 6 — `request_approval` (skill EXIT awaiting_approval)
@@ -502,6 +511,13 @@ result = tech_audit_transform.transform(
     content_parsing_raw=raw_content_parsing,
     url_cap=url_cap,
     live_findings=(live_findings or None),
+    # S-20: SF internal_all rows (Address, Size (bytes), Content Type) from the
+    # latest sf-exports/{date}/raw/internal_all.csv — HTML > 1.5 MB = MEDIUM,
+    # > 2 MB = HIGH (Googlebot reads only the first 2 MB). None → no size check.
+    page_sizes=(internal_all_rows or None),
+    # S-19: CrUX field data (mobile p75) — one response per URL, via
+    # crux_field.fetch_record(os.environ['CRUX_API_KEY'], url). None → lab only.
+    crux_raw=(crux_records or None),
 )
 ```
 

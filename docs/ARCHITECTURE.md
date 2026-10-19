@@ -78,7 +78,7 @@ v1 release için TÜM şunlar geçmeli:
 
 1. Plugin Claude Code'da yükleniyor.
 2. ~50 skill çalışıyor (her kategori için en az 1 happy-path test).
-3. 30 command (`/pseo-*`) çalışıyor.
+3. 31 command (`/pseo-*`) çalışıyor.
 4. 6 hook (session-start, pre/post-tool-use, user-prompt-submit, stop, subagent-stop) tetikleniyor.
 5. 32 schema validation PASS (schemas/*.json).
 6. Content rules input doc tamamen işlenmiş (Phase 10).
@@ -156,7 +156,7 @@ sf-import projects to 6 sheets (`crawl_sitemap`, `inlinks`, `outlinks`, `redirec
 ### Plugin manifest counts (v1.8+)
 
 - 50 SKILL.md files (44 pre-v1.8 → 45 with +sf-crawl-orchestrator → 47 with GAP-T facet-nav-audit/robots-policy-audit → 49 with GAP-T2 hreflang-audit/migration-map)
-- 30 commands/*.md files (16 pre-v1.8 → 18 with +2 pseo-sf-crawl/pseo-sf-status → 25 at v2.0 with the AMO command suite: pseo-run/-run-portfolio/-status-portfolio/-schedule/-approve/-bind + pseo-coverage → 27 with GAP-T pseo-facet-audit/pseo-robots-policy → 29 with GAP-T2 pseo-hreflang-audit/pseo-migration-map)
+- 31 commands/*.md files (16 pre-v1.8 → 18 with +2 pseo-sf-crawl/pseo-sf-status → 25 at v2.0 with the AMO command suite: pseo-run/-run-portfolio/-status-portfolio/-schedule/-approve/-bind + pseo-coverage → 27 with GAP-T pseo-facet-audit/pseo-robots-policy → 29 with GAP-T2 pseo-hreflang-audit/pseo-migration-map → 31 with S-01 pseo-index)
 - 6 hooks (UNCHANGED; Q-SF-MCP-08 RESOLVED → NO; stop_validation.py perf budget intact)
 - 6 MCP servers (was 3; +sf HTTP)
 

@@ -8,13 +8,13 @@ description: |
   existing blog FAQ section enhance (mode=enhance) veya yeni blog FAQ
   add (mode=add). R-09 talep-güdümlü FAQ (kanıt varsa 3-6, hard cap 10) +
   R-43 statik (accordion YASAK) + R-29 pasaj alıntılanabilirlik gate +
-  R-79 FAQPage @graph schema + R-109/R-110/R-111 AIO citation
-  pattern enforce.
+  R-79 (FAQPage JSON-LD üretilmez — görünür SSS odağı) + R-109/R-110/R-111
+  AIO citation pattern enforce.
   Also use when: existing blog FAQ section'da AIO citation pattern
   eksik detect edildiğinde (per 500 word density 1-2 dışı); pasaj
   alıntılanabilirlik gate (R-29) fail edildiğinde (cevap-önce TL;DR
-  yok); FAQPage schema markup eksik veya outdated (R-79 @graph
-  Question entity boş); project-config[profile] enum 5-değer
+  yok); görünür SSS soruları gerçek kullanıcı sorularını karşılamıyor
+  (R-09 kanıtı: PAA / müşteri soruları); project-config[profile] enum 5-değer
   (e-commerce | ymyl | local-service | b2b-saas | portfolio) içinden
   biri sabit ve FAQ taxonomy profile-aware enforce edilmeli
   (Principle 2).
@@ -65,7 +65,7 @@ triggers:
     "FAQ optimize et ve AIO citation density per 500 word ayarla",
     "FAQ ekle ve R-09 talep-güdümlü 3-6 band hard cap 10 zorla",
     "FAQ enhance et ve R-29 pasaj cevap-önce TL;DR garantile",
-    "FAQ schema yenile ve R-79 FAQPage @graph Question entity refresh",
+    "görünür SSS bölümünü gerçek kullanıcı sorularına göre yenile",
     "AIO citation pattern uygula ve R-109/R-110/R-111 enforce et"
   hooks: []
   scheduled: []
@@ -89,7 +89,7 @@ FAQ optimize / enhance / add skill. master.xlsx[content_decay] action
 veya master.xlsx[content_improve] optimization trigger; existing blog
 FAQ section enhance (mode=enhance) veya yeni blog FAQ add (mode=add).
 R-09 FAQ count cap + R-43 statik HTML render (accordion YASAK) +
-R-29 pasaj alıntılanabilirlik gate + R-79 FAQPage @graph schema +
+R-29 pasaj alıntılanabilirlik gate + R-79 (FAQPage JSON-LD üretilmez) +
 R-109/R-110/R-111 AIO citation pattern enforce. READ-ONLY contract:
 master.xlsx 3 sheet (new_content_plan + content_decay +
 content_improve) sadece consume; sadece outputs/ + _state yazar.
@@ -109,7 +109,7 @@ context'inde:
   kaynak verify (R-44 source verification 3-katman, R-105 expert
   quote bank-driven).
 - **Layer 3 (citation):** citation enforce — eklenen her stat/quote
-  source URL ile bağlanır, FAQPage acceptedAnswer.text içinde citation
+  source URL ile bağlanır, görünür SSS cevabı içinde citation
   reference intact.
 - **Failure mode:** P1 fact-check fail → DURUR #5 RED (FAQ section
   discard, yayın iptal, dateModified bump YOK).
@@ -387,26 +387,19 @@ simulation):
 - Cevap-önce mini paragraf intact: first sentence direct answer
   (interrogative reflection veya delay yasak).
 
-### Step 6: R-79 FAQPage @graph Schema Refresh + AIO Citation Pattern
+### Step 6: R-79 Görünür SSS Yapısı (FAQPage JSON-LD yok) + AIO Citation Pattern
 
-JSON-LD `@graph` FAQPage entity update (R-79 + R-83 microdata
-yasak):
+FAQPage JSON-LD **üretilmez ve yenilenmez** (R-79: FAQ rich result
+2026-05-07'den beri yok, doküman 2026-06-15'te kaldırıldı). Sayfada zaten
+bir FAQPage `@graph` düğümü varsa olduğu gibi bırakılır (zararsız; güncellenmez,
+silinmez). Odak görünür SSS'dir:
 
-- `mainEntity` array: her FAQ → Question entity.
-- `Question.name`: H3 question text (TL;DR truncate).
-- `Question.acceptedAnswer`: Answer entity.
-- `Answer.text`: full Q&A body (citation reference intact).
+- Her soru gerçek bir kullanıcı sorusu (PAA, müşteri e-postası, yorum) — R-09 kanıtı.
+- Yapı: her Q&A için `h3` soru + `p` cevap; cevap-önce ilk cümle.
+- Soru sayısı R-09 bandında (kanıt varsa 3-6, hard cap 10).
 
-Schema validate (Google Rich Results Test API mock):
-
-- `@type: FAQPage` present.
-- `mainEntity` array length == FAQ count (R-09 cap compliance).
-- Each `Question.name` non-empty.
-- Each `acceptedAnswer.text` non-empty.
-
-DURUR #4 trigger: Google Rich Results Test API mock validate REJECT
-→ schema fix önce (FAQPage @graph entity broken), FAQ section
-yayın blocked.
+DURUR #4 trigger: görünür SSS yapısı bozuk (soru başlığı yok, boş cevap,
+cap aşımı) → yapı düzeltilmeden FAQ section yayın blocked.
 
 AIO citation pattern enforcement (R-109/R-110/R-111):
 
@@ -483,10 +476,9 @@ strip), retry once; persistent fail → RED.
 3. **DURUR #3 — R-43 Accordion Detect.** Rendered HTML'de
    `<details>` veya `<summary>` element detect → forbidden token
    grep RED, FAQ section discard, statik visible h3+p zorla.
-4. **DURUR #4 — R-79 FAQPage Schema Validate Fail.** Google Rich
-   Results Test API mock validate REJECT (mainEntity boş veya
-   Question.name/acceptedAnswer.text broken) → schema fix önce, FAQ
-   yayın blocked.
+4. **DURUR #4 — Görünür SSS Yapısı Bozuk (R-09/R-79).** Soru başlığı
+   eksik, boş cevap ya da cap aşımı → yapı düzeltilmeden FAQ yayın
+   blocked. (FAQPage JSON-LD üretilmediği için schema doğrulaması yok.)
 5. **DURUR #5 — P1 Fact-Check Fail.** Principle 1 Layer 2 post-
    generate fact-check fail (FAQ Q&A uydurma claim/source; R-44
    source verify fail veya R-105 expert quote bank-driven match
@@ -514,8 +506,8 @@ reuse: revise-content + new-blog precedent).
 
 Sadece şu artifact'lere yazılır (outputs § + produces §):
 
-- `outputs/blog/{slug}/article.html` (updated FAQ section + JSON-LD
-  @graph FAQPage entity refresh).
+- `outputs/blog/{slug}/article.html` (updated visible FAQ section; no
+  FAQPage JSON-LD is added or refreshed — R-79).
 - `_state/events.jsonl` (append, events.schema enum compliance).
 
 ## WCAG 2.1 AA Accessibility (R-39)

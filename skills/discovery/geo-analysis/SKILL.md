@@ -104,7 +104,7 @@ that classifies the AEO/GEO posture into one of four labels:
 
 | Gap            | Condition                                                      | Action heuristic                                |
 |----------------|----------------------------------------------------------------|-------------------------------------------------|
-| `AEO_NEEDED`   | SERP top-3 present AND brand mentioned in 0 LLMs (or <50%)     | write AEO-formatted answer content (FAQ + schema) |
+| `AEO_NEEDED`   | SERP top-3 present AND brand mentioned in 0 LLMs (or <50%)     | write AEO answer-first content for the questions users ask (no FAQ schema) |
 | `SERP_GAP`     | Brand mentioned in ≥1 LLM AND no SERP top-3 placement          | boost SERP rank — internal links + content depth |
 | `AEO_HEALTHY`  | Brand mentioned in ≥50% of queried models AND SERP top-3       | monitor — already cited by LLMs                  |
 | `ABSENT`       | Neither LLM mention nor SERP top-3                             | research priority — pillar / cluster gap         |

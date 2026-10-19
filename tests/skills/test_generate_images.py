@@ -360,24 +360,17 @@ def test_r123_iptc_disclosure_writes_to_non_avif_outputs(tmp_path):
 
     Phase 2 Task 2.3 (G-AI-01) contract: when ``scripts/production/generate_images.run``
     delivers in Phase 11 Wave 2, each non-AVIF output is patched with the IPTC
-    disclosure via ``write_ai_image_disclosure``. AVIF is skipped — piexif does
-    not support the format (R-123 failure_mode AMBER, R-76 cascade guarantees
-    WebP + JPG carry the tag).
+    disclosure via ``write_ai_image_disclosure`` — every format, AVIF included
+    (S-07: real XMP via Pillow, no piexif).
     """
-    import piexif
     from scripts.production.generate_images import run
-    from scripts.util.iptc_metadata import DIGITAL_SOURCE_TYPE_AI
+    from scripts.util.iptc_metadata import TRAINED_ALGORITHMIC_MEDIA, read_digital_source_type
 
     result = run(project_slug="test-project", new_content_plan_id="row-001")
     assert result["status"] == "success"
 
     for output_path in result["images"]:
-        if str(output_path).endswith(".avif"):
-            continue
-        exif = piexif.load(str(output_path))
-        assert DIGITAL_SOURCE_TYPE_AI in exif["0th"].get(
-            piexif.ImageIFD.ImageDescription, b""
-        )
+        assert read_digital_source_type(output_path) == TRAINED_ALGORITHMIC_MEDIA
 
 
 # --- Test 18: R-123 SKILL.md contract lock (active today, no runtime needed) ---
@@ -397,8 +390,8 @@ def test_r123_iptc_step_5b_present_in_skill_body():
     assert "TrainedAlgorithmicMedia" in text, (
         "IPTC DigitalSourceType=TrainedAlgorithmicMedia tag value missing"
     )
-    assert "AVIF" in text and "skip" in text.lower(), (
-        "AVIF exclusion guidance (piexif unsupported) missing"
+    assert "avif_path" in text, (
+        "AVIF output must be tagged too (S-07: no format is skipped)"
     )
     # References section must list R-123 alongside R-71..R-77
     assert "R-123" in text, "R-123 reference missing from SKILL.md References"

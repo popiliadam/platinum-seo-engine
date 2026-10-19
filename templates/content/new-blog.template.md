@@ -56,7 +56,7 @@ H2: Karşı Argümanlar                                                    # R-5
 disclaimer block (project.config.json[content_settings.disclaimer_templates], R-51)
 
 H2: Sıkça Sorulan Sorular (FAQ)                                         # R-09: talep-güdümlü 3-6, hard cap 10
-  3-6 Q&A (snippet-friendly, statik visible R-43)                        # FAQPage schema R-79
+  3-6 Q&A (snippet-friendly, statik visible R-43)                        # görünür SSS; FAQPage JSON-LD yok (R-79 / S-05)
 
 [Pre-CTA]
 pse-key-takeaways aside (3-5 bullet başlıksız, R-102)                   # AI summary footer

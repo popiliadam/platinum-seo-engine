@@ -600,16 +600,22 @@ For each parsed JSON-LD / microdata instance:
 
 ```
 1. Coerce @type → schema_type (lists → first non-empty entry).
-2. If raw @type was a list with ≥2 distinct entries → status=BLOCKED
-   (schema.org allows multi-type, but mixed top-level types break rich
-    results in practice).
-3. Otherwise look up _REQUIRED_PROPS[schema_type]:
+2. Every @type counts (schema.org allows several; S-14): a subtype is checked
+   with its parent's Google requirements (_PARENT_TYPES: Dentist,
+   TravelAgency … → LocalBusiness; OnlineStore … → Organization), and the
+   requirements of all listed types are unioned. A type with no tracked
+   requirements → status=EXISTS "not validated" (never DONE).
+3. Look up _REQUIRED_PROPS for those types:
      - Required props all present → check _RECOMMENDED_PROPS:
          - All recommended present → status=DONE.
          - Some missing            → status=EXISTS, remaining_work names them.
      - Required missing            → status=TODO, remaining_work names them.
    Type-only fallback (presence detected, no blob) → status=EXISTS with
    "verify required props" remaining_work.
+3b. Review policy (S-13): a LocalBusiness/Organization carrying its OWN
+    aggregateRating/review → extra TODO row ("self-serving review markup");
+    review text with incentive wording ("yorum yap kazan", "in exchange for a
+    review") → extra TODO row (Google review policy 2026-07-24).
 4. DFS cross-validate (when present) only DECORATES remaining_work
    ("(DFS confirmed live)" / "(DFS did not echo live)") — it never
    silently flips a status.
@@ -623,9 +629,12 @@ For each parsed JSON-LD / microdata instance:
 ```
 Article / NewsArticle / BlogPosting   headline, author, datePublished
 Product                               name, image, offers
+                                      (recommended 2026: category, hasAdultConsideration)
 Organization                          name, url
-LocalBusiness                         name, address, telephone
-BreadcrumbList                        itemListElement
+LocalBusiness (+ subtypes)            name, address (recommended: telephone, url,
+                                      openingHoursSpecification)
+BreadcrumbList                        itemListElement (DONE when every ListItem has position)
+VideoObject                           name, thumbnailUrl, uploadDate (recommended: creator)
 FAQPage                               mainEntity
 Recipe                                name, recipeIngredient, recipeInstructions
 Event                                 name, startDate, location

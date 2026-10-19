@@ -150,6 +150,9 @@ def expected_uplift_clicks(
     curve: "_ctr_curve.Curve",
     aio_presence: str = "unchecked",
     absolute_position: float | None = None,
+    *,
+    own_cited: bool | None = None,
+    market: str | None = None,
 ) -> int:
     """Expected 28-day click gain from moving a quick-win onto page 1.
 
@@ -161,9 +164,11 @@ def expected_uplift_clicks(
 
     Observed clicks are subtracted so a row that already converts well does
     not double-count. AIO-`present` queries carry the curve's per-position
-    discount; `not_detected`/`unchecked` are NOT discounted (R-140 honesty —
-    an unproven AIO is flagged, never penalised). All CTR/discount numbers
-    come from ``curve`` (ctr-curve.json), never literals (R-139).
+    discount — split by whether our domain is cited (S-18, three states);
+    `not_detected` is not discounted; `unchecked` is priced with the market's
+    AIO rate when the curve knows it (TR), else not discounted (R-140 — an
+    unproven AIO is flagged, never invented). All CTR/discount numbers come
+    from ``curve`` (ctr-curve.json), never literals (R-139).
     """
     if impressions is None or position is None:
         return 0
@@ -187,7 +192,9 @@ def expected_uplift_clicks(
         except (TypeError, ValueError):
             pass
     target = min(10.0, max(5.0, pos - 5.0))
-    ctr_t = curve.expected_ctr(target) * curve.aio_factor(target, aio_presence)
+    ctr_t = curve.expected_ctr(target) * curve.aio_factor(
+        target, aio_presence, own_cited=own_cited, market=market,
+    )
     try:
         current = float(clicks or 0)
     except (TypeError, ValueError):
@@ -347,7 +354,7 @@ def _action_text(position: float) -> str:
         return "Refresh meta + on-page entity coverage to break top-10"
     if position <= 16:
         return "Add internal links + improve title CTR"
-    return "Expand content depth + add FAQ schema"
+    return "Expand content depth + answer the related questions on the page"
 
 
 def _row_pct(clicks: int | None, impressions: int | None) -> float:
@@ -456,6 +463,7 @@ def transform(
     dedup_by_url: bool = True,
     curve: "_ctr_curve.Curve | None" = None,
     aio_presence: dict[str, dict] | None = None,
+    market: str | None = None,
 ) -> dict:
     """
     Transform an mcp__gsc__detect_quick_wins payload into schema-shaped
@@ -568,6 +576,8 @@ def transform(
         uplift = expected_uplift_clicks(
             impressions, position, clicks, curve, aio_presence=row_presence,
             absolute_position=row_abs_rank,
+            own_cited=row_own_cited if row_presence == "present" else None,
+            market=market,
         )
 
         ctr_pct = _row_pct(clicks, impressions)
@@ -713,6 +723,9 @@ def _parse_args(argv: Iterable[str]) -> argparse.Namespace:
                    help="Optional consolidated AIO-presence JSON "
                         "({query: presence-info}); absent → all queries "
                         "'unchecked' (GAP-M2).")
+    p.add_argument("--market", default=None,
+                   help="Project market (project.config market, e.g. TR); prices "
+                        "AIO-unchecked queries with ctr-curve aio_rate_by_market (S-18).")
     return p.parse_args(list(argv))
 
 
@@ -765,6 +778,7 @@ def main(argv: list[str]) -> int:
             threshold_position_max=threshold_position_max,
             curve=curve,
             aio_presence=aio_presence,
+            market=args.market,
         )
     except ValueError as exc:
         print(f"transform failed: {exc}", file=sys.stderr)

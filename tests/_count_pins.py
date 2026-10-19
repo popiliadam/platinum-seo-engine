@@ -36,7 +36,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 # gap waves (GAP-T1/T2 brought skills 45 -> 49, commands 25 -> 29).
 # ---------------------------------------------------------------------------
 SKILL_COUNT = 50          # skills/**/SKILL.md
-COMMAND_COUNT = 30        # commands/*.md
+COMMAND_COUNT = 31        # commands/*.md (S-01 +pseo-index)
 SCHEMA_FILE_COUNT = 31    # schemas/*.schema.json
 SCHEMA_JSON_COUNT = 32    # schemas/*.json (= SCHEMA_FILE_COUNT + cross-sheet-invariants.json)
 CSR_DECLARED = 32         # len(cross-sheet-invariants.json["rules"])

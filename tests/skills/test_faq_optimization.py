@@ -136,14 +136,13 @@ def test_r29_passage_citation():
     assert "self-contained" in text.lower(), "self-contained concept missing"
 
 
-# --- Test 6: R-79 FAQPage @graph schema valid ---
-def test_r79_faqpage_schema():
+# --- Test 6: R-79 — no FAQPage JSON-LD; visible FAQ structure gate (S-05) ---
+def test_r79_faqpage_not_generated():
     text = _read_skill_text()
     assert "R-79" in text, "R-79 rule reference missing"
-    assert "FAQPage" in text, "FAQPage entity reference missing"
-    assert "@graph" in text, "@graph JSON-LD reference missing"
-    assert "mainEntity" in text, "mainEntity array reference missing"
-    assert "DURUR #4" in text, "DURUR #4 (R-79 schema validate) gate missing"
+    assert "üretilmez" in text, "R-79: FAQPage JSON-LD must not be generated"
+    assert "mainEntity` array: her FAQ" not in text, "no mainEntity refresh step"
+    assert "DURUR #4" in text, "DURUR #4 (visible FAQ structure) gate missing"
 
 
 # --- Test 7: R-109/R-110/R-111 AIO citation pattern + 500 word density ---

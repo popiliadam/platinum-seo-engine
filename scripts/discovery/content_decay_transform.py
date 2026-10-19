@@ -95,6 +95,10 @@ _YMYL_POSITION_THRESHOLD = 3.0
 # AND ranking trend negative").
 _IMPRESSIONS_THRESHOLD = -40.0
 _GROWTH_THRESHOLD = 20.0
+# S-23 volume floor: below this many clicks in the previous window a fall is
+# noise, not decay (3 → 1 click is -67%). Tunable per project via
+# ``decay_min_previous_clicks``.
+_MIN_PREVIOUS_CLICKS = 10
 
 # Decay-rule branch labels (recorded in meta so the operator sees WHY a row
 # was flagged — R-85 is a two-branch OR).
@@ -194,6 +198,31 @@ def _delta_pct(recent: int, previous: int) -> float:
     return round((recent - previous) / float(previous) * 100.0, 2)
 
 
+def _profile_name(cfg: dict) -> tuple[str, str]:
+    """(lower-cased profile name(s), where it came from) — S-23.
+
+    project.config carries ``profiles`` (a list); older callers pass a single
+    ``profile``. Reading only ``profile`` made YMYL projects fall silently to
+    the default thresholds.
+    """
+    single = str(cfg.get("profile") or "").strip().lower()
+    if single:
+        return single, "profile"
+    many = cfg.get("profiles")
+    if isinstance(many, list) and many:
+        return " ".join(str(p).strip().lower() for p in many), "profiles"
+    return "", "none"
+
+
+def _threshold_profile(cfg: Any) -> dict:
+    """Which R-85 pair was applied and why (reported in meta, never silent)."""
+    pname, source = _profile_name(cfg if isinstance(cfg, dict) else {})
+    kind = "ymyl" if "ymyl" in pname else "e-commerce" if "commerce" in pname else "default"
+    note = "" if source != "none" else "no profile in project.config — default thresholds used"
+    return {"threshold_profile": kind, "threshold_profile_source": source,
+            "threshold_profile_note": note}
+
+
 def _resolve_thresholds(
     profile_config: Any,
     *,
@@ -211,7 +240,7 @@ def _resolve_thresholds(
     win over the profile-derived value.
     """
     cfg = profile_config if isinstance(profile_config, dict) else {}
-    pname = str(cfg.get("profile") or "").strip().lower()
+    pname, _source = _profile_name(cfg)
     if "ymyl" in pname:
         base_clicks, base_pos = _YMYL_CLICKS_THRESHOLD, _YMYL_POSITION_THRESHOLD
     elif "commerce" in pname:           # "e-commerce" / "ecommerce"
@@ -236,6 +265,7 @@ def _trend_label(
     position_delta: float | None,
     clicks_threshold: float,
     position_threshold: float,
+    min_previous_clicks: int = 0,
 ) -> tuple[str, str | None]:
     """
     Label a row's trend per R-85's multi-signal contract. Returns
@@ -258,6 +288,8 @@ def _trend_label(
         return "RETIRED", None
     if clicks_delta_pct >= _GROWTH_THRESHOLD:
         return "GROWTH", None
+    if clicks_previous < min_previous_clicks:
+        return "STABLE", None  # S-23: too little volume to call a decay
     # R-85 branch 1 — clicks AND position both deteriorate.
     if (position_delta is not None
             and clicks_delta_pct < clicks_threshold
@@ -466,6 +498,11 @@ def transform(
         position_override=position_threshold,
     )
 
+    min_prev = int(cascade_default(
+        profile_config if isinstance(profile_config, dict) else {},
+        "decay_min_previous_clicks", _MIN_PREVIOUS_CLICKS,
+    ))
+
     recent_metrics = _aggregate_window(recent)
     previous_metrics = _aggregate_window(previous)
 
@@ -481,6 +518,8 @@ def transform(
         "clicks_threshold": clicks_thr,
         "position_threshold": position_thr,
         "impressions_threshold": _IMPRESSIONS_THRESHOLD,
+        "min_previous_clicks": min_prev,
+        **_threshold_profile(profile_config),
         "recent_url_count": len(recent_metrics),
         "previous_url_count": len(previous_metrics),
     }
@@ -546,6 +585,7 @@ def transform(
             position_delta=position_delta,
             clicks_threshold=clicks_thr,
             position_threshold=position_thr,
+            min_previous_clicks=min_prev,
         )
         if branch is not None:
             branch_counts[branch] += 1

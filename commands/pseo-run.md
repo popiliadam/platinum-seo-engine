@@ -647,7 +647,7 @@ doğrular (VAR MI + `content_validator` temiz mi).
   sürücüde EXISTS-only (görsel HTML değil); görsel dizini yoksa normal `missing`, ÇÖKME değil
   (DURUR #5 fallback).
 - **faq_optimization**: `new_blog`'un `article.html`'ini YERİNDE enhance eder (mode=enhance); FAQ
-  bloğu + FAQPage @graph yeniler. Aynı `article.html`'i hedefler → sürücü onu yine disclosure
+  bloğunu (görünür SSS) yeniler; FAQPage JSON-LD eklemez (R-79). Aynı `article.html`'i hedefler → sürücü onu yine disclosure
   gate'ten geçirir.
 
 > Bu bölümde **commit YAPMA / transform YAPMA** — model yalnız üretim skill'lerini koşar +

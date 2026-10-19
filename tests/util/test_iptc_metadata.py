@@ -1,78 +1,120 @@
-"""IPTC metadata writer — DigitalSourceType=TrainedAlgorithmicMedia.
+"""IPTC DigitalSourceType written as real XMP (S-07, R-123).
 
-Covers ``scripts/util/iptc_metadata.write_ai_image_disclosure``:
-  1. Round-trip: write the tag, read it back from EXIF.
-  2. Idempotent: calling twice does not corrupt the metadata.
-  3. Missing input file raises FileNotFoundError.
-  4. WebP support: EXIF survives the format-specific save path.
+Google (gen-AI content guidance, 2026-10-01) and Merchant Center read the IPTC
+``Iptc4xmpExt:DigitalSourceType`` property, whose value for fully AI-generated
+images is the IRI
+``http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia``.
+The writer used to put a plain-text note in EXIF UserComment/ImageDescription,
+which no IPTC reader recognises.
 
-AVIF is intentionally out of scope — piexif cannot parse AVIF, so the
-``generate-images`` pipeline skips AVIF outputs (documented in R-123
-failure_mode).
+Covers ``scripts/util/iptc_metadata``:
+  1. JPEG / WebP / PNG / AVIF carry the property in their XMP packet.
+  2. Existing EXIF survives; calling twice is idempotent.
+  3. The reader returns the IRI; a plain image reads None.
+  4. Missing file → FileNotFoundError; unsupported format → ValueError.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-import piexif
 import pytest
-from PIL import Image
+from PIL import Image, features
 
 from scripts.util.iptc_metadata import (
-    DIGITAL_SOURCE_TYPE_AI,
+    TRAINED_ALGORITHMIC_MEDIA,
+    read_digital_source_type,
     write_ai_image_disclosure,
 )
 
+IRI = "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia"
 
-def _make_jpeg(tmp_path: Path) -> Path:
-    img = Image.new("RGB", (10, 10), color=(0, 128, 255))
-    p = tmp_path / "test.jpg"
-    img.save(p, format="JPEG")
+
+def _make(tmp_path: Path, fmt: str, **save_kw) -> Path:
+    p = tmp_path / f"test.{fmt.lower()}"
+    Image.new("RGB", (10, 10), color=(0, 128, 255)).save(p, format=fmt, **save_kw)
     return p
 
 
-def test_write_ai_disclosure_adds_iptc_tag(tmp_path: Path) -> None:
-    """After write_ai_image_disclosure, DigitalSourceType=TrainedAlgorithmicMedia present in EXIF."""
-    img_path = _make_jpeg(tmp_path)
-    write_ai_image_disclosure(img_path)
-
-    exif_dict = piexif.load(str(img_path))
-    image_description = exif_dict["0th"].get(piexif.ImageIFD.ImageDescription, b"")
-    user_comment = exif_dict["Exif"].get(piexif.ExifIFD.UserComment, b"")
-    assert (
-        b"TrainedAlgorithmicMedia" in image_description
-        or b"TrainedAlgorithmicMedia" in user_comment
-    )
+def test_constant_is_the_iptc_iri() -> None:
+    assert TRAINED_ALGORITHMIC_MEDIA == IRI
 
 
-def test_write_ai_disclosure_idempotent(tmp_path: Path) -> None:
-    """Calling twice does not corrupt; second call overwrites cleanly."""
-    img_path = _make_jpeg(tmp_path)
-    write_ai_image_disclosure(img_path)
-    write_ai_image_disclosure(img_path)
-    exif_dict = piexif.load(str(img_path))
-    assert b"TrainedAlgorithmicMedia" in exif_dict["0th"].get(
-        piexif.ImageIFD.ImageDescription, b""
-    )
+@pytest.mark.parametrize("fmt", [
+    "JPEG", "WEBP", "PNG",
+    pytest.param("AVIF", marks=pytest.mark.skipif(
+        not features.check("avif"), reason="this Pillow build has no AVIF codec")),
+])
+def test_xmp_carries_digital_source_type(tmp_path: Path, fmt: str) -> None:
+    p = _make(tmp_path, fmt)
+    write_ai_image_disclosure(p)
+    assert read_digital_source_type(p) == IRI
+    with Image.open(p) as img:
+        assert img.format == fmt
+        xmp = img.info.get("xmp") or img.info.get("XML:com.adobe.xmp")
+    text = xmp.decode("utf-8") if isinstance(xmp, bytes) else xmp
+    assert "Iptc4xmpExt:DigitalSourceType" in text
 
 
-def test_write_ai_disclosure_raises_on_missing_file(tmp_path: Path) -> None:
-    """Missing input file raises FileNotFoundError (caller-visible failure)."""
+def test_existing_exif_is_preserved(tmp_path: Path) -> None:
+    exif = Image.Exif()
+    exif[0x0131] = "PSEO-test"  # Software
+    p = _make(tmp_path, "JPEG", exif=exif.tobytes())
+    write_ai_image_disclosure(p)
+    with Image.open(p) as img:
+        assert img.getexif().get(0x0131) == "PSEO-test"
+
+
+def test_idempotent(tmp_path: Path) -> None:
+    p = _make(tmp_path, "JPEG")
+    write_ai_image_disclosure(p)
+    write_ai_image_disclosure(p)
+    assert read_digital_source_type(p) == IRI
+
+
+def test_plain_image_reads_none(tmp_path: Path) -> None:
+    assert read_digital_source_type(_make(tmp_path, "JPEG")) is None
+
+
+def test_missing_file_raises(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError):
         write_ai_image_disclosure(tmp_path / "does-not-exist.jpg")
 
 
-def test_write_ai_disclosure_supports_webp(tmp_path: Path) -> None:
-    """WebP: PIL exif round-trip via the info dict."""
-    img = Image.new("RGB", (10, 10), color=(0, 128, 255))
-    p = tmp_path / "test.webp"
-    img.save(p, format="WEBP")
+def test_unsupported_format_raises(tmp_path: Path) -> None:
+    p = _make(tmp_path, "BMP")
+    with pytest.raises(ValueError, match="BMP"):
+        write_ai_image_disclosure(p)
+
+
+# --- review follow-ups: tagging must not degrade the image -------------------------
+
+def test_jpeg_keeps_quantization_and_subsampling(tmp_path: Path) -> None:
+    p = _make(tmp_path, "JPEG", quality=80, subsampling=0)
+    with Image.open(p) as before:
+        q_before = before.quantization
     write_ai_image_disclosure(p)
-    re_read = Image.open(p)
-    assert re_read.info.get("exif") is not None
+    with Image.open(p) as after:
+        assert after.quantization == q_before
+        from PIL import JpegImagePlugin
+        assert JpegImagePlugin.get_sampling(after) == 0
 
 
-def test_digital_source_type_constant_format() -> None:
-    """Public constant carries the expected payload (regression guard)."""
-    assert DIGITAL_SOURCE_TYPE_AI == b"DigitalSourceType=TrainedAlgorithmicMedia"
+@pytest.mark.parametrize("fmt", ["JPEG", "WEBP", "PNG"])
+def test_icc_profile_is_kept(tmp_path: Path, fmt: str) -> None:
+    from PIL import ImageCms
+    icc = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes()
+    p = _make(tmp_path, fmt, icc_profile=icc)
+    write_ai_image_disclosure(p)
+    with Image.open(p) as img:
+        assert img.info.get("icc_profile") == icc
+
+
+def test_animated_webp_keeps_all_frames(tmp_path: Path) -> None:
+    p = tmp_path / "anim.webp"
+    frames = [Image.new("RGB", (10, 10), c) for c in ((255, 0, 0), (0, 255, 0), (0, 0, 255))]
+    frames[0].save(p, format="WEBP", save_all=True, append_images=frames[1:], duration=100)
+    write_ai_image_disclosure(p)
+    with Image.open(p) as img:
+        assert getattr(img, "n_frames", 1) == 3
+    assert read_digital_source_type(p) == IRI

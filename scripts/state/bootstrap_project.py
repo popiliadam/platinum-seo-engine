@@ -62,10 +62,14 @@ DEFAULT_SF_MCP_BLOCK: dict = {
     }
 }
 
+# Agents a new project allows by default (R-99): classic search + AI search +
+# user-triggered fetchers. AI TRAINING crawlers (GPTBot, ClaudeBot,
+# Google-Extended, CCBot, ...) are the client's decision and are not defaulted;
+# Claude-Web is retired.
 DEFAULT_AI_BOTS = [
     "Googlebot", "Bingbot",
-    "GPTBot", "ChatGPT-User", "OAI-SearchBot",
-    "PerplexityBot", "ClaudeBot", "Claude-Web",
+    "OAI-SearchBot", "PerplexityBot", "Claude-SearchBot",
+    "ChatGPT-User", "Claude-User", "Perplexity-User",
 ]
 
 

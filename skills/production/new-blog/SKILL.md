@@ -25,6 +25,7 @@ inputs:
   project_slug:        { type: string,  required: true,  description: "Workspace proje slug'ı (örn 'projeA'). projects/{slug}/ dizinine map edilir." }
   new_content_plan_id: { type: string,  required: true,  description: "master.xlsx[new_content_plan] row id reference (kolon A)." }
   mode:                { type: string,  required: false, default: "draft", description: "Output mode — 'draft' (review öncesi) veya 'publish' (immediate). Enum dışı değer DURUR #5." }
+  user_value:          { type: string,  required: true,  description: "R-154 (S-02): bu sayfanın mevcut sayfalara göre kullanıcıya ne eklediği (tek cümle, gerçek fark). Boşsa DURUR #10." }
 outputs:
   - "outputs/blog/{slug}/article.html"
   - "outputs/blog/{slug}/schema.jsonld"
@@ -92,11 +93,11 @@ Brief Paketi, then renders four artifacts:
 
 1. `outputs/blog/{slug}/article.html` — `<article class="pse-blog-post">`
    fragment (R-22 fragment boundary; no `<html>` / `<body>` wrap).
-2. `outputs/blog/{slug}/schema.jsonld` — JSON-LD `@graph` with 5
-   entities (Article + Organization + Person + BreadcrumbList +
-   FAQPage; R-78..R-83).
+2. `outputs/blog/{slug}/schema.jsonld` — JSON-LD `@graph` with 4
+   entities (Article + Organization + Person + BreadcrumbList;
+   R-78..R-83). No FAQPage (R-79 / S-05: the FAQ rich result is gone).
 3. `outputs/blog/{slug}/meta-tags.json` — meta title (≤580px desktop)
-   + meta description (≤990px desktop) per R-35 (single authority) +
+   + meta description (≤920px desktop) per R-35 (single authority) +
    OpenGraph + Twitter card pack.
 4. `outputs/blog/{slug}/upload-instructions.md` — Section A new-blog
    manuel WordPress upload workflow (R-74); skill itself does NOT
@@ -121,10 +122,10 @@ with `event_type=content_new`.
 
 - `outputs/blog/{slug}/article.html` — schema-markup-aware, WCAG 2.1 AA
   compliant, BEM `pse-` CSS class prefix HTML article fragment.
-- `outputs/blog/{slug}/schema.jsonld` — JSON-LD `@graph` 5 entity
-  (Article + Organization + Person + BreadcrumbList + FAQPage).
+- `outputs/blog/{slug}/schema.jsonld` — JSON-LD `@graph` 4 entity
+  (Article + Organization + Person + BreadcrumbList); no FAQPage (R-79).
 - `outputs/blog/{slug}/meta-tags.json` — meta title (≤580px) + meta
-  description (≤990px) per R-35 + OG + Twitter pack.
+  description (≤920px) per R-35 + OG + Twitter pack.
 - `outputs/blog/{slug}/upload-instructions.md` — Section A new-blog
   WordPress manual upload steps (R-74).
 - `_state/events.jsonl` — audit append, `event_type=content_new`,
@@ -354,6 +355,23 @@ R-152 → originality, R-153 → depth (`content-craft-discipline.md`).
 `master.xlsx[new_content_plan]` row read where
 `id == {input.new_content_plan_id}`. `master.xlsx[cluster_keywords]`
 filter where `assigned_url == new_content_plan.url_slug`.
+
+### Step 1b — `publication_guard` (R-154, S-02 — ölçekli içerik koruması)
+
+Yazmaya başlamadan önce (taslak metin hazır olunca Step 8'de tekrar):
+
+```python
+from scripts.production import publication_guard as pg
+n7 = pg.recent_publications(events_jsonl_rows, now=now_utc)          # content_new + pillar_launch
+existing = {url: visible_text for url, visible_text in project_articles}  # outputs/blog/*/article.html + canlı sayfalar
+result = pg.check_new_content(draft_text=draft, user_value=input.user_value,
+                              existing=existing, publications_last_7d=n7)
+```
+
+`result.ok == False` → **DURUR #10**: haftalık tavan doldu (gelecek haftaya
+planla), mevcut bir sayfanın neredeyse kopyası (o sayfayı iyileştir) ya da
+`user_value` boş. Tavan şimdilik motor varsayılanı (`WEEKLY_PUBLISH_CAP_DEFAULT`
+= 5 yeni sayfa / 7 gün); proje bazında ayar R-61 kapanınca project-config'e eklenir.
 `master.xlsx[topical_map]` filter where
 `pillar == new_content_plan.assigned_cluster` OR
 `cluster == new_content_plan.assigned_cluster`.
@@ -379,6 +397,24 @@ monthly_volume, data_source, assigned_url, page_type, status, priority,
 note`. `page_type` enum: `[pillar, cluster, supporting]`.
 
 **DURUR #1.** master.xlsx eksik → init-project skill önce çalışmalı.
+
+### Step 2b — `read_voice_kit` (S-26 deneyim + S-16 yazar)
+
+```python
+from scripts.production import voice_kit
+kit = voice_kit.load_voice_kit(f"{workspace}/projects/{slug}")
+brief["experience"] = kit.brief_block()      # facts / stories / banned_phrases
+author = kit.authors[0] if kit.authors else None
+```
+
+- `kit.authors` boş → **DURUR #12** (gerçek yazar yok; uydurma yazar profili
+  yasak — operatör `voice/authors.json`'a gerçek kişiyi ekler). Şablon
+  `{{#IF_AUTHOR}}` byline + Person düğümünü bu kişiyle basar.
+- Yazarken en az bir `facts`/`stories` öğesi kullanılır ve
+  `data-experience="fact|story"` + `data-source="..."` ile işaretlenir; kit boşsa
+  uydurulmaz → `<!-- experience-missing: <neden> -->`. Ses için `voice.md` +
+  `opinions.md` okunur. `kit.missing` raporda listelenir.
+- Kapı motoru `experience` kapısı bunu ölçer (yasaklı kalıp = 0).
 
 ### Step 2 — `read_project_config` (Profile-Aware Switch)
 
@@ -499,7 +535,8 @@ JSON-LD `@graph` 5 entity render:
   lookup; uydurma yasak — Principle 1 Layer 3).
 - `BreadcrumbList` — Home > Pillar > Cluster > Article (R-83 4-level
   cap).
-- `FAQPage` — talep-güdümlü 3-6 FAQ Q&A items, hard cap 10 (R-79; R-09).
+- FAQPage YOK — görünür SSS bölümü (talep-güdümlü 3-6, hard cap 10; R-09)
+  kalır, JSON-LD eşi üretilmez (R-79: rich result 2026-05-07'den beri yok).
 
 Validate: Google Rich Results Test API mock validate (skill internal —
 actual API call optional). DURUR #8 trigger: REJECT → schema fix önce.
@@ -509,7 +546,7 @@ actual API call optional). DURUR #8 trigger: REJECT → schema fix önce.
 Meta title pixel calc: ≤580px desktop (R-35 single authority; ~60 char
 is only a tech-audit approximation heuristic — Türkçe glyph widths
 vary, so the pixel cap is authoritative, not the char count). Meta
-description pixel calc: ≤990px desktop (R-35; ~160 char heuristic
+description pixel calc: ≤920px desktop (R-35; ~160 char heuristic
 only). DURUR #7 trigger: cap aşımı → auto-correct attempt; fail ise
 manuel revise.
 
@@ -529,6 +566,14 @@ Principle 1).
   Twitter pack.
 - `outputs/blog/{slug}/upload-instructions.md` — Section A WordPress
   media library workflow (R-74).
+- `outputs/blog/{slug}/verification.json` — R-155 (S-03) insan doğrulama
+  kaydı, `publication_guard.blank_verification_record()` ile BOŞ başlar:
+  `{"human_verification": {"verified_by": "", "verified_at": null, "checked": []}}`.
+  Bir kişi metni, title'ı, meta description'ı, structured data'yı ve alt
+  text'leri kontrol edip doldurana kadar paket **hazır değildir**:
+  `python3 scripts/production/publication_guard.py verify outputs/blog/{slug}/verification.json`
+  exit 0 değilse yayın/deploy adımı başlamaz (`mode=publish` dahil). Kayıt
+  yalnız motorda tutulur; sayfaya görünür hiçbir ibare eklenmez.
 
 ### Step 12 — `emit_provenance`
 
@@ -544,7 +589,7 @@ Principle 1).
 | `timestamp`      | UTC ISO 8601                                   |
 | `mode`           | `input.mode` (`draft` / `publish`)             |
 
-## DURUR Conditions (9)
+## DURUR Conditions (12)
 
 | #  | Trigger                                               | Resolution                                           |
 |----|-------------------------------------------------------|------------------------------------------------------|
@@ -557,6 +602,9 @@ Principle 1).
 | 7  | meta pixel cap aşımı                                  | auto-correct fail ise manuel revise                  |
 | 8  | Schema Rich Results Test REJECT                       | JSON-LD `@graph` fix önce                            |
 | 9  | YMYL profili + reviewer adı yok (R-124 imza eksik)    | RED yayın bloklu; operatör reviewer adlandır + append_audit kaydı (reviewer+review_date+content_version) |
+| 10 | R-154 publication_guard RED (haftalık tavan / neredeyse kopya / user_value boş) | gelecek haftaya planla, mevcut sayfayı iyileştir ya da gerçek kullanıcı değerini yaz |
+| 11 | R-155 verification.json eksik (S-03 insan doğrulaması yok) | bir kişi 5 öğeyi kontrol edip kaydı doldurana kadar yayın yok |
+| 12 | `voice/authors.json` boş (S-16 gerçek yazar yok)      | operatör gerçek yazarı ekler; uydurma yazar yok       |
 
 ## Cascade Fix W-F1 (Phase 10 EKSİĞİ Closure — Atomic Commit Içinde)
 
@@ -618,7 +666,7 @@ Expected: schema_version `"1.2"`, profile.enum array of 5 strings.
 | Tier-1 Scrapling 403 / blocked   | AMBER | tier-0 SERP description fallback                                      |
 | P1 citation missing              | RED   | DURUR #6, claim revize                                                |
 | P3 7-pattern AMBER 2x same pass  | RED   | manuel revise                                                         |
-| meta pixel cap > 580 / 990 (R-35)| AMBER | auto-correct → fail RED                                               |
+| meta pixel cap > 580 / 920 (R-35)| AMBER | auto-correct → fail RED                                               |
 | Schema Rich Results REJECT       | RED   | DURUR #8, `@graph` fix                                                |
 
 ## References

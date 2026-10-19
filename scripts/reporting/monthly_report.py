@@ -30,6 +30,7 @@ if str(_REPO_ROOT) not in sys.path:
 # GAP-M-W2: core-update overlap read side (R-137). update_calendar imports only
 # stdlib (no network) — pure parse + date math; no circular import risk.
 from scripts.reporting.update_calendar import (  # noqa: E402
+    calendar_retrieved_at as _calendar_retrieved_at,
     load_calendar as _load_calendar,
     overlaps as _calendar_overlaps,
 )
@@ -449,13 +450,18 @@ def _build_decliners(
 def _measurement_quality(
     overlap: Sequence[Mapping[str, Any]],
     calendar_updates: Sequence[Mapping[str, Any]],
+    *,
+    period_end: str | None = None,
+    calendar_retrieved_at: str | None = None,
 ) -> str:
     """Derive the measurement-quality verdict from the calendar overlap (R-137).
 
     Empty calendar ⇒ ``insufficient_history`` (overlap UNDETERMINABLE — never
     asserted ``clean`` without data to check). An active rollout/rolling overlap
-    ⇒ ``update_overlap``; an only-settling overlap ⇒ ``post_update_settling``;
-    a populated calendar with no overlap ⇒ ``clean``.
+    ⇒ ``update_overlap``; an only-settling overlap ⇒ ``post_update_settling``.
+    No overlap, but the calendar was retrieved BEFORE the period ended ⇒
+    ``calendar_stale`` (S-17: an update after retrieval would be invisible);
+    otherwise ``clean``. ``calendar_retrieved_at=None`` skips the staleness check.
     """
     if not calendar_updates:
         return "insufficient_history"
@@ -464,6 +470,9 @@ def _measurement_quality(
         return "update_overlap"
     if "settling" in phases:
         return "post_update_settling"
+    if (calendar_retrieved_at and period_end
+            and calendar_retrieved_at[:10] < str(period_end)[:10]):
+        return "calendar_stale"
     return "clean"
 
 
@@ -471,6 +480,7 @@ def _measurement_notes(
     quality: str,
     overlap: Sequence[Mapping[str, Any]],
     outcomes: Sequence[Mapping[str, Any]],
+    calendar_retrieved_at: str | None = None,
 ) -> str:
     """One-line, framing-INVARIANT attribution verdict (R-137). The wording is
     identical under every framing — only TONE elsewhere may differ."""
@@ -489,6 +499,12 @@ def _measurement_notes(
         )
     elif quality == "insufficient_history":
         head = "Core-update takvimi yüklenmedi — pencere örtüşmesi doğrulanamadı"
+    elif quality == "calendar_stale":
+        head = (
+            f"Güncelleme takvimi en son {str(calendar_retrieved_at)[:10]} tarihinde "
+            f"çekildi — bu dönemdeki Google güncellemeleri bilinmiyor (temiz DEĞİL); "
+            f"takvimi yenileyin"
+        )
     else:
         head = "Bu dönem bilinen bir Google Ranking güncellemesiyle çakışmıyor"
     return head + ("" if outcomes else " | kohort verisi yok")
@@ -499,6 +515,8 @@ def _build_measurement_context(
     period_end: str,
     calendar_updates: Sequence[Mapping[str, Any]],
     cohort_results: Sequence[Mapping[str, Any]] | None,
+    *,
+    calendar_retrieved_at: str | None = None,
 ) -> dict:
     """Section 12 (additive-OPTIONAL) — measurement-honesty annotation.
 
@@ -510,7 +528,10 @@ def _build_measurement_context(
     contract, extended to measurement honesty).
     """
     overlap = list(_calendar_overlaps(period_start, period_end, calendar_updates))
-    quality = _measurement_quality(overlap, calendar_updates)
+    quality = _measurement_quality(
+        overlap, calendar_updates,
+        period_end=period_end, calendar_retrieved_at=calendar_retrieved_at,
+    )
     if isinstance(cohort_results, Mapping):
         cohort_results = [cohort_results]
     outcomes = [
@@ -520,7 +541,7 @@ def _build_measurement_context(
         "measurement_quality": quality,
         "core_updates_overlap": overlap,
         "intervention_outcomes": outcomes,
-        "notes": _measurement_notes(quality, overlap, outcomes),
+        "notes": _measurement_notes(quality, overlap, outcomes, calendar_retrieved_at),
     }
 
 
@@ -697,6 +718,7 @@ def assemble_report(
     data_sources: Sequence[Mapping[str, Any]] | None = None,
     artifacts: Mapping[str, str] | None = None,
     calendar_updates: Sequence[Mapping[str, Any]] = (),
+    calendar_retrieved_at: str | None = None,
     cohort_results: Sequence[Mapping[str, Any]] | None = None,
 ) -> dict:
     """Pure assembler: ReportInputs → schema-conformant dict.
@@ -734,6 +756,7 @@ def assemble_report(
     )
     measurement_context = _build_measurement_context(
         inputs.period_start, inputs.period_end, calendar_updates, cohort_results,
+        calendar_retrieved_at=calendar_retrieved_at,
     )
     exec_summary = _build_exec_summary(
         gsc_trends, pages_up, tech_done, content_revised, new_content,
@@ -1012,6 +1035,9 @@ def main(argv: list[str]) -> int:
     overlay_path = (Path(args.overlay_calendar_path)
                     if args.overlay_calendar_path else None)
     calendar_updates: list[dict] = []
+    calendar_retrieved_at = (
+        _calendar_retrieved_at(cal_path, overlay_path) if cal_path.is_file() else None
+    )
     if cal_path.is_file():
         try:
             calendar_updates = _load_calendar(cal_path, overlay_path)
@@ -1030,7 +1056,8 @@ def main(argv: list[str]) -> int:
         report = assemble_report(
             inputs=inputs, framing_policy=args.framing_policy,
             output_formats=output_formats, data_sources=data_sources,
-            calendar_updates=calendar_updates, cohort_results=cohort_results)
+            calendar_updates=calendar_updates, cohort_results=cohort_results,
+            calendar_retrieved_at=calendar_retrieved_at)
     except MonthlyReportError as exc:
         print(f"assemble failed: {exc}", file=sys.stderr)
         return 1

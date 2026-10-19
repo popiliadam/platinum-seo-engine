@@ -19,7 +19,7 @@ inputs:
   threshold_position_max: { type: integer, required: false, default: 20 }
   threshold_impressions: { type: integer, required: false, default: 100 }
   top_n: { type: integer, required: false, default: 50 }
-  aio_check: { type: boolean, required: false, default: false }
+  aio_check: { type: boolean, required: false, default: true }
   aio_top_k: { type: integer, required: false, default: 20 }
 outputs:
   - "master.xlsx#quick_wins"
@@ -51,11 +51,11 @@ mcp_tools:
     - "mcp__gsc__enhanced_search_analytics"
   optional:
     - "mcp__gsc__search_analytics"
-    # GAP-M2: paid, used ONLY when aio_check=true (default false ⇒ free path).
+    # GAP-M2 / S-18: paid, used when aio_check=true (default ON for the top aio_top_k).
     - "mcp__dataforseo__serp_organic_live_advanced"
 budget:
-  uses_paid_mcp: false
-  estimated_credits: 0
+  uses_paid_mcp: true
+  estimated_credits: 0.14
 autonomy:
   confidence: HIGH
   requires_approval: true
@@ -83,16 +83,18 @@ deviate only with an ADR.
 | `threshold_position_max`   | integer | 20      | Upper bound; also the scoring ceiling (D-03 invariant). |
 | `threshold_impressions`    | integer | 100     | Minimum `impressions` per row to qualify.               |
 | `top_n`                    | integer | 50      | Cap on rows written into `quick_wins`.                  |
-| `aio_check`                | boolean | false   | When true, fetch AI-Overview presence for the top `aio_top_k` queries (GAP-M2). |
+| `aio_check`                | boolean | true    | Fetch AI-Overview presence (+ own-domain citation) for the top `aio_top_k` queries (GAP-M2; ON by default since S-18). |
 | `aio_top_k`                | integer | 20      | How many provisional top queries to AIO-check (only when `aio_check`).  |
 
 ### Budget + consent (aio_check)
 
 `budget.uses_paid_mcp`/`estimated_credits` in the frontmatter describe the
-DEFAULT path (`aio_check=false` ⇒ free, 0 credits). When `aio_check=true` the
-skill additionally calls the paid `mcp__dataforseo__serp_organic_live_advanced`
-for the top `aio_top_k` queries: estimated **~0.07–0.14 credits** (K=20 ×
-0.0035, AIO discount honesty per measurement-discipline R-140). The runtime
+DEFAULT path, which since S-18 checks AIO for the top `aio_top_k` priority
+queries with the paid `mcp__dataforseo__serp_organic_live_advanced`:
+estimated **~0.07–0.14 credits** (K=20 × 0.0035). Without it the estimate is
+blind to AI Overviews (Seer: no AIO 3.35% CTR / AIO + cited 2.07% / AIO + not
+cited 0.94%). `aio_check=false` keeps the free path; unchecked queries are then
+priced with the market's AIO rate when known (`--market TR` → 23%, Seobaz). The runtime
 budget pre-flight applies (reuse the aio-competitor-map DURUR #1 pattern).
 **Consent is NOT required** for `aio_check`: it is a read-only SERP fetch, and
 consent gates outward/irreversible actions only — say so to the operator
@@ -178,6 +180,7 @@ python3 scripts/discovery/quickwins_transform.py \
     --threshold-position-max 20 \
     --ctr-curve ctr-curve.json \
     --aio-presence inbox/dfs/{date}-aio_presence-{slug}.json \
+    --market {project.config market} \
     --output-dir _state/transform/{run_id}/
 ```
 

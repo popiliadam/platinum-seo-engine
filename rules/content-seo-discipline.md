@@ -34,7 +34,7 @@ Bu doc Phase 10 SEO disiplinini tanımlar (heading, internal link, FAQ, keyword,
 
 **Statement.** İçerik ne thin ne de word wall. Paragraf 2-4 cümle; her bölümde liste/tablo/görsel/blockquote ritim; scannable.
 
-**Rationale.** Thin content (Helpful Content Update penalty) + word wall (UX dwell time düşüş). Denge SEO + UX.
+**Rationale.** İnce içerik insan odaklı (people-first) içerik ölçütlerini karşılamaz — çekirdek sıralama sistemleri bunu değerlendirir — + word wall (UX dwell time düşüş). Denge SEO + UX.
 
 **Enforcement.** Paragraf cümle sayımı; 5+ cümle paragraflar AMBER; 1000+ word section'da medya öğesi yoksa AMBER.
 
@@ -72,9 +72,9 @@ Bu doc Phase 10 SEO disiplinini tanımlar (heading, internal link, FAQ, keyword,
 
 ### R-06: İç Linkleme
 
-**Statement.** Her ~250-400 kelimede 1 iç link (sabit sayı değil **aralık**; her post'ta aralık içinde örnekle, post'lar arası birebir aynı yapısal kadansı üretme — mekanik parmak izi riski). **Bir link 1 kez kullanılır** (duplike anchor/URL yasak). Link kararı `master.xlsx[topical_map]` hub/spoke ilişkileri + `master.xlsx[master_task]` `[internal-links/*]` etiketli auto_generated satırlarından (`internal-links` skill'i Option A — 19-sheet şemasında `internal_links` sheet'i YOKTUR).
+**Statement.** Her ~250-400 kelimede 1 iç link (sabit sayı değil **aralık**; link, okurun o noktada gerçekten ihtiyaç duyacağı sayfaya verilir — sayı bunun sonucudur). **Bir link 1 kez kullanılır** (duplike anchor/URL yasak). Link kararı `master.xlsx[topical_map]` hub/spoke ilişkileri + `master.xlsx[master_task]` `[internal-links/*]` etiketli auto_generated satırlarından (`internal-links` skill'i Option A — 19-sheet şemasında `internal_links` sheet'i YOKTUR).
 
-**Rationale.** Link equity + topical authority (R-11 cluster paterni). Kadans aralığı + post-başı varyasyon: tek sabit sayı portföy-geneli mekanik imza üretir.
+**Rationale.** Link equity + topical authority (R-11 cluster paterni). Aralık bir kontrol listesi önerisidir; her sayfa kendi kullanıcı sorusuna göre yapılandırılır (S-04).
 
 **Enforcement.** Pre-publish link count check (word count / 300); duplicate URL set check.
 
@@ -82,7 +82,7 @@ Bu doc Phase 10 SEO disiplinini tanımlar (heading, internal link, FAQ, keyword,
 
 ### R-07: Liste + Tablo (Per H2 Cap)
 
-**Statement.** Her ~800-1200 kelimede (sabit değil **aralık**): ~1 liste + ~1 tablo. Tablolar atıf alabilecek kalitede (data-rich). **Per-H2 max 1 liste** (Principle 3 multi-list AI padding cap). Aralık içinde örnekle; post'lar arası birebir aynı liste/tablo kadansını tekrarlama.
+**Statement.** Her ~800-1200 kelimede (sabit değil **aralık**): ~1 liste + ~1 tablo. Tablolar atıf alabilecek kalitede (data-rich). **Per-H2 max 1 liste** (Principle 3 multi-list AI padding cap). Liste/tablo yalnız içerik gerektirdiğinde (karşılaştırma, adım, veri) kullanılır; sayfalar arası farklılık hedef değil, her sayfanın kendi sorusunun sonucudur.
 
 **Rationale.** Scannable + AIO citation (table + list snippet candidate).
 
@@ -102,9 +102,9 @@ Bu doc Phase 10 SEO disiplinini tanımlar (heading, internal link, FAQ, keyword,
 
 ### R-09: FAQ Bölümü
 
-**Statement.** FAQ **talep-güdümlü** (demand-driven): kanıt varsa (PAA varlığı, gerçek kullanıcı soruları) **3-6 FAQ**; kanıt yoksa daha az veya hiç. **Hard cap 10.** Her biri snippet kazanmaya uygun (kısa, direkt soru-cevap, schema markup R-79).
+**Statement.** FAQ **talep-güdümlü** (demand-driven): kanıt varsa (PAA varlığı, gerçek kullanıcı soruları) **3-6 FAQ**; kanıt yoksa daha az veya hiç. **Hard cap 10.** Her biri snippet kazanmaya uygun (kısa, direkt soru-cevap; JSON-LD yok — R-79).
 
-**Rationale.** Principle 3 (AI çok FAQ yazmasın). FAQ sayısı gerçek arama talebine göre belirlenir; sabit "10 FAQ" mekanik şişirme riskidir. FAQPage schema (R-79) yine AIO citation için değerli.
+**Rationale.** Principle 3 (AI çok FAQ yazmasın). FAQ sayısı gerçek arama talebine göre belirlenir; sabit "10 FAQ" mekanik şişirme riskidir. FAQPage JSON-LD artık eklenmez (R-79).
 
 **Enforcement.** FAQ count check: kanıt (PAA/kullanıcı sorusu) yoksa FAQ üretme; count > 10 → hard cap AMBER.
 
@@ -142,7 +142,7 @@ Bu doc Phase 10 SEO disiplinini tanımlar (heading, internal link, FAQ, keyword,
 
 ### R-13: Bold Disiplini (deprecated)
 
-> **status: deprecated** (2026-06-10) — "her ~250 kelimede 1 keyword bold" bir sıralama sinyali DEĞİLDİR ve portföy-geneli uygulandığında mekanik parmak-izi (fingerprint) riski yaratır. Kural ADR-038 history-stable politikası gereği silinmez/yeniden numaralanmaz; yerinde deprecate edilir. Yerine: keyword'leri yalnızca doğal vurgu gerektiğinde bold'la, sabit kadans yok.
+> **status: deprecated** (2026-06-10) — "her ~250 kelimede 1 keyword bold" bir sıralama sinyali DEĞİLDİR ve okura değer katmaz. Kural ADR-038 history-stable politikası gereği silinmez/yeniden numaralanmaz; yerinde deprecate edilir. Yerine: keyword'leri yalnızca doğal vurgu gerektiğinde bold'la, sabit kadans yok.
 
 **Statement.** (deprecated) Bold yalnızca doğal okunabilirlik için kullanılır; keyword stuffing yasak; bold edilen generic terim değil keyword olmalıdır. Eski sabit "~250 kelimede 1 bold" kadansı artık zorunlu değildir.
 
@@ -176,7 +176,7 @@ Bu doc Phase 10 SEO disiplinini tanımlar (heading, internal link, FAQ, keyword,
 
 ### R-30: Heading Enforcement (H3 + Keyword Density)
 
-**Statement.** **H3 zorunluluk gate** — H2 word count > 200 → min 2 H3 (Principle 3). **Heading keyword density** — H2'lerin %40-60'ında (aralık) primary/secondary keyword; aralık içinde örnekle, post'lar arası birebir aynı oranı hedefleme (mekanik kadans önleme).
+**Statement.** **H3 zorunluluk gate** — H2 word count > 200 → min 2 H3 (Principle 3). **Heading keyword density** — H2'lerin %40-60'ında (aralık) primary/secondary keyword; başlık okurun sorusunu adlandırır; oran bir sonuçtur, hedeflenecek ya da saklanacak bir kalıp değildir.
 
 **Rationale.** Principle 3 (AI H2 basıp geçmesin) + keyword stuffing önleme.
 
@@ -224,15 +224,15 @@ Bu doc Phase 10 SEO disiplinini tanımlar (heading, internal link, FAQ, keyword,
 
 **Failure mode.** RED.
 
-### R-79: FAQPage Schema Markup
+### R-79: FAQPage Schema Markup — otomatik eklenmez
 
-**Statement.** FAQ block (R-09) için FAQPage schema `@graph` inline. Her FAQ → `Question` entity + `acceptedAnswer.Answer.text`.
+**Statement.** FAQPage JSON-LD **otomatik eklenmez**. Görünür SSS bölümü (R-09) kullanıcıya yararlıysa kalır; JSON-LD eşi üretilmez. Öneri motorları (quick-wins, GEO) "FAQ schema ekle" önermez. Canlı sayfalardaki mevcut işaretlemeye dokunulmaz (zararsız).
 
-**Rationale.** FAQPage rich result **Ağustos 2023** kısıtlamasından sonra yalnızca yetkili kamu (.gov) ve sağlık siteleri için gösterilir — çoğu site için rich result çıkmaz; schema yine de geçerli yapı + AIO citation için değerli.
+**Rationale.** FAQ rich result **Ağustos 2023**'te yetkili kamu ve sağlık siteleriyle sınırlandı, **2026-05-07**'den beri hiçbir sitede gösterilmiyor; Google dokümanı **2026-06-15**'te kaldırdı. Kontrollü testlerde schema AI görünürlüğünü artırmadı — eklemenin getirisi yok, yalnız bakım yükü var.
 
-**Enforcement.** `templates/content/faq-block.template.html` schema inline; FAQ count == JSON-LD Question count.
+**Enforcement.** `templates/content/new-blog.template.html` ve `faq-block.template.html` FAQPage düğümü içermez (tests/rules/test_no_auto_faqpage.py).
 
-**Failure mode.** RED.
+**Failure mode.** Test RED.
 
 ### R-80: BreadcrumbList Schema
 
@@ -256,13 +256,13 @@ Bu doc Phase 10 SEO disiplinini tanımlar (heading, internal link, FAQ, keyword,
 
 ### R-82: Author Schema (Profile-Aware)
 
-**Statement.** YMYL profile'ında `Person` schema author `@type:"Person"` + `name` + `url` (author bio sayfası) + `sameAs` (LinkedIn vb.). e-commerce'te skip (R-28).
+**Statement.** **Tüm blog içeriğinde** gerçek bir yazar ya da editör (marka adına yazan kişi) görünür byline + `Person` schema (`name`, `url` bio sayfası, `sameAs`) taşır (S-16). Kaynak: `projects/<slug>/voice/authors.json`. Uydurma yazar profili **asla**; yazar yoksa new-blog durur (DURUR #12). YMYL'de ek olarak R-124 uzman imzası şarttır. Ürün/kategori sayfaları (e-commerce) byline taşımaz (R-28).
 
-**Rationale.** Principle 2 + EEAT (Authoritativeness/Trustworthiness).
+**Rationale.** E-E-A-T doğrudan bir sıralama faktörü değil; ama "kim yazdı / nasıl / neden" Google'ın insan odaklı içerik sorularının parçası ve okurun güvenini doğrudan etkiler.
 
-**Enforcement.** Profile-aware. YMYL author missing → RED.
+**Enforcement.** new-blog Step 2b (`voice_kit.load_voice_kit`): `authors` boş → DURUR #12; şablon `{{#IF_AUTHOR}}` byline + Person düğümü.
 
-**Failure mode.** YMYL'da RED.
+**Failure mode.** Yazar yok → RED (üretim durur).
 
 ### R-83: JSON-LD Only (@graph)
 

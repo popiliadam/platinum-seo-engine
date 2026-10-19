@@ -8,8 +8,8 @@ description: |
   section-targeted diff workflow uygulanır, R-88 freshness theater
   preempt edilir, R-89 canonical preserve edilir.
   Also use when: GSC clicks delta drop > threshold detect edildiğinde
-  (R-85 multi-signal: clicks_delta < -20%, delta_pct < -15%, trend
-  "down" 3-month rolling); manuel revise request var ve mevcut blog
+  (R-85 tek tanım: content_decay satırı trend == "DECAY"); manuel
+  revise request var ve mevcut blog
   outputs/blog/{slug}/article.html olarak diskten okunabiliyor;
   project-config[profile] enum 5-değer (e-commerce | ymyl |
   local-service | b2b-saas | portfolio) içinden biri sabit ve revize
@@ -288,15 +288,23 @@ domain}`, `dimensions=[query, page]`, page filtresi {input.url}.
 GSC clicks delta hesaplama: `clicks_recent - clicks_previous`
 (content_decay.clicks_delta cross-check).
 
-R-85 multi-signal threshold:
-
-- `clicks_delta < -20%` (significant drop)
-- `delta_pct < -15%`
-- `trend == "down"` (3-month rolling)
+R-85 multi-signal threshold — **tek tanım** `rules/content-update-discipline.md`
+R-85'tir ve `content_decay_transform._trend_label` ile birebir aynıdır; bu skill
+eşik yeniden tanımlamaz: `content_decay` satırının `trend == "DECAY"` olması
+gerekir (clicks + position VEYA impressions + rank dalı, profil eşikleri ve
+hacim tabanı dahil).
 
 DURUR #3 trigger: multi-signal threshold satisfied değil → revize
 gereksiz, master_task sync close request emit (READ-ONLY contract
 — bu skill kendisi master_task'a yazmaz).
+
+### Step 2b: Voice Kit Read (S-26)
+
+`scripts.production.voice_kit.load_voice_kit(project_dir)` — revize edilen
+bölümlere en az bir kaynaklı deneyim öğesi (`data-experience` + `data-source`,
+`facts.json` / `stories.json`'dan) eklenir; kit boşsa uydurulmaz,
+`<!-- experience-missing: ... -->`. `banned-phrases.txt` kalıpları metinde 0.
+SEO düzeltmesi marka tonunu (`voice.md`) bozmaz.
 
 ### Step 3: project-config Read (Profile-Aware Switch — Principle 2)
 
@@ -322,7 +330,7 @@ Profile-aware revise switch:
 - H1/H2/H3 outline + section boundaries.
 - JSON-LD @graph 5 entity (Article + Person + Organization +
   WebPage + BreadcrumbList) preserve list.
-- content-version meta (R-103) extract → **version_pre**.
+- `outputs/blog/{slug}/version.json` (R-103) read → **version_pre** (yoksa v1).
 
 DURUR #6 trigger: revise içinde canonical URL change attempt → RED
 (R-89 immutable; URL slug change R-91 redirect path).
@@ -367,12 +375,14 @@ tone):
 - `claim_delta = claim_count_post - claim_count_pre`
 - `structure_changed = structure_hash_pre != structure_hash_post`
 
-DURUR #4 trigger: `word_delta == 0 AND claim_delta == 0 AND NOT
-structure_changed` → RED (sahte tarih güncelleme; dateModified bump
-YOK, çıktı discard).
+R-88 tek tanım (`rules/content-update-discipline.md`):
 
-AMBER warning: `word_delta > 0 AND claim_delta == 0 AND NOT
-structure_changed` → manuel review öner (style-only change).
+- RED (DURUR #4): `abs(word_delta) < 50 AND claim_delta == 0 AND NOT
+  structure_changed` → sahte tarih güncelleme; dateModified bump YOK,
+  çıktı discard.
+- AMBER: `claim_delta == 0 AND NOT structure_changed` (ama
+  `abs(word_delta) >= 50`) → manuel review öner (yalnız üslup değişikliği).
+- Diğer her durum PASS.
 
 ### Step 7: R-103 Content Version Increment + dateModified Update
 
@@ -383,8 +393,8 @@ Major revise detect:
 - `profile_switch` detected (project-config profile değişmiş eski
   vs yeni snapshot).
 
-Major revise → version increment: `v1` → `v2` (R-103 content-
-version meta increment, semver minor bump on output schema).
+Major revise → version increment: `v1` → `v2` (R-103;
+`outputs/blog/{slug}/version.json` güncellenir — sayfaya meta etiketi yazılmaz).
 
 Minor revise (`claim_delta <= 5 AND NOT structure_changed AND NOT
 profile_switch`) → version unchanged.
@@ -396,6 +406,20 @@ visible HTML).
 
 Output write: `outputs/blog/{slug}/article.html` (atomic temp+
 rename).
+
+### Step 7b: Pre-Deploy Element Diff (S-24)
+
+Yeni sürüm yayınlanmadan ÖNCE canlı sayfa çekilir ve iki sürüm karşılaştırılır:
+
+```bash
+python3 scripts/production/deploy_diff_gate.py --live live.html --new outputs/blog/{slug}/article.html --host <site-host>
+```
+
+Envanter: tablo, form, iframe/embed, görsel, iç link (benzersiz path), H2 listesi,
+JSON-LD türleri. Yeni sürümde EKSİLEN her öğe listelenir; ekleme serbesttir.
+Liste boş değilse (exit 1) yayın durur — **DURUR #9**. Bu bir kalite kapısıdır
+(onay değil): yeni sürüm düzeltilir ve kapı tekrar koşulur. WordPress REST ile
+yayınlayan her script de aynı kapıdan geçer.
 
 ### Step 8: change_summary.md + events.jsonl Append
 
@@ -445,7 +469,7 @@ rename).
   trail)
 - `canonical_preserved` = `true` (R-89 invariant)
 
-## DURUR Conditions (8 koşul)
+## DURUR Conditions (9 koşul)
 
 1. **DURUR #1 — Existing Blog Yok.** `outputs/blog/{slug}/article.
    html` filesystem'de bulunamıyor → R-89 canonical preserve enforce
@@ -457,7 +481,7 @@ rename).
 3. **DURUR #3 — Decay Threshold Satisfied Değil.** R-85 multi-signal
    threshold (clicks_delta + delta_pct + trend) tüm 3 koşul
    sağlanmıyor → revize gereksiz, master_task close suggestion.
-4. **DURUR #4 — R-88 Freshness Theater Detect.** `word_delta == 0
+4. **DURUR #4 — R-88 Freshness Theater Detect.** `abs(word_delta) < 50
    AND claim_delta == 0 AND NOT structure_changed` → RED, sahte
    tarih güncelleme; çıktı discard, dateModified bump YAPMA.
 5. **DURUR #5 — scope=full Overhaul.** `input.scope == "full"` →
@@ -474,6 +498,10 @@ rename).
    bump bloklu). Operatör inceleyeni adlandırmalı; skill
    `append_audit` ile reviewer + review_date + content_version kaydını
    yazar (Principle 1 Truth-Verifiable; uydurulmuş yazarlık yasak).
+9. **DURUR #9 — Canlı Sayfadan Öğe Kaybı (S-24).** `deploy_diff_gate.py`
+   yeni sürümün canlı sayfadaki bir tabloyu, formu, embed'i, görseli, iç
+   linki, H2 bölümünü ya da JSON-LD türünü kaybettiğini raporladı → RED,
+   yayın yok; kayıp geri eklenir ya da operatör kaybı açıkça kabul eder.
 
 ## READ-ONLY Contract (F-6 Enforcement)
 

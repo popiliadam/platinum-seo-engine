@@ -470,7 +470,7 @@ def _build_serp_organic_rows(raw: dict | None) -> list[SerpOrganicRow]:
 def _action_for_gap(gap: str) -> str:
     """Heuristic action recommendation per geo_gap label."""
     return {
-        GAP_AEO_NEEDED: "write AEO-formatted answer content (FAQ + schema)",
+        GAP_AEO_NEEDED: "write AEO answer-first content for the questions users ask",
         GAP_SERP_GAP: "boost SERP rank — internal links + content depth",
         GAP_AEO_HEALTHY: "monitor — already cited by LLMs",
         GAP_ABSENT: "research priority — pillar / cluster gap",
