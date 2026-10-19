@@ -198,30 +198,6 @@ def _validate_entry(entry: dict, schema_path: Path | None = None) -> None:
 # Read + verify
 # ---------------------------------------------------------------------------
 
-def _read_last_entry(path: Path) -> dict | None:
-    """Return the last non-blank JSON entry, or None for a missing/empty file.
-
-    Called UNDER the append flock to learn the prior (seq, entry_hash). Raises
-    ConsentLedgerError on a corrupt tail line (the chain cannot be extended over
-    unparseable data).
-    """
-    if not path.exists():
-        return None
-    last: str | None = None
-    with path.open("r", encoding="utf-8") as fh:
-        for line in fh:
-            stripped = line.strip()
-            if stripped:
-                last = stripped
-    if last is None:
-        return None
-    try:
-        obj = json.loads(last)
-    except json.JSONDecodeError as exc:
-        raise ConsentLedgerError(f"corrupt consent ledger tail in {path}: {exc}") from exc
-    return obj if isinstance(obj, dict) else None
-
-
 def read_entries(workspace_root: Path | str, project_slug: str) -> list[dict]:
     """Parse every non-blank line of consent.jsonl into a list of dicts.
 
@@ -310,8 +286,17 @@ def append_consent(
         except OSError as exc:
             raise ConsentLedgerError(f"flock failed on {path}: {exc}") from exc
         try:
-            # Read the tail UNDER the lock so concurrent appenders never collide.
-            last = _read_last_entry(path)
+            # Read + verify the WHOLE chain UNDER the lock (V-07): the gate checks
+            # every entry, so extending a chain that is already broken would print
+            # "recorded" for a consent the gate can never honour.
+            existing = read_entries(workspace_root, project_slug)
+            intact, bad_index = verify_chain(existing)
+            if not intact:
+                raise ConsentLedgerError(
+                    f"consent chain broken at entry {bad_index} in {path}; re-chain it "
+                    f"(keeping each entry's facts) before appending"
+                )
+            last = existing[-1] if existing else None
             if last is None:
                 seq = 0
                 prev_hash = GENESIS_HASH
