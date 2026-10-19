@@ -62,7 +62,7 @@ import re
 import subprocess
 import sys
 from dataclasses import dataclass
-from datetime import date as date_cls, datetime, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 

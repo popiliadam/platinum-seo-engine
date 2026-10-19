@@ -2,7 +2,7 @@
 # Pins requirements.txt (direct deps) + the Python-3.10-safe subset of their
 # transitive closure. CI installs THIS file (.github/workflows/ci.yml: pip install -r requirements-lock.txt).
 #
-# Python: 3.14 (current target). CI matrix: ["3.10", "3.14"] (floor + current).
+# Python: 3.14 (current target). CI matrix: ["3.11", "3.14"] (floor + current; ADR-042).
 # Last regenerated: 2026-06-04 | Platform: darwin.
 #
 # Regenerate in a CLEAN venv so ONLY requirements.txt's closure is captured — a
@@ -24,6 +24,7 @@
 # none do (the dfs-pull SKILL.md `import requests` is an illustrative snippet;
 # the engine HTTP client is httpx, scripts/util/sf_mcp_client.py).
 attrs==26.1.0
+coverage==7.13.5
 h11==0.16.0
 httpcore==1.0.9
 httpx==0.28.1
@@ -34,4 +35,6 @@ packaging==26.1
 pillow==12.2.0
 pluggy==1.6.0
 pytest==9.0.3
+pytest-cov==7.1.0
 PyYAML==6.0.3
+ruff==0.14.0

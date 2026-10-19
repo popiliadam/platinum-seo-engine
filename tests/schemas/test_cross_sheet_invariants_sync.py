@@ -21,15 +21,24 @@ from scripts.validation import validate_invariants
 ROOT = Path(__file__).parent.parent.parent
 SCHEMA_PATH = ROOT / "schemas" / "cross-sheet-invariants.json"
 
-# F-NN ids declared in cross-sheet-invariants.json but intentionally NOT
-# implemented in validate_invariants.py (consistency_check tool handles
-# them at the cross-sheet join level, not Excel-row level).
-KNOWN_SCHEMA_ONLY: frozenset[str] = frozenset({"F-06", "F-07"})
+# Rule ids (EVERY family: F-, D-, M- — K-02 removed the F- only filter that
+# hid D-/M- rules) declared in cross-sheet-invariants.json but deliberately not
+# implemented yet, each with the reason it cannot be checked from master.xlsx
+# alone. validate_invariants reports them as NOT_IMPLEMENTED (never PASS) and
+# scripts/ci/drift_gate.py pins the same set.
+KNOWN_SCHEMA_ONLY: frozenset[str] = frozenset({
+    "F-06",  # url_slug vs assigned_url: slug↔URL mapping rule not yet defined
+    "F-07",  # needs a crawled-URL list; crawl_sitemap holds metrics, not URLs
+    "D-01",  # needs data/pillars.json — no such per-project file exists yet
+    "D-02",  # needs cluster definition files — not persisted per project yet
+    "M-01",  # dashboard holds KPI cells, not a URL set to compare against
+    "M-02",  # needs SF run_id ↔ crawl_date provenance not stored in the sheet
+})
 
 
 def _load_schema_f_ids() -> set[str]:
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
-    return {r["id"] for r in schema["rules"] if r["id"].startswith("F-")}
+    return {r["id"] for r in schema["rules"]}
 
 
 def _code_f_ids() -> set[str]:

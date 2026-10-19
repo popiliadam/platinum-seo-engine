@@ -52,11 +52,12 @@ def _parse_floor_pkgs() -> set[str]:
 
 
 def test_ci_matrix_dual_python_versions():
-    """Matrix MUST cover both 3.10 (floor LTS) and 3.14 (current/local cache)."""
+    """Matrix MUST cover the floor (3.11 since ADR-042; 3.10 is EOL) and 3.14."""
     ci = yaml.safe_load(CI_YML.read_text(encoding="utf-8"))
     versions = ci["jobs"]["ci"]["strategy"]["matrix"]["python-version"]
     assert isinstance(versions, list), "python-version must be a list"
-    assert "3.10" in versions, "3.10 floor LTS missing from matrix"
+    assert "3.11" in versions, "3.11 floor missing from matrix (ADR-042)"
+    assert "3.10" not in versions, "3.10 is end-of-life (ADR-042)"
     assert "3.14" in versions, "3.14 current/local cache version missing"
 
 

@@ -117,7 +117,7 @@ def _write_archive_report(
     lines = [
         f"# Events Archive Report — {today}",
         "",
-        f"Migration: `scripts/state/migrate_legacy_events.py` (ADR-031)",
+        "Migration: `scripts/state/migrate_legacy_events.py` (ADR-031)",
         f"Source: `{project_pack}/_state/events.jsonl`",
         f"Archived rows: **{len(fail_records)}**",
         "",

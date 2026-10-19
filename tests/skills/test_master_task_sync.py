@@ -984,7 +984,7 @@ def test_cluster_keywords_seo_value_guardrail() -> None:
     )
     # 2 actionable → tasks; 2 dropped.
     assert len(batch.appends) == 2
-    kept_keywords = {r["url"] for r in batch.appends}  # url == assigned_url ("")
+    assert {r["url"] for r in batch.appends} == {""}  # url == assigned_url ("")
     assert batch.per_source_stats["cluster_keywords"] == 2
     dropped = batch.dropped_stats.get("cluster_keywords", {})
     assert dropped.get("already_assigned") == 1

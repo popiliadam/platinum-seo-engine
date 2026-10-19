@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.14"]
+        python-version: ["3.11", "3.14"]  # K-10/ADR-042: 3.10 EOL 2026-10
     steps:
       # Supply-chain: actions pinned by full commit SHA (mutable tags can be
       # re-pointed upstream); human tag kept as trailing comment, refreshed by
@@ -31,32 +31,43 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements-lock.txt
 
-      # Step 1 — governance skill drift-check (master.xlsx invariants: 32 declared / 25 implemented cross-sheet rules)
-      # Phase 14 W3-W3-α strict mode (Q-CI-W3-03 RESOLVED runtime kanıt + 4 governance helper exec EXIT=0 4/4 zemin).
+      # Step 1 — cross-sheet invariants (K-01): runs validate_invariants on a copy of
+      # templates/master-excel.xlsx. Red on any FAIL or when the NOT_IMPLEMENTED set
+      # (7 of 32 declared today) changes. The old step ran SKILL.md blocks with a
+      # hard-coded GREEN and evaluated 0 rules.
       - name: 1. drift-check
-        run: python3 scripts/ci/run_skill_python.py skills/governance/drift-check/SKILL.md
+        run: python3 scripts/ci/drift_gate.py
         continue-on-error: false
 
-      # Step 2 — governance skill schema-validate (jsonschema Draft7 all schemas + cross-sheet-invariants ≥20 rules (additive K-02))
-      # Phase 14 W3-W3-α strict mode.
+      # Step 2 — schema-validate: runs the schema-validate SKILL.md blocks (every
+      # schemas/*.json is a valid Draft7 schema; cross-sheet-invariants.json has rules).
       - name: 2. schema-validate
         run: python3 scripts/ci/run_skill_python.py skills/governance/schema-validate/SKILL.md
         continue-on-error: false
 
-      # Step 3 — governance skill glossary-audit (drift cross-ref REFERENCE_INDEX + spec section + reverse-lookup orphan/missing AMBER + defensive acronym whitelist 22-token)
-      # Phase 14 W3-W3-α strict mode.
+      # Step 3 — glossary (K-07): red when a spec §20 term is missing from
+      # docs/GLOSSARY.md, REFERENCE_INDEX loses its glossary link, or orphan
+      # glossary terms exceed the budget. The old step computed these and
+      # discarded them.
       - name: 3. glossary-audit
-        run: python3 scripts/ci/run_skill_python.py skills/governance/glossary-audit/SKILL.md
+        run: python3 scripts/ci/glossary_gate.py
         continue-on-error: false
 
-      # Step 4 — pytest baseline + W2 yeni, no regression
-      # Coverage gate deliberately deferred (FIX-R 2026-06-10): a measured
-      # coverage baseline must exist before any fail-under threshold is added.
+      # Step 4 — full pytest suite; red on any failure, on more than SKIP_BUDGET
+      # skipped tests (tests/conftest.py, K-05) or on coverage below the floor.
       - name: 4. pytest
         env:
           # Feeds tests/ci/test_client_scrub_guard.py; absent on forks → guard skips.
           CLIENT_SLUG_PATTERN: ${{ secrets.CLIENT_SLUG_PATTERN }}
-        run: pytest --tb=short -q
+        # K-15: coverage floor — 80 % measured 2026-10-19; fail-under 79 blocks a drop.
+        run: pytest --tb=short -q --cov=scripts --cov-report=term --cov-fail-under=79
+        continue-on-error: false
+
+      # Step 4b — lint (K-09): pyflakes-class errors only (unused imports and
+      # variables, undefined names, f-strings without placeholders). Fast and
+      # quiet; style rules are deliberately not enabled.
+      - name: 4b. ruff-lint
+        run: ruff check --select F scripts tests
         continue-on-error: false
 
       # Step 4a — events.schema sanity (ADR-031: ensure schema is loadable; the
@@ -74,7 +85,8 @@ jobs:
           "
         continue-on-error: false
 
-      # Step 5 — plugin agnostik invariant (.mcp.json 4 server + repo-wide client-slug grep F-16)
+      # Step 5 — plugin-agnostic invariant (.mcp.json has exactly 5 servers +
+      # repo-wide client-slug grep F-16)
       # 2026-07-08 client-name scrub: the forbidden-slug list moved into the
       # CLIENT_SLUG_PATTERN repo secret — a public repo's own guard must not
       # advertise the very names it forbids. Scope widened from skills/-only to
@@ -89,20 +101,25 @@ jobs:
           # + adstark for refresh-audit). xquik removed 2026-09-17.
           test "$(jq '.mcpServers | keys | length' .mcp.json)" = "5"
           # Repo-wide client-slug grep (pattern from repo secret; -I skips binaries)
+          # K-08: explicit exit code — 0 = slug found (FAIL), 1 = clean,
+          # anything else = grep failed (e.g. a broken pattern) → FAIL, not PASS.
           if [ -n "$CLIENT_SLUG_PATTERN" ]; then
-            ! grep -rIEn "$CLIENT_SLUG_PATTERN" . --exclude-dir=.git
+            set +e
+            grep -rIEn "$CLIENT_SLUG_PATTERN" . --exclude-dir=.git
+            rc=$?
+            set -e
+            [ "$rc" -eq 1 ] || { echo "client-slug grep: FAIL (exit $rc)"; exit 1; }
           fi
         continue-on-error: false
 
-      # Step 6 — secret-grep (Phase 14+ CI Rule 3 production-ready 11-phase invariant)
-      # Lesson 11 üçüncü surface mop-up Phase 14 W2: regex literal wrapper script'e
-      # taşındı (deployment config kategori-spesifik convention, Phase 14 W1
-      # placeholder convention paralel evolution).
+      # Step 6 — secret-grep: the canonical scanner (34 classes, K-11) over the
+      # tree + a committed-literal git grep with explicit exit codes (K-08).
       - name: 6. secret-grep
         run: bash scripts/ci/check_secrets.sh
         continue-on-error: false
 
-      # Step 7 — frontmatter-compile (skill-frontmatter.schema.json Draft7 validate her SKILL.md frontmatter, 49 SKILL.md compliance)
+      # Step 7 — frontmatter-compile: every SKILL.md frontmatter validates against
+      # skill-frontmatter.schema.json (50 SKILL.md today).
       - name: 7. frontmatter-compile
         run: |
           python3 -c "

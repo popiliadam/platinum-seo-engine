@@ -80,6 +80,24 @@ def _secrets() -> dict[str, str]:
         "base64_high_entropy_secret_assignment": (
             "secret = " + chr(34) + "QUJDREVGR0hJSktMTU5P" + "UFFSU1RVVldYWVo=" + chr(34)
         ),
+        # K-11 classes — same fragments as tests/ci/test_secret_formats_k11.py.
+        "aws_temporary_key_asia": "ASI" + "A" + "A" * 16,
+        "aws_secret_access_key_env": "AWS_SECRET" + "_ACCESS_KEY=" + "abcdEFGH" * 5,
+        "github_pat_fine_grained": "github" + "_pat_" + "11ABCDEFG0" + "x" * 20,
+        "github_refresh_token_ghr": "gh" + "r_" + "a" * 36,
+        "google_oauth_client_secret": "GOC" + "SPX-" + "z" * 28,
+        "google_oauth_refresh_token": "1/" + "/0" + "g" * 40,
+        "google_oauth_access_token": "ya" + "29." + "h" * 40,
+        "slack_app_token_xapp": "xa" + "pp-1-" + "A1B2C3D4E5F6",
+        "slack_webhook_url": "https://hooks." + "slack.com/services/T0ABC/B0DEF/" + "q" * 24,
+        "ec_private_key_header": _BEGIN + "EC PRIVATE" + _END,
+        "encrypted_private_key_header": _BEGIN + "ENCRYPTED PRIVATE" + _END,
+        "pgp_private_key_header": "-----BEGIN " + "PGP PRIVATE KEY BLOCK-----",
+        "jwt_token": "ey" + "J" + "a" * 12 + ".ey" + "J" + "b" * 12 + "." + "c" * 12,
+        "stripe_live_key": "sk" + "_live_" + "9" * 24,
+        "dataforseo_env_unquoted": "DATAFORSEO" + "_PASSWORD=" + "a1b2c3d4e5f6g7h8",
+        "http_basic_auth_header": "Authorization: " + "Basic " + "QWxhZGRpbjpvcGVuIHNlc2FtZQ",
+        "python_auth_tuple_literal": "auth" + "=('me@x.test', 'hunter2hunter2')",
     }
 
 

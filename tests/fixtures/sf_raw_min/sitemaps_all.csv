@@ -1,0 +1,5 @@
+﻿"Address","Content Type","Status Code","Status","Indexability","Indexability Status"
+"https://example.test/","text/html","200","OK","Indexable",""
+"https://example.test/kombi/","text/html","200","OK","Indexable",""
+"https://example.test/klima/","text/html","200","OK","Indexable",""
+"https://example.test/blog/bakim/","text/html","200","OK","Indexable",""

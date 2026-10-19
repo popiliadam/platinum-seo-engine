@@ -66,11 +66,10 @@ import os
 import re
 import subprocess
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
-from urllib.parse import urlsplit
 
 # scripts/budget + scripts/ingestion are namespace packages; ensure repo
 # root on sys.path so absolute imports resolve when invoked as a script.

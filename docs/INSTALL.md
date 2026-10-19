@@ -5,7 +5,7 @@
 ## Requirements
 
 - [Claude Code CLI](https://claude.ai/code) (latest)
-- Python 3.10+
+- Python 3.11+
 - Node.js 18+ (for MCP servers via npx)
 - Git
 

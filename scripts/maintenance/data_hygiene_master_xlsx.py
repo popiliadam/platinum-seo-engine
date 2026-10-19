@@ -99,8 +99,8 @@ def _format_audit(
         "",
         f"**Date:** {today}",
         f"**Mode:** {mode}",
-        f"**Scope:** F-17 priority code normalize (master_task.priority)",
-        f"**Mapping:** P1→HIGH, P2→MEDIUM, P3→LOW (ADR-037)",
+        "**Scope:** F-17 priority code normalize (master_task.priority)",
+        "**Mapping:** P1→HIGH, P2→MEDIUM, P3→LOW (ADR-037)",
         f"**Cells affected:** {len(changes)}",
         "",
     ]

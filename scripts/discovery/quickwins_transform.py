@@ -536,7 +536,6 @@ def transform(
         ctr_raw = entry.get("currentCtr")
         if ctr_raw is None:
             ctr_raw = entry.get("ctr")
-        potential = _safe_int(entry.get("potentialClicks"))
 
         # Enrich (back-fill) when the quick-wins row is sparse.
         e = enrich.get((str(query), url_n))

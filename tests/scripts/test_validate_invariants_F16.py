@@ -24,7 +24,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import openpyxl
-import pytest
 
 from scripts.validation.validate_invariants import (
     _extract_url_from_action_field,

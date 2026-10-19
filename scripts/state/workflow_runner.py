@@ -42,7 +42,6 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from jsonschema import Draft7Validator
-from jsonschema.exceptions import ValidationError as _JSValidationError
 
 from scripts.state import anomaly_recorder, events_writer
 from scripts.validation.validate_schema import build_validator

@@ -312,7 +312,7 @@ def test_pseo_projects_dir_env_takes_precedence(tmp_path: Path) -> None:
         f"PSEO_PROJECTS_DIR override should write to {expected_path}; stderr={result.stderr}"
     )
     assert not not_expected_path.exists(), (
-        f"PSEO_WORKSPACE_ROOT/projects should NOT be written when PSEO_PROJECTS_DIR is set"
+        "PSEO_WORKSPACE_ROOT/projects should NOT be written when PSEO_PROJECTS_DIR is set"
     )
 
 

@@ -18,7 +18,6 @@ Frozen synthetic data only; no network, no workspace side effects.
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 
 import pytest

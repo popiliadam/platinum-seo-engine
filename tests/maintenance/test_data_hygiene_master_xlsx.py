@@ -42,7 +42,6 @@ def _make_master_task_workbook(
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
     mt_def = schema["sheets"]["master_task"]
     columns = mt_def["required_columns"]
-    header_row = mt_def["header_row"]
     data_start = mt_def["data_start_row"]
 
     # Build all sheets so the workbook validates structurally.

@@ -65,7 +65,7 @@ import json
 import os
 import subprocess
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date as _date, datetime
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence

@@ -23,7 +23,6 @@ import copy
 import json
 from pathlib import Path
 
-import pytest
 from jsonschema import Draft7Validator, FormatChecker
 
 REPO = Path(__file__).resolve().parents[2]
@@ -92,6 +91,6 @@ def test_unknown_use_case_key_rejected() -> None:
     ]
     assert pn_errors, (
         "Expected propertyNames rejection for 'definitely_not_a_real_use_case' "
-        f"on use_cases; validator returned: "
+        "on use_cases; validator returned: "
         + "; ".join(str(e.message) for e in errors[:5])
     )

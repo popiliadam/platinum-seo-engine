@@ -13,7 +13,8 @@ def test_ci_yaml_exists():
 
 
 def test_ci_yaml_valid_syntax():
-    yaml.safe_load(CI_YAML.read_text())
+    cfg = yaml.safe_load(CI_YAML.read_text())
+    assert isinstance(cfg, dict) and cfg["jobs"]["ci"]["steps"]  # K-13: assert, not just parse
 
 
 def test_on_push_pull_request_main():
@@ -40,7 +41,7 @@ def test_seven_steps_present():
 
 def test_python_version_matrix():
     cfg = yaml.safe_load(CI_YAML.read_text())
-    assert "3.10" in cfg["jobs"]["ci"]["strategy"]["matrix"]["python-version"]
+    assert "3.11" in cfg["jobs"]["ci"]["strategy"]["matrix"]["python-version"]  # ADR-042
 
 
 def test_pip_cache_enabled():
@@ -76,6 +77,7 @@ def test_continue_on_error_all_steps_strict_mode():
         "3. glossary-audit",
         "4. pytest",
         "4a. events-schema-sanity",
+        "4b. ruff-lint",              # K-09
         "5. plugin-agnostik-grep",
         "6. secret-grep",
         "7. frontmatter-compile",
@@ -238,15 +240,13 @@ def test_pytest_step_uses_short_tracebacks():
     assert "--tb=no" not in step4["run"], "pytest step must not suppress tracebacks"
 
 
-def test_coverage_gate_deferral_documented():
-    """FIX-R item 6: the coverage gate is DELIBERATELY deferred (a measured
-    baseline must exist before any fail-under threshold is meaningful).
-    The deferral decision must stay visible as a ci.yml comment so it reads
-    as a choice, not an omission.
-    """
-    body = CI_YAML.read_text().lower()
-    assert "coverage gate" in body, "coverage-gate deferral comment missing"
-    assert "deferred" in body, "coverage-gate comment must state it is deferred"
+def test_coverage_gate_is_enforced():
+    """FIX-R item 6 deferred the coverage gate until a measured baseline
+    existed. K-15 measured it (80 %, 2026-10-19), so the deferral is over:
+    step 4 now enforces a floor."""
+    cfg = yaml.safe_load(CI_YAML.read_text())
+    step = next(s for s in cfg["jobs"]["ci"]["steps"] if s.get("name") == "4. pytest")
+    assert "--cov-fail-under=" in step["run"]
 
 
 def test_plugin_agnostik_step5_secret_absent_safe():

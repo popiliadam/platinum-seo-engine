@@ -28,7 +28,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 
 # ---------------------------------------------------------------- helpers
@@ -39,8 +39,12 @@ def _find_items(obj: Any, needle_key: str, depth: int = 0) -> list[dict] | None:
         return None
     if isinstance(obj, list) and obj and isinstance(obj[0], dict) and needle_key in obj[0]:
         return obj
-    if isinstance(obj, dict):
-        for v in obj.values():
+    # K-15: descend into list ELEMENTS too — the REST envelope is
+    # {"tasks": [{"result": [{"items": [...]}]}]}, and walking dict values only
+    # stopped at the tasks list, so every real response projected 0 rows.
+    children = obj.values() if isinstance(obj, dict) else obj if isinstance(obj, list) else ()
+    for v in children:
+        if isinstance(v, (dict, list)):
             found = _find_items(v, needle_key, depth + 1)
             if found:
                 return found

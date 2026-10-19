@@ -19,7 +19,6 @@ History:
 import re
 from pathlib import Path
 
-import pytest
 
 ROOT = Path(__file__).parent.parent.parent
 RULES_DIR = ROOT / "rules"

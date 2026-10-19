@@ -14,7 +14,6 @@ from pathlib import Path
 
 import pytest
 
-from scripts.state import events_writer
 from scripts.state.events_writer import (
     EventPayloadTooLarge,
     EventResult,
@@ -22,7 +21,6 @@ from scripts.state.events_writer import (
     append_audit,
     append_event,
     append_provenance,
-    append_work,
     append_workflow,
     next_run_id,
     normalize_audit_action,

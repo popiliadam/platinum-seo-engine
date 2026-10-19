@@ -18,7 +18,7 @@ Append-only — superseded entry'ler işaretlenir, silinmez.
 | ADR-007 | plugin.json Baseline Schema, Optional Alanlar Phase 4'te Validate | accepted | DECISIONS_ARCHIVE.md |
 | ADR-008 | state/outputs/inbox Plugin Repo'da YOK | accepted | DECISIONS_ARCHIVE.md |
 | ADR-009 | templates/master-excel.xlsx Phase 1'de Schema'dan Üretilir | accepted | DECISIONS_ARCHIVE.md |
-| ADR-010 | Runtime Versions: Python 3.10+, Node Gerekmez | accepted | DECISIONS_ARCHIVE.md |
+| ADR-010 | Runtime Versions: Python 3.10+, Node Gerekmez | superseded by ADR-042 (floor) | DECISIONS_ARCHIVE.md |
 | ADR-011 | DECISIONS_ARCHIVE Rotation Stratejisi | accepted | DECISIONS_ARCHIVE.md |
 | ADR-012 | JSON Schema Meta-Schema URI: HTTP (History-Stable) | accepted | DECISIONS_ARCHIVE.md |
 | ADR-013 | Phase 1.4 Schema Yazım Kararları (3 Sub-Decision) | accepted | DECISIONS_ARCHIVE.md |
@@ -81,3 +81,11 @@ Append-only — superseded entry'ler işaretlenir, silinmez.
 **Context:** The brand-onboarding Stage-C bank-write (`scripts/meta/brand_onboarding_write.py`) emits R-44/R-114 fields — `experience_database`: `claim_core, evidence_url, evidence_type, verified_date`; `original_research_database`: `methodology, sample_size, url, publication_date, key_findings` — that the v1.5 `project-config.schema.json` item defs (`additionalProperties:false`) rejected. This is a pre-existing **writer↔schema drift** (the sanctioned writer already shipped these fields; the schema lagged), surfaced by the 2026-06-04 skill-contract audit finding **B4-05**. Critically, `evidence_url` (the R-44 provenance Stage C exists to capture) has no home among the existing `context/outcome/date` fields, so "map to existing fields" would silently drop it.
 **Decision:** Add the writer's fields as **optional** properties to both bank item defs; keep `required[]` unchanged and `schema_version` const **"1.5"** (no bump). This is a schema **bug-fix** realigning the contract to the already-shipped writer, not a new schema version: it is purely additive-optional, so every existing "1.5" config stays valid and there is nothing to migrate. A formal 1.5→1.6 bump was deliberately rejected — it would force a no-op `migration_0006` and invalidate every existing "1.5" config until migrated, for zero field-level benefit.
 **Consequences:** `tests/meta/test_brand_onboarding_write.py` gains `test_post_write_config_validates_against_schema` (post-Stage-C config validates clean against the live schema — the B4-05 regression lock). The in-schema property descriptions document the additive fields inline. Future *genuine* schema changes (new required fields, renames, type changes) still require the standard version bump + migration script per ADR-018; this exception covers only an additive-optional correction that introduces no new required field and changes no existing data.
+
+## ADR-042 — Python floor 3.11 (3.10 end-of-life)
+**Date:** 2026-10-19
+**Status:** accepted
+**Context:** Python 3.10 reaches end-of-life in October 2026 (audit K-10). The CI matrix floor leg could start failing without any change in this repo when an unpinned transitive dependency drops 3.10.
+**Decision:** The supported floor becomes **Python 3.11**; CI runs 3.11 + 3.14. ADR-010's "no Node" part stands. The 3.10-safe date helpers stay (harmless on 3.11+).
+**Consequences:** README / INSTALL say 3.11+; `tests/ci/test_python_version_consistency.py` and `test_ci_yaml.py` pin 3.11 and reject 3.10. A full hashed lock (`pip-compile --generate-hashes`) is still open: it needs the resolver run on both matrix interpreters.
+

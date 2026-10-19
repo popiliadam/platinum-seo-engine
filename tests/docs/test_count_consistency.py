@@ -17,7 +17,6 @@ import json
 import re
 from pathlib import Path
 
-from scripts.validation import validate_invariants
 from tests._count_pins import (
     COMMAND_COUNT,
     CSR_DECLARED,
@@ -167,8 +166,8 @@ def test_drift_check_skill_narrative_counts() -> None:
     assert f"The {implemented} rules are partitioned" in doc
     assert f"## {implemented} Invariant Rules" in doc
     # Tier table mirrors validate_invariants section comments.
-    assert "| HIGH      | 14    |" in doc
-    assert "| MEDIUM    | 6     |" in doc
+    assert f"| HIGH      | {TIER_COUNTS['HIGH']}    |" in doc   # K-14: from the pins
+    assert f"| MEDIUM    | {TIER_COUNTS['MEDIUM']}     |" in doc
     # Stale narrative gone.
     assert "(20 rules)" not in doc
     assert "The 21 rules" not in doc

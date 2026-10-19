@@ -18,7 +18,6 @@ from jsonschema import Draft7Validator
 
 from scripts.state import events_writer, workflow_runner
 from scripts.state.workflow_runner import (
-    ConcurrentMutationError,
     IllegalTransitionError,
     RunIdCollisionError,
     ValidationError,

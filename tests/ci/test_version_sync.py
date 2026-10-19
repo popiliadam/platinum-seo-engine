@@ -59,7 +59,7 @@ def _install_banner_version() -> str:
 
 def _latest_release_notes_version() -> str:
     files = sorted((REPO / "docs").glob(RELEASE_NOTES_GLOB))
-    assert files, f"No RELEASE_NOTES_v*.md under docs/"
+    assert files, "No RELEASE_NOTES_v*.md under docs/"
     # files are sorted lexically; semver normally lexically sorts correctly for
     # MAJOR.MINOR.PATCH within the same major. For multi-major sort, take the
     # one whose embedded semver is lexically max (good enough for v1.x).
@@ -124,19 +124,20 @@ def _semver_tuple(s: str) -> tuple[int, int, int]:
 
 
 def test_git_tag_matches_plugin_json_when_present() -> None:
-    """Git tag parity asserted only when the tag is at or ahead of plugin.json.
+    """The latest annotated tag equals plugin.json's version.
 
-    During mid-release development the tag lags plugin.json (we bump the json
-    first, tag the release later — Task 3.7).  Skip in that lagging window.
+    K-06: a lagging tag used to SKIP ("mid-release dev"), and v2.1.1-v2.1.4
+    shipped untagged for four releases with nothing checked. A lag now fails:
+    tag the release when plugin.json is bumped. A clone with no tags at all
+    (shallow CI checkout) still skips, with that reason.
     """
     tag = _git_tag_version()
     if tag is None:
-        pytest.skip("No annotated git tag yet (pre-release or fresh clone)")
+        pytest.skip("No annotated git tag in this clone (shallow CI checkout / fresh clone)")
     plug = _plugin_json_version()
-    if _semver_tuple(tag) < _semver_tuple(plug):
-        pytest.skip(
-            f"Latest git tag (v{tag}) lags plugin.json (v{plug}) — mid-release dev."
-        )
+    assert _semver_tuple(tag) >= _semver_tuple(plug), (
+        f"Latest git tag (v{tag}) lags plugin.json (v{plug}) — tag the release."
+    )
     assert tag == plug, (
         f"Latest git tag (v{tag}) != plugin.json version (v{plug}) — "
         "tag must be bumped to match plugin.json before release."

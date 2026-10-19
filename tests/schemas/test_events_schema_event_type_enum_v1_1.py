@@ -229,7 +229,7 @@ def test_unknown_skill_event_type_rejected() -> None:
     errors = list(validator.iter_errors(event))
     et_errors = [e for e in errors if list(e.absolute_path) == ["event_type"]]
     assert et_errors, (
-        f"Expected enum rejection for 'skill_unknown_future' on .event_type; "
-        f"validator returned: "
+        "Expected enum rejection for 'skill_unknown_future' on .event_type; "
+        "validator returned: "
         + "; ".join(str(e.message) for e in errors[:3])
     )

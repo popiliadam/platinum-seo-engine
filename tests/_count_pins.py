@@ -40,8 +40,8 @@ COMMAND_COUNT = 31        # commands/*.md (S-01 +pseo-index)
 SCHEMA_FILE_COUNT = 31    # schemas/*.schema.json
 SCHEMA_JSON_COUNT = 32    # schemas/*.json (= SCHEMA_FILE_COUNT + cross-sheet-invariants.json)
 CSR_DECLARED = 32         # len(cross-sheet-invariants.json["rules"])
-CSR_IMPLEMENTED = 25      # len(validate_invariants._RULE_FUNCTIONS)
-TIER_COUNTS = {"CRITICAL": 5, "HIGH": 14, "MEDIUM": 6}  # sum == CSR_IMPLEMENTED
+CSR_IMPLEMENTED = 26      # len(validate_invariants._RULE_FUNCTIONS) — K-02 +D-03
+TIER_COUNTS = {"CRITICAL": 5, "HIGH": 15, "MEDIUM": 6}  # sum == CSR_IMPLEMENTED
 
 
 # ---------------------------------------------------------------------------

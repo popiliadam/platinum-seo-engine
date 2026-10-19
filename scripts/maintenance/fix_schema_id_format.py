@@ -63,8 +63,7 @@ def transform(content: str, filename: str) -> tuple[str, str | None, str]:
     If $id exists: regex-replace HTTPS→HTTP + path + suffix.
     If $id missing: insert new line after the first $schema line, indented to match.
     """
-    expected = expected_id(filename)
-    expected_id_value = ID_PREFIX + SLUG_PATTERN.match(filename).group(1)
+    expected_id_value = expected_id(filename)  # validates the filename (ValueError)
 
     m = ID_LINE_RE.search(content)
     if m:

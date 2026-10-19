@@ -50,6 +50,6 @@ def test_bare_sha256_uses_ref():
     # After fix: { "$ref": "#/definitions/sha256Hash" }
     bare_lit = '{ "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }'
     assert bare_lit not in text, (
-        f"Bare sha256 literal still present in events.schema.json. "
-        f"Expected migration to $ref: #/definitions/sha256Hash."
+        "Bare sha256 literal still present in events.schema.json. "
+        "Expected migration to $ref: #/definitions/sha256Hash."
     )

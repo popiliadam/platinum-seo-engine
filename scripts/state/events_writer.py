@@ -82,7 +82,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_SCHEMA_PATH = _REPO_ROOT / "schemas" / "events.schema.json"
 
 # Secret VALUE patterns — a MIRROR of the canonical inventory in
-# scripts/security/check_secrets.sh (its 17 PATTERN_NAMES classes), so an event
+# scripts/security/check_secrets.sh (its 34 PATTERN_NAMES classes), so an event
 # can never persist a secret class the repo otherwise claims to detect (hostile
 # audit #3). Python redaction can't shell out per event, so the inventory is
 # mirrored here; the drift tripwire is tests/scripts/test_events_writer_secret_
@@ -125,6 +125,23 @@ _SECRET_VALUE_PATTERNS: tuple[re.Pattern[str], ...] = (
         r"[\"'][A-Za-z0-9+/]{24,}={1,2}[\"']",
         re.IGNORECASE,
     ),
+    # K-11 classes (mirror scripts/security/check_secrets.sh, same labels)
+    re.compile(r"ASIA[0-9A-Z]{16}"),                                     # aws_temporary_key_asia
+    re.compile(r"AWS_SECRET_ACCESS_KEY[\"']?\s*[:=]\s*[\"']?[A-Za-z0-9/+=]{40}"),  # aws_secret_access_key_env
+    re.compile(r"github_pat_[0-9A-Za-z_]{22,}"),                          # github_pat_fine_grained
+    re.compile(r"ghr_[A-Za-z0-9]{36}"),                                  # github_refresh_token_ghr
+    re.compile(r"GOCSPX-[A-Za-z0-9_\-]{20,}"),                           # google_oauth_client_secret
+    re.compile(r"(?<![0-9A-Za-z])1//0[A-Za-z0-9_\-]{30,}"),              # google_oauth_refresh_token
+    re.compile(r"ya29\.[0-9A-Za-z_\-]{30,}"),                            # google_oauth_access_token
+    re.compile(r"xapp-[0-9]-[A-Za-z0-9\-]{10,}"),                        # slack_app_token_xapp
+    re.compile(r"hooks\.slack\.com/services/T[A-Z0-9]+/B[A-Z0-9]+/[A-Za-z0-9]{20,}"),  # slack_webhook_url
+    re.compile(r"-----BEGIN (?:EC |ENCRYPTED )?PRIVATE KEY-----"),        # ec_/encrypted_private_key_header
+    re.compile(r"-----BEGIN PGP PRIVATE KEY" r" BLOCK-----"),  # pgp_private_key_header (split: no literal header in source)
+    re.compile(r"eyJ[A-Za-z0-9_\-]{10,}\.eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}"),  # jwt_token
+    re.compile(r"(?<![A-Za-z0-9])(?:sk|rk)_live_[0-9A-Za-z]{24,}"),                       # stripe_live_key
+    re.compile(r"DATAFORSEO_PASSWORD\s*=\s*[A-Za-z0-9]{12,}(?![A-Za-z0-9])"),  # dataforseo_env_unquoted
+    re.compile(r"[Aa]uthorization:\s*Basic\s+[A-Za-z0-9+/]{16,}={0,2}"),  # http_basic_auth_header
+    re.compile(r"auth\s*=\s*\(\s*[\"'][^\"']+[\"']\s*,\s*[\"'][^\"']{6,}[\"']\s*\)"),  # python_auth_tuple_literal
 )
 
 # Secret FIELD-NAME suffixes — case-insensitive endswith match.

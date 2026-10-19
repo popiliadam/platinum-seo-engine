@@ -17,10 +17,8 @@ from __future__ import annotations
 
 import json
 import re
-import shlex
 from pathlib import Path
 
-import pytest
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent

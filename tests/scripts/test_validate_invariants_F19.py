@@ -10,7 +10,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
 from openpyxl import Workbook
 
 from scripts.validation.validate_invariants import check_F_19

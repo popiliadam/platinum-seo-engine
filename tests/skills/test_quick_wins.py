@@ -34,7 +34,6 @@ import pytest
 from jsonschema import Draft7Validator
 
 from scripts.discovery import quickwins_transform
-from scripts.excel import transaction
 from scripts.state import events_writer, workflow_runner
 from tests._live_fixtures import live_project_dir, live_slug, requires_live
 

@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import json
 import multiprocessing as mp
-import os
 import time
 from pathlib import Path
 
@@ -149,6 +148,7 @@ def test_atomic_kill_mid_write_no_partial(tmp_path: Path, monkeypatch: pytest.Mo
 
     # Original workbook unchanged.
     assert wb_path.stat().st_size == pre_size
+    assert wb_path.stat().st_mtime == pre_mtime
     # Tempfile must not leak in parent dir.
     leftovers = [p for p in proj.iterdir() if p.name.startswith(".master-") and p.name.endswith(".xlsx.tmp")]
     assert leftovers == [], f"leaked tempfile: {leftovers}"
