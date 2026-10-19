@@ -117,12 +117,18 @@ retire**.
    out = rpt.transform(
        robots_txt_text, directives_rows, internal_rows, lifecycle_rows,
        platform, domain, facet_block=facet_block, url_patterns=url_patterns,
+       ai_bots=project_config.get("ai_bots"),
    )
    ```
    Lints robots.txt (noindex-line=HIGH, missing-Sitemap=MEDIUM, site-wide
    Disallow=CRITICAL, unknown=LOW), scans R-133 conflicts + R-58 lifecycle drift,
-   protects important pages, and builds `proposed_robots_txt` + a platform
-   `deployment_instructions` matrix (unverified platforms marked
+   R-99 AI bots (AI search / user agent blocked=HIGH, an `ai_bots`-allowed agent
+   blocked=MEDIUM, retired token such as Claude-Web=LOW; training crawlers are the
+   client's call and are not a finding), protects important pages, and builds
+   `proposed_robots_txt` (a named group's `Disallow: /` — e.g. a deliberate
+   GPTBot block — is KEPT; only a `User-agent: *` site-wide block is dropped),
+   `proposed_diff` (unified diff vs the live file — show it in the report), and a
+   platform `deployment_instructions` matrix (unverified platforms marked
    `verified: false`).
 4. **request_approval** — skill EXIT awaiting_approval.
 5. **write_excel** — on approve, `sheet_merge.merge_prefixed_rows(..., id_prefix="RP-",

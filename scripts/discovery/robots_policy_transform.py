@@ -30,6 +30,7 @@ rules/content-html-discipline.md (R-58 lifecycle robots-meta map).
 
 from __future__ import annotations
 
+import difflib
 from typing import Any, Iterable
 from urllib.parse import urlsplit
 from urllib.robotparser import RobotFileParser
@@ -41,6 +42,20 @@ _IMPORTANT_KINDS = {"product", "category", "blog", "hub"}
 _KNOWN_DIRECTIVES = {
     "user-agent", "disallow", "allow", "sitemap", "crawl-delay",
     "host", "clean-param", "noindex", "request-rate", "visit-time",
+}
+
+#: R-99 AI crawler classes (2026). training = model training (client's call);
+#: search = AI answer/search indexing (blocking it removes the site from those
+#: answers); user = fetches triggered by a person asking an assistant.
+AI_BOT_CLASSES: dict[str, tuple[str, ...]] = {
+    "training": ("GPTBot", "ClaudeBot", "Google-Extended", "CCBot",
+                 "Applebot-Extended", "Bytespider"),
+    "search": ("OAI-SearchBot", "PerplexityBot", "Claude-SearchBot"),
+    "user": ("ChatGPT-User", "Claude-User", "Perplexity-User"),
+}
+#: User-agent tokens their operators have retired (rules no longer apply).
+RETIRED_AI_AGENTS: dict[str, str] = {
+    "claude-web": "Anthropic retired Claude-Web; use ClaudeBot / Claude-User / Claude-SearchBot",
 }
 
 #: R-132 deployment matrix keyed by the 6-value project.config[platform] enum.
@@ -209,11 +224,16 @@ def _slug_in_address(slug: str, address: str) -> bool:
 def _build_proposed(text: str, domain: str, facet_block: str | None) -> str:
     """Live file − unsupported/site-wide lines + Sitemap + optional facet block.
 
-    Raises RobotsProposedSiteWideBlockError if the result would block ``/`` (#4).
+    A ``Disallow: /`` is dropped ONLY in a ``User-agent: *`` group (a site-wide
+    block); in a named group (``GPTBot``) it is the client's deliberate choice and
+    is kept (S-08). Raises RobotsProposedSiteWideBlockError if the result would
+    still block ``/`` for everyone (#4).
     """
     kept: list[str] = []
     has_agent = False
     has_sitemap = False
+    agents: set[str] = set()
+    last_was_agent = False
     for raw in (text or "").splitlines():
         stripped = raw.split("#", 1)[0].strip()
         if not stripped or ":" not in stripped:
@@ -221,9 +241,14 @@ def _build_proposed(text: str, domain: str, facet_block: str | None) -> str:
         directive, value = stripped.split(":", 1)
         d = directive.strip().lower()
         v = value.strip()
+        if d == "user-agent":
+            agents = agents | {v.lower()} if last_was_agent else {v.lower()}
+            last_was_agent = True
+        else:
+            last_was_agent = False
         if d == "noindex":
             continue  # Google-unsupported — never propagate
-        if d == "disallow" and v == "/":
+        if d == "disallow" and v == "/" and "*" in agents:
             continue  # never propagate a site-wide block
         if d == "user-agent":
             has_agent = True
@@ -250,6 +275,44 @@ def _build_proposed(text: str, domain: str, facet_block: str | None) -> str:
     return proposed
 
 
+def _ai_bot_findings(rp: RobotFileParser, parsed: dict, domain: str,
+                     ai_bots: list[str] | None) -> list[dict]:
+    """R-99 (S-09): blocked AI search/user bots, config-allowed bots the file
+    blocks, and retired agent tokens."""
+    home = f"https://{domain}/"
+    out: list[dict] = []
+    blocked_answers = [
+        bot for cls in ("search", "user") for bot in AI_BOT_CLASSES[cls]
+        if not rp.can_fetch(bot, home)
+    ]
+    if blocked_answers:
+        out.append(_finding(
+            "HIGH", "AI search / assistant bot blocked in robots.txt",
+            f"robots.txt blocks {', '.join(blocked_answers)} from the site root — the "
+            "site cannot appear (or be fetched on a user's request) in those AI "
+            "answers. This is separate from training opt-out.",
+            "Allow the AI search and user agents; decide training bots (GPTBot, "
+            "ClaudeBot, Google-Extended, CCBot …) separately.",
+        ))
+    wanted = [b for b in (ai_bots or []) if not rp.can_fetch(b, home)]
+    if wanted:
+        out.append(_finding(
+            "MEDIUM", "Bot allowed in project ai_bots is blocked by robots.txt",
+            f"project.config ai_bots lists {', '.join(wanted)} as allowed, but the "
+            "live robots.txt blocks it.",
+            "Either unblock the bot or remove it from ai_bots so config and file agree.",
+        ))
+    agents = {a for g in parsed["groups"] for a in g["agents"]}
+    for token, why in RETIRED_AI_AGENTS.items():
+        if token in agents:
+            out.append(_finding(
+                "LOW", f"Retired AI user agent in robots.txt: {token}",
+                why + " — rules for this token no longer do anything.",
+                "Replace it with the current agent tokens for that operator.",
+            ))
+    return out
+
+
 def _render_deployment(platform: str) -> str:
     entry = PLATFORM_DEPLOYMENT_MATRIX.get(platform, PLATFORM_DEPLOYMENT_MATRIX["custom"])
     verified = "verified" if entry["verified"] else "UNVERIFIED (operator must confirm)"
@@ -274,11 +337,15 @@ def transform(
     domain: str,
     facet_block: str | None = None,
     url_patterns: list[dict] | None = None,
+    ai_bots: list[str] | None = None,
 ) -> dict:
-    """Lint robots.txt + scan R-133/R-58 + build proposed file & deployment matrix.
+    """Lint robots.txt + scan R-133/R-58 + R-99 AI bots + build proposed file,
+    its diff against the live file, and the deployment matrix.
 
-    Returns ``{"robots_txt_rows", "proposed_robots_txt", "deployment_instructions",
-    "summary"}``. ``robots_txt_rows`` carry id=None (sheet_merge assigns RP-NNN).
+    ``ai_bots`` is ``project.config[ai_bots]`` (the agents the client allows).
+    Returns ``{"robots_txt_rows", "proposed_robots_txt", "proposed_diff",
+    "deployment_instructions", "summary"}``. ``robots_txt_rows`` carry id=None
+    (sheet_merge assigns RP-NNN).
     """
     if directives_rows is None:
         raise RobotsDirectivesMissingError(
@@ -413,7 +480,13 @@ def transform(
             "point — review before deploy).",
         ))
 
+    findings.extend(_ai_bot_findings(rp, parsed, domain, ai_bots))
+
     proposed = _build_proposed(robots_txt_text or "", domain, facet_block)
+    proposed_diff = "".join(difflib.unified_diff(
+        (robots_txt_text or "").splitlines(keepends=True), proposed.splitlines(keepends=True),
+        fromfile="robots.txt (live)", tofile="robots.txt (proposed)",
+    ))
     deployment = _render_deployment(platform)
 
     by_level: dict[str, int] = {}
@@ -432,6 +505,7 @@ def transform(
     return {
         "robots_txt_rows": findings,
         "proposed_robots_txt": proposed,
+        "proposed_diff": proposed_diff,
         "deployment_instructions": deployment,
         "summary": summary,
     }
@@ -439,6 +513,8 @@ def transform(
 
 __all__ = (
     "transform",
+    "AI_BOT_CLASSES",
+    "RETIRED_AI_AGENTS",
     "PLATFORM_DEPLOYMENT_MATRIX",
     "RobotsPolicyError",
     "RobotsDirectivesMissingError",
