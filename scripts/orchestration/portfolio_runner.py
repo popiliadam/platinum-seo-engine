@@ -207,12 +207,12 @@ def _release_all(
 
 
 def _confirm_amount(actual_cost: dict, resource: str, reserved: float) -> float:
-    """Confirm amount for a resource: the result's actual if a valid number in
-    [0, reserved], else the reserved estimate (confirm can never exceed reserved)."""
+    """Confirm amount for a resource: the result's actual if a valid number >= 0
+    (also above the reserve — D-11 records real spend), else the reserved estimate."""
     value = actual_cost.get(resource)
     if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
         return reserved
-    return min(float(value), reserved)
+    return float(value)
 
 
 def _confirm_all(
@@ -309,9 +309,16 @@ def _process_project(
             return "failed", {"slug": slug, "reason": "run_error",
                               "error": str(exc),
                               "message": _failure_message(slug, exc)}
-        _confirm_all(workspace_root, reservations,
-                     actual_cost=_actual_cost_of(result), run_id=run_id,
-                     slug=slug, now_iso=now_iso)
+        try:
+            _confirm_all(workspace_root, reservations,
+                         actual_cost=_actual_cost_of(result), run_id=run_id,
+                         slug=slug, now_iso=now_iso)
+        except cost_ledger.CostLedgerError as exc:    # D-11: never escape the sweep
+            _release_all(workspace_root, reservations, run_id=run_id, slug=slug,
+                         now_iso=now_iso)
+            return "failed", {"slug": slug, "reason": "cost_confirm_error",
+                              "error": str(exc),
+                              "message": _failure_message(slug, exc)}
         return "ran", {"slug": slug, "result": result}
     finally:
         project_lock.release(fd)
