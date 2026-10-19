@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![Claude Code Plugin](https://img.shields.io/badge/Claude_Code-plugin-7C3AED)](https://claude.ai/code)
 
-> Status: **v2.1.4** — production-ready core (production/publishing suites + 4 new tech-SEO skills are `wip`: contracts + tests locked, runtime deferred) · 50 skills · 30 commands · 6 hooks · 6 MCP servers (3 stdio + 1 HTTP)
+> Status: **v2.1.4** — production-ready core (production/publishing suites + 4 new tech-SEO skills are `wip`: contracts + tests locked, runtime deferred) · 50 skills · 31 commands · 6 hooks · 6 MCP servers (3 stdio + 1 HTTP)
 
 > **Schema-locked, drift-checked SEO automation for Claude Code.**
 > Turn manual SEO work into auditable, repeatable workflows — backed by JSON Schemas, append-only state, and a tool that audits itself.
@@ -56,7 +56,7 @@ Out of the box, **50 skills** across 8 categories cover an end-to-end SEO loop:
 | **Meta** | Init project, brand onboarding, whats-next router, mark-done | 4 |
 | **Governance** | Schema validation, glossary audit, drift-check, context loader | 4 |
 
-Plus **30 slash commands** (`/pseo-init`, `/pseo-quickwin`, `/pseo-driftcheck`, `/pseo-sf-crawl`, `/pseo-sf-status`, …), **6 hooks** that fire on session start, prompt submit, and tool use, and **6 MCP servers** wired up automatically (GSC, DataForSEO, Scrapling, SF — the last over HTTP `http://127.0.0.1:11435/mcp`).
+Plus **31 slash commands** (`/pseo-init`, `/pseo-quickwin`, `/pseo-driftcheck`, `/pseo-sf-crawl`, `/pseo-sf-status`, …), **6 hooks** that fire on session start, prompt submit, and tool use, and **6 MCP servers** wired up automatically (GSC, DataForSEO, Scrapling, SF — the last over HTTP `http://127.0.0.1:11435/mcp`).
 
 A typical workflow looks like:
 
@@ -134,7 +134,7 @@ The plugin enforces a **two-repo separation** between logic and data:
 │  platinum-seo-engine  (this)     │  reads │  platinum-seo-workspace          │
 │  ─────────────────────────────   │ ─────► │  ─────────────────────────────   │
 │  • skills/        (50 SKILL.md)  │        │  • projects/{slug}/              │
-│  • commands/      (30 slash cmds)│        │     ├ project.config.json        │
+│  • commands/      (31 slash cmds)│        │     ├ project.config.json        │
 │  • hooks/         (6 hooks)      │ writes │     ├ master.xlsx                │
 │  • schemas/       (32 JSON       │ ─────► │     ├ events.jsonl  (append-only)│
 │  • scripts/        Schemas)      │        │     └ workflows/{run_id}.json    │
