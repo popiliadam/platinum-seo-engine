@@ -419,17 +419,26 @@ def _has_post_flag(tokens: list[str]) -> bool:
     return False
 
 
-# curl / wget options that take a value: that value is never the request URL.
-_HTTP_ARG_FLAGS = frozenset({
-    "-o", "--output", "-H", "--header", "-A", "--user-agent", "-e", "--referer",
-    "-u", "--user", "-b", "--cookie", "-c", "--cookie-jar", "-X", "--request",
-    "-d", "--data", "--data-raw", "--data-binary", "--data-ascii", "--data-urlencode",
-    "--json", "-F", "--form", "-T", "--upload-file", "-w", "--write-out",
-    "-m", "--max-time", "--connect-timeout", "-r", "--range", "-K", "--config",
-    "--cacert", "--cert", "-E", "--key", "-x", "--proxy", "--resolve",
-    "-O", "--output-document", "--output-file", "-t", "--tries", "--timeout",
+# Options that take a separate value, PER TOOL (the same letter means different
+# things: curl -O/-i take none, wget -O/-i take a file; wget -d/-x/-c/-b take none).
+_CURL_ARG_FLAGS = frozenset({
+    "-o", "--output", "--output-dir", "-H", "--header", "-A", "--user-agent",
+    "-e", "--referer", "-u", "--user", "-b", "--cookie", "-c", "--cookie-jar",
+    "-X", "--request", "-d", "--data", "--data-raw", "--data-binary", "--data-ascii",
+    "--data-urlencode", "--json", "-F", "--form", "-T", "--upload-file",
+    "-w", "--write-out", "-m", "--max-time", "--connect-timeout", "-r", "--range",
+    "-K", "--config", "--cacert", "--cert", "-E", "--key", "-x", "--proxy",
+    "--resolve", "-D", "--dump-header", "-z", "--time-cond", "-Y", "-y", "--retry",
+    "-C", "--continue-at", "--limit-rate", "--max-filesize", "--interface",
+    "-Q", "--quote",
+})
+_WGET_ARG_FLAGS = frozenset({
+    "-O", "--output-document", "-o", "--output-file", "-a", "--append-output",
+    "-i", "--input-file", "-t", "--tries", "-T", "--timeout", "-P",
+    "--directory-prefix", "-U", "--user-agent", "-e", "--execute", "-A", "--accept",
+    "-R", "--reject", "--header", "--referer", "--user", "--password",
     "--post-data", "--post-file", "--body-data", "--body-file", "--method",
-    "-P", "--directory-prefix", "-U", "-a", "--append-output", "-i", "--input-file",
+    "--load-cookies", "--save-cookies", "-w", "--wait", "-Q", "--quota", "-l", "--level",
 })
 _SCHEME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*://")
 _HOSTLIKE_RE = re.compile(r"^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+(:\d+)?(/\S*)?$")
@@ -444,11 +453,14 @@ def _request_urls(tokens: list[str]) -> list[str]:
     file``, ``-H header``, ``-d data``) are skipped. ``wget -O out.html`` and
     ``-o page.html`` therefore stay files, not hosts.
     """
+    is_wget = bool(tokens) and tokens[0].rsplit("/", 1)[-1] == "wget"
+    arg_flags = _WGET_ARG_FLAGS if is_wget else _CURL_ARG_FLAGS
     urls: list[str] = []
     pending: str | None = None  # "url" = next token is a URL, "skip" = an option value
     for tok in tokens[1:]:
         if pending is not None:
-            if pending == "url":
+            # fail closed: a skipped "value" that is plainly a URL still counts
+            if pending == "url" or _SCHEME_RE.match(tok):
                 urls.append(tok)
             pending = None
             continue
@@ -458,7 +470,7 @@ def _request_urls(tokens: list[str]) -> list[str]:
             urls.append(tok.split("=", 1)[1])
         elif tok.startswith("-"):
             # a separate value follows (`-o file`, `-T 30`); glued forms carry it inline
-            if tok in _HTTP_ARG_FLAGS:
+            if tok in arg_flags:
                 pending = "skip"
         elif _SCHEME_RE.match(tok) or _HOSTLIKE_RE.match(tok):
             urls.append(tok)
