@@ -102,6 +102,7 @@ if str(_REPO_ROOT) not in sys.path:
 
 from scripts.util.url_normalize import normalize_url  # noqa: E402  (D-07)
 from scripts.util.coerce import to_int  # noqa: E402  (D-17)
+from scripts.planning.task_noise import NoiseGate  # noqa: E402  (O-02/O-18/O-19)
 
 
 # ---------------------------------------------------------------------------
@@ -939,6 +940,8 @@ def aggregate(
             )
 
     existing_index = _index_existing(existing_master_task)
+    # O-02 / O-18 / O-19: drop NEW tasks nobody will do (named reasons only).
+    noise = NoiseGate.from_master_task(existing_master_task, run_date)
 
     # Working copy of the persistent registry (content_signature → T-id).
     working_map: dict[str, str] = dict(id_map or {})
@@ -1014,6 +1017,11 @@ def aggregate(
 
             existing_row = existing_index.get(task_id)
             if existing_row is None:
+                reason = noise.drop_reason(sig.primary_source, sig.url)
+                if reason is not None:
+                    bucket = dropped_stats.setdefault(src.sheet, {})
+                    bucket[reason] = bucket.get(reason, 0) + 1
+                    continue
                 # APPEND new row (full schema seed).
                 new_row = _build_master_task_row(
                     task_id=task_id,

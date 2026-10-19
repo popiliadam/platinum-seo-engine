@@ -244,6 +244,24 @@ inbox_path.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2,
                                  sort_keys=True))
 ```
 
+#### Noise gate (O-02 / O-18 / O-19)
+
+`aggregate` drops a NEW task (never touches existing rows) when
+`scripts/planning/task_noise.NoiseGate` names a reason, counted in
+`dropped_stats[sheet][reason]` and shown in the report:
+
+| reason | rule |
+|---|---|
+| `cooldown_60d` | the url had a task DONE in the last 60 days — wait for the O-01 outcome |
+| `low_acceptance` | the source has ≥ 20 cancellations and < 10 % of its closed tasks were done |
+| `previously_canceled` | the same url + source was canceled before |
+
+After the write, refresh `projects/{slug}/seo-standartlari.md` with
+`task_noise.cancel_standards(master_task_rows, project=slug)` (plain write —
+it is a generated reading file, not state). A cancel reason seen 3+ times is
+marked **KALICI KURAL**; when canceling a task, write the reason in `note` as
+`iptal: <gerekçe>`.
+
 ### Step 4 — `request_approval` (skill EXIT awaiting_approval)
 
 ```python
