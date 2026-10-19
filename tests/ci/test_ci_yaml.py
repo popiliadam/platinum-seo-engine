@@ -13,7 +13,8 @@ def test_ci_yaml_exists():
 
 
 def test_ci_yaml_valid_syntax():
-    yaml.safe_load(CI_YAML.read_text())
+    cfg = yaml.safe_load(CI_YAML.read_text())
+    assert isinstance(cfg, dict) and cfg["jobs"]["ci"]["steps"]  # K-13: assert, not just parse
 
 
 def test_on_push_pull_request_main():
