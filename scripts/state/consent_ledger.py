@@ -59,6 +59,7 @@ import json
 import os
 import re
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
@@ -378,8 +379,14 @@ def has_session_consent(
     session_id: str,
     action: str,
     target_hash: str,
+    max_age_seconds: float | None = None,
+    now_epoch: float | None = None,
 ) -> bool:
     """True iff an INTACT chain holds an entry with this session_id + action + target_hash.
+
+    With ``max_age_seconds`` (G-09) an entry older than that — by its granted_at —
+    no longer authorizes: a consent is not a blank cheque for the rest of a long
+    session. ``now_epoch`` is injectable for tests (defaults to the wall clock).
 
     Per-session consent (the operator-chosen model, batch 2b): a consent only
     authorizes within the session that granted it. The 2a `/pseo-approve` writer
@@ -394,12 +401,27 @@ def has_session_consent(
     intact, _ = verify_chain(entries)
     if not intact:
         return False
+    now = time.time() if now_epoch is None else now_epoch
     return any(
         e.get("session_id") == session_id
         and e.get("action") == action
         and e.get("target_hash") == target_hash
+        and (max_age_seconds is None or _age_seconds(e.get("granted_at"), now) <= max_age_seconds)
         for e in entries
     )
+
+
+def _age_seconds(granted_at, now_epoch: float) -> float:
+    """Seconds since ``granted_at`` (ISO-8601, ``Z`` allowed); unparseable → infinite."""
+    if not isinstance(granted_at, str):
+        return float("inf")
+    try:
+        when = datetime.fromisoformat(granted_at.replace("Z", "+00:00"))
+    except ValueError:
+        return float("inf")
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    return now_epoch - when.timestamp()
 
 
 # ---------------------------------------------------------------------------

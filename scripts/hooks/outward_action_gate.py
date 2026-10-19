@@ -63,10 +63,6 @@ _PLUGIN_ROOT = os.environ.get("CLAUDE_PLUGIN_ROOT") or str(
 if _PLUGIN_ROOT not in sys.path:
     sys.path.insert(0, _PLUGIN_ROOT)
 
-from scripts.state.consent_ledger import (  # noqa: E402
-    has_session_consent,
-    target_hash,
-)
 from scripts.state.outward_log import append_outward  # noqa: E402
 from scripts.state.session_binding import (  # noqa: E402
     current_session_id,
@@ -187,6 +183,16 @@ _SEGMENT_SEP_RE = re.compile(r"&&|\|\||;|\n|\|")
 _POLICY = json.loads(
     Path(__file__).with_name("consent_policy.json").read_text(encoding="utf-8")
 )
+_CONSENT_MAX_AGE_SECONDS = float(_POLICY["consent_max_age_hours"]) * 3600
+
+
+def _ledger():
+    """The consent ledger, imported lazily (G-03): it needs jsonschema, and an
+    import failure at hook start-up made the hook exit 1 — which Claude Code
+    treats as ALLOW. Classification stays stdlib-only; only the consent check
+    needs the ledger, and main() turns a failure there into a DENY."""
+    from scripts.state import consent_ledger
+    return consent_ledger
 _DESTRUCTIVE_PUSH_FLAGS = frozenset(_POLICY["destructive_push_flags"])
 
 TIER_FREE = "serbest"
@@ -369,20 +375,32 @@ def _is_loopback_host(host: str) -> bool:
     return False
 
 
+_WRITE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+_BODY_FLAGS = frozenset({"--json", "--upload-file", "-T", "--body-data", "--body-file"})
+
+
 def _has_post_flag(tokens: list[str]) -> bool:
-    """True iff the tokens carry an outbound POST body marker (curl/wget)."""
+    """True iff the tokens send a body or use a write method (curl/wget) — incl.
+    combined short flags (``-sd``), ``--json``, uploads, and PUT/PATCH/DELETE (G-02)."""
     for i, tok in enumerate(tokens):
-        if tok in _POST_DATA_FLAGS:
+        nxt = tokens[i + 1].upper() if i + 1 < len(tokens) else ""
+        if tok in _POST_DATA_FLAGS or tok in _BODY_FLAGS:
             return True
-        if tok.startswith(("--data", "--post-data", "--post-file")):  # --data=… glued
+        if tok.startswith(("--data", "--post-data", "--post-file", "--json=",
+                           "--upload-file=", "--body-data", "--body-file")):
             return True
+        if tok in ("-X", "--request", "--method") and nxt in _WRITE_METHODS:
+            return True
+        if tok.startswith(("--request=", "--method=")) and tok.split("=", 1)[1].upper() in _WRITE_METHODS:
+            return True
+        if tok.startswith("-X") and len(tok) > 2:  # -XPOST / -XPUT (never a combined flag)
+            if tok[2:].upper() in _WRITE_METHODS:
+                return True
+            continue
         if tok.startswith("-d") and not tok.startswith("--") and len(tok) > 2:  # -d<data>
             return True
-        if tok in ("-X", "--request") and i + 1 < len(tokens) and tokens[i + 1].upper() == "POST":
-            return True
-        if tok.startswith("--request=") and tok.split("=", 1)[1].upper() == "POST":
-            return True
-        if tok.startswith("-X") and len(tok) > 2 and tok[2:].upper() == "POST":  # -XPOST
+        if (tok.startswith("-") and not tok.startswith("--") and len(tok) > 2
+                and tok[1:].isalpha() and any(ch in tok[1:] for ch in "dFT")):  # -sd, -sSF
             return True
     return False
 
@@ -401,6 +419,33 @@ def _split_segments(command: str) -> list[str]:
     classify, never fewer, so a gated action is never hidden by it.
     """
     return [seg.strip() for seg in _SEGMENT_SEP_RE.split(command) if seg.strip()]
+
+
+def _git_subcommand(tokens: list[str]) -> tuple[str | None, list[str]]:
+    """(subcommand, its arguments) of a git invocation, walking past git's global
+    options (those that consume the next token are skipped in pairs)."""
+    i = 1  # tokens[0] == "git"
+    while i < len(tokens):
+        tok = tokens[i]
+        if tok in _GIT_GLOBAL_ARG_FLAGS:
+            i += 2
+            continue
+        if tok.startswith("-"):
+            i += 1
+            continue
+        return tok, tokens[i + 1:]
+    return None, []
+
+
+def _git_clean_target(tokens: list[str]) -> str | None:
+    """``git clean -f…`` deletes untracked files (G-02): its target, else None."""
+    sub, rest = _git_subcommand(tokens)
+    if sub != "clean":
+        return None
+    forced = "--force" in rest or any(
+        t.startswith("-") and not t.startswith("--") and "f" in t[1:] for t in rest
+    )
+    return ("git clean " + " ".join(rest)).strip() if forced else None
 
 
 def _git_push_target(tokens: list[str]) -> str | None:
@@ -506,12 +551,31 @@ def _classify_segment(segment: str) -> tuple[str, str] | None:
         operands = _operands(tokens, 1)
         return ("fs_delete", " ".join(operands) if operands else segment.strip())
 
-    if first == "git":  # gated iff it is `git push` (even behind global flags)
+    if first == "find":
+        target = _find_delete_target(tokens)
+        return ("fs_delete", target) if target is not None else None
+
+    if first == "rsync" and any(
+        t.startswith("--delete") or t == "--remove-source-files" for t in tokens
+    ):
+        operands = _operands(tokens, 1)
+        return ("fs_delete", operands[-1] if operands else segment.strip())
+
+    if first == "git":  # gated: `git push` / `git clean -f` (even behind global flags)
         tgt = _git_push_target(tokens)
-        return ("git_push", tgt) if tgt is not None else None
+        if tgt is not None:
+            return ("git_push", tgt)
+        clean = _git_clean_target(tokens)
+        return ("fs_delete", clean) if clean is not None else None
 
     if first in _HTTP_TOKENS:
-        url = _first_url(tokens)
+        # Every URL counts (G-02): a loopback URL placed first must not hide a
+        # public one behind it.
+        urls = [t for t in tokens if t.startswith(("http://", "https://"))]
+        public = [u for u in urls if not _is_loopback_host((urlparse(u).hostname or "").lower())]
+        if urls and not public:
+            return None  # loopback only (#12); Indexing/IndexNow hosts are never loopback
+        url = public[0] if public else None
         host = (urlparse(url).hostname or "").lower() if url else ""
         is_indexing = host == _INDEXING_HOST
         is_indexnow = host.endswith("indexnow.org")
@@ -528,6 +592,54 @@ def _classify_segment(segment: str) -> tuple[str, str] | None:
         return None  # a plain GET curl/wget is not gated
 
     return None
+
+
+def _find_delete_target(tokens: list[str]) -> str | None:
+    """``find … -delete`` / ``-exec rm …``: the search roots + name patterns, else None."""
+    deletes = "-delete" in tokens or any(
+        tok in ("-exec", "-execdir", "-ok", "-okdir") and i + 1 < len(tokens)
+        and tokens[i + 1].rsplit("/", 1)[-1] in _DELETE_TOKENS
+        for i, tok in enumerate(tokens)
+    )
+    if not deletes:
+        return None
+    roots: list[str] = []
+    for tok in tokens[1:]:
+        if tok.startswith(("-", "(", "!")):
+            break
+        roots.append(tok)
+    names = [tokens[i + 1] for i, tok in enumerate(tokens[:-1])
+             if tok in ("-name", "-iname", "-path", "-ipath", "-wholename")]
+    return " ".join(roots + names) or "."
+
+
+_INTERP_DELETE_RE = re.compile(
+    r"(os\.remove|os\.unlink|os\.rmdir|shutil\.rmtree|\.unlink|\.rmdir|"
+    r"rmSync|unlinkSync|rmdirSync|FileUtils\.rm_rf|FileUtils\.rm|File\.delete)"
+    r"\s*\(\s*(?:(['\"])(.*?)\2)?"
+)
+_RECURSIVE_DELETE_CALLS = ("rmtree", "rmSync", "rm_rf")
+
+
+def _classify_interpreter_delete(command: str) -> Hit | None:
+    """An interpreter one-liner that deletes files (G-02): tiered on the literal
+    paths it names; with no literal path the gate cannot tell, so consent."""
+    leads_interpreter = any(
+        (toks := _unwrap_wrappers(_tokenize(seg)))
+        and _is_interpreter(toks[0].rsplit("/", 1)[-1])
+        for seg in _split_segments(command)
+    )
+    if not leads_interpreter:
+        return None
+    matches = list(_INTERP_DELETE_RE.finditer(command))
+    if not matches:
+        return None
+    paths = [m.group(3) for m in matches if m.group(3)]
+    if not paths:
+        return Hit("fs_delete", command.strip(), TIER_CONSENT)
+    recursive = any(call in m.group(1) for m in matches for call in _RECURSIVE_DELETE_CALLS)
+    tokens = ["rm", *(["-r"] if recursive else []), *paths]
+    return Hit("fs_delete", " ".join(paths), _delete_tier(tokens))
 
 
 def _classify_interpreter_net_write(command: str) -> tuple[str, str] | None:
@@ -549,7 +661,11 @@ def _classify_interpreter_net_write(command: str) -> tuple[str, str] | None:
     )
     if not leads_interpreter or not _interpreter_net_write(command):
         return None
-    url = _first_url_in_text(command)
+    urls = _URL_IN_TEXT_RE.findall(command)
+    public = [u for u in urls if not _is_loopback_host((urlparse(u).hostname or "").lower())]
+    if urls and not public:
+        return None  # loopback only (#12)
+    url = public[0] if public else None
     host = (urlparse(url).hostname or "").lower() if url else ""
     is_indexing = host == _INDEXING_HOST
     is_indexnow = host.endswith("indexnow.org")
@@ -563,6 +679,56 @@ def _classify_interpreter_net_write(command: str) -> tuple[str, str] | None:
         return None
     target = url if url else command.strip()
     return ("index_update", target) if is_indexing else ("net_post", target)
+
+
+_ENV_PREFIX_RE = re.compile(
+    r"""^(?:[A-Za-z_][A-Za-z0-9_]*=(?:'[^']*'|"(?:[^"\\]|\\.)*"|[^\s'"]*)\s+)+"""
+)
+_WHICH_RE = re.compile(
+    r"\$\(\s*(?:which|command\s+-v|type\s+-p)\s+([\w.-]+)\s*\)"
+    r"|`\s*(?:which|command\s+-v|type\s+-p)\s+([\w.-]+)\s*`"
+)
+_SHELLS = frozenset({"bash", "sh", "zsh", "dash", "ksh"})
+_MAX_NESTING = 3
+
+
+def _nested_script(segment: str) -> str | None:
+    """The command text run by ``bash -c '…'`` / ``sh -c`` / ``eval …``, else None."""
+    tokens = _unwrap_wrappers(_tokenize(segment))
+    if not tokens:
+        return None
+    head = tokens[0].rsplit("/", 1)[-1]
+    if head == "eval":
+        return " ".join(tokens[1:]) or None
+    if head in _SHELLS:
+        for i, tok in enumerate(tokens[1:], start=1):
+            if tok == "-c" or (tok.startswith("-") and not tok.startswith("--") and "c" in tok[1:]):
+                return tokens[i + 1] if i + 1 < len(tokens) else None
+    return None
+
+
+def _expanded_segments(command: str, depth: int = 0) -> list[str]:
+    """Shell segments with the simple disguises removed (G-02): ``NAME=value``
+    prefixes, a ``( … )`` subshell, ``$(which git)``, and the script inside
+    ``bash -c`` / ``sh -c`` / ``eval`` (recursively, bounded). Expanding only ever
+    EXPOSES a gated command; it can never hide one."""
+    out: list[str] = []
+    for segment in _split_segments(command):
+        seg = _WHICH_RE.sub(lambda m: m.group(1) or m.group(2), segment).strip()
+        if seg.startswith("("):
+            seg = seg[1:].strip()
+            if seg.endswith(")"):
+                seg = seg[:-1].strip()
+        seg = seg.lstrip("{!").strip()
+        seg = _ENV_PREFIX_RE.sub("", seg)
+        if not seg:
+            continue
+        inner = _nested_script(seg) if depth < _MAX_NESTING else None
+        if inner is not None:
+            out.extend(_expanded_segments(inner, depth + 1))
+        else:
+            out.append(seg)
+    return out
 
 
 def _classify_bash(command: str) -> tuple[str, str] | None:
@@ -584,7 +750,10 @@ def _classify_bash(command: str) -> tuple[str, str] | None:
     interp = _classify_interpreter_net_write(command)
     if interp is not None:
         return interp
-    for segment in _split_segments(command):
+    deleting = _classify_interpreter_delete(command)
+    if deleting is not None:
+        return (deleting.action, deleting.target)
+    for segment in _expanded_segments(command):
         hit = _classify_segment(segment)
         if hit is not None:
             return hit
@@ -736,6 +905,11 @@ def _segment_hit(segment: str) -> Hit | None:
     action, target = hit
     if action == "fs_delete":
         tokens = _unwrap_wrappers(_tokenize(_strip_redirections(segment)))
+        head = tokens[0].rsplit("/", 1)[-1] if tokens else ""
+        if head == "git":  # git clean -f: untracked files, no undo
+            return Hit(action, target, TIER_CONSENT)
+        if head in ("find", "rsync"):  # bulk by nature
+            return Hit(action, target, _delete_tier(["rm", "-r", *target.split()]))
         return Hit(action, target, _delete_tier(tokens))
     if action == "git_push":
         return Hit(action, target, _push_tier(target))
@@ -758,7 +932,10 @@ def assess_all(tool_name: str, tool_input) -> list[Hit]:
     interp = _classify_interpreter_net_write(command)
     if interp is not None:
         hits.append(Hit(*interp, _post_tier(*interp, command)))
-    for segment in _split_segments(command):
+    deleting = _classify_interpreter_delete(command)
+    if deleting is not None:
+        hits.append(deleting)
+    for segment in _expanded_segments(command):
         hit = _segment_hit(segment)
         if hit is not None:
             hits.append(hit)
@@ -917,7 +1094,7 @@ def _log_logged_hits(
 def evaluate(
     payload: dict,
     *,
-    has_consent_fn=has_session_consent,
+    has_consent_fn=None,
     session_id_fn=current_session_id,
     workspace_fn=resolve_workspace_root,
     slug_fn=resolve_session_project,
@@ -971,7 +1148,9 @@ def _consent_denial(
     slug = None
     if workspace is not None and session_id:
         slug = slug_fn(workspace, session_id=session_id, strict=False)
-    th = target_hash(hit.target)
+    ledger = _ledger()  # may raise (G-03) — main() turns that into a DENY
+    has_consent_fn = has_consent_fn or ledger.has_session_consent
+    th = ledger.target_hash(hit.target)
     # Fail-CLOSED consent check: a DETECTED gated action whose consent cannot be
     # VERIFIED must DENY. has_consent_fn reads the ledger and RAISES (e.g.
     # ConsentLedgerError on a corrupt consent.jsonl line); that exception must NOT
@@ -982,7 +1161,8 @@ def _consent_denial(
     if workspace is not None and slug is not None and session_id:
         try:
             if has_consent_fn(
-                workspace, slug, session_id=session_id, action=hit.action, target_hash=th
+                workspace, slug, session_id=session_id, action=hit.action,
+                target_hash=th, max_age_seconds=_CONSENT_MAX_AGE_SECONDS,
             ):
                 return None  # consented THIS session -> ALLOW
         except Exception:  # ledger unreadable/corrupt -> consent UNVERIFIABLE
@@ -1031,10 +1211,23 @@ def main() -> int:
     the gated path stays fail-CLOSED.
     """
     try:
-        raw = sys.stdin.read() or "{}"
-        payload = json.loads(raw)
-        code, messages = evaluate(payload)
+        payload = json.loads(sys.stdin.read() or "{}")
+        tool_name = payload.get("tool_name") or "" if isinstance(payload, dict) else ""
+        tool_input = payload.get("tool_input") if isinstance(payload, dict) else None
+        critical = forgery_reason(tool_name, tool_input) is not None or any(
+            h.tier == TIER_CONSENT for h in assess_all(tool_name, tool_input)
+        )
     except Exception as exc:  # no confirmed gated action -> allow + a loud warning
+        _emit(f"WARNING internal error, allowing (fail-open): {exc!r}")
+        return 0
+    try:
+        code, messages = evaluate(payload)
+    except Exception as exc:
+        # G-03: once a consent-tier action is CONFIRMED, any failure (a missing
+        # jsonschema, an unreadable ledger) denies — exit 1 would mean ALLOW.
+        if critical:
+            _emit(f"BLOCKED: onay doğrulanamadı ({exc!r}) — güvenli tarafta reddedildi")
+            return 2
         _emit(f"WARNING internal error, allowing (fail-open): {exc!r}")
         return 0
     for message in messages:

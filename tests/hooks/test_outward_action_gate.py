@@ -40,6 +40,12 @@ _GATE = _REPO / "scripts" / "hooks" / "outward_action_gate.py"
 SID = "abcdef01-2345-6789-aaaa-bbbbbbbbbbbb"
 SID8 = "abcdef01"
 
+def _now_iso() -> str:
+    """A consent granted NOW — the gate expires consents after a few hours (G-09)."""
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+
 
 # ===========================================================================
 # classify() matrix — PURE, no IO (the heart; fully unit-tested)
@@ -389,7 +395,7 @@ def _seed(ws: Path, *, action: str, target: str, session_id: str) -> None:
     cl.append_consent(
         workspace_root=ws, project_slug="demo", run_id="r-prov",
         action=action, target=target, granted_by="operator",
-        now_iso="2026-06-06T10:00:00Z", session_id=session_id,
+        now_iso=_now_iso(), session_id=session_id,
     )
 
 

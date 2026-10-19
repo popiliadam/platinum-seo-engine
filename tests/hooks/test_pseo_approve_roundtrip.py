@@ -50,6 +50,12 @@ _CMD_FILE = _ROOT / "commands" / "pseo-approve.md"
 
 SID = "abcdef01-2345-6789-aaaa-bbbbbbbbbbbb"
 
+def _now_iso() -> str:
+    """A consent granted NOW — the gate expires consents after a few hours (G-09)."""
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+
 
 def _plugin_name() -> str:
     return json.loads((_ROOT / ".claude-plugin" / "plugin.json").read_text())["name"]
@@ -182,7 +188,7 @@ def test_consent_for_a_does_not_cover_a_quoted_redirect_char(bound_ws: Path) -> 
     _, target = gate.classify("Bash", {"command": "rm -r a 2>/dev/null"})
     cl.append_consent(
         workspace_root=bound_ws, project_slug="demo", run_id="r", action="fs_delete",
-        target=target, granted_by="operator", now_iso="2026-06-06T10:00:00Z",
+        target=target, granted_by="operator", now_iso=_now_iso(),
         session_id=SID,
     )
     allowed = {"tool_name": "Bash", "tool_input": {"command": "rm -r a 2>/dev/null"},

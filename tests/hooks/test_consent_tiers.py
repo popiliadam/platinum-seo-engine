@@ -21,6 +21,12 @@ from scripts.state import session_binding as sb
 
 SID = "11111111-2222-3333-4444-555555555555"
 
+def _now_iso() -> str:
+    """A consent granted NOW — the gate expires consents after a few hours (G-09)."""
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+
 
 @pytest.fixture
 def ws(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
@@ -104,7 +110,7 @@ def test_consent_action_denied_without_consent(ws: Path) -> None:
 def test_plain_push_consent_does_not_cover_force_push(ws: Path) -> None:
     cl.append_consent(
         workspace_root=ws, project_slug="demo", run_id="r", action="git_push",
-        target="origin main", granted_by="user", now_iso="2026-10-19T10:00:00Z",
+        target="origin main", granted_by="user", now_iso=_now_iso(),
         session_id=SID,
     )
     assert gate.evaluate(_bash("git push --force origin main"))[0] == 2
@@ -114,7 +120,7 @@ def test_consent_action_allowed_with_consent(ws: Path) -> None:
     cl.append_consent(
         workspace_root=ws, project_slug="demo", run_id="r", action="git_push",
         target="--force origin main", granted_by="user",
-        now_iso="2026-10-19T10:00:00Z", session_id=SID,
+        now_iso=_now_iso(), session_id=SID,
     )
     assert gate.evaluate(_bash("git push --force origin main")) == (0, [])
 
