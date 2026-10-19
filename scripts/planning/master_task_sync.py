@@ -477,7 +477,12 @@ def _safe_str(v: Any) -> str:
     return str(v).strip()
 
 
-_NUMBER_RE = re.compile(r"\d+(?:[.,]\d+)*")
+# D-07: only COUNT phrases are volatile ("12 finding(s)", "4 URLs"). Digits
+# anywhere else name the thing itself ("iphone 15", "/p/2") and must stay —
+# masking them merged distinct tasks (review finding).
+_COUNT_PHRASE_RE = re.compile(r"\b\d+(?:[.,]\d+)*(?=\s*(?:URLs?\b|findings?\b|finding\(s\)))",
+                              re.IGNORECASE)
+_URL_RE = re.compile(r"https?://[^\s|,]+", re.IGNORECASE)
 
 
 # Signature columns before D-07, per sheet (only where they changed) — used to
@@ -487,19 +492,23 @@ _LEGACY_SIGNATURE_COLS: dict[str, tuple[str, ...]] = {
 }
 
 
+def _norm_url_text(match: "re.Match[str]") -> str:
+    try:
+        return normalize_url(match.group(0))
+    except ValueError:
+        return match.group(0)
+
+
 def _stable_part(value: Any) -> str:
     """D-07: the part of a cell that names the PROBLEM, not its current size.
 
-    URLs go through the shared normalizer; every number is masked, so
-    "12 finding(s)" and "13 finding(s)" or "4 URLs" / "5 URLs" are one task.
+    Every URL inside the text (also in "query :: url1 | url2" pairs) goes
+    through the shared normalizer; only a count before "URL(s)" /
+    "finding(s)" is masked, so "4 URLs" / "5 URLs" are one task while
+    "iphone 15" / "iphone 16" stay two.
     """
-    s = _safe_str(value)
-    if s.lower().startswith(("http://", "https://")):
-        try:
-            return normalize_url(s)
-        except ValueError:
-            return s
-    return _NUMBER_RE.sub("#", s)
+    s = _URL_RE.sub(_norm_url_text, _safe_str(value))
+    return _COUNT_PHRASE_RE.sub("#", s)
 
 
 def _row_signature(row: Mapping[str, Any], cols: Sequence[str]) -> str:

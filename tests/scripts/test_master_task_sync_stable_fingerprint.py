@@ -33,3 +33,21 @@ def test_legacy_registry_key_keeps_the_existing_task_id() -> None:
     sig = _sig(TECH, row)
     legacy_key = mts._content_signature(sig.primary_source, "", "Performance|12 finding(s): LCP slow")
     assert legacy_key in sig.legacy_signatures and legacy_key != sig.content_signature
+
+
+CLUSTER = next(s for s in mts.SOURCE_DEFS if s.sheet == "cluster_keywords")
+CANNIB = next(s for s in mts.SOURCE_DEFS if s.sheet == "cannibalization")
+
+
+def test_digits_that_name_the_thing_are_kept() -> None:
+    a = _sig(CLUSTER, {"cluster": "phones", "keyword": "iphone 15"})
+    b = _sig(CLUSTER, {"cluster": "phones", "keyword": "iphone 16"})
+    assert a.content_signature != b.content_signature
+
+
+def test_conflict_pair_urls_normalized_not_masked() -> None:
+    a = _sig(CANNIB, {"conflict_pair": "kw :: https://x.test/p/1 | https://x.test/p/2"})
+    b = _sig(CANNIB, {"conflict_pair": "kw :: https://x.test/p/3 | https://x.test/p/4"})
+    c = _sig(CANNIB, {"conflict_pair": "kw :: HTTPS://X.test/p/1/ | https://x.test/p/2?utm_source=a"})
+    assert a.content_signature != b.content_signature
+    assert a.content_signature == c.content_signature
