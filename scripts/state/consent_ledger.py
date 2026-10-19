@@ -148,8 +148,11 @@ def compute_entry_hash(entry_without_entry_hash: dict) -> str:
 # Paths + validation
 # ---------------------------------------------------------------------------
 
-def consent_path(workspace_root: Path | str, project_slug: str) -> Path:
-    """Build {ws}/projects/{slug}/_state/consent.jsonl (mkdir -p the _state dir).
+def consent_path(
+    workspace_root: Path | str, project_slug: str, *, create: bool = True
+) -> Path:
+    """Build {ws}/projects/{slug}/_state/consent.jsonl (mkdir -p the _state dir
+    unless ``create=False`` — a READ must not create a project tree, G-11).
 
     Validates the slug against ^[a-z][a-z0-9-]*$ before any mkdir so a bad
     marker / typo cannot create a ghost project tree and an id with '..' or '/'
@@ -160,7 +163,8 @@ def consent_path(workspace_root: Path | str, project_slug: str) -> Path:
             f"project_slug must match ^[a-z][a-z0-9-]*$ (got {project_slug!r})"
         )
     state_dir = Path(workspace_root) / "projects" / project_slug / "_state"
-    state_dir.mkdir(parents=True, exist_ok=True)
+    if create:
+        state_dir.mkdir(parents=True, exist_ok=True)
     return state_dir / "consent.jsonl"
 
 
@@ -205,7 +209,7 @@ def read_entries(workspace_root: Path | str, project_slug: str) -> list[dict]:
     A missing file returns [] (never raises). An existing-but-corrupt line
     raises ConsentLedgerError.
     """
-    path = consent_path(workspace_root, project_slug)
+    path = consent_path(workspace_root, project_slug, create=False)
     if not path.exists():
         return []
     entries: list[dict] = []

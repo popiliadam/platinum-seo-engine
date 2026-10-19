@@ -98,12 +98,13 @@ def test_relative_script_path_is_resolved_against_payload_cwd(tmp_path: Path):
     assert _deny(_bash("cd x && python3 fix.py", cwd=str(tmp_path)))
 
 
-def test_deny_message_names_the_safe_writer_and_escape_hatch():
+def test_deny_message_names_the_safe_writer_not_the_escape_hatch():
+    # G-11: the message must not teach the model how to switch the guard off.
     code, messages = guard.evaluate(_bash(f"python3 -c \"openpyxl.Workbook().save('{MASTER}')\""))
     text = "\n".join(messages)
     assert code == 2
     assert "scripts/excel/transaction.py" in text
-    assert "PSEO_EXCEL_WRITER=transaction.py" in text
+    assert "PSEO_EXCEL_WRITER" not in text
 
 
 # ===========================================================================
@@ -134,9 +135,10 @@ def test_running_transaction_py_itself_is_allowed():
     assert not _deny(_bash(f"python3 {script} --help"))
 
 
-def test_command_prefixed_escape_hatch_is_allowed():
+def test_command_prefixed_escape_hatch_is_refused():
+    # G-11: a prefix the MODEL types is not the operator's escape hatch.
     cmd = f"PSEO_EXCEL_WRITER=transaction.py python3 -c \"openpyxl.Workbook().save('{MASTER}')\""
-    assert not _deny(_bash(cmd))
+    assert _deny(_bash(cmd))
 
 
 def test_environment_escape_hatch_is_allowed(monkeypatch: pytest.MonkeyPatch):
@@ -205,9 +207,9 @@ def test_escape_hatch_text_inside_an_echo_does_not_bypass_the_guard():
     assert _deny(_bash(cmd))
 
 
-def test_exported_escape_hatch_is_allowed():
+def test_exported_escape_hatch_is_refused():
     cmd = f"export PSEO_EXCEL_WRITER=transaction.py; python3 -c \"openpyxl.Workbook().save('{MASTER}')\""
-    assert not _deny(_bash(cmd))
+    assert _deny(_bash(cmd))
 
 
 def test_decoy_transaction_py_outside_the_engine_is_not_trusted(tmp_path: Path):
