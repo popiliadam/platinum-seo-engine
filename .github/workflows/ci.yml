@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.14"]
+        python-version: ["3.11", "3.14"]  # K-10/ADR-042: 3.10 EOL 2026-10
     steps:
       # Supply-chain: actions pinned by full commit SHA (mutable tags can be
       # re-pointed upstream); human tag kept as trailing comment, refreshed by
@@ -39,8 +39,8 @@ jobs:
         run: python3 scripts/ci/drift_gate.py
         continue-on-error: false
 
-      # Step 2 — governance skill schema-validate (jsonschema Draft7 all schemas + cross-sheet-invariants ≥20 rules (additive K-02))
-      # Phase 14 W3-W3-α strict mode.
+      # Step 2 — schema-validate: runs the schema-validate SKILL.md blocks (every
+      # schemas/*.json is a valid Draft7 schema; cross-sheet-invariants.json has rules).
       - name: 2. schema-validate
         run: python3 scripts/ci/run_skill_python.py skills/governance/schema-validate/SKILL.md
         continue-on-error: false
@@ -53,9 +53,8 @@ jobs:
         run: python3 scripts/ci/glossary_gate.py
         continue-on-error: false
 
-      # Step 4 — pytest baseline + W2 yeni, no regression
-      # Coverage gate deliberately deferred (FIX-R 2026-06-10): a measured
-      # coverage baseline must exist before any fail-under threshold is added.
+      # Step 4 — full pytest suite; red on any failure, on more than SKIP_BUDGET
+      # skipped tests (tests/conftest.py, K-05) or on coverage below the floor.
       - name: 4. pytest
         env:
           # Feeds tests/ci/test_client_scrub_guard.py; absent on forks → guard skips.
@@ -86,7 +85,8 @@ jobs:
           "
         continue-on-error: false
 
-      # Step 5 — plugin agnostik invariant (.mcp.json 4 server + repo-wide client-slug grep F-16)
+      # Step 5 — plugin-agnostic invariant (.mcp.json has exactly 5 servers +
+      # repo-wide client-slug grep F-16)
       # 2026-07-08 client-name scrub: the forbidden-slug list moved into the
       # CLIENT_SLUG_PATTERN repo secret — a public repo's own guard must not
       # advertise the very names it forbids. Scope widened from skills/-only to
@@ -112,15 +112,14 @@ jobs:
           fi
         continue-on-error: false
 
-      # Step 6 — secret-grep (Phase 14+ CI Rule 3 production-ready 11-phase invariant)
-      # Lesson 11 üçüncü surface mop-up Phase 14 W2: regex literal wrapper script'e
-      # taşındı (deployment config kategori-spesifik convention, Phase 14 W1
-      # placeholder convention paralel evolution).
+      # Step 6 — secret-grep: the canonical scanner (33 classes, K-11) over the
+      # tree + a committed-literal git grep with explicit exit codes (K-08).
       - name: 6. secret-grep
         run: bash scripts/ci/check_secrets.sh
         continue-on-error: false
 
-      # Step 7 — frontmatter-compile (skill-frontmatter.schema.json Draft7 validate her SKILL.md frontmatter, 49 SKILL.md compliance)
+      # Step 7 — frontmatter-compile: every SKILL.md frontmatter validates against
+      # skill-frontmatter.schema.json (50 SKILL.md today).
       - name: 7. frontmatter-compile
         run: |
           python3 -c "

@@ -76,7 +76,7 @@ A typical workflow looks like:
 ### Requirements
 
 - [Claude Code CLI](https://claude.ai/code) (latest)
-- Python 3.10+
+- Python 3.11+
 - Node.js 18+ (for the MCP servers via `npx`)
 - Git
 
@@ -238,7 +238,7 @@ Browse the full catalog: [`skills/`](skills/). Slash commands map 1:1 to commonl
 
 ## Tech stack
 
-- **Python 3.10+** — scripts, schema validation, Excel transactions (`openpyxl`, `jsonschema`, `pyyaml`).
+- **Python 3.11+** — scripts, schema validation, Excel transactions (`openpyxl`, `jsonschema`, `pyyaml`).
 - **Claude Code Plugin SDK** — skills, slash commands, hooks.
 - **Model Context Protocol (MCP)** — four servers wired in `.mcp.json` (v1.8+):
   - `mcp-server-gsc` (Google Search Console, stdio)

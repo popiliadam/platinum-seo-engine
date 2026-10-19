@@ -2,7 +2,7 @@
 # Pins requirements.txt (direct deps) + the Python-3.10-safe subset of their
 # transitive closure. CI installs THIS file (.github/workflows/ci.yml: pip install -r requirements-lock.txt).
 #
-# Python: 3.14 (current target). CI matrix: ["3.10", "3.14"] (floor + current).
+# Python: 3.14 (current target). CI matrix: ["3.11", "3.14"] (floor + current; ADR-042).
 # Last regenerated: 2026-06-04 | Platform: darwin.
 #
 # Regenerate in a CLEAN venv so ONLY requirements.txt's closure is captured — a
