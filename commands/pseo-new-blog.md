@@ -27,7 +27,7 @@ model: sonnet
 1. master.xlsx[new_content_plan] satır oku (id=$2)
 2. project-config consume (brand_identity + content_settings + profile)
 3. R-71..R-76 image discipline enforce (8K ultra realistic, nano-banana model R-72 default, hero image R-73, picture LCP, format cascade webp+jpg+avif R-76, alt text R-74)
-4. Content generation: markdown + HTML + JSON-LD @graph (5 entity: Article + Person/Organization + WebPage + BreadcrumbList + FAQPage)
+4. Content generation: markdown + HTML + JSON-LD @graph (4 entity: Article + Person/Organization + WebPage + BreadcrumbList; FAQPage yok — R-79)
 5. Foundational Principles 3-layer enforce (Truth-Verifiable + Profile-Aware + AI-Suistimal)
 6. Output write — 4 artifact: `outputs/blog/{slug}/article.html` + `schema.jsonld` + `meta-tags.json` + `upload-instructions.md` (markdown article YOK; HTML fragment + ayrı JSON-LD dosyası)
 7. events.jsonl append — `event_kind=work + event_type=content_new + task_id=T-XXXXX` (URL-bearing pillar pattern: url+url_normalized+after+pillar mandatory per events.schema)

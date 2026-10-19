@@ -347,7 +347,7 @@ def _action_text(position: float) -> str:
         return "Refresh meta + on-page entity coverage to break top-10"
     if position <= 16:
         return "Add internal links + improve title CTR"
-    return "Expand content depth + add FAQ schema"
+    return "Expand content depth + answer the related questions on the page"
 
 
 def _row_pct(clicks: int | None, impressions: int | None) -> float:

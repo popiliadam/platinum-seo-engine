@@ -57,7 +57,7 @@ Bu doc Phase 10 EEAT (Experience, Expertise, Authoritativeness, Trustworthiness)
 
 ### R-48: Schema Markup Baseline
 
-**Statement.** EEAT schema baseline: Article (R-78) + Author (R-82 profile-aware) + Organization (R-81) + Breadcrumb (R-80) + FAQPage (R-79) — JSON-LD `@graph` array tek `<script>`.
+**Statement.** EEAT schema baseline: Article (R-78) + Author (R-82 profile-aware) + Organization (R-81) + Breadcrumb (R-80) — JSON-LD `@graph` array tek `<script>`. FAQPage yok (R-79).
 
 **Rationale.** Schema markup Knowledge Graph entity recognition'ın hammaddesi.
 

@@ -102,9 +102,9 @@ Bu doc Phase 10 SEO disiplinini tanımlar (heading, internal link, FAQ, keyword,
 
 ### R-09: FAQ Bölümü
 
-**Statement.** FAQ **talep-güdümlü** (demand-driven): kanıt varsa (PAA varlığı, gerçek kullanıcı soruları) **3-6 FAQ**; kanıt yoksa daha az veya hiç. **Hard cap 10.** Her biri snippet kazanmaya uygun (kısa, direkt soru-cevap, schema markup R-79).
+**Statement.** FAQ **talep-güdümlü** (demand-driven): kanıt varsa (PAA varlığı, gerçek kullanıcı soruları) **3-6 FAQ**; kanıt yoksa daha az veya hiç. **Hard cap 10.** Her biri snippet kazanmaya uygun (kısa, direkt soru-cevap; JSON-LD yok — R-79).
 
-**Rationale.** Principle 3 (AI çok FAQ yazmasın). FAQ sayısı gerçek arama talebine göre belirlenir; sabit "10 FAQ" mekanik şişirme riskidir. FAQPage schema (R-79) yine AIO citation için değerli.
+**Rationale.** Principle 3 (AI çok FAQ yazmasın). FAQ sayısı gerçek arama talebine göre belirlenir; sabit "10 FAQ" mekanik şişirme riskidir. FAQPage JSON-LD artık eklenmez (R-79).
 
 **Enforcement.** FAQ count check: kanıt (PAA/kullanıcı sorusu) yoksa FAQ üretme; count > 10 → hard cap AMBER.
 
@@ -224,15 +224,15 @@ Bu doc Phase 10 SEO disiplinini tanımlar (heading, internal link, FAQ, keyword,
 
 **Failure mode.** RED.
 
-### R-79: FAQPage Schema Markup
+### R-79: FAQPage Schema Markup — otomatik eklenmez
 
-**Statement.** FAQ block (R-09) için FAQPage schema `@graph` inline. Her FAQ → `Question` entity + `acceptedAnswer.Answer.text`.
+**Statement.** FAQPage JSON-LD **otomatik eklenmez**. Görünür SSS bölümü (R-09) kullanıcıya yararlıysa kalır; JSON-LD eşi üretilmez. Öneri motorları (quick-wins, GEO) "FAQ schema ekle" önermez. Canlı sayfalardaki mevcut işaretlemeye dokunulmaz (zararsız).
 
-**Rationale.** FAQPage rich result **Ağustos 2023** kısıtlamasından sonra yalnızca yetkili kamu (.gov) ve sağlık siteleri için gösterilir — çoğu site için rich result çıkmaz; schema yine de geçerli yapı + AIO citation için değerli.
+**Rationale.** FAQ rich result **Ağustos 2023**'te yetkili kamu ve sağlık siteleriyle sınırlandı, **2026-05-07**'den beri hiçbir sitede gösterilmiyor; Google dokümanı **2026-06-15**'te kaldırdı. Kontrollü testlerde schema AI görünürlüğünü artırmadı — eklemenin getirisi yok, yalnız bakım yükü var.
 
-**Enforcement.** `templates/content/faq-block.template.html` schema inline; FAQ count == JSON-LD Question count.
+**Enforcement.** `templates/content/new-blog.template.html` ve `faq-block.template.html` FAQPage düğümü içermez (tests/rules/test_no_auto_faqpage.py).
 
-**Failure mode.** RED.
+**Failure mode.** Test RED.
 
 ### R-80: BreadcrumbList Schema
 

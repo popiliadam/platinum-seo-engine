@@ -9,7 +9,7 @@
   - R-39 WCAG 2.1 AA (contrast, alt, heading linear)
   - R-78..R-84 schema markup JSON-LD @graph ONLY (R-83 — microdata/RDFa YASAK)
   - R-29 H2 cevap-önce, R-101 self-contained intro, R-102 AI summary footer
-  - R-09 FAQ talep-güdümlü 3-6, hard cap 10, statik visible (R-43 accordion yasak), R-79 FAQPage @graph
+  - R-09 FAQ talep-güdümlü 3-6, hard cap 10, statik visible (R-43 accordion yasak); R-79: FAQPage JSON-LD otomatik eklenmez (S-05)
   - R-26 CTA doğal akış, R-05 "Sonuç" başlığı yasak
   - Principle 1 truth-verifiable + Principle 2 profile-aware + Principle 3 anti-cheap-content
 -->
@@ -170,10 +170,6 @@
     {
       "@type": "BreadcrumbList",
       "itemListElement": {{BREADCRUMB_ITEMS_ARRAY}}
-    },
-    {
-      "@type": "FAQPage",
-      "mainEntity": {{FAQ_ITEMS_ARRAY}}
     }
   ]
 }

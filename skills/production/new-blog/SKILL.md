@@ -92,9 +92,9 @@ Brief Paketi, then renders four artifacts:
 
 1. `outputs/blog/{slug}/article.html` — `<article class="pse-blog-post">`
    fragment (R-22 fragment boundary; no `<html>` / `<body>` wrap).
-2. `outputs/blog/{slug}/schema.jsonld` — JSON-LD `@graph` with 5
-   entities (Article + Organization + Person + BreadcrumbList +
-   FAQPage; R-78..R-83).
+2. `outputs/blog/{slug}/schema.jsonld` — JSON-LD `@graph` with 4
+   entities (Article + Organization + Person + BreadcrumbList;
+   R-78..R-83). No FAQPage (R-79 / S-05: the FAQ rich result is gone).
 3. `outputs/blog/{slug}/meta-tags.json` — meta title (≤580px desktop)
    + meta description (≤990px desktop) per R-35 (single authority) +
    OpenGraph + Twitter card pack.
@@ -121,8 +121,8 @@ with `event_type=content_new`.
 
 - `outputs/blog/{slug}/article.html` — schema-markup-aware, WCAG 2.1 AA
   compliant, BEM `pse-` CSS class prefix HTML article fragment.
-- `outputs/blog/{slug}/schema.jsonld` — JSON-LD `@graph` 5 entity
-  (Article + Organization + Person + BreadcrumbList + FAQPage).
+- `outputs/blog/{slug}/schema.jsonld` — JSON-LD `@graph` 4 entity
+  (Article + Organization + Person + BreadcrumbList); no FAQPage (R-79).
 - `outputs/blog/{slug}/meta-tags.json` — meta title (≤580px) + meta
   description (≤990px) per R-35 + OG + Twitter pack.
 - `outputs/blog/{slug}/upload-instructions.md` — Section A new-blog
@@ -499,7 +499,8 @@ JSON-LD `@graph` 5 entity render:
   lookup; uydurma yasak — Principle 1 Layer 3).
 - `BreadcrumbList` — Home > Pillar > Cluster > Article (R-83 4-level
   cap).
-- `FAQPage` — talep-güdümlü 3-6 FAQ Q&A items, hard cap 10 (R-79; R-09).
+- FAQPage YOK — görünür SSS bölümü (talep-güdümlü 3-6, hard cap 10; R-09)
+  kalır, JSON-LD eşi üretilmez (R-79: rich result 2026-05-07'den beri yok).
 
 Validate: Google Rich Results Test API mock validate (skill internal —
 actual API call optional). DURUR #8 trigger: REJECT → schema fix önce.
