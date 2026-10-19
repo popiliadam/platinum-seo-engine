@@ -244,6 +244,35 @@
                 "additionalProperties": false
               }
             },
+            "task_outcomes": {
+              "type": "array",
+              "description": "O-01: per task type, the treated-vs-control median clicks change after 28 days (scripts/reporting/task_outcome.py summarize). Difference in pp; n<30 directional.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "primary_source": {"type": "string"},
+                  "tasks_measured": {"type": "integer", "minimum": 0},
+                  "treated_median_clicks_delta_pct": {"type": ["number", "null"]},
+                  "control_median_clicks_delta_pct": {"type": ["number", "null"]},
+                  "difference_pp": {"type": ["number", "null"]},
+                  "median_position_delta": {"type": ["number", "null"]},
+                  "verdict": {"enum": ["engine_positive", "engine_negative", "indistinguishable", "insufficient_data"]},
+                  "caveat": {"type": "string"}
+                },
+                "required": ["primary_source", "tasks_measured", "verdict"],
+                "additionalProperties": false
+              }
+            },
+            "task_outcome_coverage": {
+              "type": "object",
+              "description": "O-01: DONE tasks old enough for the 28-day window vs those with before + after measurements (wave gate: share >= 0.8).",
+              "properties": {
+                "eligible": {"type": "integer", "minimum": 0},
+                "measured": {"type": "integer", "minimum": 0},
+                "share": {"type": ["number", "null"]}
+              },
+              "additionalProperties": false
+            },
             "intervention_outcomes": {
               "type": "array",
               "description": "Treated-vs-control quick-win outcomes (R-138) from scripts/reporting/intervention_outcome.py — reported as the treated−control difference in pp, never a raw treated delta; n<30 directional caveat; no p-values.",

@@ -60,7 +60,8 @@ triggers:
       mode: "report-only"
 mcp_tools:
   required: []
-  optional: []
+  optional:
+    - "mcp__gsc__search_analytics"   # O-01 task-outcome windows (free)
 budget:
   uses_paid_mcp: false
   estimated_credits: 0
@@ -211,6 +212,33 @@ python3 scripts/reporting/monthly_report.py \
 Absent cohort files ⇒ `intervention_outcomes = []` (the section says "kohort
 verisi yok"); never invent an outcome. This wiring writes NOTHING to
 `master.xlsx` and emits NO `events.jsonl` row — the skill stays READ-ONLY.
+
+## Task outcomes — did the finished work move its page? (O-01)
+
+Before assembling the report, measure every DONE task that has a url and a
+done_date (28-day windows: before / after_28 / after_56, plus up to 5 untouched
+control URLs per task). The engine plans, the skill fetches, the engine records:
+
+```bash
+python3 scripts/reporting/task_outcome.py plan --project {slug} --today {date}
+# → {"fetch": [{"startDate", "endDate"}, ...], "measurements_due": N, "coverage": {...}}
+```
+
+For each window in `fetch`, ONE call (not one per URL):
+`mcp__gsc__search_analytics(siteUrl=…, startDate=…, endDate=…, dimensions="page",
+rowLimit=gsc_window.GSC_ROW_LIMIT)` — check `gsc_window.truncation(raw)`; a capped
+window is re-pulled with a narrower page filter. Save the answers as a JSON list
+`[{"startDate", "endDate", "payload"}]`, then:
+
+```bash
+python3 scripts/reporting/task_outcome.py record --project {slug} --today {date} --responses answers.json
+```
+
+Measurements are appended to `_state/metrics/task_outcomes.jsonl` (append-only;
+a window that was not fetched writes nothing — never a fabricated zero).
+`monthly_report.py` then adds `measurement_context.task_outcomes` (per task type:
+treated vs control median Δclicks, difference in pp, n<30 directional) and
+`task_outcome_coverage` (measured / eligible; wave goal ≥ 0.8).
 
 ## DURUR conditions (8 + base)
 

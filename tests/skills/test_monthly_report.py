@@ -159,7 +159,8 @@ def test_frontmatter_validates(
 
     # No required NOR optional MCP tools — local aggregation only.
     assert fm.get("mcp_tools", {}).get("required", []) == []
-    assert fm.get("mcp_tools", {}).get("optional", []) == []
+    # O-01: the task-outcome loop pulls GSC windows (free, optional).
+    assert fm.get("mcp_tools", {}).get("optional", []) == ["mcp__gsc__search_analytics"]
 
     # REVIZE 1: outputs[] has exactly 3 entries; events.jsonl REMOVED.
     outputs = fm["outputs"]

@@ -573,6 +573,8 @@ def _build_measurement_context(
     *,
     calendar_retrieved_at: str | None = None,
     gsc_age_days: int | None = None,
+    task_outcomes: Sequence[Mapping[str, Any]] | None = None,
+    task_outcome_coverage: Mapping[str, Any] | None = None,
 ) -> dict:
     """Section 12 (additive-OPTIONAL) — measurement-honesty annotation.
 
@@ -593,9 +595,15 @@ def _build_measurement_context(
     outcomes = [
         dict(o) for o in (cohort_results or []) if isinstance(o, Mapping)
     ]
+    extra: dict = {}
+    if task_outcomes is not None:
+        extra["task_outcomes"] = [dict(o) for o in task_outcomes]
+    if task_outcome_coverage is not None:
+        extra["task_outcome_coverage"] = dict(task_outcome_coverage)
     return {
         "measurement_quality": quality,
         "core_updates_overlap": overlap,
+        **extra,
         "intervention_outcomes": outcomes,
         "notes": _measurement_notes(quality, overlap, outcomes, calendar_retrieved_at)
                  + _gsc_age_note(gsc_age_days),
@@ -787,6 +795,8 @@ def assemble_report(
     calendar_retrieved_at: str | None = None,
     cohort_results: Sequence[Mapping[str, Any]] | None = None,
     gsc_age_days: int | None = None,
+    task_outcomes: Sequence[Mapping[str, Any]] | None = None,
+    task_outcome_coverage: Mapping[str, Any] | None = None,
 ) -> dict:
     """Pure assembler: ReportInputs → schema-conformant dict.
 
@@ -824,6 +834,7 @@ def assemble_report(
     measurement_context = _build_measurement_context(
         inputs.period_start, inputs.period_end, calendar_updates, cohort_results,
         calendar_retrieved_at=calendar_retrieved_at, gsc_age_days=gsc_age_days,
+        task_outcomes=task_outcomes, task_outcome_coverage=task_outcome_coverage,
     )
     exec_summary = _build_exec_summary(
         gsc_trends, pages_up, tech_done, content_revised, new_content,
@@ -929,6 +940,17 @@ def _flatten_for_template(report: Mapping[str, Any]) -> dict[str, str]:
             f"({_safe_str(o.get('phase'))}, {o.get('overlap_days', 0)} gün "
             f"örtüşme): {_safe_str(o.get('begin'))} → {_safe_str(o.get('end'))}"
         )
+    cov = mc.get("task_outcome_coverage")
+    if cov:
+        mc_lines.append(
+            f"- Sonucu ölçülen tamamlanmış görev: {cov.get('measured', 0)}/"
+            f"{cov.get('eligible', 0)} (O-01)")
+    for to_row in mc.get("task_outcomes", []):
+        mc_lines.append(
+            f"- {_safe_str(to_row.get('primary_source'))}: "
+            f"{_safe_str(to_row.get('verdict'))} — kontrol grubuna göre "
+            f"{to_row.get('difference_pp')}pp, {to_row.get('tasks_measured')} görev "
+            f"{_safe_str(to_row.get('caveat'))}".rstrip())
     for oc in mc.get("intervention_outcomes", []):
         mc_lines.append(
             f"- Kohort {_safe_str(oc.get('cohort_date'))}: "
@@ -1057,6 +1079,15 @@ def _resolve_template_path(explicit: str | None) -> Path:
     return _REPO_ROOT / "templates" / "reports" / "monthly-report.template.md"
 
 
+def _task_outcome_inputs(project_dir: Path, master_task: Sequence[Mapping[str, Any]]) -> dict:
+    """O-01 ledger → summary + coverage (empty ledger → coverage only)."""
+    from scripts.reporting import task_outcome
+    ledger = task_outcome.read_ledger(project_dir / task_outcome.LEDGER_REL)
+    today = datetime.now(timezone.utc).date()
+    return {"task_outcomes": task_outcome.summarize(ledger),
+            "task_outcome_coverage": task_outcome.coverage(master_task, ledger, today=today)}
+
+
 _DEFAULT_SHEETS = ("master_task", "completed_work", "content_improve",
     "new_content_plan", "gsc_performance", "opportunity", "content_decay",
     "tech_seo", "schema")
@@ -1126,7 +1157,8 @@ def main(argv: list[str]) -> int:
             calendar_updates=calendar_updates, cohort_results=cohort_results,
             calendar_retrieved_at=calendar_retrieved_at,
             gsc_age_days=gsc_data_age_days(project_dir / "_state" / "events.jsonl",
-                                           datetime.now(timezone.utc).date()))
+                                           datetime.now(timezone.utc).date()),
+            **_task_outcome_inputs(project_dir, wb_data.get("master_task", [])))
     except MonthlyReportError as exc:
         print(f"assemble failed: {exc}", file=sys.stderr)
         return 1
