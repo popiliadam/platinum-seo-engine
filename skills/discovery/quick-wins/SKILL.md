@@ -422,6 +422,22 @@ Stop and flag the manager — do not patch, do not fall back.
 - Tests: `tests/skills/test_quick_wins.py` (8 cases incl. live MCP).
 - Template: `templates/reports/quickwin.template.md`.
 
+
+## Query mismatch and business-value order (O-16 / O-17)
+
+After the transform, two report sections (no extra paid calls):
+
+* **Query mismatch** — `scripts/discovery/query_mismatch.find_mismatches(targets, gsc_rows)`
+  with `targets` = {url: target keyword} from `new_content_plan` / `topical_map`
+  and `gsc_rows` = the query×page pull (`dimensions="query,page"`). A page whose
+  top-impression query shares < 0.5 of its words with the target becomes a
+  `rewrite` task at position 8-15 (H1, meta, first 100 words toward the real
+  query) or `check_aio` at 1-3 with CTR < 5 % (do not touch the title first).
+* **Business value** — `scripts/discovery/commercial_priority.rank(rows)` with
+  each row's keyword, position, CPC and the top-3 organic URLs from the DFS
+  SERP pull (already fetched for the AIO check). Score = intent (commercial
+  when 2+ of the top 3 are category/product/service pages) × winnability ×
+  CPC as value. The report orders actions by this score, not by traffic.
 ## GSC row limit and window (D-01 / D-04)
 
 Every `mcp__gsc__search_analytics` / `mcp__gsc__enhanced_search_analytics` call
