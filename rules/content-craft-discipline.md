@@ -22,6 +22,8 @@ Her craft kuralı, B2 kapı motorunun (`scripts/production/quality_gates.py` §6
 
 ## Rules
 
+> **Yapı ilkesi (S-04).** Her sayfa kendi kullanıcı sorusuna göre yapılandırılır: başlıklar, liste/tablo, link ve kaynak sayısı o sorunun cevabından çıkar. Sayfalar arasındaki çeşitlilik amaç değil, sonuçtur. "Mekanik izi gizlemek" için yapıyı değiştirmek değer üretmez, şablonu saklar — Google spam politikasının kapsadığı davranıştır ve bu motorda yasaktır.
+
 ### R-149: Empati / Pain-Mirror Giriş (Profile-Aware)
 
 **Statement.** Her içeriğin girişi (intro) okurun **gerçek derdini** somut biçimde yansıtır (pain-mirror): soyut tanım değil, okurun yaşadığı an. Örn. eksik diş → "gülerken elini ağzına götürmek"; kombi arızası → "sabah duşta suyun aniden soğuması". Bu empati kancası, sorunun **direkt cevabıyla** (R-01 / R-29 / R-101 AEO cevap-önce intro) AYNI açılış bloğunda birleşir: empati + self-contained cevap. Ton profile-aware (Principle 2): `profiles ⊇ {ymyl}` → **güven bölgesi** tonu (empati + netlik, satışçı dil YASAK); pazarlama yüzeyi (e-commerce / landing) → cesur, sinematik ton (operatör kararı — pazarlama yüzeyi cesaret hizası). Profil ne olursa olsun uydurma deneyim yasak (Principle 1 / R-119).

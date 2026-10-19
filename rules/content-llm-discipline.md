@@ -77,7 +77,7 @@ Varsayılan öneri: arama ve kullanıcı botlarına izin; eğitim botları müş
 
 ### R-106: Citation Patterns (Universal)
 
-**Statement.** Citation pattern universal (Principle 3): per 500 word **min 1 max 2 citation** (aralık). Aralık içinde örnekle; post'lar arası birebir aynı citation kadansını üretme (mekanik parmak izi önleme). Format: `<a href="URL" rel="external noopener">Source Name</a>` veya inline parenthetical "(Source, 2024)".
+**Statement.** Citation pattern universal (Principle 3): per 500 word **min 1 max 2 citation** (aralık). Kaynak, iddianın olduğu yerde verilir; sayı bu ihtiyacın sonucudur. Format: `<a href="URL" rel="external noopener">Source Name</a>` veya inline parenthetical "(Source, 2024)".
 
 **Rationale.** Principle 3 (UX overload önleme) + AIO citation density signal.
 
