@@ -101,6 +101,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from scripts.util.url_normalize import normalize_url  # noqa: E402  (D-07)
+from scripts.util.coerce import to_int  # noqa: E402  (D-17)
 
 
 # ---------------------------------------------------------------------------
@@ -365,19 +366,7 @@ def _to_int(v: Any) -> int:
     """Best-effort integer coercion for volume-style cells. Non-numeric /
     blank → 0 (treated as below any positive threshold). Handles "5,400",
     "5400", 5400, 5400.0, "" gracefully."""
-    if v is None:
-        return 0
-    if isinstance(v, bool):
-        return 0
-    if isinstance(v, (int, float)):
-        return int(v)
-    s = str(v).strip().replace(",", "").replace(" ", "")
-    if not s:
-        return 0
-    try:
-        return int(float(s))
-    except ValueError:
-        return 0
+    return to_int(v, default=0)  # D-17: shared parser ("5.400" → 5400)
 
 
 def _cluster_keywords_actionable(row: Mapping[str, Any]) -> tuple[bool, str]:
